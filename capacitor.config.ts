@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'io.ionic.starter',
-  appName: '.nutritrack_tmp',
+  appId: 'com.nutritrack.app',
+  appName: 'NutriTrack',
   webDir: 'www'
 };
 

@@ -11,10 +11,9 @@ node_modules/
 
 # Ionic / Capacitor
 .capacitor/
-/android/
-/ios/
-!/android/app/src/main/
 .angular/cache/
+# Native-Projekte (android/, ios/) werden versioniert (Capacitor-Best-Practice).
+# Build-Artefakte ignorieren die generierten android/.gitignore + ios/.gitignore.
 
 # Env & secrets
 .env
