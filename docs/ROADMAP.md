@@ -34,7 +34,9 @@ Status-Legende: [ ] offen · [~] in Arbeit · [x] fertig
 
 ## Phase 3 — Politur / Native
 - [ ] Design-Pass (eigenständig, nicht Template-Default; Theme, Hierarchie, Motion)
-- [ ] Capacitor Android/iOS Projekte, Plugin-Permissions (Kamera-Berechtigung in Info.plist/AndroidManifest, wenn native Projekte angelegt werden)
+- [x] Capacitor Android/iOS Projekte angelegt (`cap add`), Kamera-Permissions gesetzt
+      (Android `CAMERA`, iOS `NSCameraUsageDescription` + Photo-Library); native Projekte versioniert
+- [ ] Native Build/Signierung (Android Studio / Xcode auf Mac), Icons/Splash, Store-Release
 - [ ] Offline-Robustheit, Cache-Invalidierung
 - [ ] E2E (kritische Flows), Visual Checks
 
