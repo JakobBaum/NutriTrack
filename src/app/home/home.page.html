@@ -1,20 +1,108 @@
 <ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>
-      Blank
-    </ion-title>
+  <ion-toolbar color="primary">
+    <ion-title>NutriTrack — Bedarfsrechner</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">Blank</ion-title>
-    </ion-toolbar>
-  </ion-header>
+<ion-content [fullscreen]="true" class="ion-padding">
+  <ion-list inset="true">
+    <ion-item>
+      <ion-input
+        label="Gewicht (kg)"
+        labelPlacement="stacked"
+        type="number"
+        inputmode="decimal"
+        [(ngModel)]="weightKg"
+      ></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-input
+        label="Größe (cm)"
+        labelPlacement="stacked"
+        type="number"
+        inputmode="numeric"
+        [(ngModel)]="heightCm"
+      ></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-input
+        label="Alter (Jahre)"
+        labelPlacement="stacked"
+        type="number"
+        inputmode="numeric"
+        [(ngModel)]="age"
+      ></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-select label="Geschlecht" labelPlacement="stacked" [(ngModel)]="sex">
+        @for (s of sexes; track s.value) {
+          <ion-select-option [value]="s.value">{{ s.label }}</ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+    <ion-item>
+      <ion-select label="Aktivität" labelPlacement="stacked" [(ngModel)]="activityLevel">
+        @for (a of activities; track a.value) {
+          <ion-select-option [value]="a.value">{{ a.label }}</ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+    <ion-item>
+      <ion-select label="Ziel" labelPlacement="stacked" [(ngModel)]="goal">
+        @for (g of goals; track g.value) {
+          <ion-select-option [value]="g.value">{{ g.label }}</ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+    @if (showRate) {
+      <ion-item>
+        <ion-input
+          label="Tempo (kg/Woche)"
+          labelPlacement="stacked"
+          type="number"
+          inputmode="decimal"
+          [(ngModel)]="rateKgPerWeek"
+        ></ion-input>
+      </ion-item>
+    }
+  </ion-list>
 
-  <div id="container">
-    <strong>Ready to create an app?</strong>
-    <p>Start with Ionic <a target="_blank" rel="noopener noreferrer" href="https://ionicframework.com/docs/components">UI Components</a></p>
-  </div>
+  <ion-button expand="block" class="ion-margin" (click)="calculate()">
+    Bedarf berechnen
+  </ion-button>
+
+  @if (target) {
+    <ion-card>
+      <ion-card-header>
+        <ion-card-subtitle>Dein Tagesziel</ion-card-subtitle>
+        <ion-card-title>{{ target.kcal }} kcal</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-grid>
+          <ion-row class="ion-text-center">
+            <ion-col>
+              <div class="macro-value">{{ target.proteinG }} g</div>
+              <div class="macro-label">Eiweiß</div>
+            </ion-col>
+            <ion-col>
+              <div class="macro-value">{{ target.carbsG }} g</div>
+              <div class="macro-label">Kohlenhydrate</div>
+            </ion-col>
+            <ion-col>
+              <div class="macro-value">{{ target.fatG }} g</div>
+              <div class="macro-label">Fett</div>
+            </ion-col>
+            <ion-col>
+              <div class="macro-value">{{ target.fiberG }} g</div>
+              <div class="macro-label">Ballaststoffe</div>
+            </ion-col>
+          </ion-row>
+        </ion-grid>
+        <p class="hint">
+          Richtwert nach Mifflin-St Jeor. In der fertigen App wird dieser Bedarf
+          gegen deine getrackten Mahlzeiten verrechnet.
+        </p>
+      </ion-card-content>
+    </ion-card>
+  }
 </ion-content>
