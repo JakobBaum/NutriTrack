@@ -67,42 +67,55 @@
     }
   </ion-list>
 
-  <ion-button expand="block" class="ion-margin" (click)="calculate()">
+  <ion-button expand="block" class="cta" (click)="calculate()">
     Bedarf berechnen
   </ion-button>
 
+  @if (errors.length) {
+    <div class="errors" role="alert">
+      @for (e of errors; track e) {
+        <div class="error-row">
+          <ion-icon name="alert-circle-outline" aria-hidden="true"></ion-icon>
+          <span>{{ e }}</span>
+        </div>
+      }
+    </div>
+  }
+
   @if (target) {
-    <ion-card>
-      <ion-card-header>
-        <ion-card-subtitle>Dein Tagesziel</ion-card-subtitle>
-        <ion-card-title>{{ target.kcal }} kcal</ion-card-title>
-      </ion-card-header>
-      <ion-card-content>
-        <ion-grid>
-          <ion-row class="ion-text-center">
-            <ion-col>
-              <div class="macro-value">{{ target.proteinG }} g</div>
-              <div class="macro-label">Eiweiß</div>
-            </ion-col>
-            <ion-col>
-              <div class="macro-value">{{ target.carbsG }} g</div>
-              <div class="macro-label">Kohlenhydrate</div>
-            </ion-col>
-            <ion-col>
-              <div class="macro-value">{{ target.fatG }} g</div>
-              <div class="macro-label">Fett</div>
-            </ion-col>
-            <ion-col>
-              <div class="macro-value">{{ target.fiberG }} g</div>
-              <div class="macro-label">Ballaststoffe</div>
-            </ion-col>
-          </ion-row>
-        </ion-grid>
-        <p class="hint">
-          Richtwert nach Mifflin-St Jeor. In der fertigen App wird dieser Bedarf
-          gegen deine getrackten Mahlzeiten verrechnet.
-        </p>
-      </ion-card-content>
-    </ion-card>
+    <section class="result">
+      <div class="kcal">
+        <span class="kcal-value">{{ target.kcal }}</span>
+        <span class="kcal-unit">kcal / Tag</span>
+      </div>
+
+      <div class="macros">
+        <div class="macro">
+          <span class="macro-label">Eiweiß</span>
+          <span class="macro-value">{{ target.proteinG }} g</span>
+        </div>
+        <div class="macro">
+          <span class="macro-label">Kohlenhydrate</span>
+          <span class="macro-value">{{ target.carbsG }} g</span>
+        </div>
+        <div class="macro">
+          <span class="macro-label">Fett</span>
+          <span class="macro-value">{{ target.fatG }} g</span>
+        </div>
+        <div class="macro">
+          <span class="macro-label">Ballaststoffe</span>
+          <span class="macro-value">{{ target.fiberG }} g</span>
+        </div>
+        <div class="macro">
+          <span class="macro-label">Zucker <small>(max.)</small></span>
+          <span class="macro-value">{{ target.sugarG }} g</span>
+        </div>
+      </div>
+
+      <p class="hint">
+        Richtwert nach Mifflin-St Jeor. Zucker = WHO-Obergrenze (&lt; 10 % der Energie).
+        Wird später gegen deine getrackten Mahlzeiten verrechnet.
+      </p>
+    </section>
   }
 </ion-content>

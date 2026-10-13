@@ -38,6 +38,8 @@ export interface DailyTarget {
   carbsG: number;
   fatG: number;
   fiberG: number;
+  /** Richtwert freier Zucker (Obergrenze, WHO: < 10 % der Energie). */
+  sugarG: number;
 }
 
 /** Nährwerte einer Bezugsmenge. */

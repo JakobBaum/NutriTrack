@@ -33,6 +33,9 @@ const FAT_ENERGY_RATIO = 0.27;
 /** Ballaststoffe: 14 g je 1000 kcal (DGE/US-Richtwert). */
 const FIBER_G_PER_1000_KCAL = 14;
 
+/** Freier Zucker (Obergrenze): WHO-Empfehlung < 10 % der Energie, 4 kcal/g. */
+const SUGAR_ENERGY_RATIO = 0.1;
+
 /**
  * Reine, testbare Ernährungs-Rechenlogik. Dient als deterministischer Fallback,
  * wenn kein KI-Anbieter für die Bedarfsberechnung verfügbar ist, und als
@@ -76,8 +79,9 @@ export class NutritionCalcService {
       Math.round((kcal - proteinKcal - fatKcal) / KCAL_PER_G.carbs),
     );
     const fiberG = Math.round((kcal / 1000) * FIBER_G_PER_1000_KCAL);
+    const sugarG = Math.round((kcal * SUGAR_ENERGY_RATIO) / KCAL_PER_G.carbs);
 
-    return { kcal, proteinG, carbsG, fatG, fiberG };
+    return { kcal, proteinG, carbsG, fatG, fiberG, sugarG };
   }
 
   /**
@@ -105,8 +109,9 @@ export class NutritionCalcService {
         carbsG: acc.carbsG + (f.carbsG || 0),
         fatG: acc.fatG + (f.fatG || 0),
         fiberG: acc.fiberG + (f.fiberG || 0),
+        sugarG: acc.sugarG + (f.sugarG || 0),
       }),
-      { kcal: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0 },
+      { kcal: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0 },
     );
   }
 
