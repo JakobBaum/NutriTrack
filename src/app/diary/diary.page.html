@@ -1,6 +1,11 @@
 <ion-header class="ion-no-border">
   <ion-toolbar>
     <ion-title>Tagebuch</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="openFastfood()" aria-label="Fastfood-Helfer">
+        <ion-icon slot="icon-only" name="fast-food-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
   </ion-toolbar>
   <ion-toolbar>
     <div class="date-nav">
@@ -84,6 +89,40 @@
       @if (error()) {
         <ion-text color="danger"><p class="form-error">{{ error() }}</p></ion-text>
       }
+
+      <!-- Food-Textsuche (OpenFoodFacts) -->
+      <ion-searchbar
+        [(ngModel)]="searchQuery"
+        (keyup.enter)="searchFood()"
+        (ionClear)="searchResults.set([])"
+        placeholder="Lebensmittel suchen…"
+        inputmode="search"
+      ></ion-searchbar>
+      <div class="scan-row">
+        <ion-button size="small" fill="outline" (click)="searchFood()" [disabled]="searching()">
+          @if (searching()) { <ion-spinner name="dots"></ion-spinner> } @else { Suchen }
+        </ion-button>
+        <ion-button size="small" fill="outline" (click)="labelInput.click()" [disabled]="scanning()">
+          @if (scanning()) { <ion-spinner name="dots"></ion-spinner> } @else {
+            <ion-icon slot="start" name="camera-outline"></ion-icon> Etikett scannen
+          }
+        </ion-button>
+        <input #labelInput type="file" accept="image/*" capture="environment" hidden (change)="onLabelFile($event)" />
+      </div>
+      @if (hint()) { <p class="scan-hint">{{ hint() }}</p> }
+      @if (searchResults().length) {
+        <ion-list inset="true" lines="full" class="search-results">
+          @for (item of searchResults(); track item.id) {
+            <ion-item button (click)="selectFood(item)">
+              <ion-label>
+                <h3>{{ item.name }}</h3>
+                <p>{{ item.brand }} · {{ item.facts.kcal }} kcal / 100 g</p>
+              </ion-label>
+            </ion-item>
+          }
+        </ion-list>
+      }
+
       <ion-list inset="true">
         <ion-item>
           <ion-input label="Name" labelPlacement="stacked" [(ngModel)]="form.label" placeholder="z.B. Haferflocken"></ion-input>
@@ -120,6 +159,68 @@
       </ion-list>
 
       <ion-button expand="block" class="ion-margin-top" (click)="save()">Speichern</ion-button>
+    </ion-content>
+  </ng-template>
+</ion-modal>
+
+<!-- Fastfood-Helfer modal -->
+<ion-modal [isOpen]="ffOpen()" (didDismiss)="closeFastfood()">
+  <ng-template>
+    <ion-header class="ion-no-border">
+      <ion-toolbar>
+        <ion-title>Fastfood-Helfer</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="closeFastfood()">Schließen</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      <p class="scan-hint">
+        Sag, wohin du gehst und dein Budget — du bekommst proteinreiche Optionen.
+        Quelle: <strong>{{ isLive() ? 'Claude (live)' : 'Mock (offline)' }}</strong>
+      </p>
+      @if (error()) {
+        <ion-text color="danger"><p class="form-error">{{ error() }}</p></ion-text>
+      }
+      <ion-list inset="true">
+        <ion-item>
+          <ion-input label="Restaurant" labelPlacement="stacked" [(ngModel)]="ff.restaurant" placeholder="z.B. McDonald’s"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-input type="number" inputmode="numeric" label="kcal-Budget" labelPlacement="stacked" [(ngModel)]="ff.kcalBudget" placeholder="z.B. 800"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-input type="number" inputmode="decimal" label="Geld-Budget (€)" labelPlacement="stacked" [(ngModel)]="ff.moneyBudget" placeholder="optional"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-input label="Priorität" labelPlacement="stacked" [(ngModel)]="ff.preference" placeholder="viel Protein"></ion-input>
+        </ion-item>
+      </ion-list>
+      <ion-button expand="block" (click)="runFastfood()" [disabled]="ffLoading()">
+        @if (ffLoading()) {
+          <ion-spinner name="dots" slot="start"></ion-spinner> Suche…
+        } @else {
+          <ion-icon slot="start" name="sparkles-outline"></ion-icon> Vorschläge holen
+        }
+      </ion-button>
+
+      @for (s of ffResults(); track s.itemName) {
+        <ion-card class="ff-card">
+          <ion-card-header>
+            <ion-card-title>{{ s.itemName }}</ion-card-title>
+            <ion-card-subtitle>
+              {{ s.facts.kcal }} kcal · {{ s.facts.proteinG }}g Protein
+              @if ((s.estPrice ?? null) !== null) { · ≈ {{ s.estPrice!.toFixed(2) }} € }
+            </ion-card-subtitle>
+          </ion-card-header>
+          <ion-card-content>
+            <p>{{ s.rationale }}</p>
+            <ion-button size="small" fill="clear" (click)="logFastfood(s)">
+              <ion-icon slot="start" name="add-circle-outline"></ion-icon> Ins Tagebuch
+            </ion-button>
+          </ion-card-content>
+        </ion-card>
+      }
     </ion-content>
   </ng-template>
 </ion-modal>

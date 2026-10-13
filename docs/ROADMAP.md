@@ -7,22 +7,23 @@ Status-Legende: [ ] offen · [~] in Arbeit · [x] fertig
 - [x] Doku: README, ARCHITECTURE, API-RESEARCH
 - [~] Doku: DATA-MODEL, ROADMAP, PRD, Projekt-CLAUDE.md
 - [x] Domain-Modelle (`core/models/*`)
-- [ ] Adapter-Interfaces + DI-Tokens (`core/ai/ai-provider.ts`, `core/food/food-provider.ts`)
-- [ ] `OpenFoodFactsProvider` + `CompositeFoodProvider` (+ Tests)
+- [x] Adapter-Interfaces + DI-Tokens (`core/ai/ai-provider.ts` + `AI_PROVIDER`, `core/food/food-provider.ts` + `FOOD_PROVIDER`)
+- [x] `OpenFoodFactsProvider` (Text + Barcode); `CompositeFoodProvider` folgt bei 2. Quelle
 - [x] `NutritionCalcService` (Mifflin-St Jeor, Makro-Splits, Ziel) (+ Tests)
 - [x] `StorageService` (localStorage; später Preferences/SQLite) + Signal-Stores (`core/state`)
-- [ ] `MockAiProvider` + `ClaudeAiProvider` (Grundgerüst + Vision + Schema-Guard)
+- [x] `MockAiProvider` + `ClaudeAiProvider` + `AiService`-Router (Vision, Schema-Guard, Modell-Routing)
 
 ## Phase 1 — MVP-Kern (UI)
 - [x] Tab-Shell + Routing (Heute/Dashboard, Tagebuch, Rezepte, Einkauf, Profil)
 - [x] Onboarding/Profil → Bedarf berechnen (in „Profil")
 - [x] Dashboard: Kalorien + Makro-Fortschritt (gegessen/übrig), Mahlzeiten des Tages
-- [x] Diary: Mahlzeit manuell hinzufügen, löschen, Tagessumme (Food-Textsuche folgt)
+- [x] Diary: Mahlzeit hinzufügen (manuell + **Food-Textsuche OpenFoodFacts**), löschen, Tagessumme
 - [x] Rezepte: anlegen/bearbeiten/löschen, ins Tagebuch loggen
-- [x] Einkaufsliste: aus #Gerichte + #Personen lokal generieren, abhaken/ergänzen
+- [x] Einkaufsliste: Wocheneinkauf (Personen×Tage×Mahlzeiten×Budget) + Schätzpreise, abhaken/ergänzen
 - [x] Hellblaues Design-System + `ProgressRingComponent`
-- [ ] Barcode-Scan → OpenFoodFacts → Eintrag
-- [ ] Etikett-Scan (Foto → AiProvider.recognizeLabel, per100g/perPortion)
+- [x] Etikett-Scan (Foto-Upload → `AiProvider.recognizeLabel`; native Kamera folgt)
+- [x] Fastfood-Helfer (kcal-/Geld-Budget + Kette → proteinreiche Vorschläge → Tagebuch)
+- [ ] Barcode-**Scanner-UI** (Lookup via OpenFoodFacts ist da; Kamera-Scanner fehlt noch)
 
 ## Phase 2 — Erweiterung
 - [ ] Rezepte: Liste, erstellen/bearbeiten, Nährwert-Summe

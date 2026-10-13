@@ -12,6 +12,80 @@ ion-content {
     gap: 12px;
     margin-bottom: 14px;
   }
+
+  &__meals {
+    margin-bottom: 12px;
+  }
+
+  &__sub {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--nt-muted);
+  }
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+
+  ion-chip.on {
+    --background: var(--ion-color-primary-tint);
+    --color: var(--ion-color-primary-shade);
+    font-weight: 700;
+  }
+}
+
+.provider-hint {
+  margin: 8px 2px 0;
+  font-size: 12px;
+  color: var(--nt-muted);
+  text-align: center;
+}
+
+.form-error {
+  margin: 8px 2px 0;
+  font-weight: 600;
+}
+
+.totals {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px 8px 4px;
+
+  &__sum {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--ion-color-primary-shade);
+
+    &.over {
+      color: var(--nt-over);
+    }
+  }
+
+  &__budget,
+  &__meta {
+    font-size: 12px;
+    color: var(--nt-muted);
+  }
+
+  &__meta {
+    margin-left: auto;
+  }
+}
+
+.qty {
+  display: block;
+  font-size: 12px;
+  color: var(--nt-muted);
+}
+
+.price-note {
+  margin: 10px 14px 0;
+  font-size: 11px;
+  color: var(--nt-muted);
 }
 
 .suggested {

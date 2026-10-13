@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildShoppingList } from './shopping-generator';
-import { Recipe } from '../models';
+import {
+  buildShoppingList,
+  buildWeekPlan,
+  estimatePrice,
+  priceItems,
+} from './shopping-generator';
+import { Recipe, ShoppingItem } from '../models';
 
 function recipe(partial: Partial<Recipe>): Recipe {
   return {
@@ -61,5 +66,52 @@ describe('buildShoppingList', () => {
     const { items } = buildShoppingList([], 0, 0);
     const nudeln = items.find((i) => i.name === 'Nudeln');
     expect(nudeln?.amount).toBe(125); // 1 Person
+  });
+});
+
+describe('buildWeekPlan', () => {
+  it('füllt days × meals Slots zyklisch mit Rezepten und skaliert auf Personen', () => {
+    const r = recipe({
+      servings: 2,
+      ingredients: [{ name: 'Nudeln', amount: 100, unit: 'g' }],
+    });
+    // 3 Tage × 1 Mahlzeit = 3 Slots, 4 Personen → Faktor 2 je Slot → 3 × 200 = 600 g
+    const { items, suggestedDishes } = buildWeekPlan([r], 4, 3, 1);
+    expect(items).toHaveLength(1);
+    expect(items[0].amount).toBe(600);
+    expect(suggestedDishes).toEqual(['Test']);
+  });
+
+  it('skaliert die Basis-Liste auf Personen × Tage, wenn keine Rezepte da sind', () => {
+    const { items } = buildWeekPlan([], 2, 5, 1);
+    const nudeln = items.find((i) => i.name === 'Nudeln');
+    expect(nudeln?.amount).toBe(125 * 2 * 5);
+  });
+});
+
+describe('estimatePrice / priceItems', () => {
+  const item = (o: Partial<ShoppingItem>): ShoppingItem => ({
+    name: 'X',
+    amount: 100,
+    unit: 'g',
+    checked: false,
+    ...o,
+  });
+
+  it('schätzt Preise je Einheit und berücksichtigt den Markt', () => {
+    const spar = estimatePrice(item({ amount: 100, unit: 'g' }), 'Spar');
+    const hofer = estimatePrice(item({ amount: 100, unit: 'g' }), 'Hofer');
+    expect(spar).toBeGreaterThan(hofer); // Diskonter günstiger
+    expect(estimatePrice(item({ amount: 1, unit: 'Stk' }))).toBeGreaterThanOrEqual(0.1);
+  });
+
+  it('summiert Schätzpreise zu estTotal', () => {
+    const { items, estTotal } = priceItems([
+      item({ amount: 200, unit: 'g' }),
+      item({ amount: 1, unit: 'Stk' }),
+    ]);
+    expect(items.every((i) => i.estPrice != null)).toBe(true);
+    const sum = items.reduce((s, i) => s + (i.estPrice ?? 0), 0);
+    expect(estTotal).toBeCloseTo(Math.round(sum * 100) / 100, 2);
   });
 });

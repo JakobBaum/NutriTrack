@@ -122,6 +122,8 @@ export interface ShoppingItem {
   amount: number;
   unit: string;
   checked: boolean;
+  /** Geschätzter Preis in EUR (KI-Schätzung; echte Preise folgen später). */
+  estPrice?: number;
 }
 
 export interface ShoppingList {
@@ -131,12 +133,24 @@ export interface ShoppingList {
   items: ShoppingItem[];
   /** Optional: vorgeschlagene Gerichte zur Liste. */
   suggestedDishes?: string[];
+  /** Anzahl Tage des Wocheneinkaufs. */
+  days?: number;
+  /** Berücksichtigte Mahlzeiten (z.B. nur Abendessen). */
+  meals?: MealType[];
+  /** Budget-Vorgabe in EUR. */
+  budget?: number;
+  /** Geschätzte Gesamtkosten in EUR (Summe estPrice). */
+  estTotal?: number;
+  /** Gewählter Markt (z.B. "Spar"), aktuell nur informativ für Schätzpreise. */
+  store?: string;
   generatedAt: string;
 }
 
 export interface FastFoodRequest {
   kcalBudget: number;
   restaurant: string;
+  /** Optionales Geld-Budget in EUR. */
+  moneyBudget?: number;
   /** Priorität, z.B. "high protein". */
   preference?: string;
 }
@@ -147,6 +161,8 @@ export interface FastFoodSuggestion {
   facts: NutritionFacts;
   /** Begründung, warum der Vorschlag passt. */
   rationale: string;
+  /** Geschätzter Preis in EUR (optional). */
+  estPrice?: number;
 }
 
 /** Konfiguration eines KI-Anbieters (lokal gespeichert). */

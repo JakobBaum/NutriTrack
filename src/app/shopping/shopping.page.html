@@ -8,17 +8,60 @@
   <ion-card class="generator">
     <ion-card-content>
       <div class="generator__row">
-        <ion-input type="number" inputmode="numeric" label="Gerichte" labelPlacement="stacked" [(ngModel)]="dishes" fill="outline"></ion-input>
         <ion-input type="number" inputmode="numeric" label="Personen" labelPlacement="stacked" [(ngModel)]="persons" fill="outline"></ion-input>
+        <ion-input type="number" inputmode="numeric" label="Tage" labelPlacement="stacked" [(ngModel)]="days" fill="outline"></ion-input>
       </div>
-      <ion-button expand="block" (click)="generate()">
-        <ion-icon slot="start" name="sparkles-outline"></ion-icon>
-        Liste generieren
+
+      <div class="generator__meals">
+        <span class="generator__sub">Mahlzeiten</span>
+        <div class="chips">
+          @for (m of mealToggles; track m.value) {
+            <ion-chip [class.on]="m.checked" (click)="m.checked = !m.checked">
+              <ion-icon [name]="m.checked ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
+              <ion-label>{{ m.label }}</ion-label>
+            </ion-chip>
+          }
+        </div>
+      </div>
+
+      <div class="generator__row">
+        <ion-input type="number" inputmode="decimal" label="Budget (€)" labelPlacement="stacked" [(ngModel)]="budget" placeholder="optional" fill="outline"></ion-input>
+        <ion-select label="Markt" labelPlacement="stacked" [(ngModel)]="storeName" interface="popover" fill="outline">
+          @for (s of stores; track s) {
+            <ion-select-option [value]="s">{{ s || 'egal' }}</ion-select-option>
+          }
+        </ion-select>
+      </div>
+
+      <ion-button expand="block" (click)="generate()" [disabled]="loading()">
+        @if (loading()) {
+          <ion-spinner name="dots" slot="start"></ion-spinner> Generiere…
+        } @else {
+          <ion-icon slot="start" name="sparkles-outline"></ion-icon> Wocheneinkauf generieren
+        }
       </ion-button>
+      <p class="provider-hint">
+        KI-Quelle: <strong>{{ isLive() ? 'Claude (live)' : 'Mock (offline, Schätzpreise)' }}</strong>
+      </p>
+      @if (error()) {
+        <ion-text color="danger"><p class="form-error">{{ error() }}</p></ion-text>
+      }
     </ion-card-content>
   </ion-card>
 
   @if (list(); as l) {
+    <div class="totals">
+      @if ((l.estTotal ?? null) !== null) {
+        <span class="totals__sum" [class.over]="overBudget()">≈ {{ l.estTotal!.toFixed(2) }} €</span>
+      }
+      @if ((l.budget ?? null) !== null) {
+        <span class="totals__budget">Budget {{ l.budget!.toFixed(2) }} €</span>
+      }
+      @if ((l.days ?? null) !== null) {
+        <span class="totals__meta">{{ l.persons }} P · {{ l.days }} Tage</span>
+      }
+    </div>
+
     @if (l.suggestedDishes && l.suggestedDishes.length) {
       <div class="suggested">
         <span class="suggested__label">Gerichte:</span>
@@ -33,8 +76,13 @@
         <ion-item-sliding>
           <ion-item button (click)="toggle($index)">
             <ion-checkbox slot="start" [checked]="item.checked" (ionChange)="toggle($index)"></ion-checkbox>
-            <ion-label [class.checked]="item.checked">{{ item.name }}</ion-label>
-            <ion-note slot="end">{{ item.amount }} {{ item.unit }}</ion-note>
+            <ion-label [class.checked]="item.checked">
+              {{ item.name }}
+              <span class="qty">{{ item.amount }} {{ item.unit }}</span>
+            </ion-label>
+            @if ((item.estPrice ?? null) !== null) {
+              <ion-note slot="end">{{ item.estPrice!.toFixed(2) }} €</ion-note>
+            }
           </ion-item>
           <ion-item-options side="end">
             <ion-item-option color="danger" (click)="removeItem($index)">
@@ -59,10 +107,11 @@
         </ion-button>
       </ion-item>
     </ion-list>
+    <p class="price-note">Preise sind KI-Schätzungen — echte Marktpreise folgen später.</p>
   } @else {
     <div class="empty">
       <ion-icon name="cart-outline" class="empty__icon"></ion-icon>
-      <p>Noch keine Liste. Gib Gerichte &amp; Personen an und generiere eine Liste.</p>
+      <p>Noch keine Liste. Gib Personen, Tage, Mahlzeiten &amp; Budget an und generiere.</p>
     </div>
   }
 

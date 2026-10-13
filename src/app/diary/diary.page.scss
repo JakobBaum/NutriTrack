@@ -96,6 +96,34 @@ ion-content {
   color: var(--nt-muted);
 }
 
+.scan-row {
+  display: flex;
+  gap: 8px;
+  padding: 0 8px;
+  margin-top: 4px;
+}
+
+.scan-hint {
+  margin: 8px 12px 0;
+  font-size: 12px;
+  color: var(--nt-muted);
+}
+
+.search-results {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.ff-card {
+  margin: 12px 0;
+
+  p {
+    margin: 0 0 6px;
+    font-size: 13px;
+    color: var(--nt-muted);
+  }
+}
+
 .content-spacer {
   height: 80px;
 }

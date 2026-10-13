@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
 import { ProfileStore } from './profile.store';
 import { DiaryStore } from './diary.store';
 import { RecipeStore } from './recipe.store';
@@ -24,7 +25,7 @@ function facts(kcal: number, proteinG = 0): NutritionFacts {
 beforeEach(() => {
   localStorage.clear();
   TestBed.resetTestingModule();
-  TestBed.configureTestingModule({});
+  TestBed.configureTestingModule({ providers: [provideHttpClient()] });
 });
 
 describe('ProfileStore', () => {

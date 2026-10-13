@@ -1,0 +1,93 @@
+import { Injectable, inject } from '@angular/core';
+import {
+  DailyTarget,
+  FastFoodRequest,
+  FastFoodSuggestion,
+  UserProfile,
+} from '../models';
+import { NutritionCalcService } from '../nutrition/nutrition-calc.service';
+import { buildWeekPlan, priceItems } from '../shopping/shopping-generator';
+import {
+  AiProvider,
+  LabelResult,
+  ShoppingPlanRequest,
+  ShoppingPlanResult,
+} from './ai-provider';
+
+/**
+ * Deterministischer KI-Anbieter für Entwicklung/Tests — **ohne Netzwerk, ohne Kosten**.
+ * Liefert plausible, nachvollziehbare Ergebnisse, damit alle KI-Flows ohne echten
+ * Key bedienbar und testbar sind.
+ */
+@Injectable({ providedIn: 'root' })
+export class MockAiProvider implements AiProvider {
+  private readonly calc = inject(NutritionCalcService);
+
+  async computeTargets(profile: UserProfile): Promise<DailyTarget> {
+    // Mock = deterministische Fallback-Formel.
+    return this.calc.dailyTarget(profile);
+  }
+
+  async generateShoppingList(req: ShoppingPlanRequest): Promise<ShoppingPlanResult> {
+    const plan = buildWeekPlan(req.recipes, req.persons, req.days, req.meals.length);
+    const { items, estTotal } = priceItems(plan.items, req.store);
+    const note =
+      req.budget && estTotal > req.budget
+        ? `Schätzung ${estTotal.toFixed(2)} € liegt über dem Budget von ${req.budget.toFixed(2)} €.`
+        : undefined;
+    return { items, suggestedDishes: plan.suggestedDishes, estTotal, note };
+  }
+
+  async recognizeLabel(
+    _imageBase64: string,
+    basis: 'per100g' | 'perPortion',
+  ): Promise<LabelResult> {
+    // Deterministischer Platzhalter-Nährwert (z.B. Müsliriegel).
+    return {
+      name: 'Erkanntes Produkt (Mock)',
+      facts: {
+        kcal: basis === 'per100g' ? 380 : 150,
+        proteinG: basis === 'per100g' ? 8 : 3,
+        carbsG: basis === 'per100g' ? 60 : 24,
+        fatG: basis === 'per100g' ? 10 : 4,
+        fiberG: basis === 'per100g' ? 6 : 2,
+        sugarG: basis === 'per100g' ? 20 : 8,
+        basis,
+        portionG: basis === 'perPortion' ? 40 : undefined,
+      },
+    };
+  }
+
+  async suggestFastfood(req: FastFoodRequest): Promise<FastFoodSuggestion[]> {
+    const r = req.restaurant || 'Fastfood';
+    const base: FastFoodSuggestion[] = [
+      {
+        restaurant: r,
+        itemName: 'Grilled Chicken (ohne Mayo)',
+        facts: { kcal: 350, proteinG: 37, carbsG: 30, fatG: 8, basis: 'perPortion' },
+        rationale: 'Sehr proteinreich bei moderaten Kalorien — bestes Verhältnis.',
+        estPrice: 6.5,
+      },
+      {
+        restaurant: r,
+        itemName: 'Doppel-Hamburger',
+        facts: { kcal: 440, proteinG: 25, carbsG: 34, fatG: 23, basis: 'perPortion' },
+        rationale: 'Viel Protein fürs Geld, passt meist ins kcal-Budget.',
+        estPrice: 4.0,
+      },
+      {
+        restaurant: r,
+        itemName: 'Hähnchen-Wrap',
+        facts: { kcal: 300, proteinG: 20, carbsG: 28, fatG: 10, basis: 'perPortion' },
+        rationale: 'Leichter Snack mit solidem Proteinanteil.',
+        estPrice: 3.5,
+      },
+    ];
+    const within = base.filter((s) => !req.kcalBudget || s.facts.kcal <= req.kcalBudget);
+    const list = within.length ? within : base;
+    // Nach Protein/kcal-Verhältnis sortieren (proteinreichste zuerst).
+    return list.sort(
+      (a, b) => b.facts.proteinG / b.facts.kcal - a.facts.proteinG / a.facts.kcal,
+    );
+  }
+}

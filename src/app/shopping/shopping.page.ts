@@ -1,9 +1,11 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { MealType } from '../core/models';
+import { AiService } from '../core/ai/ai.service';
 import { ShoppingStore } from '../core/state/shopping.store';
 
 /**
- * Einkaufsliste: generiert eine Liste aus #Gerichte + #Personen (lokal aus den
- * vorhandenen Rezepten, sonst Basis-Liste) und erlaubt Abhaken/Ergänzen.
+ * Einkaufsliste: generiert einen Wocheneinkauf (Personen × Tage × Mahlzeiten ×
+ * Budget) über den KI-Anbieter inkl. Schätzpreisen; abhaken/ergänzen/löschen.
  */
 @Component({
   selector: 'app-shopping',
@@ -14,18 +16,52 @@ import { ShoppingStore } from '../core/state/shopping.store';
 })
 export class ShoppingPage {
   private readonly store = inject(ShoppingStore);
+  private readonly ai = inject(AiService);
 
   readonly list = this.store.list;
+  readonly loading = signal(false);
+  readonly error = signal<string | null>(null);
 
-  dishes = 3;
   persons = 2;
+  days = 5;
+  budget: number | null = null;
+  storeName = '';
+
+  readonly mealToggles: { value: MealType; label: string; checked: boolean }[] = [
+    { value: 'breakfast', label: 'Frühstück', checked: false },
+    { value: 'lunch', label: 'Mittag', checked: true },
+    { value: 'dinner', label: 'Abend', checked: true },
+    { value: 'snack', label: 'Snacks', checked: false },
+  ];
+
+  readonly stores = ['', 'Spar', 'Billa', 'Hofer', 'Lidl', 'Penny'];
 
   newItemName = '';
   newItemAmount: number | null = null;
   newItemUnit = 'g';
 
-  generate(): void {
-    this.store.generate(this.dishes, this.persons);
+  /** Zeigt an, ob gerade gegen echten Claude-Anbieter geroutet wird. */
+  isLive(): boolean {
+    return this.ai.isLive();
+  }
+
+  async generate(): Promise<void> {
+    const meals = this.mealToggles.filter((m) => m.checked).map((m) => m.value);
+    this.error.set(null);
+    this.loading.set(true);
+    try {
+      await this.store.generatePlan({
+        persons: this.persons,
+        days: this.days,
+        meals: meals.length ? meals : ['dinner'],
+        budget: this.budget ?? undefined,
+        store: this.storeName || undefined,
+      });
+    } catch (e: unknown) {
+      this.error.set(e instanceof Error ? e.message : 'Generierung fehlgeschlagen.');
+    } finally {
+      this.loading.set(false);
+    }
   }
 
   toggle(index: number): void {
@@ -51,5 +87,10 @@ export class ShoppingPage {
     this.newItemName = '';
     this.newItemAmount = null;
     this.newItemUnit = 'g';
+  }
+
+  overBudget(): boolean {
+    const l = this.list();
+    return !!l && l.budget != null && (l.estTotal ?? 0) > l.budget;
   }
 }

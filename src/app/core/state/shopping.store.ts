@@ -1,9 +1,19 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { ShoppingItem, ShoppingList } from '../models';
+import { MealType, ShoppingItem, ShoppingList } from '../models';
+import { AiService } from '../ai/ai.service';
 import { StorageService } from '../storage/storage.service';
 import { buildShoppingList } from '../shopping/shopping-generator';
 import { makeId } from '../util/id';
 import { RecipeStore } from './recipe.store';
+
+/** Optionen für den Wocheneinkauf. */
+export interface ShoppingPlanOptions {
+  persons: number;
+  days: number;
+  meals: MealType[];
+  budget?: number;
+  store?: string;
+}
 
 const KEY_LIST = 'shopping';
 
@@ -16,6 +26,7 @@ const KEY_LIST = 'shopping';
 export class ShoppingStore {
   private readonly storage = inject(StorageService);
   private readonly recipes = inject(RecipeStore);
+  private readonly ai = inject(AiService);
 
   private readonly _list = signal<ShoppingList | null>(
     this.storage.get<ShoppingList | null>(KEY_LIST, null),
@@ -37,6 +48,37 @@ export class ShoppingStore {
       persons: Math.max(1, Math.floor(persons)),
       items,
       suggestedDishes,
+      generatedAt: new Date().toISOString(),
+    };
+    this._list.set(list);
+    this.persist();
+    return list;
+  }
+
+  /**
+   * Generiert einen Wocheneinkauf über den KI-Anbieter (Mock oder Claude),
+   * inkl. Schätzpreisen. Persistiert das Ergebnis.
+   */
+  async generatePlan(opts: ShoppingPlanOptions): Promise<ShoppingList> {
+    const result = await this.ai.generateShoppingList({
+      persons: opts.persons,
+      days: opts.days,
+      meals: opts.meals,
+      budget: opts.budget,
+      store: opts.store,
+      recipes: this.recipes.recipes(),
+    });
+    const list: ShoppingList = {
+      id: makeId('shopping'),
+      dishes: Math.max(1, Math.floor(opts.days)) * Math.max(1, opts.meals.length),
+      persons: Math.max(1, Math.floor(opts.persons)),
+      days: Math.max(1, Math.floor(opts.days)),
+      meals: opts.meals,
+      budget: opts.budget,
+      store: opts.store,
+      items: result.items,
+      suggestedDishes: result.suggestedDishes,
+      estTotal: result.estTotal,
       generatedAt: new Date().toISOString(),
     };
     this._list.set(list);
