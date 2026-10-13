@@ -21,9 +21,9 @@ Status-Legende: [ ] offen · [~] in Arbeit · [x] fertig
 - [x] Rezepte: anlegen/bearbeiten/löschen, ins Tagebuch loggen
 - [x] Einkaufsliste: Wocheneinkauf (Personen×Tage×Mahlzeiten×Budget) + Schätzpreise, abhaken/ergänzen
 - [x] Hellblaues Design-System + `ProgressRingComponent`
-- [x] Etikett-Scan (Foto-Upload → `AiProvider.recognizeLabel`; native Kamera folgt)
+- [x] Etikett-Scan (Foto-Upload **+ native Kamera** via `@capacitor/camera` → `AiProvider.recognizeLabel`)
 - [x] Fastfood-Helfer (kcal-/Geld-Budget + Kette → proteinreiche Vorschläge → Tagebuch)
-- [ ] Barcode-**Scanner-UI** (Lookup via OpenFoodFacts ist da; Kamera-Scanner fehlt noch)
+- [x] Barcode-**Scanner-UI** (`@zxing/browser` Live-Scan + manuelle Eingabe → `lookupByBarcode`)
 
 ## Phase 2 — Erweiterung
 - [ ] Rezepte: Liste, erstellen/bearbeiten, Nährwert-Summe
@@ -34,7 +34,7 @@ Status-Legende: [ ] offen · [~] in Arbeit · [x] fertig
 
 ## Phase 3 — Politur / Native
 - [ ] Design-Pass (eigenständig, nicht Template-Default; Theme, Hierarchie, Motion)
-- [ ] Capacitor Android/iOS Projekte, Plugin-Permissions (Kamera)
+- [ ] Capacitor Android/iOS Projekte, Plugin-Permissions (Kamera-Berechtigung in Info.plist/AndroidManifest, wenn native Projekte angelegt werden)
 - [ ] Offline-Robustheit, Cache-Invalidierung
 - [ ] E2E (kritische Flows), Visual Checks
 

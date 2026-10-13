@@ -1,7 +1,18 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { DiaryEntry, FastFoodSuggestion, FoodItem, MealType } from '../core/models';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  ViewChild,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import type { IScannerControls } from '@zxing/browser';
+import { DiaryEntry, FastFoodSuggestion, FoodItem, MealType, NutritionFacts } from '../core/models';
 import { AiService } from '../core/ai/ai.service';
 import { FOOD_PROVIDER } from '../core/food/food-provider';
+import { CameraService } from '../core/scan/camera.service';
+import { BarcodeScannerService } from '../core/scan/barcode-scanner.service';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { addDaysISO, dayLabel, toDateISO } from '../core/util/date';
@@ -59,6 +70,10 @@ export class DiaryPage {
   private readonly profileStore = inject(ProfileStore);
   private readonly food = inject(FOOD_PROVIDER);
   private readonly ai = inject(AiService);
+  private readonly camera = inject(CameraService);
+  private readonly barcode = inject(BarcodeScannerService);
+
+  @ViewChild('barcodeVideo') barcodeVideo?: ElementRef<HTMLVideoElement>;
 
   readonly selectedDate = signal(toDateISO());
   readonly dateLabel = computed(() => dayLabel(this.selectedDate()));
@@ -102,6 +117,16 @@ export class DiaryPage {
   readonly searching = signal(false);
   readonly scanning = signal(false);
   readonly hint = signal<string | null>(null);
+
+  /** Native Kamera nur auf dem Gerät; im Web → Datei-Upload-Fallback. */
+  readonly nativeCamera = this.camera.isNativeCameraAvailable();
+
+  // --- Barcode scanner modal ---
+  readonly bcOpen = signal(false);
+  readonly bcError = signal<string | null>(null);
+  readonly bcLooking = signal(false);
+  manualBarcode = '';
+  private scanControls?: IScannerControls;
 
   // --- Fastfood helper ---
   readonly ffOpen = signal(false);
@@ -157,21 +182,40 @@ export class DiaryPage {
     }
   }
 
+  /** Schreibt Name + Nährwerte (pro 100 g) in das Formular. */
+  private applyFacts(name: string, facts: NutritionFacts): void {
+    this.form.label = name;
+    this.form.kcal = Math.round(facts.kcal);
+    this.form.proteinG = Math.round(facts.proteinG);
+    this.form.carbsG = Math.round(facts.carbsG);
+    this.form.fatG = Math.round(facts.fatG);
+    this.form.fiberG = facts.fiberG != null ? Math.round(facts.fiberG) : null;
+    this.form.sugarG = facts.sugarG != null ? Math.round(facts.sugarG) : null;
+  }
+
   /** Übernimmt die Nährwerte (pro 100 g) eines Treffers in das Formular. */
   selectFood(item: FoodItem): void {
-    this.form.label = item.name;
-    this.form.kcal = Math.round(item.facts.kcal);
-    this.form.proteinG = Math.round(item.facts.proteinG);
-    this.form.carbsG = Math.round(item.facts.carbsG);
-    this.form.fatG = Math.round(item.facts.fatG);
-    this.form.fiberG = item.facts.fiberG != null ? Math.round(item.facts.fiberG) : null;
-    this.form.sugarG = item.facts.sugarG != null ? Math.round(item.facts.sugarG) : null;
+    this.applyFacts(item.name, item.facts);
     this.searchResults.set([]);
     this.searchQuery = '';
     this.hint.set('Werte pro 100 g übernommen — bei Bedarf anpassen.');
   }
 
-  /** Liest ein Etiketten-Foto per KI-Vision und füllt das Formular. */
+  /** Nimmt per nativer Kamera ein Etiketten-Foto auf und erkennt es per KI. */
+  async takeLabelPhoto(): Promise<void> {
+    this.error.set(null);
+    this.scanning.set(true);
+    try {
+      const base64 = await this.camera.takePhotoBase64();
+      await this.recognizeLabel(base64);
+    } catch (e: unknown) {
+      this.error.set(e instanceof Error ? e.message : 'Kamera nicht verfügbar.');
+    } finally {
+      this.scanning.set(false);
+    }
+  }
+
+  /** Liest ein Etiketten-Foto (Datei-Upload-Fallback) per KI-Vision. */
   async onLabelFile(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -180,24 +224,89 @@ export class DiaryPage {
     this.scanning.set(true);
     try {
       const base64 = await this.fileToBase64(file);
-      const res = await this.ai.recognizeLabel(base64, 'per100g');
-      this.form.label = res.name;
-      this.form.kcal = Math.round(res.facts.kcal);
-      this.form.proteinG = Math.round(res.facts.proteinG);
-      this.form.carbsG = Math.round(res.facts.carbsG);
-      this.form.fatG = Math.round(res.facts.fatG);
-      this.form.fiberG = res.facts.fiberG != null ? Math.round(res.facts.fiberG) : null;
-      this.form.sugarG = res.facts.sugarG != null ? Math.round(res.facts.sugarG) : null;
-      this.hint.set(
-        this.isLive()
-          ? 'Etikett erkannt (pro 100 g) — bitte prüfen.'
-          : 'Mock-Werte eingetragen (KI-Key in Profil für echte Erkennung).',
-      );
+      await this.recognizeLabel(base64);
     } catch (e: unknown) {
       this.error.set(e instanceof Error ? e.message : 'Etikett-Erkennung fehlgeschlagen.');
     } finally {
       this.scanning.set(false);
       input.value = '';
+    }
+  }
+
+  /** Ruft die KI-Etiketterkennung und schreibt das Ergebnis ins Formular. */
+  private async recognizeLabel(base64: string): Promise<void> {
+    const res = await this.ai.recognizeLabel(base64, 'per100g');
+    this.applyFacts(res.name, res.facts);
+    this.hint.set(
+      this.isLive()
+        ? 'Etikett erkannt (pro 100 g) — bitte prüfen.'
+        : 'Mock-Werte eingetragen (KI-Key in Profil für echte Erkennung).',
+    );
+  }
+
+  // --- Barcode scanner ---
+  openBarcode(): void {
+    this.manualBarcode = '';
+    this.bcError.set(null);
+    this.bcLooking.set(false);
+    this.bcOpen.set(true);
+  }
+
+  closeBarcode(): void {
+    this.bcOpen.set(false);
+  }
+
+  /** ion-modal didPresent → Live-Scan starten, sofern der Browser es kann. */
+  async onBarcodePresent(): Promise<void> {
+    const video =
+      this.barcodeVideo?.nativeElement ??
+      (document.querySelector('video#barcodeVideo') as HTMLVideoElement | null);
+    if (!video || !this.barcode.isSupported()) return;
+    try {
+      this.scanControls = await this.barcode.start(
+        video,
+        (code) => this.lookupBarcode(code),
+        () => this.bcError.set('Kamerazugriff fehlgeschlagen — Code manuell eingeben.'),
+      );
+    } catch {
+      this.bcError.set('Kamera nicht verfügbar — Code manuell eingeben.');
+    }
+  }
+
+  /** ion-modal didDismiss → Kamera/Scanner freigeben. */
+  onBarcodeDismiss(): void {
+    this.stopScanner();
+  }
+
+  private stopScanner(): void {
+    this.scanControls?.stop();
+    this.scanControls = undefined;
+  }
+
+  submitManualBarcode(): void {
+    const code = this.manualBarcode.trim();
+    if (code) this.lookupBarcode(code);
+  }
+
+  /** Schlägt einen Barcode nach und übernimmt den Treffer ins Formular. */
+  private async lookupBarcode(code: string): Promise<void> {
+    if (this.bcLooking()) return;
+    this.stopScanner();
+    this.bcError.set(null);
+    this.bcLooking.set(true);
+    try {
+      const item = await this.food.lookupByBarcode(code);
+      if (!item) {
+        this.bcError.set(`Kein Produkt zu Barcode ${code} gefunden.`);
+        return;
+      }
+      this.applyFacts(item.name, item.facts);
+      this.hint.set(`Barcode erkannt: ${item.name} — Werte pro 100 g übernommen.`);
+      this.closeBarcode();
+    } catch {
+      this.bcError.set('Barcode-Abfrage fehlgeschlagen (Netzwerk?).');
+    } finally {
+      this.bcLooking.set(false);
     }
   }
 

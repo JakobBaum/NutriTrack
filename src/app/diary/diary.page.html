@@ -102,9 +102,19 @@
         <ion-button size="small" fill="outline" (click)="searchFood()" [disabled]="searching()">
           @if (searching()) { <ion-spinner name="dots"></ion-spinner> } @else { Suchen }
         </ion-button>
+        <ion-button size="small" fill="outline" (click)="openBarcode()" [disabled]="scanning()">
+          <ion-icon slot="start" name="barcode-outline"></ion-icon> Barcode
+        </ion-button>
+        @if (nativeCamera) {
+          <ion-button size="small" fill="outline" (click)="takeLabelPhoto()" [disabled]="scanning()">
+            @if (scanning()) { <ion-spinner name="dots"></ion-spinner> } @else {
+              <ion-icon slot="start" name="camera-outline"></ion-icon> Foto aufnehmen
+            }
+          </ion-button>
+        }
         <ion-button size="small" fill="outline" (click)="labelInput.click()" [disabled]="scanning()">
           @if (scanning()) { <ion-spinner name="dots"></ion-spinner> } @else {
-            <ion-icon slot="start" name="camera-outline"></ion-icon> Etikett scannen
+            <ion-icon slot="start" name="image-outline"></ion-icon> Etikett scannen
           }
         </ion-button>
         <input #labelInput type="file" accept="image/*" capture="environment" hidden (change)="onLabelFile($event)" />
@@ -221,6 +231,49 @@
           </ion-card-content>
         </ion-card>
       }
+    </ion-content>
+  </ng-template>
+</ion-modal>
+
+<!-- Barcode-Scanner modal -->
+<ion-modal [isOpen]="bcOpen()" (didPresent)="onBarcodePresent()" (didDismiss)="onBarcodeDismiss()">
+  <ng-template>
+    <ion-header class="ion-no-border">
+      <ion-toolbar>
+        <ion-title>Barcode scannen</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="closeBarcode()">Schließen</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      <div class="scanner">
+        <video id="barcodeVideo" #barcodeVideo class="scanner__video" muted autoplay playsinline></video>
+        <div class="scanner__frame"></div>
+      </div>
+      <p class="scan-hint">Halte den Strichcode in den Rahmen — oder gib ihn manuell ein.</p>
+      @if (bcError()) {
+        <ion-text color="danger"><p class="form-error">{{ bcError() }}</p></ion-text>
+      }
+      <ion-list inset="true">
+        <ion-item>
+          <ion-input
+            label="Barcode"
+            labelPlacement="stacked"
+            inputmode="numeric"
+            [(ngModel)]="manualBarcode"
+            (keyup.enter)="submitManualBarcode()"
+            placeholder="z.B. 4000417025005"
+          ></ion-input>
+        </ion-item>
+      </ion-list>
+      <ion-button expand="block" (click)="submitManualBarcode()" [disabled]="bcLooking()">
+        @if (bcLooking()) {
+          <ion-spinner name="dots" slot="start"></ion-spinner> Suche…
+        } @else {
+          <ion-icon slot="start" name="search-outline"></ion-icon> Nachschlagen
+        }
+      </ion-button>
     </ion-content>
   </ng-template>
 </ion-modal>
