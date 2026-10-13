@@ -1,0 +1,7 @@
+{
+  "name": ".nutritrack_tmp",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}
