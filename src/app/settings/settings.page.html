@@ -1,0 +1,110 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar>
+    <ion-title>Profil &amp; Einstellungen</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <!-- Aktuelles Ziel -->
+  @if (target(); as t) {
+    <ion-card class="target-card">
+      <ion-card-content>
+        <div class="target-card__kcal">
+          <span class="num">{{ t.kcal }}</span><span class="unit">kcal / Tag</span>
+        </div>
+        <div class="target-card__macros">
+          <span><strong>{{ t.proteinG }}</strong>g Eiweiß</span>
+          <span><strong>{{ t.carbsG }}</strong>g Kohlenh.</span>
+          <span><strong>{{ t.fatG }}</strong>g Fett</span>
+          <span><strong>{{ t.fiberG }}</strong>g Ballast.</span>
+          <span><strong>{{ t.sugarG }}</strong>g Zucker max.</span>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  }
+
+  <h4 class="form-sub">Profil</h4>
+  @if (error()) {
+    <ion-text color="danger"><p class="form-error">{{ error() }}</p></ion-text>
+  }
+  <ion-list inset="true">
+    <ion-item>
+      <ion-input type="number" inputmode="decimal" label="Gewicht (kg)" labelPlacement="stacked" [(ngModel)]="weightKg"></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-input type="number" inputmode="numeric" label="Größe (cm)" labelPlacement="stacked" [(ngModel)]="heightCm"></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-input type="number" inputmode="numeric" label="Alter" labelPlacement="stacked" [(ngModel)]="age"></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-select label="Geschlecht" labelPlacement="stacked" [(ngModel)]="sex" interface="popover">
+        @for (s of sexes; track s.value) {
+          <ion-select-option [value]="s.value">{{ s.label }}</ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+    <ion-item>
+      <ion-select label="Aktivität" labelPlacement="stacked" [(ngModel)]="activityLevel" interface="popover">
+        @for (a of activities; track a.value) {
+          <ion-select-option [value]="a.value">{{ a.label }}</ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+    <ion-item>
+      <ion-select label="Ziel" labelPlacement="stacked" [(ngModel)]="goal" interface="popover">
+        @for (g of goals; track g.value) {
+          <ion-select-option [value]="g.value">{{ g.label }}</ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+    @if (showRate) {
+      <ion-item>
+        <ion-input type="number" inputmode="decimal" label="Tempo (kg/Woche)" labelPlacement="stacked" [(ngModel)]="rateKgPerWeek"></ion-input>
+      </ion-item>
+    }
+  </ion-list>
+  <ion-button expand="block" class="ion-margin-horizontal" (click)="saveProfile()">
+    Bedarf berechnen &amp; speichern
+  </ion-button>
+
+  <h4 class="form-sub">KI-Anbieter</h4>
+  <p class="hint">Wird nur lokal auf diesem Gerät gespeichert.</p>
+  <ion-list inset="true">
+    <ion-item>
+      <ion-select label="Anbieter" labelPlacement="stacked" [(ngModel)]="ai.provider" interface="popover">
+        @for (p of providers; track p.value) {
+          <ion-select-option [value]="p.value">{{ p.label }}</ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+    <ion-item>
+      <ion-input label="Endpoint (optional)" labelPlacement="stacked" [(ngModel)]="ai.endpoint" placeholder="https://..."></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-input label="Modell" labelPlacement="stacked" [(ngModel)]="ai.model" placeholder="claude-opus-4-8"></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-input type="password" label="API-Key" labelPlacement="stacked" [(ngModel)]="ai.apiKey" placeholder="sk-..."></ion-input>
+    </ion-item>
+  </ion-list>
+  <ion-button expand="block" fill="outline" class="ion-margin-horizontal" (click)="saveAi()">
+    KI-Einstellungen speichern
+  </ion-button>
+
+  <h4 class="form-sub">Daten</h4>
+  <ion-button expand="block" color="danger" fill="clear" (click)="resetData()">
+    <ion-icon slot="start" name="trash-outline"></ion-icon>
+    Alle lokalen Daten zurücksetzen
+  </ion-button>
+
+  <div class="content-spacer"></div>
+
+  <ion-toast
+    [isOpen]="savedToast() !== null"
+    [message]="savedToast() ?? ''"
+    [duration]="2000"
+    position="bottom"
+    (didDismiss)="onToastDismiss()"
+  ></ion-toast>
+</ion-content>

@@ -1,0 +1,90 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar>
+    <div class="date-nav">
+      <ion-button fill="clear" size="small" (click)="prevDay()" aria-label="Vorheriger Tag">
+        <ion-icon slot="icon-only" name="chevron-back-outline"></ion-icon>
+      </ion-button>
+      <span class="date-nav__label">{{ dateLabel() }}</span>
+      <ion-button
+        fill="clear"
+        size="small"
+        (click)="nextDay()"
+        [disabled]="isToday()"
+        aria-label="Nächster Tag"
+      >
+        <ion-icon slot="icon-only" name="chevron-forward-outline"></ion-icon>
+      </ion-button>
+    </div>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  @if (!hasProfile()) {
+    <div class="empty">
+      <ion-icon name="sparkles-outline" class="empty__icon"></ion-icon>
+      <h2>Willkommen bei NutriTrack</h2>
+      <p>Richte dein Profil ein, damit wir deinen Tagesbedarf berechnen können.</p>
+      <ion-button expand="block" (click)="openSettings()">Profil einrichten</ion-button>
+    </div>
+  } @else {
+    <!-- Kalorien-Hero -->
+    <section class="hero">
+      <app-progress-ring
+        [value]="kcalEaten()"
+        [max]="kcalTarget()"
+        [size]="208"
+        [stroke]="16"
+        color="var(--nt-kcal)"
+      >
+        <div class="hero__center">
+          <div class="hero__big">{{ kcalRemaining() }}</div>
+          <div class="hero__unit">kcal übrig</div>
+        </div>
+      </app-progress-ring>
+      <div class="hero__meta">
+        <span><strong>{{ kcalEaten() }}</strong> gegessen</span>
+        <span class="dot">·</span>
+        <span><strong>{{ kcalTarget() }}</strong> Ziel</span>
+      </div>
+      @if (kcalOver()) {
+        <ion-text color="danger" class="hero__over">Tagesziel überschritten</ion-text>
+      }
+    </section>
+
+    <!-- Makro-Grid -->
+    <h3 class="section-title">Makros</h3>
+    <section class="macro-grid">
+      @for (m of macros(); track m.key) {
+        <div class="macro-card">
+          <app-progress-ring [value]="m.eaten" [max]="m.target" [size]="64" [stroke]="7" [color]="m.color">
+            <span class="macro-card__dot" [style.background]="m.color"></span>
+          </app-progress-ring>
+          <div class="macro-card__label">{{ m.label }}</div>
+          <div class="macro-card__value">{{ m.eaten }} / {{ m.target }} g</div>
+        </div>
+      }
+    </section>
+
+    <!-- Mahlzeiten -->
+    <h3 class="section-title">Mahlzeiten</h3>
+    <ion-list inset="true" lines="full" class="meals">
+      @for (meal of meals(); track meal.type) {
+        <ion-item button detail="true" (click)="openDiary()">
+          <ion-icon slot="start" [name]="meal.icon" class="meals__icon"></ion-icon>
+          <ion-label>{{ meal.label }}</ion-label>
+          <ion-note slot="end">{{ meal.kcal }} kcal</ion-note>
+        </ion-item>
+      }
+    </ion-list>
+
+    <div class="content-spacer"></div>
+  }
+
+  @if (hasProfile()) {
+    <ion-fab slot="fixed" vertical="bottom" horizontal="end">
+      <ion-fab-button (click)="openDiary()" aria-label="Mahlzeit hinzufügen">
+        <ion-icon name="add"></ion-icon>
+      </ion-fab-button>
+    </ion-fab>
+  }
+</ion-content>

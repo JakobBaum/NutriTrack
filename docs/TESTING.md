@@ -36,11 +36,13 @@ Im Browser manuell testen (DevTools → Gerät emulieren für mobile Ansicht).
 Aktuell sichtbar: **Bedarfsrechner** — Werte eingeben → „Bedarf berechnen" → kcal + Makros.
 
 ## 5. Manuelle Test-Checkliste (MVP, wächst mit)
-- [ ] Bedarfsrechner: Profil eingeben → plausibles Tagesziel (kcal + Makros)
-- [ ] Ziel „Abnehmen/Zunehmen" → Tempo-Feld erscheint, Defizit/Überschuss wirkt
-- [ ] (später) Mahlzeit per Textsuche eintragen → Tagesbilanz aktualisiert
-- [ ] (später) Barcode-Scan → OpenFoodFacts-Treffer → Eintrag
-- [ ] (später) Etikett-/Foto-Scan → KI erkennt Nährwerte (per100g/perPortion)
+- [x] Profil (Tab „Profil"): eingeben → „Bedarf berechnen" → plausibles Tagesziel
+- [x] Ziel „Abnehmen/Zunehmen" → Tempo-Feld erscheint, Defizit/Überschuss wirkt
+- [x] Dashboard: Kalorienring + Makro-Grid füllen sich nach Einträgen; Datum wechseln
+- [x] Tagebuch: Eintrag per „+"/Modal erfassen → Tagessumme steigt; löschen funktioniert
+- [x] Rezepte: anlegen → „Tagebuch" loggt eine Portion; bearbeiten/löschen
+- [x] Einkauf: „Liste generieren" → Positionen; abhaken/ergänzen/löschen
+- [ ] (später) Mahlzeit per Food-Textsuche/Barcode/Etikett-Scan eintragen
 - [ ] (später) Rezept-Import (URL/TikTok/Foto) → Rezept in Liste
 
 ## 6. KI-Flows ohne Kosten testen
@@ -57,8 +59,15 @@ npx cap run android      # bzw. ios (macOS/Xcode nötig)
 ```
 Kamera-/Scanner-Permissions in den nativen Projekten deklarieren.
 
-## 8. E2E (später)
-Playwright für kritische Flows (Onboarding → Bedarf, Mahlzeit erfassen, Scan).
+## 8. E2E / Smoke (Playwright)
+Ein Browser-Smoke-Test prüft die Kern-Flows gegen den laufenden Dev-Server
+(Tab-Navigation, Profil speichern, Dashboard-Ringe, Tagebuch-Eintrag, Einkaufsliste)
+und erfasst Konsolen-/Laufzeitfehler + Screenshots.
+```bash
+npm start                      # Dev-Server starten
+npx playwright install chromium
+# Smoke-Skript gegen http://127.0.0.1:8100 laufen lassen (siehe Projekt-Memory)
+```
 Visuelle Checks an Breakpoints 320/375/768/1024.
 
 ## 9. Abschluss je Baustein

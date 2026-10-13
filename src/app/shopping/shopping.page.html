@@ -1,0 +1,70 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar>
+    <ion-title>Einkaufsliste</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <ion-card class="generator">
+    <ion-card-content>
+      <div class="generator__row">
+        <ion-input type="number" inputmode="numeric" label="Gerichte" labelPlacement="stacked" [(ngModel)]="dishes" fill="outline"></ion-input>
+        <ion-input type="number" inputmode="numeric" label="Personen" labelPlacement="stacked" [(ngModel)]="persons" fill="outline"></ion-input>
+      </div>
+      <ion-button expand="block" (click)="generate()">
+        <ion-icon slot="start" name="sparkles-outline"></ion-icon>
+        Liste generieren
+      </ion-button>
+    </ion-card-content>
+  </ion-card>
+
+  @if (list(); as l) {
+    @if (l.suggestedDishes && l.suggestedDishes.length) {
+      <div class="suggested">
+        <span class="suggested__label">Gerichte:</span>
+        @for (dish of l.suggestedDishes; track dish) {
+          <ion-chip>{{ dish }}</ion-chip>
+        }
+      </div>
+    }
+
+    <ion-list inset="true" lines="full">
+      @for (item of l.items; track $index) {
+        <ion-item-sliding>
+          <ion-item button (click)="toggle($index)">
+            <ion-checkbox slot="start" [checked]="item.checked" (ionChange)="toggle($index)"></ion-checkbox>
+            <ion-label [class.checked]="item.checked">{{ item.name }}</ion-label>
+            <ion-note slot="end">{{ item.amount }} {{ item.unit }}</ion-note>
+          </ion-item>
+          <ion-item-options side="end">
+            <ion-item-option color="danger" (click)="removeItem($index)">
+              <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+            </ion-item-option>
+          </ion-item-options>
+        </ion-item-sliding>
+      }
+      @if (l.items.length === 0) {
+        <ion-item lines="none"><ion-label color="medium">Liste ist leer.</ion-label></ion-item>
+      }
+    </ion-list>
+
+    <h4 class="form-sub">Position hinzufügen</h4>
+    <ion-list inset="true">
+      <ion-item>
+        <ion-input class="add-name" [(ngModel)]="newItemName" placeholder="Artikel"></ion-input>
+        <ion-input class="add-amount" type="number" inputmode="decimal" [(ngModel)]="newItemAmount" placeholder="Menge"></ion-input>
+        <ion-input class="add-unit" [(ngModel)]="newItemUnit" placeholder="g"></ion-input>
+        <ion-button slot="end" fill="clear" size="small" (click)="addManual()" aria-label="Hinzufügen">
+          <ion-icon slot="icon-only" name="add-circle-outline"></ion-icon>
+        </ion-button>
+      </ion-item>
+    </ion-list>
+  } @else {
+    <div class="empty">
+      <ion-icon name="cart-outline" class="empty__icon"></ion-icon>
+      <p>Noch keine Liste. Gib Gerichte &amp; Personen an und generiere eine Liste.</p>
+    </div>
+  }
+
+  <div class="content-spacer"></div>
+</ion-content>

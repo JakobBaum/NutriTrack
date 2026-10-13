@@ -1,0 +1,64 @@
+ion-content {
+  --padding-bottom: 24px;
+}
+
+.target-card {
+  margin: 12px;
+  background: linear-gradient(135deg, var(--ion-color-primary-tint), var(--ion-color-primary));
+  color: #fff;
+  box-shadow: 0 10px 28px rgba(56, 189, 248, 0.35);
+
+  &__kcal {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+
+    .num {
+      font-size: 38px;
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+    .unit {
+      font-size: 14px;
+      font-weight: 600;
+      opacity: 0.9;
+    }
+  }
+
+  &__macros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin-top: 10px;
+    font-size: 12px;
+    opacity: 0.95;
+
+    strong {
+      font-size: 13px;
+    }
+  }
+}
+
+.form-sub {
+  margin: 20px 20px 6px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nt-muted);
+}
+
+.hint {
+  margin: 0 20px 4px;
+  font-size: 12px;
+  color: var(--nt-muted);
+}
+
+.form-error {
+  margin: 0 20px 8px;
+  font-weight: 600;
+}
+
+.content-spacer {
+  height: 40px;
+}

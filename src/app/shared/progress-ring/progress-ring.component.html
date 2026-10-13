@@ -1,0 +1,33 @@
+<div class="ring" [style.width.px]="size()" [style.height.px]="size()">
+  <svg
+    [attr.width]="size()"
+    [attr.height]="size()"
+    [attr.viewBox]="'0 0 ' + size() + ' ' + size()"
+    aria-hidden="true"
+  >
+    <circle
+      class="ring__track"
+      [attr.cx]="center()"
+      [attr.cy]="center()"
+      [attr.r]="radius()"
+      [attr.stroke]="track()"
+      [attr.stroke-width]="stroke()"
+      fill="none"
+    />
+    <circle
+      class="ring__value"
+      [attr.cx]="center()"
+      [attr.cy]="center()"
+      [attr.r]="radius()"
+      [attr.stroke]="strokeColor()"
+      [attr.stroke-width]="stroke()"
+      [attr.stroke-dasharray]="circumference()"
+      [attr.stroke-dashoffset]="dashOffset()"
+      stroke-linecap="round"
+      fill="none"
+    />
+  </svg>
+  <div class="ring__content">
+    <ng-content></ng-content>
+  </div>
+</div>

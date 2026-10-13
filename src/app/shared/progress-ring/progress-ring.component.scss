@@ -1,0 +1,27 @@
+:host {
+  display: inline-block;
+}
+
+.ring {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+
+  svg {
+    // Start oben (12 Uhr) statt rechts (3 Uhr)
+    transform: rotate(-90deg);
+  }
+
+  &__value {
+    transition: stroke-dashoffset 500ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  &__content {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    line-height: 1.1;
+  }
+}

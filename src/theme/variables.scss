@@ -1,37 +1,52 @@
-// NutriTrack Theme — modern, mobile-first, schlicht.
+// NutriTrack Theme — modern, mobile-first, schlicht, hellblau.
 // Ionic Theming: https://ionicframework.com/docs/theming/
 
 :root {
-  // --- Markenfarbe: frisches Emerald-Grün ---
-  --ion-color-primary: #10b981;
-  --ion-color-primary-rgb: 16, 185, 129;
+  // --- Markenfarbe: frisches Hellblau (Sky) ---
+  --ion-color-primary: #38bdf8;
+  --ion-color-primary-rgb: 56, 189, 248;
   --ion-color-primary-contrast: #ffffff;
   --ion-color-primary-contrast-rgb: 255, 255, 255;
-  --ion-color-primary-shade: #0ea371;
-  --ion-color-primary-tint: #28c08d;
+  --ion-color-primary-shade: #0ea5e9;
+  --ion-color-primary-tint: #7dd3fc;
 
-  // --- Flächen & Text (helles, ruhiges UI) ---
-  --ion-background-color: #f5f7f8;
-  --ion-background-color-rgb: 245, 247, 248;
-  --ion-text-color: #121a16;
-  --ion-text-color-rgb: 18, 26, 22;
+  // --- Flächen & Text (helles, kühles, ruhiges UI) ---
+  --ion-background-color: #f1f6fb;
+  --ion-background-color-rgb: 241, 246, 251;
+  --ion-text-color: #0f172a;
+  --ion-text-color-rgb: 15, 23, 42;
 
-  --ion-toolbar-background: #ffffff;
+  --ion-toolbar-background: #f1f6fb;
   --ion-item-background: #ffffff;
   --ion-card-background: #ffffff;
 
-  // --- Grautöne ---
-  --ion-color-step-100: #eef1f2;
-  --ion-color-step-200: #dfe4e5;
-  --ion-color-step-400: #9aa5a1;
-  --ion-color-step-600: #68756f;
+  // --- Grautöne (slate) ---
+  --ion-color-step-100: #e8eef5;
+  --ion-color-step-200: #d7e0eb;
+  --ion-color-step-400: #94a3b8;
+  --ion-color-step-600: #64748b;
 
   // --- NutriTrack-eigene Design-Tokens ---
-  --nt-radius: 18px;
-  --nt-radius-sm: 12px;
+  --nt-radius: 22px;
+  --nt-radius-sm: 14px;
   --nt-gap: 16px;
-  --nt-shadow: 0 6px 20px rgba(18, 26, 22, 0.06);
-  --nt-muted: #68756f;
+  --nt-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --nt-shadow-sm: 0 2px 10px rgba(15, 23, 42, 0.05);
+  --nt-muted: #64748b;
+  --nt-surface: #ffffff;
+  --nt-bg: #f1f6fb;
+
+  // Semantische Makro-Farben (mehrdimensionale Palette, nicht nur ein Blau)
+  --nt-kcal: #38bdf8;   // Kalorien — hellblau (Primär)
+  --nt-protein: #3b82f6; // Eiweiß — blau
+  --nt-carbs: #f59e0b;   // Kohlenhydrate — amber
+  --nt-fat: #8b5cf6;     // Fett — violett
+  --nt-fiber: #10b981;   // Ballaststoffe — grün
+  --nt-sugar: #f43f5e;   // Zucker — rosé
+  --nt-over: #f43f5e;    // Über-Ziel — Warnung
+
+  // Ring-Hintergrund (ungefüllter Teil)
+  --nt-track: #e8eef5;
 
   // Weiche, moderne System-Schrift
   --ion-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
@@ -42,6 +57,7 @@
 ion-toolbar {
   --border-width: 0 !important;
   --border-color: transparent;
+  --background: var(--nt-bg);
 }
 
 // Karten/Items durchgängig abgerundet
@@ -49,4 +65,23 @@ ion-card,
 ion-list[inset] {
   border-radius: var(--nt-radius);
   box-shadow: var(--nt-shadow);
+}
+
+// Tab-Bar: flach, hell, mit hellblauem aktivem Zustand
+ion-tab-bar {
+  --background: #ffffff;
+  --border: 0;
+  box-shadow: 0 -6px 24px rgba(15, 23, 42, 0.05);
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+ion-tab-button {
+  --color: var(--nt-muted);
+  --color-selected: var(--ion-color-primary-shade);
+}
+
+// FAB im Markenblau
+ion-fab-button {
+  --box-shadow: 0 10px 24px rgba(56, 189, 248, 0.4);
 }

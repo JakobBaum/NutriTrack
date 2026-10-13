@@ -6,18 +6,21 @@ Status-Legende: [ ] offen · [~] in Arbeit · [x] fertig
 - [x] Git-Repo, Scaffold (Ionic/Angular 22, Capacitor 8), npm install
 - [x] Doku: README, ARCHITECTURE, API-RESEARCH
 - [~] Doku: DATA-MODEL, ROADMAP, PRD, Projekt-CLAUDE.md
-- [ ] Domain-Modelle (`core/models/*`)
+- [x] Domain-Modelle (`core/models/*`)
 - [ ] Adapter-Interfaces + DI-Tokens (`core/ai/ai-provider.ts`, `core/food/food-provider.ts`)
 - [ ] `OpenFoodFactsProvider` + `CompositeFoodProvider` (+ Tests)
-- [ ] `NutritionCalcService` (Mifflin-St Jeor, Makro-Splits, Ziel) (+ Tests)
-- [ ] `StorageService` (Preferences + IndexedDB), `SettingsService`
+- [x] `NutritionCalcService` (Mifflin-St Jeor, Makro-Splits, Ziel) (+ Tests)
+- [x] `StorageService` (localStorage; später Preferences/SQLite) + Signal-Stores (`core/state`)
 - [ ] `MockAiProvider` + `ClaudeAiProvider` (Grundgerüst + Vision + Schema-Guard)
 
 ## Phase 1 — MVP-Kern (UI)
-- [ ] Tab-Shell + Routing (Dashboard, Rezepte, Einkaufsliste, Einstellungen)
-- [ ] Onboarding/Profil → Bedarf berechnen
-- [ ] Dashboard: Kalorien + Makro-Fortschritt (gegessen/übrig), Mahlzeiten des Tages
-- [ ] Diary: Mahlzeit hinzufügen (Food-Textsuche), Mengen, Löschen
+- [x] Tab-Shell + Routing (Heute/Dashboard, Tagebuch, Rezepte, Einkauf, Profil)
+- [x] Onboarding/Profil → Bedarf berechnen (in „Profil")
+- [x] Dashboard: Kalorien + Makro-Fortschritt (gegessen/übrig), Mahlzeiten des Tages
+- [x] Diary: Mahlzeit manuell hinzufügen, löschen, Tagessumme (Food-Textsuche folgt)
+- [x] Rezepte: anlegen/bearbeiten/löschen, ins Tagebuch loggen
+- [x] Einkaufsliste: aus #Gerichte + #Personen lokal generieren, abhaken/ergänzen
+- [x] Hellblaues Design-System + `ProgressRingComponent`
 - [ ] Barcode-Scan → OpenFoodFacts → Eintrag
 - [ ] Etikett-Scan (Foto → AiProvider.recognizeLabel, per100g/perPortion)
 

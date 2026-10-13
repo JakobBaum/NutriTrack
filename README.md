@@ -11,13 +11,27 @@ Rezepte erstellen/importieren, Einkaufslisten generieren, Fastfood-Helfer.
 - **KI-Service-Layer** mit austauschbarem Anbieter; Default-Adapter: Claude (Anthropic)
 
 ## Status
-Siehe `docs/ROADMAP.md`. Aktuelle Phase: Projekt-Setup + MVP-Kern.
+Siehe `docs/ROADMAP.md`. Aktuelle Phase: **MVP-Gerüst steht** (Tab-Shell + Kernseiten,
+lokale Persistenz, hellblaues Design). Als Nächstes: KI-/Food-Adapter + Scan-Funktionen.
+
+### Was ist gebaut (MVP-Gerüst)
+- **Tab-Shell** (`ion-tabs`) mit 5 Seiten: Heute (Dashboard), Tagebuch, Rezepte, Einkauf, Profil.
+- **Dashboard**: großer Kalorien-Fortschrittsring + Makro-Grid (Eiweiß/Kohlenh./Fett/Ballast./Zucker),
+  Mahlzeiten-Übersicht, Datums-Navigation.
+- **Tagebuch**: Einträge je Mahlzeit erfassen (Modal) und löschen; Tagessumme.
+- **Rezepte**: anlegen/bearbeiten/löschen, ins Tagebuch loggen; KI-Import als Stub vorbereitet.
+- **Einkauf**: Liste aus #Gerichte + #Personen generieren (lokal aus Rezepten), abhaken/ergänzen.
+- **Profil**: Bedarf berechnen (Mifflin-St Jeor) + speichern, KI-Anbieter-Konfiguration, Daten-Reset.
+- **State**: Signal-Stores (`core/state`) + schlanker `StorageService` (aktuell `localStorage`,
+  später austauschbar gegen Capacitor Preferences/SQLite).
+- **Wiederverwendbar**: `ProgressRingComponent` (SVG, kein Chart-Lib).
 
 ## Setup
 ```bash
 npm install
-npm start            # Dev-Server (Browser)
-npm test             # Unit-Tests (Karma/Jasmine)
+npm start            # Dev-Server (Browser, http://localhost:8100)
+npm test             # Unit-Tests (Vitest)
+npm run build        # Produktions-Build
 npx cap sync         # Native Projekte synchronisieren
 ```
 
