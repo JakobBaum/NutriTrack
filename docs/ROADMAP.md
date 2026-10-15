@@ -20,14 +20,17 @@ Status-Legende: [ ] offen · [~] in Arbeit · [x] fertig
 - [x] Diary: Mahlzeit hinzufügen (manuell + **Food-Textsuche OpenFoodFacts**), löschen, Tagessumme
 - [x] Rezepte: anlegen/bearbeiten/löschen, ins Tagebuch loggen
 - [x] Einkaufsliste: Wocheneinkauf (Personen×Tage×Mahlzeiten×Budget) + Schätzpreise, abhaken/ergänzen
-- [x] Hellblaues Design-System + `ProgressRingComponent`
+- [x] ~~Hellblaues~~ **Dunkel-rotes** Design-System (nach Referenz-App, BeispielFotos) + `ProgressRingComponent`
 - [x] Etikett-Scan (Foto-Upload **+ native Kamera** via `@capacitor/camera` → `AiProvider.recognizeLabel`)
 - [x] Fastfood-Helfer (kcal-/Geld-Budget + Kette → proteinreiche Vorschläge → Tagebuch)
 - [x] Barcode-**Scanner-UI** (`@zxing/browser` Live-Scan + manuelle Eingabe → `lookupByBarcode`)
 
 ## Phase 2 — Erweiterung
-- [ ] Rezepte: Liste, erstellen/bearbeiten, Nährwert-Summe
+- [x] Rezepte: Zutaten per Food-API (OpenFoodFacts) + Barcode, **Nährwert-Summe** (Gesamt/je Portion)
 - [ ] Rezept-Import: URL (JSON-LD), TikTok, Foto, Text (AiProvider)
+- [ ] **Open Prices**-Anbindung für echte Supermarktpreise (statt KI-Schätzung) — Quelle laut API-Screenshot
+- [ ] Datenquelle **Bundeslebensmittelschlüssel 4.0** (Max Rubner-Institut) für unverpackte Lebensmittel
+- [ ] Add-Food „Speed-Dial" (Suchen/Barcode/Etikett/Unterwegs/Sprechen/Teller) wie Referenz
 - [ ] Einkaufsliste aus #Gerichte + #Personen generieren
 - [ ] Fastfood-Helfer (kcal-Ziel + Kette → Empfehlungen)
 - [ ] Einstellungen: KI-Key/Endpoint, Provider-Auswahl, Profil, Bedarf neu berechnen
