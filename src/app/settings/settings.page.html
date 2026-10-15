@@ -68,8 +68,19 @@
     Bedarf berechnen &amp; speichern
   </ion-button>
 
-  <h4 class="form-sub">KI-Anbieter</h4>
-  <p class="hint">Wird nur lokal auf diesem Gerät gespeichert.</p>
+  <h4 class="form-sub">KI-Verbindung</h4>
+  <p class="hint">
+    Empfohlen: <strong>KI-Proxy-URL</strong> eintragen — dann nutzen alle Geräte denselben
+    internen Server-Key, kein eigener Key nötig. Alternativ ein eigener Anthropic-Key (nur lokal).
+  </p>
+  <ion-list inset="true">
+    <ion-item>
+      <ion-input label="KI-Proxy-URL" labelPlacement="stacked" [(ngModel)]="ai.proxyUrl" inputmode="url" placeholder="https://nutritrack-ai.<account>.workers.dev"></ion-input>
+    </ion-item>
+  </ion-list>
+
+  <h4 class="form-sub">Eigener Key (optional)</h4>
+  <p class="hint">Nur nötig ohne Proxy. Wird ausschließlich lokal auf diesem Gerät gespeichert.</p>
   <ion-list inset="true">
     <ion-item>
       <ion-select label="Anbieter" labelPlacement="stacked" [(ngModel)]="ai.provider" interface="popover">
@@ -82,7 +93,7 @@
       <ion-input label="Endpoint (optional)" labelPlacement="stacked" [(ngModel)]="ai.endpoint" placeholder="https://..."></ion-input>
     </ion-item>
     <ion-item>
-      <ion-input label="Modell" labelPlacement="stacked" [(ngModel)]="ai.model" placeholder="claude-opus-4-8"></ion-input>
+      <ion-input label="Modell" labelPlacement="stacked" [(ngModel)]="ai.model" placeholder="automatisch (Haiku/Sonnet)"></ion-input>
     </ion-item>
     <ion-item>
       <ion-input type="password" label="API-Key" labelPlacement="stacked" [(ngModel)]="ai.apiKey" [clearOnEdit]="false" autocomplete="off" placeholder="sk-..."></ion-input>

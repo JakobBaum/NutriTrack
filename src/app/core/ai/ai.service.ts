@@ -13,6 +13,7 @@ import {
   ShoppingPlanResult,
 } from './ai-provider';
 import { ClaudeAiProvider } from './claude-ai-provider';
+import { ProxyAiProvider } from './proxy-ai-provider';
 import { MockAiProvider } from './mock-ai-provider';
 
 /**
@@ -26,15 +27,29 @@ export class AiService implements AiProvider {
   private readonly settings = inject(SettingsStore);
   private readonly mock = inject(MockAiProvider);
   private readonly claude = inject(ClaudeAiProvider);
+  private readonly proxy = inject(ProxyAiProvider);
 
-  /** True, wenn aktuell gegen den echten Claude-Anbieter geroutet wird. */
-  isLive(): boolean {
+  /** True, wenn eine Proxy-URL hinterlegt ist (interner Key für alle Nutzer). */
+  private hasProxy(): boolean {
+    return !!this.settings.ai().proxyUrl?.trim();
+  }
+
+  /** True, wenn ein eigener Claude-Key hinterlegt ist. */
+  private hasOwnKey(): boolean {
     const cfg = this.settings.ai();
     return cfg.provider === 'claude' && !!cfg.apiKey?.trim();
   }
 
+  /** True, wenn echte KI aktiv ist (Proxy ODER eigener Key) statt Mock. */
+  isLive(): boolean {
+    return this.hasProxy() || this.hasOwnKey();
+  }
+
+  /** Bevorzugt den geteilten Proxy, dann eigener Key, sonst kostenloser Mock. */
   private active(): AiProvider {
-    return this.isLive() ? this.claude : this.mock;
+    if (this.hasProxy()) return this.proxy;
+    if (this.hasOwnKey()) return this.claude;
+    return this.mock;
   }
 
   computeTargets(profile: UserProfile): Promise<DailyTarget> {

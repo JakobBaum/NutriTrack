@@ -14,6 +14,7 @@ import { AiService } from '../core/ai/ai.service';
 import { FOOD_PROVIDER } from '../core/food/food-provider';
 import { CameraService } from '../core/scan/camera.service';
 import { BarcodeScannerService } from '../core/scan/barcode-scanner.service';
+import { OpenPricesProvider } from '../core/price/open-prices.provider';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { addDaysISO, dayLabel, toDateISO } from '../core/util/date';
@@ -73,6 +74,7 @@ export class DiaryPage implements OnDestroy {
   private readonly ai = inject(AiService);
   private readonly camera = inject(CameraService);
   private readonly barcode = inject(BarcodeScannerService);
+  private readonly prices = inject(OpenPricesProvider);
 
   @ViewChild('barcodeVideo') barcodeVideo?: ElementRef<HTMLVideoElement>;
 
@@ -307,8 +309,14 @@ export class DiaryPage implements OnDestroy {
         return;
       }
       this.applyFacts(item.name, item.facts);
-      this.hint.set(`Barcode erkannt: ${item.name} — Werte pro 100 g übernommen.`);
       this.closeBarcode();
+      // Realen Preis (Open Prices) best-effort ergänzen — blockiert nichts.
+      const price = await this.prices.priceByBarcode(code);
+      this.hint.set(
+        price
+          ? `Barcode erkannt: ${item.name} — Werte pro 100 g. Realer Preis ca. ${price.avg.toFixed(2)} ${price.currency}.`
+          : `Barcode erkannt: ${item.name} — Werte pro 100 g übernommen.`,
+      );
     } catch {
       this.bcError.set('Barcode-Abfrage fehlgeschlagen (Netzwerk?).');
     } finally {

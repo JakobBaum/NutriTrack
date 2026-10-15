@@ -10,6 +10,9 @@ const DEFAULT_AI: AiConfig = {
   // routet der AiService sauber auf den kostenlosen Mock (siehe AiService.isLive).
   provider: 'claude',
   endpoint: '',
+  // Interner KI-Proxy (ein Server-Key für alle Nutzer). Leer = nicht gesetzt;
+  // dann greift ein optionaler eigener Key, sonst der Mock.
+  proxyUrl: '',
   // Leer lassen: Der ClaudeAiProvider routet dann automatisch auf das günstige
   // Modell (Haiku) bzw. Sonnet nur für Vision. Ein hier gesetzter Wert würde
   // dieses Routing für ALLE Calls überschreiben (bewusster Experten-Override).

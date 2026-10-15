@@ -18,6 +18,30 @@ die kostenlose, keyfreie Quelle; weitere werden als zusätzliche Provider in die
 sofern Key hinterlegt. Ergebnisse werden auf das interne `FoodItem`/`NutritionFacts`-Schema
 gemappt und lokal gecacht.
 
+**Barcode kommt IMMER aus der API, nie aus der KI.** `lookupByBarcode` → OpenFoodFacts
+`/api/v2/product/{code}.json` (bzw. USDA UPC-Suche als Fallback). Die KI (`recognizeLabel`)
+wird ausschließlich für das Foto-Etikett genutzt, wenn kein Barcode vorhanden ist.
+
+### Bundeslebensmittelschlüssel (BLS) 4.0 — Max Rubner-Institut
+- Deutschlands offizielle Nährwert-DB für **unverpackte** Lebensmittel (Rohware, Gerichte),
+  ~7.140 Einträge, bis zu 138 Nährwerte je Lebensmittel. **Seit Ende 2025 kostenlos** (CC BY 4.0).
+- Offizielle DB/Download: `https://www.blsdb.de/` (Datensatz-Extrakt, kein offizieller Live-API).
+- Dritt-REST-API: `https://www.naehrwerte.io/` (JSON) — **Registrierung/Key erforderlich**.
+- **Integration:** als key-konfigurierbarer Provider in die Food-Kette (aktiv, sobald Key gesetzt);
+  alternativ offiziellen Datensatz-Auszug bündeln (wie die Referenz-App). Status: vorbereitet.
+
+## Preise (echte Supermarktpreise)
+
+| Provider | Kosten | Key | Keyed by | Hinweise |
+|----------|--------|-----|----------|----------|
+| **Open Prices** (OpenFoodFacts) | frei | nein (nur Lesen) | Barcode / Kategorie | `https://prices.openfoodfacts.org/api/v1/prices?product_code={barcode}&order_by=-date`. Von der Community erfasste reale Preise inkl. Markt/Datum/Währung. Schreiben braucht Auth. |
+
+- **Integration:** `OpenPricesProvider` liefert zu einem Barcode den letzten/durchschnittlichen
+  realen Preis (EUR), wird im Barcode-/Zutaten-Ergebnis angezeigt. Für generische
+  Einkaufslisten-Posten (ohne Barcode) bleibt die KI-/Heuristik-Schätzung, bis ein Produkt
+  verknüpft ist. Ersetzt schrittweise die reinen Schätzpreise (`docs/FEATURE-REQUESTS.md` §2).
+- Antwort (relevante Felder): `items[] = { price, currency, product_code, price_per, date, location_id }`.
+
 ## Rezept-Import (URL / TikTok / Webseite / Foto)
 
 | Quelle | Methode |

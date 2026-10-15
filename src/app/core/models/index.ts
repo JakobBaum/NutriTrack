@@ -176,4 +176,7 @@ export interface AiConfig {
   apiKey?: string;
   endpoint?: string;
   model?: string;
+  /** URL des internen KI-Proxys (ein geteilter Server-Key für alle Nutzer).
+   *  Ist sie gesetzt, nutzt die App den Proxy statt eines eigenen Keys. */
+  proxyUrl?: string;
 }
