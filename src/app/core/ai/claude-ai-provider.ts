@@ -158,7 +158,8 @@ export class ClaudeAiProvider implements AiProvider {
 
   private num(v: unknown): number {
     const n = typeof v === 'number' ? v : Number(v);
-    return Number.isFinite(n) ? n : 0;
+    // Nährwerte und Preise sind nie negativ — defekte Modellwerte abfangen.
+    return Number.isFinite(n) ? Math.max(0, n) : 0;
   }
 
   /** JSON-Call mit reinem Text-User-Content. */

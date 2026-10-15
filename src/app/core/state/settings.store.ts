@@ -7,7 +7,10 @@ const KEY_AI = 'ai-config';
 const DEFAULT_AI: AiConfig = {
   provider: 'mock',
   endpoint: '',
-  model: 'claude-opus-4-8',
+  // Leer lassen: Der ClaudeAiProvider routet dann automatisch auf das günstige
+  // Modell (Haiku) bzw. Sonnet nur für Vision. Ein hier gesetzter Wert würde
+  // dieses Routing für ALLE Calls überschreiben (bewusster Experten-Override).
+  model: '',
   apiKey: '',
 };
 

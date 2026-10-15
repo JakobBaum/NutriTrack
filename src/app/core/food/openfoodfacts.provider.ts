@@ -64,7 +64,8 @@ export class OpenFoodFactsProvider implements FoodProvider {
 
   private num(v: number | string | undefined): number {
     const n = typeof v === 'number' ? v : Number(v);
-    return Number.isFinite(n) ? n : 0;
+    // Nährwerte sind nie negativ — fehlerhafte Felder defensiv auf 0 klemmen.
+    return Number.isFinite(n) ? Math.max(0, n) : 0;
   }
 
   private toFoodItem(p: OffProduct): FoodItem | null {

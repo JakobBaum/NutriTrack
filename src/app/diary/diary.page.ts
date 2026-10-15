@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  OnDestroy,
   ViewChild,
   computed,
   inject,
@@ -65,7 +66,7 @@ interface FastFoodForm {
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class DiaryPage {
+export class DiaryPage implements OnDestroy {
   private readonly diary = inject(DiaryStore);
   private readonly profileStore = inject(ProfileStore);
   private readonly food = inject(FOOD_PROVIDER);
@@ -136,6 +137,11 @@ export class DiaryPage {
 
   isLive(): boolean {
     return this.ai.isLive();
+  }
+
+  ngOnDestroy(): void {
+    // Kamera-Stream freigeben, falls der Scanner beim Zerstören noch läuft.
+    this.stopScanner();
   }
 
   prevDay(): void {
