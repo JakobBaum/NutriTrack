@@ -1,46 +1,45 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { Recipe } from '../core/models';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  OnDestroy,
+  ViewChild,
+  inject,
+  signal,
+} from '@angular/core';
+import type { IScannerControls } from '@zxing/browser';
+import { FoodItem, NutritionFacts, Recipe, RecipeIngredient } from '../core/models';
+import { FOOD_PROVIDER } from '../core/food/food-provider';
+import { BarcodeScannerService } from '../core/scan/barcode-scanner.service';
 import { DiaryStore } from '../core/state/diary.store';
 import { RecipeDraft, RecipeStore } from '../core/state/recipe.store';
+import { perServingFacts, totalFacts, hasNutrition } from '../core/nutrition/recipe-nutrition';
 import { toDateISO } from '../core/util/date';
 
 interface IngredientForm {
   name: string;
   amount: number | null;
   unit: string;
+  facts?: NutritionFacts;
+  foodItemId?: string;
 }
 
 interface RecipeForm {
   title: string;
   servings: number | null;
+  cookedWeightG: number | null;
   ingredients: IngredientForm[];
-  stepsText: string;
-  kcal: number | null;
-  proteinG: number | null;
-  carbsG: number | null;
-  fatG: number | null;
-  fiberG: number | null;
-  sugarG: number | null;
+  steps: string[];
 }
 
 function emptyForm(): RecipeForm {
-  return {
-    title: '',
-    servings: 2,
-    ingredients: [{ name: '', amount: null, unit: 'g' }],
-    stepsText: '',
-    kcal: null,
-    proteinG: null,
-    carbsG: null,
-    fatG: null,
-    fiberG: null,
-    sugarG: null,
-  };
+  return { title: '', servings: 2, cookedWeightG: null, ingredients: [], steps: [''] };
 }
 
 /**
- * Rezepte: Liste eigener Rezepte, anlegen/bearbeiten, löschen und schnell
- * ins Tagebuch loggen. KI-Import (URL/TikTok/Foto) ist als Stub vorbereitet.
+ * Rezepte: Liste eigener Rezepte, anlegen/bearbeiten, löschen und ins Tagebuch
+ * loggen. Zutaten werden per Food-API (Textsuche + Barcode) befüllt; die
+ * Nährwerte werden pro Zutat skaliert und zum Gesamt/je Portion summiert.
  */
 @Component({
   selector: 'app-recipes',
@@ -49,9 +48,13 @@ function emptyForm(): RecipeForm {
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class RecipesPage {
+export class RecipesPage implements OnDestroy {
   private readonly store = inject(RecipeStore);
   private readonly diary = inject(DiaryStore);
+  private readonly food = inject(FOOD_PROVIDER);
+  private readonly barcode = inject(BarcodeScannerService);
+
+  @ViewChild('ingBarcodeVideo') barcodeVideo?: ElementRef<HTMLVideoElement>;
 
   readonly recipes = this.store.recipes;
 
@@ -62,6 +65,50 @@ export class RecipesPage {
 
   form: RecipeForm = emptyForm();
 
+  // --- Zutaten-Picker (Suche + Barcode) ---
+  readonly pickerOpen = signal(false);
+  pickerQuery = '';
+  readonly pickerResults = signal<FoodItem[]>([]);
+  readonly pickerSearching = signal(false);
+  readonly pickerError = signal<string | null>(null);
+
+  // --- Barcode-Scanner im Picker ---
+  readonly bcOpen = signal(false);
+  readonly bcError = signal<string | null>(null);
+  readonly bcLooking = signal(false);
+  manualBarcode = '';
+  private scanControls?: IScannerControls;
+
+  ngOnDestroy(): void {
+    this.stopScanner();
+  }
+
+  // --- Live-Nährwerte (aus den Zutaten berechnet) ---
+  private toIngredients(): RecipeIngredient[] {
+    return this.form.ingredients
+      .filter((i) => i.name.trim())
+      .map((i) => ({
+        name: i.name.trim(),
+        amount: this.toNum(i.amount),
+        unit: i.unit.trim() || 'g',
+        facts: i.facts,
+        foodItemId: i.foodItemId,
+      }));
+  }
+
+  total(): NutritionFacts {
+    return totalFacts(this.toIngredients());
+  }
+
+  perServing(): NutritionFacts {
+    return perServingFacts(this.toIngredients(), this.form.servings ?? 1);
+  }
+
+  hasNutrition(): boolean {
+    return hasNutrition(this.toIngredients());
+  }
+
+  // --- Modal öffnen/schließen ---
   openAdd(): void {
     this.form = emptyForm();
     this.editId.set(null);
@@ -73,16 +120,15 @@ export class RecipesPage {
     this.form = {
       title: recipe.title,
       servings: recipe.servings,
-      ingredients: recipe.ingredients.length
-        ? recipe.ingredients.map((i) => ({ name: i.name, amount: i.amount, unit: i.unit }))
-        : [{ name: '', amount: null, unit: 'g' }],
-      stepsText: recipe.steps.join('\n'),
-      kcal: recipe.factsPerServing?.kcal ?? null,
-      proteinG: recipe.factsPerServing?.proteinG ?? null,
-      carbsG: recipe.factsPerServing?.carbsG ?? null,
-      fatG: recipe.factsPerServing?.fatG ?? null,
-      fiberG: recipe.factsPerServing?.fiberG ?? null,
-      sugarG: recipe.factsPerServing?.sugarG ?? null,
+      cookedWeightG: recipe.cookedWeightG ?? null,
+      ingredients: recipe.ingredients.map((i) => ({
+        name: i.name,
+        amount: i.amount,
+        unit: i.unit,
+        facts: i.facts,
+        foodItemId: i.foodItemId,
+      })),
+      steps: recipe.steps.length ? [...recipe.steps] : [''],
     };
     this.editId.set(recipe.id);
     this.error.set(null);
@@ -93,18 +139,138 @@ export class RecipesPage {
     this.isModalOpen.set(false);
   }
 
-  addIngredientRow(): void {
+  // --- Zutaten ---
+  removeIngredient(index: number): void {
+    this.form.ingredients = this.form.ingredients.filter((_, i) => i !== index);
+  }
+
+  addManualIngredient(): void {
     this.form.ingredients = [...this.form.ingredients, { name: '', amount: null, unit: 'g' }];
   }
 
-  removeIngredientRow(index: number): void {
-    this.form.ingredients = this.form.ingredients.filter((_, i) => i !== index);
+  kcalOf(ing: IngredientForm): number {
+    return totalFacts([{ name: ing.name, amount: this.toNum(ing.amount), unit: ing.unit, facts: ing.facts }]).kcal;
+  }
+
+  // --- Schritte ---
+  addStep(): void {
+    this.form.steps = [...this.form.steps, ''];
+  }
+
+  removeStep(index: number): void {
+    const next = this.form.steps.filter((_, i) => i !== index);
+    this.form.steps = next.length ? next : [''];
+  }
+
+  trackIndex(index: number): number {
+    return index;
+  }
+
+  // --- Zutaten-Picker ---
+  openPicker(): void {
+    this.pickerQuery = '';
+    this.pickerResults.set([]);
+    this.pickerError.set(null);
+    this.pickerOpen.set(true);
+  }
+
+  closePicker(): void {
+    this.pickerOpen.set(false);
+  }
+
+  async searchFood(): Promise<void> {
+    const q = this.pickerQuery.trim();
+    if (!q) return;
+    this.pickerError.set(null);
+    this.pickerSearching.set(true);
+    try {
+      this.pickerResults.set(await this.food.searchByText(q));
+      if (this.pickerResults().length === 0) this.pickerError.set('Keine Treffer gefunden.');
+    } catch {
+      this.pickerError.set('Suche fehlgeschlagen (Netzwerk?).');
+    } finally {
+      this.pickerSearching.set(false);
+    }
+  }
+
+  /** Übernimmt einen Food-Treffer als Zutat (Standardmenge = Portion oder 100 g). */
+  pickFood(item: FoodItem): void {
+    const amount = item.servingG && item.servingG > 0 ? Math.round(item.servingG) : 100;
+    this.form.ingredients = [
+      ...this.form.ingredients,
+      { name: item.name, amount, unit: 'g', facts: item.facts, foodItemId: item.id },
+    ];
+    this.closePicker();
+    this.toastMessage.set(`„${item.name}" als Zutat hinzugefügt.`);
+  }
+
+  // --- Barcode im Picker ---
+  openBarcode(): void {
+    this.manualBarcode = '';
+    this.bcError.set(null);
+    this.bcLooking.set(false);
+    this.bcOpen.set(true);
+  }
+
+  closeBarcode(): void {
+    this.bcOpen.set(false);
+  }
+
+  async onBarcodePresent(): Promise<void> {
+    const video =
+      this.barcodeVideo?.nativeElement ??
+      (document.querySelector('video#ingBarcodeVideo') as HTMLVideoElement | null);
+    if (!video || !this.barcode.isSupported()) return;
+    try {
+      this.scanControls = await this.barcode.start(
+        video,
+        (code) => this.lookupBarcode(code),
+        () => this.bcError.set('Kamerazugriff fehlgeschlagen — Code manuell eingeben.'),
+      );
+    } catch {
+      this.bcError.set('Kamera nicht verfügbar — Code manuell eingeben.');
+    }
+  }
+
+  onBarcodeDismiss(): void {
+    this.stopScanner();
+  }
+
+  private stopScanner(): void {
+    this.scanControls?.stop();
+    this.scanControls = undefined;
+  }
+
+  submitManualBarcode(): void {
+    const code = this.manualBarcode.trim();
+    if (code) this.lookupBarcode(code);
+  }
+
+  private async lookupBarcode(code: string): Promise<void> {
+    if (this.bcLooking()) return;
+    this.stopScanner();
+    this.bcError.set(null);
+    this.bcLooking.set(true);
+    try {
+      const item = await this.food.lookupByBarcode(code);
+      if (!item) {
+        this.bcError.set(`Kein Produkt zu Barcode ${code} gefunden.`);
+        return;
+      }
+      this.closeBarcode();
+      this.pickFood(item);
+    } catch {
+      this.bcError.set('Barcode-Abfrage fehlgeschlagen (Netzwerk?).');
+    } finally {
+      this.bcLooking.set(false);
+    }
   }
 
   private toNum(v: number | null): number {
     return typeof v === 'number' && Number.isFinite(v) ? v : 0;
   }
 
+  // --- Speichern ---
   save(): void {
     const title = this.form.title.trim();
     if (!title) {
@@ -116,38 +282,28 @@ export class RecipesPage {
       this.error.set('Portionen muss mindestens 1 sein.');
       return;
     }
-    const kcal = this.form.kcal;
-    if (kcal === null || !Number.isFinite(kcal) || kcal < 0) {
-      this.error.set('Bitte gültige Kalorien je Portion eingeben.');
+    const ingredients = this.toIngredients();
+    if (ingredients.length === 0) {
+      this.error.set('Bitte mindestens eine Zutat hinzufügen.');
       return;
     }
+    this.error.set(null);
 
     const draft: RecipeDraft = {
       title,
       servings: Math.floor(servings),
-      ingredients: this.form.ingredients
-        .filter((i) => i.name.trim())
-        .map((i) => ({ name: i.name.trim(), amount: this.toNum(i.amount), unit: i.unit.trim() || 'g' })),
-      steps: this.form.stepsText
-        .split('\n')
-        .map((s) => s.trim())
-        .filter(Boolean),
+      cookedWeightG: this.form.cookedWeightG != null ? this.toNum(this.form.cookedWeightG) : undefined,
+      ingredients,
+      steps: this.form.steps.map((s) => s.trim()).filter(Boolean),
       origin: 'own',
-      factsPerServing: {
-        kcal: Math.round(kcal),
-        proteinG: this.toNum(this.form.proteinG),
-        carbsG: this.toNum(this.form.carbsG),
-        fatG: this.toNum(this.form.fatG),
-        fiberG: this.toNum(this.form.fiberG),
-        sugarG: this.toNum(this.form.sugarG),
-        basis: 'perPortion',
-      },
+      factsPerServing: perServingFacts(ingredients, servings),
     };
 
     const id = this.editId();
     if (id) this.store.update(id, draft);
     else this.store.add(draft);
     this.closeModal();
+    this.toastMessage.set(id ? 'Rezept aktualisiert.' : 'Rezept gespeichert.');
   }
 
   remove(id: string): void {
@@ -166,11 +322,6 @@ export class RecipesPage {
       facts: recipe.factsPerServing,
     });
     this.toastMessage.set(`„${recipe.title}" ins Tagebuch gelegt.`);
-  }
-
-  /** Platzhalter für den KI-gestützten Rezept-Import. */
-  importStub(): void {
-    this.toastMessage.set('KI-Import (URL/TikTok/Foto) kommt in einer späteren Version.');
   }
 
   onToastDismiss(): void {

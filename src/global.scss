@@ -32,6 +32,9 @@
  * https://ionicframework.com/docs/theming/dark-mode
  */
 
+/* NutriTrack erzwingt ein eigenes dunkles Theme über src/theme/variables.scss.
+ * Daher KEINE system-/klassenbasierte Ionic-Dark-Palette importieren — sonst
+ * würden deren Werte unsere rote Dark-Palette je nach System-Theme überschreiben. */
 /* @import "@ionic/angular/css/palettes/dark.always.css"; */
 /* @import "@ionic/angular/css/palettes/dark.class.css"; */
-@import "@ionic/angular/css/palettes/dark.system.css";
+/* @import "@ionic/angular/css/palettes/dark.system.css"; */

@@ -4,48 +4,6 @@ ion-content {
   --padding-top: 8px;
 }
 
-.import-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  text-align: left;
-  background: var(--nt-surface);
-  border: 1px dashed var(--ion-color-primary);
-  border-radius: var(--nt-radius);
-  box-shadow: var(--nt-shadow-sm);
-  padding: 14px 16px;
-  margin: 4px 0 16px;
-  color: var(--ion-text-color);
-  cursor: pointer;
-
-  > ion-icon:first-child {
-    font-size: 22px;
-    color: var(--ion-color-primary-shade);
-  }
-
-  div {
-    display: flex;
-    flex-direction: column;
-    line-height: 1.25;
-
-    strong {
-      font-size: 15px;
-    }
-
-    span {
-      font-size: 12px;
-      color: var(--nt-muted);
-    }
-  }
-
-  &__ai {
-    margin-left: auto;
-    font-size: 18px;
-    color: var(--ion-color-primary);
-  }
-}
-
 .empty {
   display: flex;
   flex-direction: column;
@@ -87,23 +45,198 @@ ion-content {
   font-weight: 600;
 }
 
-.form-sub {
-  margin: 16px 8px 4px;
+// Abschnitts-Label (uppercase, gedämpft) — wie in der Referenz
+.field-label {
+  display: block;
+  margin: 18px 6px 6px;
   font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--nt-muted);
 }
 
-.ing-name {
-  flex: 1 1 42%;
+// Gestrichelter Hinzufügen-Button (rot) — "+ Zutat/Schritt hinzufügen"
+.dashed-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px;
+  margin: 8px 0 4px;
+  background: transparent;
+  border: 1.5px dashed var(--nt-border);
+  border-radius: var(--nt-radius-sm);
+  color: var(--ion-color-primary);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+
+  ion-icon {
+    font-size: 18px;
+  }
+
+  &--accent {
+    border-color: rgba(229, 72, 77, 0.5);
+  }
 }
-.ing-amount {
-  flex: 0 0 26%;
+
+.link-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 6px 0;
+  background: transparent;
+  border: 0;
+  color: var(--nt-muted);
+  font-size: 13px;
+  cursor: pointer;
 }
-.ing-unit {
-  flex: 0 0 18%;
+
+// Menge/Einheit rechts in der Zutatenzeile
+.ing-qty {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 120px;
+
+  ion-input {
+    --padding-start: 6px;
+    --padding-end: 6px;
+    text-align: right;
+    font-weight: 600;
+  }
+
+  &__unit {
+    max-width: 38px;
+    color: var(--nt-muted);
+  }
+}
+
+// Live-Nährwertkarte
+.nutri-card {
+  margin: 14px 2px 4px;
+  padding: 14px 16px;
+  background: var(--nt-surface);
+  border: 1px solid var(--nt-border);
+  border-radius: var(--nt-radius);
+
+  &__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--nt-muted);
+  }
+
+  &__total {
+    color: var(--ion-color-primary);
+  }
+}
+
+.nutri-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--nt-border);
+  border-radius: var(--nt-radius-sm);
+  overflow: hidden;
+
+  &__cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 14px 8px;
+    background: var(--nt-surface-2);
+
+    strong {
+      font-size: 18px;
+      font-style: italic;
+      font-weight: 800;
+    }
+
+    span {
+      font-size: 12px;
+      color: var(--nt-muted);
+    }
+  }
+}
+
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+// Zubereitungsschritt mit Nummer
+.step-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 6px 2px;
+
+  &__no {
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    margin-top: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--nt-border);
+    border-radius: 50%;
+    font-size: 13px;
+    color: var(--nt-muted);
+  }
+
+  ion-textarea {
+    flex: 1;
+    --background: var(--nt-surface-2);
+    --padding-start: 12px;
+    --padding-end: 12px;
+    border-radius: var(--nt-radius-sm);
+  }
+}
+
+.save-btn {
+  margin-top: 20px;
+}
+
+// Barcode-Scanner (gleiches Muster wie im Tagebuch)
+.scanner {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--nt-radius);
+  overflow: hidden;
+  background: #000;
+
+  &__video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  &__frame {
+    position: absolute;
+    inset: 18% 12%;
+    border: 2px solid var(--ion-color-primary);
+    border-radius: 12px;
+    box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.25);
+  }
+}
+
+.scan-hint {
+  margin: 8px 12px 0;
+  font-size: 12px;
+  color: var(--nt-muted);
 }
 
 .content-spacer {

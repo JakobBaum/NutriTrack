@@ -77,6 +77,9 @@ export interface RecipeIngredient {
   unit: string;
   /** Verknüpfung zu einem FoodItem (für Nährwert-Summe), optional. */
   foodItemId?: string;
+  /** Nährwerte der Zutat in ihrer Bezugsmenge (z.B. per100g aus der Food-API),
+   *  Basis für die automatische Summierung. Fehlt bei manuellen Zutaten. */
+  facts?: NutritionFacts;
 }
 
 export type RecipeOrigin = 'own' | 'url' | 'tiktok' | 'photo' | 'text';
@@ -87,7 +90,9 @@ export interface Recipe {
   servings: number;
   ingredients: RecipeIngredient[];
   steps: string[];
-  /** Nährwerte je Portion (berechnet/geschätzt). */
+  /** Fertig gekochtes Gesamtgewicht in g (optional, informativ). */
+  cookedWeightG?: number;
+  /** Nährwerte je Portion (aus den Zutaten summiert / Portionen). */
   factsPerServing?: NutritionFacts;
   origin: RecipeOrigin;
   sourceUrl?: string;

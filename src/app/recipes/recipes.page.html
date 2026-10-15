@@ -5,19 +5,9 @@
 </ion-header>
 
 <ion-content>
-  <!-- Import-Stub -->
-  <button class="import-card" (click)="importStub()">
-    <ion-icon name="link-outline"></ion-icon>
-    <div>
-      <strong>Rezept importieren</strong>
-      <span>aus URL, TikTok oder Foto (bald)</span>
-    </div>
-    <ion-icon name="sparkles-outline" class="import-card__ai"></ion-icon>
-  </button>
-
   @if (recipes().length === 0) {
     <div class="empty">
-      <ion-icon name="book-outline" class="empty__icon"></ion-icon>
+      <ion-icon name="restaurant-outline" class="empty__icon"></ion-icon>
       <p>Noch keine Rezepte. Lege dein erstes Rezept an.</p>
     </div>
   } @else {
@@ -87,57 +77,201 @@
         <ion-text color="danger"><p class="form-error">{{ error() }}</p></ion-text>
       }
 
+      <span class="field-label">Name</span>
       <ion-list inset="true">
         <ion-item>
-          <ion-input label="Titel" labelPlacement="stacked" [(ngModel)]="form.title" placeholder="z.B. Pasta al Tonno"></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-input type="number" inputmode="numeric" label="Portionen" labelPlacement="stacked" [(ngModel)]="form.servings" placeholder="2"></ion-input>
+          <ion-input [(ngModel)]="form.title" placeholder="zum Beispiel Linsen-Dal"></ion-input>
         </ion-item>
       </ion-list>
 
-      <h4 class="form-sub">Zutaten</h4>
-      <ion-list inset="true">
-        @for (ing of form.ingredients; track $index) {
-          <ion-item>
-            <ion-input class="ing-name" [(ngModel)]="ing.name" placeholder="Zutat"></ion-input>
-            <ion-input class="ing-amount" type="number" inputmode="decimal" [(ngModel)]="ing.amount" placeholder="Menge"></ion-input>
-            <ion-input class="ing-unit" [(ngModel)]="ing.unit" placeholder="g"></ion-input>
-            <ion-button slot="end" fill="clear" size="small" color="medium" (click)="removeIngredientRow($index)" aria-label="Zutat entfernen">
-              <ion-icon slot="icon-only" name="close-outline"></ion-icon>
-            </ion-button>
-          </ion-item>
-        }
-      </ion-list>
-      <ion-button fill="clear" size="small" (click)="addIngredientRow()">
-        <ion-icon slot="start" name="add-outline"></ion-icon>
-        Zutat hinzufügen
+      <!-- Zutaten -->
+      <span class="field-label">Zutaten</span>
+      @if (form.ingredients.length) {
+        <ion-list inset="true" lines="full">
+          @for (ing of form.ingredients; track trackIndex($index)) {
+            <ion-item-sliding>
+              <ion-item>
+                <ion-label>
+                  <h3>{{ ing.name || 'Zutat' }}</h3>
+                  <p>
+                    @if (ing.facts) { {{ kcalOf(ing) }} kcal } @else { manuell }
+                  </p>
+                </ion-label>
+                <div class="ing-qty" slot="end">
+                  <ion-input type="number" inputmode="decimal" [(ngModel)]="ing.amount" aria-label="Menge"></ion-input>
+                  <ion-input class="ing-qty__unit" [(ngModel)]="ing.unit" aria-label="Einheit"></ion-input>
+                </div>
+              </ion-item>
+              <ion-item-options side="end">
+                <ion-item-option color="danger" (click)="removeIngredient($index)">
+                  <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+                </ion-item-option>
+              </ion-item-options>
+            </ion-item-sliding>
+          }
+        </ion-list>
+      }
+      <button class="dashed-add" (click)="openPicker()">
+        <ion-icon name="add-outline"></ion-icon> Zutat hinzufügen
+      </button>
+      <button class="link-add" (click)="addManualIngredient()">
+        <ion-icon name="create-outline"></ion-icon> manuelle Zutat
+      </button>
+
+      <!-- Live-Nährwerte -->
+      @if (hasNutrition()) {
+        <div class="nutri-card">
+          <div class="nutri-card__head">
+            <span>Nährwerte je Portion</span>
+            <span class="nutri-card__total">Gesamt {{ total().kcal }} kcal</span>
+          </div>
+          <div class="nutri-grid">
+            <div class="nutri-grid__cell">
+              <strong>{{ perServing().kcal }}</strong><span>kcal</span>
+            </div>
+            <div class="nutri-grid__cell">
+              <strong>{{ perServing().proteinG }} g</strong><span>Eiweiß</span>
+            </div>
+            <div class="nutri-grid__cell">
+              <strong>{{ perServing().carbsG }} g</strong><span>Kohlenh.</span>
+            </div>
+            <div class="nutri-grid__cell">
+              <strong>{{ perServing().fatG }} g</strong><span>Fett</span>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Fertig gekocht + Portionen -->
+      <div class="two-col">
+        <div>
+          <span class="field-label">Fertig gekocht</span>
+          <ion-list inset="true">
+            <ion-item>
+              <ion-input type="number" inputmode="numeric" [(ngModel)]="form.cookedWeightG" placeholder="0"></ion-input>
+              <ion-note slot="end">g</ion-note>
+            </ion-item>
+          </ion-list>
+        </div>
+        <div>
+          <span class="field-label">Portionen</span>
+          <ion-list inset="true">
+            <ion-item>
+              <ion-input type="number" inputmode="numeric" [(ngModel)]="form.servings" placeholder="4"></ion-input>
+            </ion-item>
+          </ion-list>
+        </div>
+      </div>
+
+      <!-- Zubereitung -->
+      <span class="field-label">Zubereitung</span>
+      @for (step of form.steps; track trackIndex($index)) {
+        <div class="step-row">
+          <span class="step-row__no">{{ $index + 1 }}</span>
+          <ion-textarea
+            [(ngModel)]="form.steps[$index]"
+            [autoGrow]="true"
+            rows="2"
+            placeholder="zum Beispiel 45 g Haferflocken mit 150 ml Milch 3 Minuten köcheln"
+          ></ion-textarea>
+          <ion-button fill="clear" size="small" color="medium" (click)="removeStep($index)" aria-label="Schritt entfernen">
+            <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+          </ion-button>
+        </div>
+      }
+      <button class="dashed-add" (click)="addStep()">
+        <ion-icon name="add-outline"></ion-icon> Schritt hinzufügen
+      </button>
+
+      <ion-button expand="block" class="ion-margin-top save-btn" (click)="save()">Rezept sichern</ion-button>
+    </ion-content>
+  </ng-template>
+</ion-modal>
+
+<!-- Zutaten-Picker modal -->
+<ion-modal [isOpen]="pickerOpen()" (didDismiss)="closePicker()">
+  <ng-template>
+    <ion-header class="ion-no-border">
+      <ion-toolbar>
+        <ion-title>Zutat hinzufügen</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="closePicker()">Abbrechen</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      <ion-searchbar
+        [(ngModel)]="pickerQuery"
+        (keyup.enter)="searchFood()"
+        (ionClear)="pickerResults.set([])"
+        placeholder="Suchen, zum Beispiel Reis"
+        inputmode="search"
+      ></ion-searchbar>
+      <button class="dashed-add dashed-add--accent" (click)="openBarcode()">
+        <ion-icon name="barcode-outline"></ion-icon> Barcode scannen
+      </button>
+      <ion-button size="small" fill="outline" (click)="searchFood()" [disabled]="pickerSearching()">
+        @if (pickerSearching()) { <ion-spinner name="dots"></ion-spinner> } @else { Suchen }
       </ion-button>
+      @if (pickerError()) {
+        <ion-text color="danger"><p class="form-error">{{ pickerError() }}</p></ion-text>
+      }
+      @if (pickerResults().length) {
+        <ion-list inset="true" lines="full">
+          @for (item of pickerResults(); track item.id) {
+            <ion-item button (click)="pickFood(item)">
+              <ion-label>
+                <h3>{{ item.name }}</h3>
+                <p>{{ item.brand }} · {{ item.facts.kcal }} kcal / 100 g</p>
+              </ion-label>
+              <ion-icon slot="end" name="add-circle" color="primary"></ion-icon>
+            </ion-item>
+          }
+        </ion-list>
+      }
+    </ion-content>
+  </ng-template>
+</ion-modal>
 
-      <h4 class="form-sub">Nährwerte je Portion</h4>
+<!-- Barcode-Scanner modal (im Picker) -->
+<ion-modal [isOpen]="bcOpen()" (didPresent)="onBarcodePresent()" (didDismiss)="onBarcodeDismiss()">
+  <ng-template>
+    <ion-header class="ion-no-border">
+      <ion-toolbar>
+        <ion-title>Barcode scannen</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="closeBarcode()">Schließen</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      <div class="scanner">
+        <video id="ingBarcodeVideo" #ingBarcodeVideo class="scanner__video" muted autoplay playsinline></video>
+        <div class="scanner__frame"></div>
+      </div>
+      <p class="scan-hint">Halte den Strichcode in den Rahmen — oder gib ihn manuell ein.</p>
+      @if (bcError()) {
+        <ion-text color="danger"><p class="form-error">{{ bcError() }}</p></ion-text>
+      }
       <ion-list inset="true">
         <ion-item>
-          <ion-input type="number" inputmode="numeric" label="Kalorien (kcal)" labelPlacement="stacked" [(ngModel)]="form.kcal" placeholder="0"></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-input type="number" inputmode="numeric" label="Eiweiß (g)" labelPlacement="stacked" [(ngModel)]="form.proteinG" placeholder="0"></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-input type="number" inputmode="numeric" label="Kohlenhydrate (g)" labelPlacement="stacked" [(ngModel)]="form.carbsG" placeholder="0"></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-input type="number" inputmode="numeric" label="Fett (g)" labelPlacement="stacked" [(ngModel)]="form.fatG" placeholder="0"></ion-input>
+          <ion-input
+            label="Barcode"
+            labelPlacement="stacked"
+            inputmode="numeric"
+            [(ngModel)]="manualBarcode"
+            (keyup.enter)="submitManualBarcode()"
+            placeholder="z.B. 4000417025005"
+          ></ion-input>
         </ion-item>
       </ion-list>
-
-      <h4 class="form-sub">Zubereitung (eine Zeile pro Schritt)</h4>
-      <ion-list inset="true">
-        <ion-item>
-          <ion-textarea [(ngModel)]="form.stepsText" [autoGrow]="true" rows="3" placeholder="Schritt 1&#10;Schritt 2"></ion-textarea>
-        </ion-item>
-      </ion-list>
-
-      <ion-button expand="block" class="ion-margin-top" (click)="save()">Speichern</ion-button>
+      <ion-button expand="block" (click)="submitManualBarcode()" [disabled]="bcLooking()">
+        @if (bcLooking()) {
+          <ion-spinner name="dots" slot="start"></ion-spinner> Suche…
+        } @else {
+          <ion-icon slot="start" name="search-outline"></ion-icon> Nachschlagen
+        }
+      </ion-button>
     </ion-content>
   </ng-template>
 </ion-modal>
