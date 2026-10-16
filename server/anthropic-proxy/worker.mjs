@@ -37,6 +37,12 @@ const PROMPTS = {
     '[{"restaurant":string,"itemName":string,"kcal":number,"proteinG":number,' +
     '"carbsG":number,"fatG":number,"rationale":string,"estPrice":number}]. ' +
     'Priorisiere proteinreiche Optionen mit gutem Verhältnis, bleibe im kcal-/Geld-Budget.',
+  importRecipe:
+    'Du extrahierst Rezepte in strukturiertes JSON. Antworte NUR mit JSON: ' +
+    '{"title":string,"servings":number,"ingredients":[{"name":string,"amount":number,"unit":string}],' +
+    '"steps":[string]}. ' +
+    'Mengen als Zahl, Einheit getrennt (z.B. "g","ml","EL","Stk"). servings als Ganzzahl (Standard 2). ' +
+    'Schreibe Zutaten und Schritte auf Deutsch. Keine Erklärung.',
 };
 
 const MAX_TOKENS = {
@@ -44,6 +50,7 @@ const MAX_TOKENS = {
   generateShoppingList: 1500,
   recognizeLabel: 500,
   suggestFastfood: 800,
+  importRecipe: 1500,
 };
 
 function corsHeaders(origin) {
@@ -72,8 +79,26 @@ function extractJson(text) {
   }
 }
 
+/** Holt eine URL serverseitig und reduziert HTML grob auf Text (löst Browser-CORS). */
+async function fetchUrlText(url) {
+  try {
+    const res = await fetch(url, { headers: { 'user-agent': 'NutriTrack/1.0' } });
+    if (!res.ok) return '';
+    const html = await res.text();
+    return html
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 12000);
+  } catch {
+    return '';
+  }
+}
+
 /** Baut den User-Content je Funktion (Text oder Vision-Blöcke). */
-function buildContent(fn, payload) {
+async function buildContent(fn, payload) {
   if (fn === 'recognizeLabel') {
     const basis = payload?.basis === 'perPortion' ? 'eine Portion' : '100 g';
     return {
@@ -84,6 +109,11 @@ function buildContent(fn, payload) {
         { type: 'text', text: 'Lies die Nährwerte vom Etikett.' },
       ],
     };
+  }
+  if (fn === 'importRecipe') {
+    const text = (payload?.text || '').trim();
+    const source = text || (payload?.url ? await fetchUrlText(payload.url) : '');
+    return { model: MODEL_LIGHT, system: PROMPTS.importRecipe, content: `Rezept-Quelle:\n${source}` };
   }
   return { model: MODEL_LIGHT, system: PROMPTS[fn], content: JSON.stringify(payload ?? {}) };
 }
@@ -108,6 +138,18 @@ function mapResult(fn, obj, payload) {
     const arr = Array.isArray(obj) ? obj : obj.items ?? [];
     return arr.map((i) => ({ restaurant: String(i.restaurant ?? payload?.restaurant ?? ''), itemName: String(i.itemName ?? ''), facts: { kcal: num(i.kcal), proteinG: num(i.proteinG), carbsG: num(i.carbsG), fatG: num(i.fatG), basis: 'perPortion' }, rationale: String(i.rationale ?? ''), estPrice: i.estPrice != null ? num(i.estPrice) : undefined }));
   }
+  if (fn === 'importRecipe') {
+    const ingredients = Array.isArray(obj.ingredients)
+      ? obj.ingredients.map((i) => ({ name: String(i.name ?? '').trim(), amount: num(i.amount), unit: String(i.unit ?? 'g').trim() || 'g' })).filter((i) => i.name)
+      : [];
+    return {
+      title: String(obj.title ?? 'Importiertes Rezept').trim() || 'Importiertes Rezept',
+      servings: Math.max(1, Math.round(num(obj.servings) || 2)),
+      ingredients,
+      steps: Array.isArray(obj.steps) ? obj.steps.map(String) : [],
+      sourceUrl: payload?.url,
+    };
+  }
   return obj;
 }
 
@@ -129,7 +171,7 @@ async function handle(request, env) {
   const fn = body?.fn;
   if (!PROMPTS[fn]) return new Response(JSON.stringify({ error: `Unbekannte Funktion: ${fn}` }), { status: 400, headers: corsHeaders(origin) });
 
-  const { model, system, content } = buildContent(fn, body.payload);
+  const { model, system, content } = await buildContent(fn, body.payload);
   const anthropicReq = { model, max_tokens: MAX_TOKENS[fn] || 800, system, messages: [{ role: 'user', content }] };
 
   const res = await fetch(ANTHROPIC_URL, {

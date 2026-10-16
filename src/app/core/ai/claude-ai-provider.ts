@@ -11,6 +11,8 @@ import { SettingsStore } from '../state/settings.store';
 import {
   AiProvider,
   LabelResult,
+  RecipeImportInput,
+  RecipeImportResult,
   ShoppingPlanRequest,
   ShoppingPlanResult,
 } from './ai-provider';
@@ -147,6 +149,34 @@ export class ClaudeAiProvider implements AiProvider {
       rationale: String(i['rationale'] ?? ''),
       estPrice: i['estPrice'] != null ? this.num(i['estPrice']) : undefined,
     }));
+  }
+
+  async importRecipe(input: RecipeImportInput): Promise<RecipeImportResult> {
+    const sys =
+      'Du extrahierst Rezepte in strukturiertes JSON. Antworte NUR mit JSON: ' +
+      '{"title":string,"servings":number,"ingredients":[{"name":string,"amount":number,"unit":string}],' +
+      '"steps":[string]}. ' +
+      'Mengen als Zahl, Einheit getrennt (z.B. "g","ml","EL","Stk"). servings als Ganzzahl (Standard 2). ' +
+      'Schreibe Zutaten und Schritte auf Deutsch. Keine Erklärung.';
+    const user = input.text?.trim()
+      ? `Rezept-Text:\n${input.text.trim()}`
+      : `Hole und extrahiere das Rezept von dieser URL: ${input.url ?? ''}`;
+    const obj = await this.callJson(sys, user, this.model(MODEL_LIGHT), 1500);
+    const ingredients = Array.isArray(obj['ingredients'])
+      ? (obj['ingredients'] as Record<string, unknown>[]).map((i) => ({
+          name: String(i['name'] ?? '').trim(),
+          amount: this.num(i['amount']),
+          unit: String(i['unit'] ?? 'g').trim() || 'g',
+        }))
+      : [];
+    const servings = Math.max(1, Math.round(this.num(obj['servings']) || 2));
+    return {
+      title: String(obj['title'] ?? 'Importiertes Rezept').trim() || 'Importiertes Rezept',
+      servings,
+      ingredients: ingredients.filter((i) => i.name),
+      steps: Array.isArray(obj['steps']) ? (obj['steps'] as unknown[]).map(String) : [],
+      sourceUrl: input.url,
+    };
   }
 
   // --- intern ---

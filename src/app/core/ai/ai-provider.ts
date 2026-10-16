@@ -40,6 +40,23 @@ export interface LabelResult {
   facts: NutritionFacts;
 }
 
+/** Eingabe für den Rezept-Import: entweder freier Text ODER eine URL. */
+export interface RecipeImportInput {
+  /** Eingefügter Rezept-Text (Zutaten + Zubereitung). */
+  text?: string;
+  /** Quell-URL (über Proxy/nativ geholt; im reinen Browser CORS-limitiert). */
+  url?: string;
+}
+
+/** Strukturiertes Rezept aus dem Import (noch ohne Nährwerte je Zutat). */
+export interface RecipeImportResult {
+  title: string;
+  servings: number;
+  ingredients: { name: string; amount: number; unit: string }[];
+  steps: string[];
+  sourceUrl?: string;
+}
+
 /**
  * Austauschbare KI-Schnittstelle. Konkrete Adapter: {@link MockAiProvider}
  * (deterministisch, kostenlos) und ClaudeAiProvider (Anthropic Messages API).
@@ -57,6 +74,9 @@ export interface AiProvider {
 
   /** Schlägt passende Fastfood-Optionen vor (proteinreich, im Budget). */
   suggestFastfood(req: FastFoodRequest): Promise<FastFoodSuggestion[]>;
+
+  /** Parst eingefügten Text oder eine URL zu einem strukturierten Rezept. */
+  importRecipe(input: RecipeImportInput): Promise<RecipeImportResult>;
 }
 
 /** DI-Token für den aktiven KI-Anbieter (Routing via {@link AiService}). */

@@ -9,6 +9,8 @@ import { SettingsStore } from '../state/settings.store';
 import {
   AiProvider,
   LabelResult,
+  RecipeImportInput,
+  RecipeImportResult,
   ShoppingPlanRequest,
   ShoppingPlanResult,
 } from './ai-provider';
@@ -66,5 +68,9 @@ export class AiService implements AiProvider {
 
   suggestFastfood(req: FastFoodRequest): Promise<FastFoodSuggestion[]> {
     return this.active().suggestFastfood(req);
+  }
+
+  importRecipe(input: RecipeImportInput): Promise<RecipeImportResult> {
+    return this.active().importRecipe(input);
   }
 }

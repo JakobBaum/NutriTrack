@@ -10,9 +10,18 @@ import { buildWeekPlan, priceItems } from '../shopping/shopping-generator';
 import {
   AiProvider,
   LabelResult,
+  RecipeImportInput,
+  RecipeImportResult,
   ShoppingPlanRequest,
   ShoppingPlanResult,
 } from './ai-provider';
+
+/** Erkennt "250 g Mehl", "2 EL Öl", "1 Zwiebel" am Zeilenanfang. */
+const INGREDIENT_RE = /^\s*(\d+(?:[.,]\d+)?)\s*([a-zA-ZäöüÄÖÜ.]+)?\s+(.+)$/;
+const UNITS = new Set([
+  'g', 'kg', 'mg', 'ml', 'l', 'el', 'tl', 'stk', 'stück', 'prise', 'prisen',
+  'packung', 'dose', 'dosen', 'bund', 'zehe', 'zehen', 'scheibe', 'scheiben', 'tasse', 'tassen',
+]);
 
 /**
  * Deterministischer KI-Anbieter für Entwicklung/Tests — **ohne Netzwerk, ohne Kosten**.
@@ -89,5 +98,56 @@ export class MockAiProvider implements AiProvider {
     return list.sort(
       (a, b) => b.facts.proteinG / b.facts.kcal - a.facts.proteinG / a.facts.kcal,
     );
+  }
+
+  /**
+   * Parst eingefügten Rezept-Text deterministisch (ohne Netzwerk). Zutaten-Zeilen
+   * werden per Muster erkannt, der Rest wird als Zubereitungsschritte behandelt.
+   * Für eine reine URL gibt es einen Platzhalter — echter Abruf erfolgt via Proxy.
+   */
+  async importRecipe(input: RecipeImportInput): Promise<RecipeImportResult> {
+    const text = (input.text ?? '').trim();
+    if (!text) {
+      return {
+        title: 'Importiertes Rezept',
+        servings: 2,
+        ingredients: [],
+        steps: input.url ? [`Quelle: ${input.url} (Text manuell einfügen).`] : [],
+        sourceUrl: input.url,
+      };
+    }
+
+    const lines = text
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    const title = lines[0] ?? 'Importiertes Rezept';
+    const body = lines.slice(1);
+
+    const ingredients: RecipeImportResult['ingredients'] = [];
+    const steps: string[] = [];
+    for (const line of body) {
+      const m = INGREDIENT_RE.exec(line);
+      const hasUnit = m && m[2] && UNITS.has(m[2].toLowerCase().replace('.', ''));
+      if (m && (hasUnit || !m[2])) {
+        const amount = Number(m[1].replace(',', '.'));
+        const unit = hasUnit ? m[2]!.toLowerCase().replace('.', '') : 'Stk';
+        ingredients.push({
+          name: m[3].trim(),
+          amount: Number.isFinite(amount) ? amount : 0,
+          unit,
+        });
+      } else {
+        steps.push(line);
+      }
+    }
+
+    return {
+      title,
+      servings: 2,
+      ingredients,
+      steps,
+      sourceUrl: input.url,
+    };
   }
 }

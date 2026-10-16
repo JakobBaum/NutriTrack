@@ -11,6 +11,8 @@ import { SettingsStore } from '../state/settings.store';
 import {
   AiProvider,
   LabelResult,
+  RecipeImportInput,
+  RecipeImportResult,
   ShoppingPlanRequest,
   ShoppingPlanResult,
 } from './ai-provider';
@@ -49,5 +51,9 @@ export class ProxyAiProvider implements AiProvider {
 
   suggestFastfood(req: FastFoodRequest): Promise<FastFoodSuggestion[]> {
     return this.call<FastFoodSuggestion[]>('suggestFastfood', req);
+  }
+
+  importRecipe(input: RecipeImportInput): Promise<RecipeImportResult> {
+    return this.call<RecipeImportResult>('importRecipe', input);
   }
 }
