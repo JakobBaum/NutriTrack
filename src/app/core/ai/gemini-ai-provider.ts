@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import {
@@ -216,15 +216,41 @@ export class GeminiAiProvider implements AiProvider {
       contents: [{ role: 'user', parts }],
       generationConfig: { maxOutputTokens: maxTokens, responseMimeType: 'application/json', temperature: 0 },
     };
-    const res = await firstValueFrom(
-      this.http.post<GeminiResponse>(url, body, {
-        headers: { 'x-goog-api-key': cfg.apiKey, 'content-type': 'application/json' },
-      }),
-    );
+    const res = await this.postWithRetry(url, body, cfg.apiKey);
     const text = (res.candidates?.[0]?.content?.parts ?? [])
       .map((p) => p.text ?? '')
       .join('\n');
     return this.extractJson(text);
+  }
+
+  /**
+   * POST mit Backoff-Retry bei transienten Gemini-Fehlern (503 überlastet,
+   * 429 Rate-Limit, 500). Gemini liefert bei Last häufig 503 — ein paar
+   * Wiederholungen mit wachsender Pause lösen das meist.
+   */
+  private async postWithRetry(
+    url: string,
+    body: unknown,
+    apiKey: string,
+    attempts = 3,
+  ): Promise<GeminiResponse> {
+    const headers = { 'x-goog-api-key': apiKey, 'content-type': 'application/json' };
+    let lastErr: unknown;
+    for (let i = 0; i < attempts; i++) {
+      try {
+        return await firstValueFrom(this.http.post<GeminiResponse>(url, body, { headers }));
+      } catch (e: unknown) {
+        lastErr = e;
+        const status = e instanceof HttpErrorResponse ? e.status : 0;
+        const transient = status === 503 || status === 429 || status === 500;
+        if (!transient || i === attempts - 1) break;
+        await new Promise((r) => setTimeout(r, 600 * (i + 1)));
+      }
+    }
+    if (lastErr instanceof HttpErrorResponse && lastErr.status === 503) {
+      throw new Error('Gemini ist gerade überlastet (503) — bitte in ein paar Sekunden erneut versuchen.');
+    }
+    throw lastErr;
   }
 
   /** Extrahiert das erste JSON-Objekt/-Array robust aus einer Modellantwort. */

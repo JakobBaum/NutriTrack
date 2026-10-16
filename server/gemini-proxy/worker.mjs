@@ -151,6 +151,23 @@ function mapResult(fn, obj, payload) {
   return obj;
 }
 
+/** POST an Gemini mit Backoff-Retry bei transienten Fehlern (503/429/500). */
+async function geminiFetchWithRetry(apiKey, geminiReq, attempts = 3) {
+  let res;
+  for (let i = 0; i < attempts; i++) {
+    res = await fetch(`${GEMINI_BASE}/${MODEL}:generateContent`, {
+      method: 'POST',
+      headers: { 'x-goog-api-key': apiKey, 'content-type': 'application/json' },
+      body: JSON.stringify(geminiReq),
+    });
+    if (res.ok) return res;
+    const transient = res.status === 503 || res.status === 429 || res.status === 500;
+    if (!transient || i === attempts - 1) return res;
+    await new Promise((r) => setTimeout(r, 600 * (i + 1)));
+  }
+  return res;
+}
+
 async function handle(request, env) {
   const origin = env.ALLOWED_ORIGIN || '*';
   if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders(origin) });
@@ -176,11 +193,7 @@ async function handle(request, env) {
     generationConfig: { maxOutputTokens: MAX_TOKENS[fn] || 800, responseMimeType: 'application/json', temperature: 0 },
   };
 
-  const res = await fetch(`${GEMINI_BASE}/${MODEL}:generateContent`, {
-    method: 'POST',
-    headers: { 'x-goog-api-key': apiKey, 'content-type': 'application/json' },
-    body: JSON.stringify(geminiReq),
-  });
+  const res = await geminiFetchWithRetry(apiKey, geminiReq);
   if (!res.ok) {
     const detail = await res.text();
     return new Response(JSON.stringify({ error: 'Gemini-Fehler', status: res.status, detail: detail.slice(0, 500) }), { status: 502, headers: corsHeaders(origin) });
