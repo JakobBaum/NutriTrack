@@ -5,17 +5,16 @@ import { StorageService } from '../storage/storage.service';
 const KEY_AI = 'ai-config';
 
 const DEFAULT_AI: AiConfig = {
-  // Claude ist der Standard-Anbieter: Die Anbindung ist fest verdrahtet und
+  // Gemini ist der Standard-Anbieter: Die Anbindung ist fest verdrahtet und
   // aktiviert sich automatisch, sobald ein API-Key hinterlegt ist. Ohne Key
   // routet der AiService sauber auf den kostenlosen Mock (siehe AiService.isLive).
-  provider: 'claude',
+  provider: 'gemini',
   endpoint: '',
   // Interner KI-Proxy (ein Server-Key für alle Nutzer). Leer = nicht gesetzt;
   // dann greift ein optionaler eigener Key, sonst der Mock.
   proxyUrl: '',
-  // Leer lassen: Der ClaudeAiProvider routet dann automatisch auf das günstige
-  // Modell (Haiku) bzw. Sonnet nur für Vision. Ein hier gesetzter Wert würde
-  // dieses Routing für ALLE Calls überschreiben (bewusster Experten-Override).
+  // Leer lassen: Der GeminiAiProvider nutzt dann automatisch gemini-3.8-flash.
+  // Ein hier gesetzter Wert überschreibt das Modell für ALLE Calls.
   model: '',
   apiKey: '',
 };

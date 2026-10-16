@@ -172,7 +172,7 @@ export interface FastFoodSuggestion {
 
 /** Konfiguration eines KI-Anbieters (lokal gespeichert). */
 export interface AiConfig {
-  provider: 'claude' | 'mock' | string;
+  provider: 'gemini' | 'mock' | string;
   apiKey?: string;
   endpoint?: string;
   model?: string;

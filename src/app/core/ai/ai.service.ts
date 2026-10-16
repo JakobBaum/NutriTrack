@@ -14,13 +14,13 @@ import {
   ShoppingPlanRequest,
   ShoppingPlanResult,
 } from './ai-provider';
-import { ClaudeAiProvider } from './claude-ai-provider';
+import { GeminiAiProvider } from './gemini-ai-provider';
 import { ProxyAiProvider } from './proxy-ai-provider';
 import { MockAiProvider } from './mock-ai-provider';
 
 /**
  * Laufzeit-Router über {@link AiProvider}. Wählt pro Aufruf den aktiven Anbieter
- * anhand der Einstellungen: `claude` nur, wenn Provider gewählt UND ein Key
+ * anhand der Einstellungen: `gemini` nur, wenn Provider gewählt UND ein Key
  * hinterlegt ist — sonst der kostenlose {@link MockAiProvider}. So funktionieren
  * alle KI-Flows auch ohne Key, und der Wechsel greift sofort ohne DI-Neuaufbau.
  */
@@ -28,7 +28,7 @@ import { MockAiProvider } from './mock-ai-provider';
 export class AiService implements AiProvider {
   private readonly settings = inject(SettingsStore);
   private readonly mock = inject(MockAiProvider);
-  private readonly claude = inject(ClaudeAiProvider);
+  private readonly gemini = inject(GeminiAiProvider);
   private readonly proxy = inject(ProxyAiProvider);
 
   /** True, wenn eine Proxy-URL hinterlegt ist (interner Key für alle Nutzer). */
@@ -36,10 +36,10 @@ export class AiService implements AiProvider {
     return !!this.settings.ai().proxyUrl?.trim();
   }
 
-  /** True, wenn ein eigener Claude-Key hinterlegt ist. */
+  /** True, wenn ein eigener Gemini-Key hinterlegt ist. */
   private hasOwnKey(): boolean {
     const cfg = this.settings.ai();
-    return cfg.provider === 'claude' && !!cfg.apiKey?.trim();
+    return cfg.provider === 'gemini' && !!cfg.apiKey?.trim();
   }
 
   /** True, wenn echte KI aktiv ist (Proxy ODER eigener Key) statt Mock. */
@@ -50,7 +50,7 @@ export class AiService implements AiProvider {
   /** Bevorzugt den geteilten Proxy, dann eigener Key, sonst kostenloser Mock. */
   private active(): AiProvider {
     if (this.hasProxy()) return this.proxy;
-    if (this.hasOwnKey()) return this.claude;
+    if (this.hasOwnKey()) return this.gemini;
     return this.mock;
   }
 

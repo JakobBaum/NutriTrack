@@ -64,7 +64,7 @@ export class SettingsPage {
 
   readonly providers = [
     { value: 'mock', label: 'Mock (Test, offline)' },
-    { value: 'claude', label: 'Claude (Anthropic)' },
+    { value: 'gemini', label: 'Gemini (Google)' },
   ];
 
   private readonly ranges = {

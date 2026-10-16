@@ -17,28 +17,27 @@ import {
   ShoppingPlanResult,
 } from './ai-provider';
 
-const DEFAULT_ENDPOINT = 'https://api.anthropic.com/v1/messages';
-// Modell-Routing: klein & günstig als Standard, größer nur für Vision.
-const MODEL_LIGHT = 'claude-haiku-4-5-20251001';
-const MODEL_VISION = 'claude-sonnet-4-6';
+const DEFAULT_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+// Ein Modell für alles — Gemini 3.8 Flash ist multimodal (Text + Vision).
+const MODEL_DEFAULT = 'gemini-3.8-flash';
 
-interface AnthropicTextBlock {
-  type: string;
+interface GeminiPart {
   text?: string;
 }
-interface AnthropicResponse {
-  content?: AnthropicTextBlock[];
+interface GeminiResponse {
+  candidates?: { content?: { parts?: GeminiPart[] } }[];
 }
 
 /**
- * KI-Anbieter über die **Anthropic Messages API** (Claude).
+ * KI-Anbieter über die **Google Gemini API** (Generative Language API).
  * Key/Endpoint/Modell kommen aus den lokal gespeicherten Einstellungen
- * ({@link SettingsStore}). Modell-Routing: {@link MODEL_LIGHT} für einfache,
- * strukturierte Tasks (günstig), {@link MODEL_VISION} nur für Etikett-Vision.
- * Alle Antworten werden als JSON erzwungen und defensiv geparst (Schema-Guard).
+ * ({@link SettingsStore}). Standardmodell {@link MODEL_DEFAULT} (multimodal) —
+ * ein in den Einstellungen gesetztes Modell überschreibt das. Alle Antworten
+ * werden per `responseMimeType: application/json` als JSON erzwungen und
+ * defensiv geparst (Schema-Guard).
  */
 @Injectable({ providedIn: 'root' })
-export class ClaudeAiProvider implements AiProvider {
+export class GeminiAiProvider implements AiProvider {
   private readonly http = inject(HttpClient);
   private readonly settings = inject(SettingsStore);
 
@@ -48,7 +47,7 @@ export class ClaudeAiProvider implements AiProvider {
       '{"kcal":number,"proteinG":number,"carbsG":number,"fatG":number,"fiberG":number,"sugarG":number}. ' +
       'Nutze Mifflin-St Jeor + Aktivitätsfaktor + Ziel-Anpassung. Keine Erklärung.';
     const user = `Profil: ${JSON.stringify(profile)}`;
-    const obj = await this.callJson(sys, user, this.model(MODEL_LIGHT), 400);
+    const obj = await this.callJson(sys, user, 400);
     return {
       kcal: this.num(obj['kcal']),
       proteinG: this.num(obj['proteinG']),
@@ -79,7 +78,7 @@ export class ClaudeAiProvider implements AiProvider {
       store: req.store,
       recipes: recipeTitles,
     });
-    const obj = await this.callJson(sys, user, this.model(MODEL_LIGHT), 1500);
+    const obj = await this.callJson(sys, user, 1500);
     const items = Array.isArray(obj['items'])
       ? (obj['items'] as Record<string, unknown>[]).map((i) => ({
           name: String(i['name'] ?? ''),
@@ -108,11 +107,11 @@ export class ClaudeAiProvider implements AiProvider {
       '{"name":string,"kcal":number,"proteinG":number,"carbsG":number,"fatG":number,' +
       '"fiberG":number,"sugarG":number}. ' +
       `Werte beziehen sich auf ${basis === 'per100g' ? '100 g' : 'eine Portion'}.`;
-    const content = [
-      { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageBase64 } },
-      { type: 'text', text: 'Lies die Nährwerte vom Etikett.' },
+    const parts = [
+      { inline_data: { mime_type: 'image/jpeg', data: imageBase64 } },
+      { text: 'Lies die Nährwerte vom Etikett.' },
     ];
-    const obj = await this.callJsonRaw(sys, content, this.model(MODEL_VISION), 500);
+    const obj = await this.callJsonRaw(sys, parts, 500);
     return {
       name: String(obj['name'] ?? 'Produkt'),
       facts: {
@@ -134,7 +133,7 @@ export class ClaudeAiProvider implements AiProvider {
       '"carbsG":number,"fatG":number,"rationale":string,"estPrice":number}]. ' +
       'Priorisiere proteinreiche Optionen mit gutem Verhältnis, bleibe im kcal-/Geld-Budget.';
     const user = JSON.stringify(req);
-    const parsed = await this.callJsonRaw(sys, user, this.model(MODEL_LIGHT), 800);
+    const parsed = await this.callJsonRaw(sys, [{ text: user }], 800);
     const arr = Array.isArray(parsed) ? parsed : (parsed['items'] as unknown[]) ?? [];
     return (arr as Record<string, unknown>[]).map((i) => ({
       restaurant: String(i['restaurant'] ?? req.restaurant),
@@ -161,7 +160,7 @@ export class ClaudeAiProvider implements AiProvider {
     const user = input.text?.trim()
       ? `Rezept-Text:\n${input.text.trim()}`
       : `Hole und extrahiere das Rezept von dieser URL: ${input.url ?? ''}`;
-    const obj = await this.callJson(sys, user, this.model(MODEL_LIGHT), 1500);
+    const obj = await this.callJson(sys, user, 1500);
     const ingredients = Array.isArray(obj['ingredients'])
       ? (obj['ingredients'] as Record<string, unknown>[]).map((i) => ({
           name: String(i['name'] ?? '').trim(),
@@ -181,9 +180,9 @@ export class ClaudeAiProvider implements AiProvider {
 
   // --- intern ---
 
-  private model(fallback: string): string {
+  private model(): string {
     const m = this.settings.ai().model?.trim();
-    return m && m.length > 0 ? m : fallback;
+    return m && m.length > 0 ? m : MODEL_DEFAULT;
   }
 
   private num(v: unknown): number {
@@ -196,42 +195,34 @@ export class ClaudeAiProvider implements AiProvider {
   private async callJson(
     system: string,
     userText: string,
-    model: string,
     maxTokens: number,
   ): Promise<Record<string, unknown>> {
-    return this.callJsonRaw(system, userText, model, maxTokens);
+    return this.callJsonRaw(system, [{ text: userText }], maxTokens);
   }
 
-  /** JSON-Call mit beliebigem Content (Text oder Vision-Blöcke). */
+  /** JSON-Call mit beliebigen Gemini-`parts` (Text oder Vision). */
   private async callJsonRaw(
     system: string,
-    content: unknown,
-    model: string,
+    parts: unknown[],
     maxTokens: number,
   ): Promise<Record<string, unknown> & unknown[]> {
     const cfg = this.settings.ai();
-    if (!cfg.apiKey) throw new Error('Kein Claude-API-Key in den Einstellungen hinterlegt.');
+    if (!cfg.apiKey) throw new Error('Kein Gemini-API-Key in den Einstellungen hinterlegt.');
 
-    const endpoint = cfg.endpoint?.trim() || DEFAULT_ENDPOINT;
+    const base = cfg.endpoint?.trim() || DEFAULT_BASE;
+    const url = `${base}/${this.model()}:generateContent`;
     const body = {
-      model,
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: 'user', content }],
+      system_instruction: { parts: [{ text: system }] },
+      contents: [{ role: 'user', parts }],
+      generationConfig: { maxOutputTokens: maxTokens, responseMimeType: 'application/json', temperature: 0 },
     };
     const res = await firstValueFrom(
-      this.http.post<AnthropicResponse>(endpoint, body, {
-        headers: {
-          'x-api-key': cfg.apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-          'content-type': 'application/json',
-        },
+      this.http.post<GeminiResponse>(url, body, {
+        headers: { 'x-goog-api-key': cfg.apiKey, 'content-type': 'application/json' },
       }),
     );
-    const text = (res.content ?? [])
-      .filter((b) => b.type === 'text')
-      .map((b) => b.text ?? '')
+    const text = (res.candidates?.[0]?.content?.parts ?? [])
+      .map((p) => p.text ?? '')
       .join('\n');
     return this.extractJson(text);
   }

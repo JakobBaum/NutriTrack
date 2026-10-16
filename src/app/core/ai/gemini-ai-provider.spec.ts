@@ -5,9 +5,12 @@ import {
   HttpTestingController,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
-import { ClaudeAiProvider } from './claude-ai-provider';
+import { GeminiAiProvider } from './gemini-ai-provider';
 import { SettingsStore } from '../state/settings.store';
 import { AiConfig, UserProfile } from '../models';
+
+const BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+const url = (model: string) => `${BASE}/${model}:generateContent`;
 
 const profile: UserProfile = {
   weightKg: 80,
@@ -25,17 +28,17 @@ const TARGET_JSON =
 const LABEL_JSON =
   '{"name":"Müsli","kcal":350,"proteinG":10,"carbsG":60,"fatG":6,"fiberG":8,"sugarG":15}';
 
-function anthropicReply(json: string) {
-  return { content: [{ type: 'text', text: json }] };
+function geminiReply(json: string) {
+  return { candidates: [{ content: { parts: [{ text: json }] } }] };
 }
 
 function configure(ai: Partial<AiConfig>): void {
   const store = TestBed.inject(SettingsStore);
-  store.setAi({ provider: 'claude', endpoint: '', model: '', apiKey: 'sk-test', ...ai });
+  store.setAi({ provider: 'gemini', endpoint: '', model: '', apiKey: 'test-key', ...ai });
 }
 
 let http: HttpTestingController;
-let provider: ClaudeAiProvider;
+let provider: GeminiAiProvider;
 
 beforeEach(() => {
   localStorage.clear();
@@ -44,64 +47,63 @@ beforeEach(() => {
     providers: [provideHttpClient(), provideHttpClientTesting()],
   });
   http = TestBed.inject(HttpTestingController);
-  provider = TestBed.inject(ClaudeAiProvider);
+  provider = TestBed.inject(GeminiAiProvider);
 });
 
 afterEach(() => http.verify());
 
-describe('ClaudeAiProvider — Modell-Routing (Kostenschutz)', () => {
-  it('nutzt das günstige Haiku-Modell für einfache Tasks, wenn kein Modell gesetzt ist', async () => {
+describe('GeminiAiProvider — Modell-Routing', () => {
+  it('nutzt gemini-3.8-flash als Standardmodell, wenn kein Modell gesetzt ist', async () => {
     // Arrange
     configure({ model: '' });
 
     // Act
     const promise = provider.computeTargets(profile);
-    const req = http.expectOne('https://api.anthropic.com/v1/messages');
+    const req = http.expectOne(url('gemini-3.8-flash'));
 
     // Assert
-    expect(req.request.body.model).toBe('claude-haiku-4-5-20251001');
-    expect(req.request.headers.get('x-api-key')).toBe('sk-test');
-    req.flush(anthropicReply(TARGET_JSON));
+    expect(req.request.headers.get('x-goog-api-key')).toBe('test-key');
+    req.flush(geminiReply(TARGET_JSON));
     await promise;
   });
 
-  it('nutzt Sonnet nur für die Vision-/Etikett-Erkennung', async () => {
+  it('nutzt dasselbe (multimodale) Modell für die Vision-/Etikett-Erkennung', async () => {
     // Arrange
     configure({ model: '' });
 
     // Act
     const promise = provider.recognizeLabel('deadbeef', 'per100g');
-    const req = http.expectOne('https://api.anthropic.com/v1/messages');
+    const req = http.expectOne(url('gemini-3.8-flash'));
 
     // Assert
-    expect(req.request.body.model).toBe('claude-sonnet-4-6');
-    req.flush(anthropicReply(LABEL_JSON));
+    expect(req.request.body.contents[0].parts[0].inline_data.data).toBe('deadbeef');
+    req.flush(geminiReply(LABEL_JSON));
     await promise;
   });
 
-  it('überschreibt das Routing, wenn in den Einstellungen ein Modell gesetzt ist', async () => {
+  it('überschreibt das Modell, wenn in den Einstellungen eines gesetzt ist', async () => {
     // Arrange
-    configure({ model: 'claude-opus-4-8' });
+    configure({ model: 'gemini-3.8-pro' });
 
     // Act
     const promise = provider.computeTargets(profile);
-    const req = http.expectOne('https://api.anthropic.com/v1/messages');
+    const req = http.expectOne(url('gemini-3.8-pro'));
 
     // Assert
-    expect(req.request.body.model).toBe('claude-opus-4-8');
-    req.flush(anthropicReply(TARGET_JSON));
+    expect(req.request.body.generationConfig.responseMimeType).toBe('application/json');
+    req.flush(geminiReply(TARGET_JSON));
     await promise;
   });
 });
 
-describe('ClaudeAiProvider — Robustheit', () => {
+describe('GeminiAiProvider — Robustheit', () => {
   it('wirft ohne API-Key einen klaren Fehler', async () => {
     // Arrange
     configure({ apiKey: '' });
 
     // Act / Assert
     await expect(provider.computeTargets(profile)).rejects.toThrow(/API-Key/);
-    http.expectNone('https://api.anthropic.com/v1/messages');
+    http.expectNone(url('gemini-3.8-flash'));
   });
 
   it('klemmt negative Nährwerte aus einer defekten Antwort auf 0', async () => {
@@ -110,8 +112,8 @@ describe('ClaudeAiProvider — Robustheit', () => {
 
     // Act
     const promise = provider.computeTargets(profile);
-    const req = http.expectOne('https://api.anthropic.com/v1/messages');
-    req.flush(anthropicReply('{"kcal":-500,"proteinG":-5,"carbsG":10,"fatG":3}'));
+    const req = http.expectOne(url('gemini-3.8-flash'));
+    req.flush(geminiReply('{"kcal":-500,"proteinG":-5,"carbsG":10,"fatG":3}'));
     const target = await promise;
 
     // Assert

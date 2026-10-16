@@ -1,20 +1,19 @@
 /**
- * NutriTrack KI-Proxy (serverless, host-agnostisch `fetch`-Handler).
+ * NutriTrack KI-Proxy (serverless, host-agnostischer `fetch`-Handler).
  *
- * Zweck: EIN interner Anthropic-API-Key für ALLE App-Nutzer. Der Key liegt
- * ausschließlich serverseitig in der Umgebungsvariable `ANTHROPIC_API_KEY` —
+ * Zweck: EIN interner Gemini-API-Key für ALLE App-Nutzer. Der Key liegt
+ * ausschließlich serverseitig in der Umgebungsvariable `GEMINI_API_KEY` —
  * niemals im Client. Die App ruft nur diesen Proxy, die System-Prompts sind
- * hier fix hinterlegt und pro Funktion gewählt. Modell-Routing: günstiges
- * Haiku als Standard, Sonnet nur für Vision (Etikett).
+ * hier fix hinterlegt und pro Funktion gewählt.
  *
  * Deploy: Cloudflare Workers (`wrangler deploy`), Vercel Edge oder Node.
  * Siehe README.md. CORS ist offen (öffentliche App) — bei Bedarf ALLOWED_ORIGIN
  * in der Umgebung setzen, um auf die eigene Domain zu beschränken.
  */
 
-const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
-const MODEL_LIGHT = 'claude-haiku-4-5-20251001';
-const MODEL_VISION = 'claude-sonnet-4-6';
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+// Ein Modell für alles — Gemini 3.8 Flash ist multimodal (Text + Vision).
+const MODEL = 'gemini-3.8-flash';
 
 // Fixe System-Prompts je Funktion (serverseitig, für alle Nutzer identisch).
 const PROMPTS = {
@@ -97,25 +96,24 @@ async function fetchUrlText(url) {
   }
 }
 
-/** Baut den User-Content je Funktion (Text oder Vision-Blöcke). */
+/** Baut System-Prompt + Gemini-`parts` je Funktion (Text oder Vision). */
 async function buildContent(fn, payload) {
   if (fn === 'recognizeLabel') {
     const basis = payload?.basis === 'perPortion' ? 'eine Portion' : '100 g';
     return {
-      model: MODEL_VISION,
       system: PROMPTS.recognizeLabel + ` Werte beziehen sich auf ${basis}.`,
-      content: [
-        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: payload.imageBase64 } },
-        { type: 'text', text: 'Lies die Nährwerte vom Etikett.' },
+      parts: [
+        { inline_data: { mime_type: 'image/jpeg', data: payload.imageBase64 } },
+        { text: 'Lies die Nährwerte vom Etikett.' },
       ],
     };
   }
   if (fn === 'importRecipe') {
     const text = (payload?.text || '').trim();
     const source = text || (payload?.url ? await fetchUrlText(payload.url) : '');
-    return { model: MODEL_LIGHT, system: PROMPTS.importRecipe, content: `Rezept-Quelle:\n${source}` };
+    return { system: PROMPTS.importRecipe, parts: [{ text: `Rezept-Quelle:\n${source}` }] };
   }
-  return { model: MODEL_LIGHT, system: PROMPTS[fn], content: JSON.stringify(payload ?? {}) };
+  return { system: PROMPTS[fn], parts: [{ text: JSON.stringify(payload ?? {}) }] };
 }
 
 /** Mappt die Modellantwort auf das App-Schema (gleiche Shapes wie die App erwartet). */
@@ -158,8 +156,8 @@ async function handle(request, env) {
   if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders(origin) });
   if (request.method !== 'POST') return new Response(JSON.stringify({ error: 'POST erwartet' }), { status: 405, headers: corsHeaders(origin) });
 
-  const apiKey = env.ANTHROPIC_API_KEY;
-  if (!apiKey) return new Response(JSON.stringify({ error: 'Server ohne ANTHROPIC_API_KEY konfiguriert.' }), { status: 500, headers: corsHeaders(origin) });
+  const apiKey = env.GEMINI_API_KEY;
+  if (!apiKey) return new Response(JSON.stringify({ error: 'Server ohne GEMINI_API_KEY konfiguriert.' }), { status: 500, headers: corsHeaders(origin) });
 
   let body;
   try {
@@ -171,21 +169,25 @@ async function handle(request, env) {
   const fn = body?.fn;
   if (!PROMPTS[fn]) return new Response(JSON.stringify({ error: `Unbekannte Funktion: ${fn}` }), { status: 400, headers: corsHeaders(origin) });
 
-  const { model, system, content } = await buildContent(fn, body.payload);
-  const anthropicReq = { model, max_tokens: MAX_TOKENS[fn] || 800, system, messages: [{ role: 'user', content }] };
+  const { system, parts } = await buildContent(fn, body.payload);
+  const geminiReq = {
+    system_instruction: { parts: [{ text: system }] },
+    contents: [{ role: 'user', parts }],
+    generationConfig: { maxOutputTokens: MAX_TOKENS[fn] || 800, responseMimeType: 'application/json', temperature: 0 },
+  };
 
-  const res = await fetch(ANTHROPIC_URL, {
+  const res = await fetch(`${GEMINI_BASE}/${MODEL}:generateContent`, {
     method: 'POST',
-    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify(anthropicReq),
+    headers: { 'x-goog-api-key': apiKey, 'content-type': 'application/json' },
+    body: JSON.stringify(geminiReq),
   });
   if (!res.ok) {
     const detail = await res.text();
-    return new Response(JSON.stringify({ error: 'Anthropic-Fehler', status: res.status, detail: detail.slice(0, 500) }), { status: 502, headers: corsHeaders(origin) });
+    return new Response(JSON.stringify({ error: 'Gemini-Fehler', status: res.status, detail: detail.slice(0, 500) }), { status: 502, headers: corsHeaders(origin) });
   }
 
   const data = await res.json();
-  const text = (data.content ?? []).filter((b) => b.type === 'text').map((b) => b.text ?? '').join('\n');
+  const text = (data.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? '').join('\n');
   try {
     const parsed = extractJson(text);
     return new Response(JSON.stringify(mapResult(fn, parsed, body.payload)), { headers: corsHeaders(origin) });
