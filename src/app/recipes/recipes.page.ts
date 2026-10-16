@@ -8,7 +8,9 @@ import {
   signal,
 } from '@angular/core';
 import type { IScannerControls } from '@zxing/browser';
-import { FoodItem, NutritionFacts, Recipe, RecipeIngredient } from '../core/models';
+import { ActionSheetController } from '@ionic/angular';
+import { FoodItem, MealType, NutritionFacts, Recipe, RecipeIngredient } from '../core/models';
+import { AiService } from '../core/ai/ai.service';
 import { FOOD_PROVIDER } from '../core/food/food-provider';
 import { BarcodeScannerService } from '../core/scan/barcode-scanner.service';
 import { DiaryStore } from '../core/state/diary.store';
@@ -36,6 +38,13 @@ function emptyForm(): RecipeForm {
   return { title: '', servings: 2, cookedWeightG: null, ingredients: [], steps: [''] };
 }
 
+const MEAL_OPTIONS: { value: MealType; label: string }[] = [
+  { value: 'breakfast', label: 'Frühstück' },
+  { value: 'lunch', label: 'Mittagessen' },
+  { value: 'dinner', label: 'Abendessen' },
+  { value: 'snack', label: 'Snack' },
+];
+
 /**
  * Rezepte: Liste eigener Rezepte, anlegen/bearbeiten, löschen und ins Tagebuch
  * loggen. Zutaten werden per Food-API (Textsuche + Barcode) befüllt; die
@@ -53,6 +62,21 @@ export class RecipesPage implements OnDestroy {
   private readonly diary = inject(DiaryStore);
   private readonly food = inject(FOOD_PROVIDER);
   private readonly barcode = inject(BarcodeScannerService);
+  private readonly actionSheets = inject(ActionSheetController);
+  private readonly ai = inject(AiService);
+
+  readonly mealOptions = MEAL_OPTIONS;
+
+  // --- Rezept-Import (Text/URL via KI) ---
+  readonly importOpen = signal(false);
+  readonly importBusy = signal(false);
+  readonly importError = signal<string | null>(null);
+  importText = '';
+  importUrl = '';
+
+  isLive(): boolean {
+    return this.ai.isLive();
+  }
 
   @ViewChild('ingBarcodeVideo') barcodeVideo?: ElementRef<HTMLVideoElement>;
 
@@ -139,6 +163,54 @@ export class RecipesPage implements OnDestroy {
     this.isModalOpen.set(false);
   }
 
+  // --- Import ---
+  openImport(): void {
+    this.importText = '';
+    this.importUrl = '';
+    this.importError.set(null);
+    this.importBusy.set(false);
+    this.importOpen.set(true);
+  }
+
+  closeImport(): void {
+    this.importOpen.set(false);
+  }
+
+  /** Parst Text/URL via KI zu einem Rezept und öffnet das Formular vorbefüllt. */
+  async runImport(): Promise<void> {
+    const text = this.importText.trim();
+    const url = this.importUrl.trim();
+    if (!text && !url) {
+      this.importError.set('Bitte Text einfügen oder eine URL angeben.');
+      return;
+    }
+    this.importError.set(null);
+    this.importBusy.set(true);
+    try {
+      const res = await this.ai.importRecipe({ text: text || undefined, url: url || undefined });
+      this.form = {
+        title: res.title,
+        servings: res.servings || 2,
+        cookedWeightG: null,
+        ingredients: res.ingredients.map((i) => ({ name: i.name, amount: i.amount, unit: i.unit })),
+        steps: res.steps.length ? [...res.steps] : [''],
+      };
+      this.editId.set(null);
+      this.error.set(null);
+      this.importOpen.set(false);
+      this.isModalOpen.set(true);
+      this.toastMessage.set(
+        this.isLive()
+          ? 'Rezept importiert — bitte prüfen und speichern.'
+          : 'Rezept aus Text erkannt (Mock) — Nährwerte ggf. je Zutat ergänzen.',
+      );
+    } catch {
+      this.importError.set('Import fehlgeschlagen — bitte Text einfügen oder erneut versuchen.');
+    } finally {
+      this.importBusy.set(false);
+    }
+  }
+
   // --- Zutaten ---
   removeIngredient(index: number): void {
     this.form.ingredients = this.form.ingredients.filter((_, i) => i !== index);
@@ -187,7 +259,7 @@ export class RecipesPage implements OnDestroy {
       this.pickerResults.set(await this.food.searchByText(q));
       if (this.pickerResults().length === 0) this.pickerError.set('Keine Treffer gefunden.');
     } catch {
-      this.pickerError.set('Suche fehlgeschlagen (Netzwerk?).');
+      this.pickerError.set('Suche fehlgeschlagen — bitte erneut versuchen.');
     } finally {
       this.pickerSearching.set(false);
     }
@@ -260,7 +332,7 @@ export class RecipesPage implements OnDestroy {
       this.closeBarcode();
       this.pickFood(item);
     } catch {
-      this.bcError.set('Barcode-Abfrage fehlgeschlagen (Netzwerk?).');
+      this.bcError.set('Barcode-Abfrage fehlgeschlagen — bitte erneut versuchen.');
     } finally {
       this.bcLooking.set(false);
     }
@@ -310,18 +382,37 @@ export class RecipesPage implements OnDestroy {
     this.store.remove(id);
   }
 
-  /** Loggt eine Portion des Rezepts in das heutige Tagebuch (Mittagessen). */
-  logToDiary(recipe: Recipe): void {
+  /**
+   * Loggt eine Portion des Rezepts ins heutige Tagebuch. Die Mahlzeit wird
+   * erst hier (beim Klick) abgefragt — sie wird nicht am Rezept gespeichert.
+   */
+  async logToDiary(recipe: Recipe): Promise<void> {
+    if (!recipe.factsPerServing) return;
+    const sheet = await this.actionSheets.create({
+      header: 'Als welche Mahlzeit loggen?',
+      buttons: [
+        ...this.mealOptions.map((m) => ({ text: m.label, data: m.value })),
+        { text: 'Abbrechen', role: 'cancel' },
+      ],
+    });
+    await sheet.present();
+    const { data, role } = await sheet.onDidDismiss<MealType>();
+    if (role === 'cancel' || !data) return;
+    this.logMeal(recipe, data);
+  }
+
+  private logMeal(recipe: Recipe, meal: MealType): void {
     if (!recipe.factsPerServing) return;
     this.diary.add({
       dateISO: toDateISO(),
-      meal: 'lunch',
+      meal,
       label: recipe.title,
       ref: { kind: 'recipe', recipeId: recipe.id },
       servings: 1,
       facts: recipe.factsPerServing,
     });
-    this.toastMessage.set(`„${recipe.title}" ins Tagebuch gelegt.`);
+    const mealLabel = this.mealOptions.find((m) => m.value === meal)?.label ?? 'Tagebuch';
+    this.toastMessage.set(`„${recipe.title}" als ${mealLabel} gelegt.`);
   }
 
   onToastDismiss(): void {

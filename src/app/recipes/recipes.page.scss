@@ -23,6 +23,28 @@ ion-content {
   }
 }
 
+// Einstieg "Rezept importieren" oben in der Liste
+.import-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px;
+  margin: 4px 0 10px;
+  background: var(--nt-surface-2);
+  border: 1.5px dashed rgba(56, 189, 248, 0.55);
+  border-radius: var(--nt-radius-sm);
+  color: var(--ion-color-primary);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+
+  ion-icon {
+    font-size: 18px;
+  }
+}
+
 .recipe {
   margin: 10px 0;
 
@@ -78,8 +100,17 @@ ion-content {
   }
 
   &--accent {
-    border-color: rgba(229, 72, 77, 0.5);
+    border-color: rgba(56, 189, 248, 0.55);
   }
+}
+
+// Editierbarer Zutatname (ersetzt die frühere read-only Überschrift)
+.ing-name {
+  font-weight: 700;
+  --padding-start: 0;
+  --padding-top: 2px;
+  --padding-bottom: 0;
+  min-height: 24px;
 }
 
 .link-add {
