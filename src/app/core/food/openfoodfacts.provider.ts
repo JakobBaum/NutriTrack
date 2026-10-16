@@ -1,13 +1,20 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { FoodItem, NutritionFacts } from '../models';
 import { makeId } from '../util/id';
 import { FoodProvider } from './food-provider';
 
-const SEARCH_URL = 'https://world.openfoodfacts.org/cgi/search.pl';
+const SEARCH_URL = 'https://world.openfoodfacts.org/api/v2/search';
 const PRODUCT_URL = 'https://world.openfoodfacts.org/api/v2/product';
 const FIELDS = 'code,product_name,brands,image_small_url,nutriments,serving_quantity';
+
+// OpenFoodFacts bittet um einen identifizierenden User-Agent. Nativ (Capacitor)
+// wird er mitgesendet; im Browser ist der Header "verboten" und wird still
+// ignoriert — schadet also nicht.
+const OFF_HEADERS = new HttpHeaders({
+  'User-Agent': 'NutriTrack/1.0 (https://github.com/jakob/nutritrack)',
+});
 
 interface OffNutriments {
   [k: string]: number | string | undefined;
@@ -21,9 +28,17 @@ interface OffProduct {
   nutriments?: OffNutriments;
 }
 
+/** Ein nicht gefundener Treffer (HTTP 404) ist kein Netzwerkfehler. */
+function isNotFound(e: unknown): boolean {
+  return e instanceof HttpErrorResponse && e.status === 404;
+}
+
 /**
  * Food-Datenquelle über die freie **OpenFoodFacts**-API (kein Key nötig).
  * Nährwerte werden auf 100 g bezogen (`per100g`) nach {@link NutritionFacts} gemappt.
+ *
+ * Fehlerverhalten: „nicht gefunden" liefert `[]` bzw. `null` (kein Wurf); nur
+ * echte Netz-/Serverfehler werfen, damit die UI sie als solche melden kann.
  */
 @Injectable({ providedIn: 'root' })
 export class OpenFoodFactsProvider implements FoodProvider {
@@ -32,34 +47,43 @@ export class OpenFoodFactsProvider implements FoodProvider {
   async searchByText(query: string, limit = 12): Promise<FoodItem[]> {
     const q = query.trim();
     if (!q) return [];
-    const res = await firstValueFrom(
-      this.http.get<{ products?: OffProduct[] }>(SEARCH_URL, {
-        params: {
-          search_terms: q,
-          search_simple: '1',
-          action: 'process',
-          json: '1',
-          page_size: String(limit),
-          fields: FIELDS,
-        },
-      }),
-    );
-    return (res.products ?? [])
-      .map((p) => this.toFoodItem(p))
-      .filter((f): f is FoodItem => f !== null);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<{ products?: OffProduct[] }>(SEARCH_URL, {
+          headers: OFF_HEADERS,
+          params: {
+            search_terms: q,
+            page_size: String(limit),
+            fields: FIELDS,
+          },
+        }),
+      );
+      return (res.products ?? [])
+        .map((p) => this.toFoodItem(p))
+        .filter((f): f is FoodItem => f !== null);
+    } catch (e: unknown) {
+      if (isNotFound(e)) return [];
+      throw e;
+    }
   }
 
   async lookupByBarcode(barcode: string): Promise<FoodItem | null> {
     const code = barcode.trim();
     if (!code) return null;
-    const res = await firstValueFrom(
-      this.http.get<{ status?: number; product?: OffProduct }>(
-        `${PRODUCT_URL}/${encodeURIComponent(code)}.json`,
-        { params: { fields: FIELDS } },
-      ),
-    );
-    if (!res.product || res.status === 0) return null;
-    return this.toFoodItem(res.product);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<{ status?: number; product?: OffProduct }>(
+          `${PRODUCT_URL}/${encodeURIComponent(code)}.json`,
+          { headers: OFF_HEADERS, params: { fields: FIELDS } },
+        ),
+      );
+      if (!res.product || res.status === 0) return null;
+      return this.toFoodItem(res.product);
+    } catch (e: unknown) {
+      // Unbekannter Barcode → 404: als „nicht gefunden" behandeln, nicht als Netzfehler.
+      if (isNotFound(e)) return null;
+      throw e;
+    }
   }
 
   private num(v: number | string | undefined): number {
