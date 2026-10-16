@@ -48,11 +48,21 @@ export interface RecipeImportInput {
   url?: string;
 }
 
-/** Strukturiertes Rezept aus dem Import (noch ohne Nährwerte je Zutat). */
+/** Eine Zutat aus dem Import — Nährwerte je Zutat optional (KI/Schätzung). */
+export interface RecipeImportIngredient {
+  name: string;
+  amount: number;
+  unit: string;
+  /** Nährwerte in ihrer Bezugsmenge (per100g bei g/ml, sonst perPortion je 1 Einheit).
+   *  Fehlt, wenn weder KI noch Schätzung einen Wert liefern — dann manuell eintragen. */
+  facts?: NutritionFacts;
+}
+
+/** Strukturiertes Rezept aus dem Import. */
 export interface RecipeImportResult {
   title: string;
   servings: number;
-  ingredients: { name: string; amount: number; unit: string }[];
+  ingredients: RecipeImportIngredient[];
   steps: string[];
   sourceUrl?: string;
 }

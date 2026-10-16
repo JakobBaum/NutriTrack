@@ -6,6 +6,7 @@ import {
   UserProfile,
 } from '../models';
 import { NutritionCalcService } from '../nutrition/nutrition-calc.service';
+import { estimateIngredientFacts } from '../nutrition/ingredient-estimate';
 import { buildWeekPlan, priceItems } from '../shopping/shopping-generator';
 import {
   AiProvider,
@@ -132,10 +133,13 @@ export class MockAiProvider implements AiProvider {
       if (m && (hasUnit || !m[2])) {
         const amount = Number(m[1].replace(',', '.'));
         const unit = hasUnit ? m[2]!.toLowerCase().replace('.', '') : 'Stk';
+        const name = m[3].trim();
         ingredients.push({
-          name: m[3].trim(),
+          name,
           amount: Number.isFinite(amount) ? amount : 0,
           unit,
+          // Bekannte Zutaten direkt mit Nährwerten (statt KI); sonst manuell.
+          facts: estimateIngredientFacts(name, unit),
         });
       } else {
         steps.push(line);

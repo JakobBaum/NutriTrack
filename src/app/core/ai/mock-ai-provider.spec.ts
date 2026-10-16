@@ -27,9 +27,24 @@ describe('MockAiProvider — importRecipe (Text-Parser)', () => {
     // Assert
     expect(res.title).toBe('Pfannkuchen');
     expect(res.ingredients).toHaveLength(3);
-    expect(res.ingredients[0]).toEqual({ name: 'Mehl', amount: 250, unit: 'g' });
-    expect(res.ingredients[1]).toEqual({ name: 'Eier', amount: 2, unit: 'Stk' });
+    expect(res.ingredients[0]).toMatchObject({ name: 'Mehl', amount: 250, unit: 'g' });
+    expect(res.ingredients[1]).toMatchObject({ name: 'Eier', amount: 2, unit: 'Stk' });
     expect(res.steps).toContain('Alles verrühren und in der Pfanne backen.');
+  });
+
+  it('schätzt Nährwerte für bekannte Zutaten (kcal + Makros) beim Import', async () => {
+    // Arrange
+    const text = ['Omelette', '3 Eier', '20 g Butter', '5 g Xyzpulver'].join('\n');
+
+    // Act
+    const res = await provider.importRecipe({ text });
+
+    // Assert — bekannte Zutaten bekommen Nährwerte, unbekannte bleiben manuell
+    const ei = res.ingredients.find((i) => i.name === 'Eier');
+    expect(ei?.facts?.kcal).toBeGreaterThan(0);
+    expect(ei?.facts?.proteinG).toBeGreaterThan(0);
+    const unknown = res.ingredients.find((i) => i.name.startsWith('Xyzpulver'));
+    expect(unknown?.facts).toBeUndefined();
   });
 
   it('gibt einen Platzhalter zurück, wenn nur eine URL angegeben ist', async () => {

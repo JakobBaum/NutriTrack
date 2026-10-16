@@ -5,6 +5,8 @@ import {
   DailyTarget,
   FastFoodRequest,
   FastFoodSuggestion,
+  NutritionBasis,
+  NutritionFacts,
   UserProfile,
 } from '../models';
 import { SettingsStore } from '../state/settings.store';
@@ -20,6 +22,8 @@ import {
 const DEFAULT_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 // Ein Modell für alles — Gemini 3.8 Flash ist multimodal (Text + Vision).
 const MODEL_DEFAULT = 'gemini-3.8-flash';
+// Einheiten, die 1:1 als Gramm/Milliliter gelten (→ Bezug per100g).
+const GRAM_UNITS = new Set(['g', 'gramm', 'gr', 'ml', 'milliliter']);
 
 interface GeminiPart {
   text?: string;
@@ -153,20 +157,28 @@ export class GeminiAiProvider implements AiProvider {
   async importRecipe(input: RecipeImportInput): Promise<RecipeImportResult> {
     const sys =
       'Du extrahierst Rezepte in strukturiertes JSON. Antworte NUR mit JSON: ' +
-      '{"title":string,"servings":number,"ingredients":[{"name":string,"amount":number,"unit":string}],' +
-      '"steps":[string]}. ' +
+      '{"title":string,"servings":number,"ingredients":[{"name":string,"amount":number,"unit":string,' +
+      '"facts":{"kcal":number,"proteinG":number,"carbsG":number,"fatG":number,"fiberG":number,"sugarG":number,' +
+      '"basis":"per100g"|"perPortion","portionG":number}}],"steps":[string]}. ' +
       'Mengen als Zahl, Einheit getrennt (z.B. "g","ml","EL","Stk"). servings als Ganzzahl (Standard 2). ' +
+      'Berechne für JEDE Zutat die Nährwerte (kcal + alle Makros): bei g/ml als Werte je 100 g (basis "per100g", ' +
+      'portionG weglassen); bei Stück/Löffel/Zehe usw. als Werte für EINE Einheit (basis "perPortion", ' +
+      'portionG = ungefähres Gewicht einer Einheit in g). Kennst du eine Zutat nicht, lass "facts" weg. ' +
       'Schreibe Zutaten und Schritte auf Deutsch. Keine Erklärung.';
     const user = input.text?.trim()
       ? `Rezept-Text:\n${input.text.trim()}`
       : `Hole und extrahiere das Rezept von dieser URL: ${input.url ?? ''}`;
-    const obj = await this.callJson(sys, user, 1500);
+    const obj = await this.callJson(sys, user, 2500);
     const ingredients = Array.isArray(obj['ingredients'])
-      ? (obj['ingredients'] as Record<string, unknown>[]).map((i) => ({
-          name: String(i['name'] ?? '').trim(),
-          amount: this.num(i['amount']),
-          unit: String(i['unit'] ?? 'g').trim() || 'g',
-        }))
+      ? (obj['ingredients'] as Record<string, unknown>[]).map((i) => {
+          const unit = String(i['unit'] ?? 'g').trim() || 'g';
+          return {
+            name: String(i['name'] ?? '').trim(),
+            amount: this.num(i['amount']),
+            unit,
+            facts: this.parseIngredientFacts(i['facts'], unit),
+          };
+        })
       : [];
     const servings = Math.max(1, Math.round(this.num(obj['servings']) || 2));
     return {
@@ -175,6 +187,39 @@ export class GeminiAiProvider implements AiProvider {
       ingredients: ingredients.filter((i) => i.name),
       steps: Array.isArray(obj['steps']) ? (obj['steps'] as unknown[]).map(String) : [],
       sourceUrl: input.url,
+    };
+  }
+
+  /** Parst die von der KI gelieferten Zutat-Nährwerte defensiv; Basis wird
+   *  aus der Einheit abgeleitet, falls die KI keine gültige Basis liefert. */
+  private parseIngredientFacts(raw: unknown, unit: string): NutritionFacts | undefined {
+    if (!raw || typeof raw !== 'object') return undefined;
+    const f = raw as Record<string, unknown>;
+    const kcal = this.num(f['kcal']);
+    const proteinG = this.num(f['proteinG']);
+    const carbsG = this.num(f['carbsG']);
+    const fatG = this.num(f['fatG']);
+    // Reine Null-Werte (z.B. Wasser/Salz liefern 0) nur verwerfen, wenn ALLES 0 ist.
+    if (kcal === 0 && proteinG === 0 && carbsG === 0 && fatG === 0) return undefined;
+
+    const gramUnit = GRAM_UNITS.has(unit.toLowerCase());
+    const rawBasis = String(f['basis'] ?? '');
+    const basis: NutritionBasis =
+      rawBasis === 'per100g' || rawBasis === 'perPortion'
+        ? (rawBasis as NutritionBasis)
+        : gramUnit
+          ? 'per100g'
+          : 'perPortion';
+    const portionG = basis === 'perPortion' ? this.num(f['portionG']) || 50 : undefined;
+    return {
+      kcal,
+      proteinG,
+      carbsG,
+      fatG,
+      fiberG: this.num(f['fiberG']),
+      sugarG: this.num(f['sugarG']),
+      basis,
+      portionG,
     };
   }
 

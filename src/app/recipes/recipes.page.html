@@ -103,9 +103,15 @@
                     placeholder="Zutat benennen"
                     aria-label="Zutatname"
                   ></ion-input>
-                  <p>
-                    @if (ing.facts) { {{ kcalOf(ing) }} kcal } @else { manuell }
-                  </p>
+                  <button class="ing-facts-toggle" type="button" (click)="toggleIngredient($index)"
+                          [attr.aria-expanded]="isExpanded($index)">
+                    @if (ing.facts) {
+                      <span>{{ kcalOf(ing) }} kcal</span>
+                    } @else {
+                      <span class="ing-facts-toggle--missing">Nährwerte fehlen</span>
+                    }
+                    <ion-icon [name]="isExpanded($index) ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
+                  </button>
                 </ion-label>
                 <div class="ing-qty" slot="end">
                   <ion-input type="number" inputmode="decimal" [(ngModel)]="ing.amount" aria-label="Menge"></ion-input>
@@ -118,6 +124,40 @@
                 </ion-item-option>
               </ion-item-options>
             </ion-item-sliding>
+            @if (isExpanded($index)) {
+              <div class="ing-detail">
+                @if (ing.facts) {
+                  <div class="ing-detail__grid">
+                    <div><strong>{{ factsOf(ing).kcal }}</strong><span>kcal</span></div>
+                    <div><strong>{{ factsOf(ing).proteinG }} g</strong><span>Eiweiß</span></div>
+                    <div><strong>{{ factsOf(ing).carbsG }} g</strong><span>Kohlenh.</span></div>
+                    <div><strong>{{ factsOf(ing).fatG }} g</strong><span>Fett</span></div>
+                    <div><strong>{{ factsOf(ing).fiberG }} g</strong><span>Ballast.</span></div>
+                    <div><strong>{{ factsOf(ing).sugarG }} g</strong><span>Zucker</span></div>
+                  </div>
+                  <p class="ing-detail__note">
+                    Werte für {{ ing.amount || 0 }} {{ ing.unit }}. Zum Korrigieren die Felder je 100 g unten anpassen.
+                  </p>
+                  <div class="ing-detail__inputs">
+                    <label>kcal/100g <ion-input type="number" inputmode="decimal" [(ngModel)]="ing.facts.kcal" aria-label="kcal je 100g"></ion-input></label>
+                    <label>Eiweiß <ion-input type="number" inputmode="decimal" [(ngModel)]="ing.facts.proteinG" aria-label="Eiweiß je 100g"></ion-input></label>
+                    <label>Kohlenh. <ion-input type="number" inputmode="decimal" [(ngModel)]="ing.facts.carbsG" aria-label="Kohlenhydrate je 100g"></ion-input></label>
+                    <label>Fett <ion-input type="number" inputmode="decimal" [(ngModel)]="ing.facts.fatG" aria-label="Fett je 100g"></ion-input></label>
+                    <label>Ballast. <ion-input type="number" inputmode="decimal" [(ngModel)]="ing.facts.fiberG" aria-label="Ballaststoffe je 100g"></ion-input></label>
+                    <label>Zucker <ion-input type="number" inputmode="decimal" [(ngModel)]="ing.facts.sugarG" aria-label="Zucker je 100g"></ion-input></label>
+                  </div>
+                } @else {
+                  <p class="ing-detail__hint">
+                    <ion-icon name="information-circle-outline"></ion-icon>
+                    Für diese Zutat sind keine Nährwerte hinterlegt. Bitte je 100 g eintragen,
+                    damit sie in die Rezept-Summe einfließt.
+                  </p>
+                  <ion-button size="small" fill="outline" (click)="enableManualFacts(ing)">
+                    <ion-icon slot="start" name="create-outline"></ion-icon> Nährwerte eintragen
+                  </ion-button>
+                }
+              </div>
+            }
           }
         </ion-list>
       }

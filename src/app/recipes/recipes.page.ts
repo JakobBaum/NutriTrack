@@ -15,7 +15,12 @@ import { FOOD_PROVIDER } from '../core/food/food-provider';
 import { BarcodeScannerService } from '../core/scan/barcode-scanner.service';
 import { DiaryStore } from '../core/state/diary.store';
 import { RecipeDraft, RecipeStore } from '../core/state/recipe.store';
-import { perServingFacts, totalFacts, hasNutrition } from '../core/nutrition/recipe-nutrition';
+import {
+  perServingFacts,
+  totalFacts,
+  hasNutrition,
+  ingredientFacts,
+} from '../core/nutrition/recipe-nutrition';
 import { toDateISO } from '../core/util/date';
 
 interface IngredientForm {
@@ -192,7 +197,12 @@ export class RecipesPage implements OnDestroy {
         title: res.title,
         servings: res.servings || 2,
         cookedWeightG: null,
-        ingredients: res.ingredients.map((i) => ({ name: i.name, amount: i.amount, unit: i.unit })),
+        ingredients: res.ingredients.map((i) => ({
+          name: i.name,
+          amount: i.amount,
+          unit: i.unit,
+          facts: i.facts,
+        })),
         steps: res.steps.length ? [...res.steps] : [''],
       };
       this.editId.set(null);
@@ -221,7 +231,39 @@ export class RecipesPage implements OnDestroy {
   }
 
   kcalOf(ing: IngredientForm): number {
-    return totalFacts([{ name: ing.name, amount: this.toNum(ing.amount), unit: ing.unit, facts: ing.facts }]).kcal;
+    return this.factsOf(ing).kcal;
+  }
+
+  /** Skalierte Nährwerte einer Zutat (für Menge/Einheit) zur Detail-Anzeige. */
+  factsOf(ing: IngredientForm): NutritionFacts {
+    return ingredientFacts({
+      name: ing.name,
+      amount: this.toNum(ing.amount),
+      unit: ing.unit,
+      facts: ing.facts,
+    });
+  }
+
+  // --- Zutat-Detail (Nährwerte ansehen / manuell eintragen) ---
+  readonly expandedIndex = signal<number | null>(null);
+
+  toggleIngredient(index: number): void {
+    this.expandedIndex.set(this.expandedIndex() === index ? null : index);
+  }
+
+  isExpanded(index: number): boolean {
+    return this.expandedIndex() === index;
+  }
+
+  /** Legt ein leeres Nährwert-Objekt (je 100 g) für die manuelle Eingabe an. */
+  enableManualFacts(ing: IngredientForm): void {
+    if (ing.facts) return;
+    ing.facts = { kcal: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0, basis: 'per100g' };
+  }
+
+  /** True, wenn die Zutat (noch) keine Nährwerte hat → Hinweis zum Eintragen. */
+  needsManualFacts(ing: IngredientForm): boolean {
+    return !ing.facts;
   }
 
   // --- Schritte ---
