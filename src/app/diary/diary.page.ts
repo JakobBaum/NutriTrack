@@ -9,7 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import type { IScannerControls } from '@zxing/browser';
-import { DiaryEntry, FastFoodSuggestion, FoodItem, MealType, NutritionFacts } from '../core/models';
+import { DiaryEntry, FastFoodSuggestion, FoodItem, MealType, NutritionFacts, Recipe } from '../core/models';
 import { AiService } from '../core/ai/ai.service';
 import { FOOD_PROVIDER } from '../core/food/food-provider';
 import { CameraService } from '../core/scan/camera.service';
@@ -17,6 +17,8 @@ import { BarcodeScannerService } from '../core/scan/barcode-scanner.service';
 import { OpenPricesProvider } from '../core/price/open-prices.provider';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
+import { RecipeStore } from '../core/state/recipe.store';
+import { CustomFood, CustomFoodStore } from '../core/state/custom-food.store';
 import { addDaysISO, dayLabel, toDateISO } from '../core/util/date';
 
 interface MealGroup {
@@ -70,6 +72,8 @@ interface FastFoodForm {
 export class DiaryPage implements OnDestroy {
   private readonly diary = inject(DiaryStore);
   private readonly profileStore = inject(ProfileStore);
+  private readonly recipeStore = inject(RecipeStore);
+  private readonly customFoods = inject(CustomFoodStore);
   private readonly food = inject(FOOD_PROVIDER);
   private readonly ai = inject(AiService);
   private readonly camera = inject(CameraService);
@@ -114,6 +118,39 @@ export class DiaryPage implements OnDestroy {
   readonly error = signal<string | null>(null);
   form: EntryForm = { ...EMPTY_FORM };
 
+  /** Gewähltes Rezept (für die ref des Eintrags), null bei manuell/Food. */
+  private pickedRecipeId: string | null = null;
+
+  /** Freitext-Filter für die Rezept-Auswahl im Add-Modal. */
+  readonly recipeQuery = signal('');
+
+  /** Rezepte mit Nährwerten je Portion, optional nach Titel gefiltert. */
+  readonly recipeOptions = computed<Recipe[]>(() => {
+    const q = this.recipeQuery().trim().toLowerCase();
+    const withFacts = this.recipeStore.recipes().filter((r) => !!r.factsPerServing);
+    return q ? withFacts.filter((r) => r.title.toLowerCase().includes(q)) : withFacts;
+  });
+
+  /** True, wenn es überhaupt loggbare Rezepte gibt (für die Sektion-Anzeige). */
+  readonly hasLoggableRecipes = computed(() =>
+    this.recipeStore.recipes().some((r) => !!r.factsPerServing),
+  );
+
+  /** Zeigt die manuellen Eingabefelder erst nach Klick / Auswahl. */
+  readonly showManualForm = signal(false);
+
+  /** Freitext-Filter für gespeicherte (eigene) Lebensmittel. */
+  readonly customQuery = signal('');
+
+  /** Gespeicherte manuelle Lebensmittel, optional nach Name gefiltert. */
+  readonly customFoodOptions = computed<CustomFood[]>(() => {
+    const q = this.customQuery().trim().toLowerCase();
+    const all = this.customFoods.foods();
+    return q ? all.filter((f) => f.name.toLowerCase().includes(q)) : all;
+  });
+
+  readonly hasCustomFoods = computed(() => this.customFoods.foods().length > 0);
+
   // --- Food search ---
   searchQuery = '';
   readonly searchResults = signal<FoodItem[]>([]);
@@ -156,11 +193,27 @@ export class DiaryPage implements OnDestroy {
 
   openAdd(meal: MealType = 'breakfast'): void {
     this.form = { ...EMPTY_FORM, meal };
+    this.pickedRecipeId = null;
+    this.recipeQuery.set('');
+    this.customQuery.set('');
+    this.showManualForm.set(false);
     this.searchQuery = '';
     this.searchResults.set([]);
     this.hint.set(null);
     this.error.set(null);
     this.isModalOpen.set(true);
+  }
+
+  /** Blendet die manuellen Eingabefelder ein (eigener Button). */
+  openManualEntry(): void {
+    this.form.label = this.form.label || '';
+    this.showManualForm.set(true);
+  }
+
+  /** Übernimmt ein gespeichertes eigenes Lebensmittel als Eintrag. */
+  selectCustomFood(food: CustomFood): void {
+    this.applyFacts(food.name, food.facts);
+    this.hint.set('Gespeichertes Lebensmittel übernommen — bei Bedarf anpassen.');
   }
 
   closeAdd(): void {
@@ -184,7 +237,7 @@ export class DiaryPage implements OnDestroy {
       this.searchResults.set(await this.food.searchByText(q));
       if (this.searchResults().length === 0) this.hint.set('Keine Treffer gefunden.');
     } catch {
-      this.error.set('Suche fehlgeschlagen (Netzwerk?).');
+      this.error.set('Suche fehlgeschlagen — bitte erneut versuchen.');
     } finally {
       this.searching.set(false);
     }
@@ -192,6 +245,10 @@ export class DiaryPage implements OnDestroy {
 
   /** Schreibt Name + Nährwerte (pro 100 g) in das Formular. */
   private applyFacts(name: string, facts: NutritionFacts): void {
+    // Food/Barcode/Etikett → kein Rezeptbezug mehr.
+    this.pickedRecipeId = null;
+    // Gefüllte Werte sichtbar machen (Felder sind sonst eingeklappt).
+    this.showManualForm.set(true);
     this.form.label = name;
     this.form.kcal = Math.round(facts.kcal);
     this.form.proteinG = Math.round(facts.proteinG);
@@ -207,6 +264,20 @@ export class DiaryPage implements OnDestroy {
     this.searchResults.set([]);
     this.searchQuery = '';
     this.hint.set('Werte pro 100 g übernommen — bei Bedarf anpassen.');
+  }
+
+  /**
+   * Übernimmt ein Rezept (Nährwerte je Portion) als Eintrag. Die im Modal
+   * gewählte Mahlzeit bleibt bestehen, wird aber auf die Rezept-Vorgabe
+   * gesetzt, falls vorhanden.
+   */
+  selectRecipe(recipe: Recipe): void {
+    if (!recipe.factsPerServing) return;
+    this.applyFacts(recipe.title, recipe.factsPerServing);
+    this.pickedRecipeId = recipe.id;
+    this.searchResults.set([]);
+    this.searchQuery = '';
+    this.hint.set('Rezept übernommen (je Portion) — Menge/Mahlzeit anpassbar.');
   }
 
   /** Nimmt per nativer Kamera ein Etiketten-Foto auf und erkennt es per KI. */
@@ -318,7 +389,7 @@ export class DiaryPage implements OnDestroy {
           : `Barcode erkannt: ${item.name} — Werte pro 100 g übernommen.`,
       );
     } catch {
-      this.bcError.set('Barcode-Abfrage fehlgeschlagen (Netzwerk?).');
+      this.bcError.set('Barcode-Abfrage fehlgeschlagen — bitte erneut versuchen.');
     } finally {
       this.bcLooking.set(false);
     }
@@ -347,20 +418,25 @@ export class DiaryPage implements OnDestroy {
       this.error.set('Bitte gültige Kalorien (kcal) eingeben.');
       return;
     }
+    const facts: NutritionFacts = {
+      kcal: Math.round(kcal),
+      proteinG: this.toNum(this.form.proteinG),
+      carbsG: this.toNum(this.form.carbsG),
+      fatG: this.toNum(this.form.fatG),
+      fiberG: this.toNum(this.form.fiberG),
+      sugarG: this.toNum(this.form.sugarG),
+      basis: 'perPortion',
+    };
     this.diary.add({
       dateISO: this.selectedDate(),
       meal: this.form.meal,
       label,
-      facts: {
-        kcal: Math.round(kcal),
-        proteinG: this.toNum(this.form.proteinG),
-        carbsG: this.toNum(this.form.carbsG),
-        fatG: this.toNum(this.form.fatG),
-        fiberG: this.toNum(this.form.fiberG),
-        sugarG: this.toNum(this.form.sugarG),
-        basis: 'perPortion',
-      },
+      ref: this.pickedRecipeId ? { kind: 'recipe', recipeId: this.pickedRecipeId } : undefined,
+      servings: this.pickedRecipeId ? 1 : undefined,
+      facts,
     });
+    // Nicht-Rezept-Einträge für spätere Wiederverwendung merken.
+    if (!this.pickedRecipeId) this.customFoods.save(label, facts);
     this.closeAdd();
   }
 

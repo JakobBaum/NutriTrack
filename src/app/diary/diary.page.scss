@@ -96,6 +96,28 @@ ion-content {
   color: var(--nt-muted);
 }
 
+// Eigener Button, der die manuellen Eingabefelder einblendet
+.manual-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px;
+  margin: 10px 0 4px;
+  background: var(--nt-surface-2);
+  border: 1.5px dashed rgba(56, 189, 248, 0.55);
+  border-radius: var(--nt-radius-sm);
+  color: var(--ion-color-primary);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+
+  ion-icon {
+    font-size: 18px;
+  }
+}
+
 .scan-row {
   display: flex;
   flex-wrap: wrap;

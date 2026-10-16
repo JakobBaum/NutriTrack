@@ -3,6 +3,7 @@ import { ActivityLevel, AiConfig, Goal, Sex, UserProfile } from '../core/models'
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { RecipeStore } from '../core/state/recipe.store';
+import { CustomFoodStore } from '../core/state/custom-food.store';
 import { SettingsStore } from '../core/state/settings.store';
 import { ShoppingStore } from '../core/state/shopping.store';
 
@@ -22,6 +23,7 @@ export class SettingsPage {
   private readonly settingsStore = inject(SettingsStore);
   private readonly diary = inject(DiaryStore);
   private readonly recipes = inject(RecipeStore);
+  private readonly customFoods = inject(CustomFoodStore);
   private readonly shopping = inject(ShoppingStore);
 
   readonly target = this.profileStore.target;
@@ -126,6 +128,7 @@ export class SettingsPage {
     this.profileStore.clear();
     this.diary.clear();
     this.recipes.clear();
+    this.customFoods.clear();
     this.shopping.clear();
     this.settingsStore.clear();
     this.ai = { ...this.settingsStore.ai() };

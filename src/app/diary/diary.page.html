@@ -133,42 +133,102 @@
         </ion-list>
       }
 
-      <ion-list inset="true">
-        <ion-item>
-          <ion-input label="Name" labelPlacement="stacked" [(ngModel)]="form.label" placeholder="z.B. Haferflocken"></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-select label="Mahlzeit" labelPlacement="stacked" [(ngModel)]="form.meal" interface="popover">
-            @for (opt of mealOptions; track opt.value) {
-              <ion-select-option [value]="opt.value">{{ opt.label }}</ion-select-option>
+      <!-- Aus eigenem Rezept übernehmen (Nährwerte je Portion) -->
+      @if (hasLoggableRecipes()) {
+        <h4 class="form-sub">Aus Rezept</h4>
+        <ion-searchbar
+          [ngModel]="recipeQuery()"
+          (ngModelChange)="recipeQuery.set($event)"
+          placeholder="Rezept suchen…"
+          inputmode="search"
+        ></ion-searchbar>
+        @if (recipeOptions().length) {
+          <ion-list inset="true" lines="full">
+            @for (recipe of recipeOptions(); track recipe.id) {
+              <ion-item button (click)="selectRecipe(recipe)">
+                <ion-label>
+                  <h3>{{ recipe.title }}</h3>
+                  <p>{{ recipe.factsPerServing?.kcal }} kcal / Portion</p>
+                </ion-label>
+                <ion-icon slot="end" name="add-circle" color="primary"></ion-icon>
+              </ion-item>
             }
-          </ion-select>
-        </ion-item>
-        <ion-item>
-          <ion-input type="number" inputmode="numeric" label="Kalorien (kcal)" labelPlacement="stacked" [(ngModel)]="form.kcal" placeholder="0"></ion-input>
-        </ion-item>
-      </ion-list>
+          </ion-list>
+        } @else {
+          <p class="scan-hint">Kein Rezept gefunden.</p>
+        }
+      }
 
-      <h4 class="form-sub">Makros (optional, in g)</h4>
-      <ion-list inset="true">
-        <ion-item>
-          <ion-input type="number" inputmode="numeric" label="Eiweiß" labelPlacement="stacked" [(ngModel)]="form.proteinG" placeholder="0"></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-input type="number" inputmode="numeric" label="Kohlenhydrate" labelPlacement="stacked" [(ngModel)]="form.carbsG" placeholder="0"></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-input type="number" inputmode="numeric" label="Fett" labelPlacement="stacked" [(ngModel)]="form.fatG" placeholder="0"></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-input type="number" inputmode="numeric" label="Ballaststoffe" labelPlacement="stacked" [(ngModel)]="form.fiberG" placeholder="0"></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-input type="number" inputmode="numeric" label="Zucker" labelPlacement="stacked" [(ngModel)]="form.sugarG" placeholder="0"></ion-input>
-        </ion-item>
-      </ion-list>
+      <!-- Gespeicherte eigene Lebensmittel (Wiederverwendung) -->
+      @if (hasCustomFoods()) {
+        <h4 class="form-sub">Gespeichert</h4>
+        <ion-searchbar
+          [ngModel]="customQuery()"
+          (ngModelChange)="customQuery.set($event)"
+          placeholder="Eigene Lebensmittel suchen…"
+          inputmode="search"
+        ></ion-searchbar>
+        @if (customFoodOptions().length) {
+          <ion-list inset="true" lines="full">
+            @for (food of customFoodOptions(); track food.id) {
+              <ion-item button (click)="selectCustomFood(food)">
+                <ion-label>
+                  <h3>{{ food.name }}</h3>
+                  <p>{{ food.facts.kcal }} kcal</p>
+                </ion-label>
+                <ion-icon slot="end" name="add-circle" color="primary"></ion-icon>
+              </ion-item>
+            }
+          </ion-list>
+        } @else {
+          <p class="scan-hint">Kein gespeichertes Lebensmittel gefunden.</p>
+        }
+      }
 
-      <ion-button expand="block" class="ion-margin-top" (click)="save()">Speichern</ion-button>
+      <!-- Manuelle Eingabe: erst auf Klick (oder wenn ein Treffer übernommen wurde) -->
+      @if (!showManualForm()) {
+        <button class="manual-cta" (click)="openManualEntry()">
+          <ion-icon name="create-outline"></ion-icon>
+          <span>Manuell eintragen</span>
+        </button>
+      } @else {
+        <ion-list inset="true">
+          <ion-item>
+            <ion-input label="Name" labelPlacement="stacked" [(ngModel)]="form.label" placeholder="z.B. Haferflocken"></ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-select label="Mahlzeit" labelPlacement="stacked" [(ngModel)]="form.meal" interface="popover">
+              @for (opt of mealOptions; track opt.value) {
+                <ion-select-option [value]="opt.value">{{ opt.label }}</ion-select-option>
+              }
+            </ion-select>
+          </ion-item>
+          <ion-item>
+            <ion-input type="number" inputmode="numeric" label="Kalorien (kcal)" labelPlacement="stacked" [(ngModel)]="form.kcal" placeholder="0"></ion-input>
+          </ion-item>
+        </ion-list>
+
+        <h4 class="form-sub">Makros (optional, in g)</h4>
+        <ion-list inset="true">
+          <ion-item>
+            <ion-input type="number" inputmode="numeric" label="Eiweiß" labelPlacement="stacked" [(ngModel)]="form.proteinG" placeholder="0"></ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input type="number" inputmode="numeric" label="Kohlenhydrate" labelPlacement="stacked" [(ngModel)]="form.carbsG" placeholder="0"></ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input type="number" inputmode="numeric" label="Fett" labelPlacement="stacked" [(ngModel)]="form.fatG" placeholder="0"></ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input type="number" inputmode="numeric" label="Ballaststoffe" labelPlacement="stacked" [(ngModel)]="form.fiberG" placeholder="0"></ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input type="number" inputmode="numeric" label="Zucker" labelPlacement="stacked" [(ngModel)]="form.sugarG" placeholder="0"></ion-input>
+          </ion-item>
+        </ion-list>
+
+        <ion-button expand="block" class="ion-margin-top" (click)="save()">Speichern</ion-button>
+      }
     </ion-content>
   </ng-template>
 </ion-modal>
