@@ -8,8 +8,8 @@ import {
 } from '@angular/common/http/testing';
 import { OpenFoodFactsProvider } from './openfoodfacts.provider';
 
-const SEARCH_URL = 'https://world.openfoodfacts.org/api/v2/search';
-const PRODUCT_URL = 'https://world.openfoodfacts.org/api/v2/product';
+const SEARCH_URL = 'https://search.openfoodfacts.org/search';
+const PRODUCT_URL = 'https://world.openfoodfacts.org/api/v3/product';
 
 function product(name: string) {
   return {
@@ -34,15 +34,16 @@ beforeEach(() => {
 
 afterEach(() => http.verify());
 
-describe('OpenFoodFactsProvider — Suche', () => {
-  it('nutzt den v2-Such-Endpoint und mappt Treffer', async () => {
+describe('OpenFoodFactsProvider — Suche (search-a-licious)', () => {
+  it('nutzt /search mit q + page_size und mappt hits', async () => {
     // Act
-    const promise = provider.searchByText('reis');
+    const promise = provider.searchByText('reis', 20);
     const req: TestRequest = http.expectOne((r) => r.url === SEARCH_URL);
 
     // Assert
-    expect(req.request.params.get('search_terms')).toBe('reis');
-    req.flush({ products: [product('Reis')] });
+    expect(req.request.params.get('q')).toBe('reis');
+    expect(req.request.params.get('page_size')).toBe('20');
+    req.flush({ hits: [product('Reis')] });
     const items = await promise;
     expect(items).toHaveLength(1);
     expect(items[0].name).toBe('Reis');
@@ -70,7 +71,7 @@ describe('OpenFoodFactsProvider — Suche', () => {
   });
 });
 
-describe('OpenFoodFactsProvider — Barcode', () => {
+describe('OpenFoodFactsProvider — Barcode (v3)', () => {
   it('liefert null bei 404 statt zu werfen', async () => {
     // Act
     const promise = provider.lookupByBarcode('000');
@@ -81,11 +82,11 @@ describe('OpenFoodFactsProvider — Barcode', () => {
     await expect(promise).resolves.toBeNull();
   });
 
-  it('liefert null bei status 0 (OFF „Produkt nicht gefunden")', async () => {
+  it('liefert null bei status "failure" (v3: Produkt nicht gefunden)', async () => {
     // Act
     const promise = provider.lookupByBarcode('123');
     const req = http.expectOne((r) => r.url === `${PRODUCT_URL}/123.json`);
-    req.flush({ status: 0 });
+    req.flush({ status: 'failure' });
 
     // Assert
     await expect(promise).resolves.toBeNull();
@@ -95,7 +96,7 @@ describe('OpenFoodFactsProvider — Barcode', () => {
     // Act
     const promise = provider.lookupByBarcode('111');
     const req = http.expectOne((r) => r.url === `${PRODUCT_URL}/111.json`);
-    req.flush({ status: 1, product: product('Nutella') });
+    req.flush({ status: 'success', product: product('Nutella') });
 
     // Assert
     const item = await promise;
