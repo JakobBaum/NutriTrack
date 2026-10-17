@@ -4,10 +4,12 @@ import { firstValueFrom } from 'rxjs';
 import { FoodItem, NutritionFacts } from '../models';
 import { makeId } from '../util/id';
 import { FoodProvider } from './food-provider';
+import { SettingsStore } from '../state/settings.store';
 import { environment } from '../../../environments/environment';
 
 // Freitextsuche: dev → proxied relative path; prod → direkt (CapacitorHttp bypasses CORS).
-const SEARCH_URL = environment.offSearchUrl;
+// Wenn proxyUrl gesetzt: ${proxyUrl}/off-search (CF-Worker übernimmt den CORS-Proxy).
+const SEARCH_URL_DEFAULT = environment.offSearchUrl;
 // Barcode exakt über Product Opener v3 (hat CORS *).
 const PRODUCT_V3_URL = 'https://world.openfoodfacts.org/api/v3/product';
 const FIELDS = 'code,product_name,brands,image_url,image_small_url,nutriments,serving_quantity';
@@ -51,13 +53,19 @@ function isNotFound(e: unknown): boolean {
 @Injectable({ providedIn: 'root' })
 export class OpenFoodFactsProvider implements FoodProvider {
   private readonly http = inject(HttpClient);
+  private readonly settings = inject(SettingsStore);
+
+  private searchUrl(): string {
+    const proxy = this.settings.ai().proxyUrl?.trim();
+    return proxy ? `${proxy}/off-search` : SEARCH_URL_DEFAULT;
+  }
 
   async searchByText(query: string, limit = 12): Promise<FoodItem[]> {
     const q = query.trim();
     if (!q) return [];
     try {
       const res = await firstValueFrom(
-        this.http.get<SearchResponse>(SEARCH_URL, {
+        this.http.get<SearchResponse>(this.searchUrl(), {
           headers: OFF_HEADERS,
           params: {
             q,
