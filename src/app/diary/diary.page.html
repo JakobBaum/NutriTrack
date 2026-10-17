@@ -49,11 +49,17 @@
               <ion-item>
                 <ion-label>
                   <h3>{{ entry.label }}</h3>
-                  <p>{{ entry.facts.proteinG }}E · {{ entry.facts.carbsG }}K · {{ entry.facts.fatG }}F (g)</p>
+                  <p>
+                    {{ entry.facts.proteinG }}E · {{ entry.facts.carbsG }}K · {{ entry.facts.fatG }}F (g)
+                    @if (entry.amountG) { · {{ entry.amountG }} g }
+                  </p>
                 </ion-label>
                 <ion-note slot="end">{{ entry.facts.kcal }} kcal</ion-note>
               </ion-item>
               <ion-item-options side="end">
+                <ion-item-option color="primary" (click)="openEdit(entry)">
+                  <ion-icon slot="icon-only" name="create-outline"></ion-icon>
+                </ion-item-option>
                 <ion-item-option color="danger" (click)="remove(entry.id)">
                   <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
                 </ion-item-option>
@@ -68,10 +74,22 @@
   <div class="content-spacer"></div>
 
   <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-    <ion-fab-button (click)="openAdd()" aria-label="Eintrag hinzufügen">
+    <ion-fab-button aria-label="Eintrag hinzufügen">
       <ion-icon name="add"></ion-icon>
     </ion-fab-button>
+    <ion-fab-list side="top">
+      <ion-fab-button color="medium" (click)="openAdd()" aria-label="Manuell eintragen">
+        <ion-icon name="create-outline"></ion-icon>
+      </ion-fab-button>
+      <ion-fab-button color="medium" (click)="openBarcode()" aria-label="Barcode scannen">
+        <ion-icon name="barcode-outline"></ion-icon>
+      </ion-fab-button>
+      <ion-fab-button color="medium" (click)="labelInput.click()" aria-label="Etikett scannen">
+        <ion-icon name="image-outline"></ion-icon>
+      </ion-fab-button>
+    </ion-fab-list>
   </ion-fab>
+  <input #labelInput type="file" accept="image/*" capture="environment" hidden (change)="onLabelFile($event)" />
 </ion-content>
 
 <!-- Add-entry modal -->
@@ -88,6 +106,31 @@
     <ion-content class="ion-padding">
       @if (error()) {
         <ion-text color="danger"><p class="form-error">{{ error() }}</p></ion-text>
+      }
+
+      <!-- Zuletzt benutzte Lebensmittel -->
+      @if (recentFoods().length || recentRecipes().length) {
+        <h4 class="form-sub">Zuletzt benutzt</h4>
+        <ion-list inset="true" lines="full">
+          @for (entry of recentFoods(); track entry.id) {
+            <ion-item button (click)="selectRecentFood(entry)">
+              <ion-label>
+                <h3>{{ entry.label }}</h3>
+                <p>{{ entry.facts.kcal }} kcal</p>
+              </ion-label>
+              <ion-icon slot="end" name="time-outline" color="medium"></ion-icon>
+            </ion-item>
+          }
+          @for (recipe of recentRecipes(); track recipe.id) {
+            <ion-item button (click)="selectRecipe(recipe)">
+              <ion-label>
+                <h3>{{ recipe.title }}</h3>
+                <p>{{ recipe.factsPerServing?.kcal }} kcal / Portion</p>
+              </ion-label>
+              <ion-icon slot="end" name="restaurant-outline" color="medium"></ion-icon>
+            </ion-item>
+          }
+        </ion-list>
       }
 
       <!-- Food-Textsuche (OpenFoodFacts) -->
@@ -112,12 +155,12 @@
             }
           </ion-button>
         }
-        <ion-button size="small" fill="outline" (click)="labelInput.click()" [disabled]="scanning()">
+        <ion-button size="small" fill="outline" (click)="modalLabelInput.click()" [disabled]="scanning()">
           @if (scanning()) { <ion-spinner name="dots"></ion-spinner> } @else {
             <ion-icon slot="start" name="image-outline"></ion-icon> Etikett scannen
           }
         </ion-button>
-        <input #labelInput type="file" accept="image/*" capture="environment" hidden (change)="onLabelFile($event)" />
+        <input #modalLabelInput type="file" accept="image/*" capture="environment" hidden (change)="onLabelFile($event)" />
       </div>
       @if (hint()) { <p class="scan-hint">{{ hint() }}</p> }
       @if (searchResults().length) {
@@ -204,8 +247,21 @@
             </ion-select>
           </ion-item>
           <ion-item>
-            <ion-input type="number" inputmode="numeric" label="Kalorien (kcal)" labelPlacement="stacked" [(ngModel)]="form.kcal" placeholder="0"></ion-input>
+            <ion-input type="number" inputmode="decimal" label="Menge (g)" labelPlacement="stacked" [(ngModel)]="form.amountG" placeholder="z.B. 150">
+              <ion-note slot="end">g</ion-note>
+            </ion-input>
           </ion-item>
+          @if (!baseFacts || form.amountG === null) {
+            <ion-item>
+              <ion-input type="number" inputmode="numeric" label="Kalorien (kcal)" labelPlacement="stacked" [(ngModel)]="form.kcal" placeholder="0"></ion-input>
+            </ion-item>
+          } @else {
+            <ion-item lines="none">
+              <ion-label color="medium">
+                <p>kcal werden aus {{ form.amountG }} g berechnet</p>
+              </ion-label>
+            </ion-item>
+          }
         </ion-list>
 
         <h4 class="form-sub">Makros (optional, in g)</h4>
@@ -295,45 +351,101 @@
   </ng-template>
 </ion-modal>
 
-<!-- Barcode-Scanner modal -->
-<ion-modal [isOpen]="bcOpen()" (didPresent)="onBarcodePresent()" (didDismiss)="onBarcodeDismiss()">
+<!-- Edit-Eintrag modal -->
+<ion-modal [isOpen]="editOpen()" (didDismiss)="closeEdit()">
   <ng-template>
     <ion-header class="ion-no-border">
       <ion-toolbar>
-        <ion-title>Barcode scannen</ion-title>
+        <ion-title>Eintrag bearbeiten</ion-title>
         <ion-buttons slot="end">
-          <ion-button (click)="closeBarcode()">Schließen</ion-button>
+          <ion-button (click)="closeEdit()">Abbrechen</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
-      <div class="scanner">
-        <video id="barcodeVideo" #barcodeVideo class="scanner__video" muted autoplay playsinline></video>
-        <div class="scanner__frame"></div>
-      </div>
-      <p class="scan-hint">Halte den Strichcode in den Rahmen — oder gib ihn manuell ein.</p>
-      @if (bcError()) {
-        <ion-text color="danger"><p class="form-error">{{ bcError() }}</p></ion-text>
-      }
       <ion-list inset="true">
         <ion-item>
-          <ion-input
-            label="Barcode"
-            labelPlacement="stacked"
-            inputmode="numeric"
-            [(ngModel)]="manualBarcode"
-            (keyup.enter)="submitManualBarcode()"
-            placeholder="z.B. 4000417025005"
-          ></ion-input>
+          <ion-input label="Name" labelPlacement="stacked" [(ngModel)]="editForm.label"></ion-input>
         </ion-item>
-      </ion-list>
-      <ion-button expand="block" (click)="submitManualBarcode()" [disabled]="bcLooking()">
-        @if (bcLooking()) {
-          <ion-spinner name="dots" slot="start"></ion-spinner> Suche…
-        } @else {
-          <ion-icon slot="start" name="search-outline"></ion-icon> Nachschlagen
+        <ion-item>
+          <ion-select label="Mahlzeit" labelPlacement="stacked" [(ngModel)]="editForm.meal" interface="popover">
+            @for (opt of mealOptions; track opt.value) {
+              <ion-select-option [value]="opt.value">{{ opt.label }}</ion-select-option>
+            }
+          </ion-select>
+        </ion-item>
+        @if (editBaseFacts) {
+          <ion-item>
+            <ion-input type="number" inputmode="decimal" label="Menge (g)" labelPlacement="stacked" [(ngModel)]="editForm.amountG">
+              <ion-note slot="end">g</ion-note>
+            </ion-input>
+          </ion-item>
         }
-      </ion-button>
+      </ion-list>
+      <ion-button expand="block" class="ion-margin-top" (click)="saveEdit()">Speichern</ion-button>
     </ion-content>
+  </ng-template>
+</ion-modal>
+
+<!-- Barcode-Scanner modal (Vollbild) -->
+<ion-modal [isOpen]="bcOpen()" cssClass="barcode-fullscreen-modal" (didPresent)="onBarcodePresent()" (didDismiss)="onBarcodeDismiss()">
+  <ng-template>
+    <div class="bc-fullscreen">
+      <!-- Vollbild-Kamera -->
+      <video id="barcodeVideo" #barcodeVideo class="bc-video" muted autoplay playsinline></video>
+
+      <!-- Scan-Rahmen -->
+      <div class="bc-overlay">
+        <div class="bc-frame"></div>
+        @if (bcLooking()) {
+          <p class="bc-status">Produkt wird gesucht…</p>
+        } @else {
+          <p class="bc-status">Barcode in den Rahmen halten</p>
+        }
+        @if (bcError()) {
+          <p class="bc-error">{{ bcError() }}</p>
+        }
+      </div>
+
+      <!-- Schließen-Button oben rechts -->
+      <ion-fab vertical="top" horizontal="end" slot="fixed" class="bc-close-fab">
+        <ion-fab-button size="small" color="dark" (click)="closeBarcode()">
+          <ion-icon name="close"></ion-icon>
+        </ion-fab-button>
+      </ion-fab>
+
+      <!-- Manuell-Eingabe-Button unten links -->
+      <div class="bc-manual-btn-wrap">
+        <ion-button fill="solid" color="dark" size="small" (click)="toggleBcManual()">
+          <ion-icon slot="start" name="create-outline"></ion-icon>
+          Manuell eingeben
+        </ion-button>
+      </div>
+
+      <!-- Manuell-Eingabe-Panel (ausgeklappt) -->
+      @if (bcManualOpen()) {
+        <div class="bc-manual-panel">
+          <ion-list inset="true">
+            <ion-item>
+              <ion-input
+                label="Barcode"
+                labelPlacement="stacked"
+                inputmode="numeric"
+                [(ngModel)]="manualBarcode"
+                (keyup.enter)="submitManualBarcode()"
+                placeholder="z.B. 4000417025005"
+              ></ion-input>
+            </ion-item>
+          </ion-list>
+          <ion-button expand="block" (click)="submitManualBarcode()" [disabled]="bcLooking()">
+            @if (bcLooking()) {
+              <ion-spinner name="dots" slot="start"></ion-spinner> Suche…
+            } @else {
+              <ion-icon slot="start" name="search-outline"></ion-icon> Nachschlagen
+            }
+          </ion-button>
+        </div>
+      }
+    </div>
   </ng-template>
 </ion-modal>

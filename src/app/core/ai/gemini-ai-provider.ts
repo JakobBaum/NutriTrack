@@ -27,6 +27,7 @@ const GRAM_UNITS = new Set(['g', 'gramm', 'gr', 'ml', 'milliliter']);
 
 interface GeminiPart {
   text?: string;
+  inlineData?: { mimeType: string; data: string };
 }
 interface GeminiResponse {
   candidates?: { content?: { parts?: GeminiPart[] } }[];
@@ -112,7 +113,7 @@ export class GeminiAiProvider implements AiProvider {
       '"fiberG":number,"sugarG":number}. ' +
       `Werte beziehen sich auf ${basis === 'per100g' ? '100 g' : 'eine Portion'}.`;
     const parts = [
-      { inline_data: { mime_type: 'image/jpeg', data: imageBase64 } },
+      { inlineData: { mimeType: 'image/jpeg', data: imageBase64 } },
       { text: 'Lies die Nährwerte vom Etikett.' },
     ];
     const obj = await this.callJsonRaw(sys, parts, 500);
@@ -165,10 +166,19 @@ export class GeminiAiProvider implements AiProvider {
       'portionG weglassen); bei Stück/Löffel/Zehe usw. als Werte für EINE Einheit (basis "perPortion", ' +
       'portionG = ungefähres Gewicht einer Einheit in g). Kennst du eine Zutat nicht, lass "facts" weg. ' +
       'Schreibe Zutaten und Schritte auf Deutsch. Keine Erklärung.';
-    const user = input.text?.trim()
-      ? `Rezept-Text:\n${input.text.trim()}`
-      : `Hole und extrahiere das Rezept von dieser URL: ${input.url ?? ''}`;
-    const obj = await this.callJson(sys, user, 2500);
+    let obj: Record<string, unknown>;
+    if (input.imageBase64) {
+      const parts = [
+        { inlineData: { mimeType: 'image/jpeg', data: input.imageBase64 } },
+        { text: 'Extrahiere das Rezept aus diesem Foto.' },
+      ];
+      obj = await this.callJsonRaw(sys, parts, 2500);
+    } else {
+      const user = input.text?.trim()
+        ? `Rezept-Text:\n${input.text.trim()}`
+        : `Hole und extrahiere das Rezept von dieser URL: ${input.url ?? ''}`;
+      obj = await this.callJson(sys, user, 2500);
+    }
     const ingredients = Array.isArray(obj['ingredients'])
       ? (obj['ingredients'] as Record<string, unknown>[]).map((i) => {
           const unit = String(i['unit'] ?? 'g').trim() || 'g';

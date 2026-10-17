@@ -21,6 +21,8 @@ export interface NewDiaryEntry {
   ref?: DiaryRef;
   amountG?: number;
   servings?: number;
+  /** Basis-Nährwerte vor Mengenskalierung (per100g) — für spätere Neuskalierung. */
+  baseFacts?: NutritionFacts;
 }
 
 /**
@@ -51,11 +53,43 @@ export class DiaryStore {
       amountG: input.amountG,
       servings: input.servings,
       facts: input.facts,
+      baseFacts: input.baseFacts,
       createdAt: new Date().toISOString(),
     };
     this._entries.update((list) => [...list, entry]);
     this.persist();
     return entry;
+  }
+
+  /** Aktualisiert Name, Mahlzeit, Menge und skaliert Nährwerte neu (wenn baseFacts vorhanden). */
+  update(id: string, patch: {
+    label?: string;
+    meal?: MealType;
+    amountG?: number;
+    servings?: number;
+  }): void {
+    this._entries.update((list) =>
+      list.map((e) => {
+        if (e.id !== id) return e;
+        const next = { ...e, ...patch };
+        // Nährwerte neu skalieren, wenn Basis und neue Menge bekannt.
+        if (e.baseFacts && patch.amountG != null && e.baseFacts.basis === 'per100g') {
+          const factor = patch.amountG / 100;
+          next.facts = {
+            ...e.baseFacts,
+            kcal: Math.round(e.baseFacts.kcal * factor),
+            proteinG: Math.round(e.baseFacts.proteinG * factor * 10) / 10,
+            carbsG: Math.round(e.baseFacts.carbsG * factor * 10) / 10,
+            fatG: Math.round(e.baseFacts.fatG * factor * 10) / 10,
+            fiberG: e.baseFacts.fiberG != null ? Math.round(e.baseFacts.fiberG * factor * 10) / 10 : undefined,
+            sugarG: e.baseFacts.sugarG != null ? Math.round(e.baseFacts.sugarG * factor * 10) / 10 : undefined,
+            basis: 'perPortion',
+          };
+        }
+        return next;
+      }),
+    );
+    this.persist();
   }
 
   /** Entfernt einen Eintrag. */
@@ -87,6 +121,42 @@ export class DiaryStore {
       (sum, e) => sum + (e.facts.kcal || 0),
       0,
     );
+  }
+
+  /**
+   * Letzte `limit` eindeutige Lebensmittel-Einträge (manuelle + Food/Barcode),
+   * sortiert nach Erstell-Datum absteigend. Rezepte werden ausgelassen.
+   */
+  recentFoods(limit = 5): DiaryEntry[] {
+    const seen = new Set<string>();
+    return [...this._entries()]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .filter((e) => {
+        if (e.ref?.kind === 'recipe') return false;
+        if (seen.has(e.label)) return false;
+        seen.add(e.label);
+        return true;
+      })
+      .slice(0, limit);
+  }
+
+  /**
+   * Letzte `limit` eindeutige Rezept-IDs aus Tagebuch-Einträgen,
+   * neueste zuerst.
+   */
+  recentRecipeIds(limit = 3): string[] {
+    const seen = new Set<string>();
+    const ids: string[] = [];
+    for (const e of [...this._entries()].sort((a, b) =>
+      b.createdAt.localeCompare(a.createdAt),
+    )) {
+      if (e.ref?.kind === 'recipe' && e.ref.recipeId && !seen.has(e.ref.recipeId)) {
+        seen.add(e.ref.recipeId);
+        ids.push(e.ref.recipeId);
+        if (ids.length >= limit) break;
+      }
+    }
+    return ids;
   }
 
   /** Löscht alle Einträge (für "Daten zurücksetzen"). */

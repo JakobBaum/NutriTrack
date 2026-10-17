@@ -1,11 +1,11 @@
 <ion-header class="ion-no-border">
   <ion-toolbar>
-    <ion-title>Profil &amp; Einstellungen</ion-title>
+    <ion-title>Profil</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content>
-  <!-- Aktuelles Ziel -->
+  <!-- Aktuelles Tagesziel -->
   @if (target(); as t) {
     <ion-card class="target-card">
       <ion-card-content>
@@ -23,91 +23,60 @@
     </ion-card>
   }
 
-  <h4 class="form-sub">Profil</h4>
-  @if (error()) {
-    <ion-text color="danger"><p class="form-error">{{ error() }}</p></ion-text>
-  }
-  <ion-list inset="true">
-    <ion-item>
-      <ion-input type="number" inputmode="decimal" label="Gewicht (kg)" labelPlacement="stacked" [(ngModel)]="weightKg"></ion-input>
+  <h4 class="form-sub">Konto</h4>
+  <ion-list inset="true" lines="full">
+    <ion-item button detail="true" (click)="profileOpen.set(true)">
+      <ion-icon slot="start" name="body-outline"></ion-icon>
+      <ion-label>Bedarfs-Berechner</ion-label>
+      <ion-note slot="end">{{ target() ? 'Konfiguriert' : 'Einrichten' }}</ion-note>
     </ion-item>
-    <ion-item>
-      <ion-input type="number" inputmode="numeric" label="Größe (cm)" labelPlacement="stacked" [(ngModel)]="heightCm"></ion-input>
-    </ion-item>
-    <ion-item>
-      <ion-input type="number" inputmode="numeric" label="Alter" labelPlacement="stacked" [(ngModel)]="age"></ion-input>
-    </ion-item>
-    <ion-item>
-      <ion-select label="Geschlecht" labelPlacement="stacked" [(ngModel)]="sex" interface="popover">
-        @for (s of sexes; track s.value) {
-          <ion-select-option [value]="s.value">{{ s.label }}</ion-select-option>
-        }
-      </ion-select>
-    </ion-item>
-    <ion-item>
-      <ion-select label="Aktivität" labelPlacement="stacked" [(ngModel)]="activityLevel" interface="popover">
-        @for (a of activities; track a.value) {
-          <ion-select-option [value]="a.value">{{ a.label }}</ion-select-option>
-        }
-      </ion-select>
-    </ion-item>
-    <ion-item>
-      <ion-select label="Ziel" labelPlacement="stacked" [(ngModel)]="goal" interface="popover">
-        @for (g of goals; track g.value) {
-          <ion-select-option [value]="g.value">{{ g.label }}</ion-select-option>
-        }
-      </ion-select>
-    </ion-item>
-    @if (showRate) {
-      <ion-item>
-        <ion-input type="number" inputmode="decimal" label="Tempo (kg/Woche)" labelPlacement="stacked" [(ngModel)]="rateKgPerWeek"></ion-input>
-      </ion-item>
-    }
-  </ion-list>
-  <ion-button expand="block" class="ion-margin-horizontal" (click)="saveProfile()">
-    Bedarf berechnen &amp; speichern
-  </ion-button>
-
-  <h4 class="form-sub">KI-Verbindung</h4>
-  <p class="hint">
-    Empfohlen: <strong>KI-Proxy-URL</strong> eintragen — dann nutzen alle Geräte denselben
-    internen Server-Key, kein eigener Key nötig. Alternativ ein eigener Gemini-Key (nur lokal).
-  </p>
-  <ion-list inset="true">
-    <ion-item>
-      <ion-input label="KI-Proxy-URL" labelPlacement="stacked" [(ngModel)]="ai.proxyUrl" inputmode="url" placeholder="https://nutritrack-ai.<account>.workers.dev"></ion-input>
+    <ion-item button detail="true" (click)="aiOpen.set(true)">
+      <ion-icon slot="start" name="sparkles-outline"></ion-icon>
+      <ion-label>KI-Verbindung</ion-label>
     </ion-item>
   </ion-list>
 
-  <h4 class="form-sub">Eigener Key (optional)</h4>
-  <p class="hint">Nur nötig ohne Proxy. Wird ausschließlich lokal auf diesem Gerät gespeichert.</p>
-  <ion-list inset="true">
-    <ion-item>
-      <ion-select label="Anbieter" labelPlacement="stacked" [(ngModel)]="ai.provider" interface="popover">
-        @for (p of providers; track p.value) {
-          <ion-select-option [value]="p.value">{{ p.label }}</ion-select-option>
-        }
-      </ion-select>
+  <h4 class="form-sub">App</h4>
+  <ion-list inset="true" lines="full">
+    <ion-item button detail="true" (click)="infoSection.set('anleitung')">
+      <ion-icon slot="start" name="book-outline"></ion-icon>
+      <ion-label>Anleitung</ion-label>
     </ion-item>
-    <ion-item>
-      <ion-input label="Endpoint (optional)" labelPlacement="stacked" [(ngModel)]="ai.endpoint" placeholder="https://..."></ion-input>
+    <ion-item button detail="true" (click)="infoSection.set('hilfe')">
+      <ion-icon slot="start" name="help-circle-outline"></ion-icon>
+      <ion-label>Hilfe &amp; Kontakt</ion-label>
     </ion-item>
-    <ion-item>
-      <ion-input label="Modell" labelPlacement="stacked" [(ngModel)]="ai.model" placeholder="automatisch (gemini-3.8-flash)"></ion-input>
+    <ion-item button detail="false" href="https://instagram.com" target="_blank" rel="noopener">
+      <ion-icon slot="start" name="logo-instagram"></ion-icon>
+      <ion-label>Social Media</ion-label>
+      <ion-icon slot="end" name="open-outline" style="font-size:16px;color:var(--ion-color-medium)"></ion-icon>
     </ion-item>
-    <ion-item>
-      <ion-input type="password" label="API-Key" labelPlacement="stacked" [(ngModel)]="ai.apiKey" [clearOnEdit]="false" autocomplete="off" placeholder="Gemini-API-Key"></ion-input>
+    <ion-item button detail="false">
+      <ion-icon slot="start" name="star-outline"></ion-icon>
+      <ion-label>App bewerten</ion-label>
+      <ion-icon slot="end" name="open-outline" style="font-size:16px;color:var(--ion-color-medium)"></ion-icon>
     </ion-item>
   </ion-list>
-  <ion-button expand="block" fill="outline" class="ion-margin-horizontal" (click)="saveAi()">
-    KI-Einstellungen speichern
-  </ion-button>
+
+  <h4 class="form-sub">Rechtliches</h4>
+  <ion-list inset="true" lines="full">
+    <ion-item button detail="true" (click)="infoSection.set('datenschutz')">
+      <ion-icon slot="start" name="shield-outline"></ion-icon>
+      <ion-label>Datenschutzerklärung</ion-label>
+    </ion-item>
+    <ion-item button detail="true" (click)="infoSection.set('agb')">
+      <ion-icon slot="start" name="document-text-outline"></ion-icon>
+      <ion-label>Nutzungsbedingungen</ion-label>
+    </ion-item>
+  </ion-list>
 
   <h4 class="form-sub">Daten</h4>
-  <ion-button expand="block" color="danger" fill="clear" (click)="resetData()">
-    <ion-icon slot="start" name="trash-outline"></ion-icon>
-    Alle lokalen Daten zurücksetzen
-  </ion-button>
+  <ion-list inset="true" lines="none">
+    <ion-item button color="danger" (click)="resetData()">
+      <ion-icon slot="start" name="trash-outline"></ion-icon>
+      <ion-label>Alle lokalen Daten zurücksetzen</ion-label>
+    </ion-item>
+  </ion-list>
 
   <div class="content-spacer"></div>
 
@@ -119,3 +88,165 @@
     (didDismiss)="onToastDismiss()"
   ></ion-toast>
 </ion-content>
+
+<!-- Bedarfs-Berechner Modal -->
+<ion-modal [isOpen]="profileOpen()" (ionModalDidDismiss)="profileOpen.set(false)">
+  <ng-template>
+    <ion-header class="ion-no-border">
+      <ion-toolbar>
+        <ion-title>Bedarfs-Berechner</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="profileOpen.set(false)">Schließen</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content>
+      @if (error()) {
+        <ion-text color="danger"><p class="form-error ion-padding-horizontal">{{ error() }}</p></ion-text>
+      }
+      <ion-list inset="true">
+        <ion-item>
+          <ion-input type="number" inputmode="decimal" label="Gewicht (kg)" labelPlacement="stacked" [(ngModel)]="weightKg"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-input type="number" inputmode="numeric" label="Größe (cm)" labelPlacement="stacked" [(ngModel)]="heightCm"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-input type="number" inputmode="numeric" label="Alter" labelPlacement="stacked" [(ngModel)]="age"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-select label="Geschlecht" labelPlacement="stacked" [(ngModel)]="sex" interface="popover">
+            @for (s of sexes; track s.value) {
+              <ion-select-option [value]="s.value">{{ s.label }}</ion-select-option>
+            }
+          </ion-select>
+        </ion-item>
+        <ion-item>
+          <ion-select label="Aktivität" labelPlacement="stacked" [(ngModel)]="activityLevel" interface="popover">
+            @for (a of activities; track a.value) {
+              <ion-select-option [value]="a.value">{{ a.label }}</ion-select-option>
+            }
+          </ion-select>
+        </ion-item>
+        <ion-item>
+          <ion-select label="Ziel" labelPlacement="stacked" [(ngModel)]="goal" interface="popover">
+            @for (g of goals; track g.value) {
+              <ion-select-option [value]="g.value">{{ g.label }}</ion-select-option>
+            }
+          </ion-select>
+        </ion-item>
+        @if (showRate) {
+          <ion-item>
+            <ion-input type="number" inputmode="decimal" label="Tempo (kg/Woche)" labelPlacement="stacked" [(ngModel)]="rateKgPerWeek"></ion-input>
+          </ion-item>
+        }
+      </ion-list>
+      <ion-button expand="block" class="ion-margin-horizontal ion-margin-bottom" (click)="saveProfile()">
+        Bedarf berechnen &amp; speichern
+      </ion-button>
+    </ion-content>
+  </ng-template>
+</ion-modal>
+
+<!-- KI-Verbindung Modal -->
+<ion-modal [isOpen]="aiOpen()" (ionModalDidDismiss)="aiOpen.set(false)">
+  <ng-template>
+    <ion-header class="ion-no-border">
+      <ion-toolbar>
+        <ion-title>KI-Verbindung</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="aiOpen.set(false)">Schließen</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      <p class="hint">
+        Empfohlen: <strong>KI-Proxy-URL</strong> eintragen — dann nutzen alle Geräte denselben
+        internen Server-Key, kein eigener Key nötig. Alternativ ein eigener Gemini-Key (nur lokal).
+      </p>
+      <ion-list inset="true">
+        <ion-item>
+          <ion-input label="KI-Proxy-URL" labelPlacement="stacked" [(ngModel)]="ai.proxyUrl" inputmode="url" placeholder="https://nutritrack-ai.<account>.workers.dev"></ion-input>
+        </ion-item>
+      </ion-list>
+      <h4 class="form-sub">Eigener Key (optional)</h4>
+      <p class="hint">Nur nötig ohne Proxy. Wird ausschließlich lokal auf diesem Gerät gespeichert.</p>
+      <ion-list inset="true">
+        <ion-item>
+          <ion-select label="Anbieter" labelPlacement="stacked" [(ngModel)]="ai.provider" interface="popover">
+            @for (p of providers; track p.value) {
+              <ion-select-option [value]="p.value">{{ p.label }}</ion-select-option>
+            }
+          </ion-select>
+        </ion-item>
+        <ion-item>
+          <ion-input label="Endpoint (optional)" labelPlacement="stacked" [(ngModel)]="ai.endpoint" placeholder="https://..."></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-input label="Modell" labelPlacement="stacked" [(ngModel)]="ai.model" placeholder="automatisch (gemini-3.8-flash)"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-input type="password" label="API-Key" labelPlacement="stacked" [(ngModel)]="ai.apiKey" [clearOnEdit]="false" autocomplete="off" placeholder="Gemini-API-Key"></ion-input>
+        </ion-item>
+      </ion-list>
+      <ion-button expand="block" fill="outline" class="ion-margin-horizontal" (click)="saveAi()">
+        KI-Einstellungen speichern
+      </ion-button>
+    </ion-content>
+  </ng-template>
+</ion-modal>
+
+<!-- Info-Modals (Anleitung / Datenschutz / AGB / Hilfe) -->
+<ion-modal [isOpen]="infoSection() !== null" (ionModalDidDismiss)="infoSection.set(null)">
+  <ng-template>
+    <ion-header class="ion-no-border">
+      <ion-toolbar>
+        <ion-title>
+          @switch (infoSection()) {
+            @case ('anleitung') { Anleitung }
+            @case ('datenschutz') { Datenschutzerklärung }
+            @case ('agb') { Nutzungsbedingungen }
+            @case ('hilfe') { Hilfe & Kontakt }
+          }
+        </ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="infoSection.set(null)">Schließen</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      @switch (infoSection()) {
+        @case ('anleitung') {
+          <h3>So funktioniert NutriTrack</h3>
+          <p>1. <strong>Profil einrichten</strong> — trage Gewicht, Größe, Alter und Ziel ein, um deinen persönlichen Tagesbedarf zu berechnen.</p>
+          <p>2. <strong>Tagebuch führen</strong> — füge täglich gegessene Lebensmittel und Mahlzeiten über die Suche, den Barcode-Scanner oder das Etikett-Scan per Kamera hinzu.</p>
+          <p>3. <strong>Rezepte anlegen</strong> — importiere Rezepte per Link, Text oder Foto, oder erfasse sie manuell. Koche direkt aus der App mit dem Kochmodus.</p>
+          <p>4. <strong>Einkauf planen</strong> — lass die KI auf Basis deiner Rezepte eine Einkaufsliste erstellen.</p>
+          <p>5. <strong>Fortschritt beobachten</strong> — das Dashboard zeigt täglich, wie viel Energie und Makros du noch zur Verfügung hast.</p>
+        }
+        @case ('datenschutz') {
+          <h3>Datenschutzerklärung</h3>
+          <p>Alle Daten (Profil, Tagebuch, Rezepte) werden <strong>ausschließlich lokal</strong> auf deinem Gerät gespeichert. Es werden keine persönlichen Daten an unsere Server übertragen.</p>
+          <p>Wenn du die KI-Funktion nutzt, werden Anfragen (z. B. Rezepttexte, Etikettenfotos) an den konfigurierten KI-Dienst (Google Gemini oder deinen eigenen Proxy) gesendet. Bitte beachte dabei die Datenschutzbestimmungen des jeweiligen Anbieters.</p>
+          <p>Barcode-Anfragen gehen an die Open Food Facts API (<em>openfoodfacts.org</em>), eine öffentliche, gemeinnützige Datenbank.</p>
+        }
+        @case ('agb') {
+          <h3>Nutzungsbedingungen</h3>
+          <p>NutriTrack ist ein persönliches Ernährungstagebuch und dient ausschließlich zur Information. Es ersetzt keine professionelle Ernährungs- oder Gesundheitsberatung.</p>
+          <p>Die berechneten Kalorienbedarfe sind Schätzwerte auf Basis anerkannter Formeln (Mifflin-St Jeor). Individuelle Abweichungen sind möglich.</p>
+          <p>Die App wird ohne Gewähr bereitgestellt. Der Entwickler übernimmt keine Haftung für Schäden, die durch die Nutzung der App entstehen.</p>
+        }
+        @case ('hilfe') {
+          <h3>Hilfe &amp; Kontakt</h3>
+          <p>Bei Fragen oder Problemen wende dich an:</p>
+          <p><strong>E-Mail:</strong> baumgartner.jakob12&#64;gmail.com</p>
+          <p>Für Fehlerberichte und Feature-Anfragen kannst du uns auch direkt über die App kontaktieren.</p>
+          <h4>Häufige Fragen</h4>
+          <p><strong>Barcode wird nicht erkannt?</strong> Stelle sicher, dass genügend Licht vorhanden ist. Alternativ kannst du den Barcode manuell eingeben.</p>
+          <p><strong>KI funktioniert nicht?</strong> Prüfe in den KI-Einstellungen, ob ein gültiger API-Key oder Proxy eingetragen ist.</p>
+          <p><strong>Daten verloren?</strong> Alle Daten werden lokal gespeichert. Wenn du die App deinstallierst, werden sie gelöscht.</p>
+        }
+      }
+    </ion-content>
+  </ng-template>
+</ion-modal>

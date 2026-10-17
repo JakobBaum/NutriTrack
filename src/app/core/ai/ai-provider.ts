@@ -40,12 +40,14 @@ export interface LabelResult {
   facts: NutritionFacts;
 }
 
-/** Eingabe für den Rezept-Import: entweder freier Text ODER eine URL. */
+/** Eingabe für den Rezept-Import: freier Text, URL oder Foto (Base64). */
 export interface RecipeImportInput {
   /** Eingefügter Rezept-Text (Zutaten + Zubereitung). */
   text?: string;
   /** Quell-URL (über Proxy/nativ geholt; im reinen Browser CORS-limitiert). */
   url?: string;
+  /** Foto eines Rezepts (Base64 ohne data-URL-Präfix) für KI-Vision-Erkennung. */
+  imageBase64?: string;
 }
 
 /** Eine Zutat aus dem Import — Nährwerte je Zutat optional (KI/Schätzung). */

@@ -126,6 +126,7 @@ ion-content {
   margin-top: 4px;
 }
 
+// --- Alter inline scanner (nicht mehr genutzt, aber lassen wir ihn für Kompatibilität) ---
 .scanner {
   position: relative;
   width: 100%;
@@ -149,6 +150,8 @@ ion-content {
     box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.25);
   }
 }
+
+// bc-* Vollbild-Scanner-Styles sind in global.scss
 
 .scan-hint {
   margin: 8px 12px 0;

@@ -27,8 +27,8 @@
       <ion-button expand="block" (click)="openSettings()">Profil einrichten</ion-button>
     </div>
   } @else {
-    <!-- Kalorien-Hero -->
-    <section class="hero">
+    <!-- Kalorien-Hero (klickbar → kcal-Drill) -->
+    <section class="hero" role="button" tabindex="0" (click)="openDrill('kcal')" (keydown.enter)="openDrill('kcal')">
       <app-progress-ring
         [value]="kcalEaten()"
         [max]="kcalTarget()"
@@ -55,13 +55,13 @@
     <h3 class="section-title">Makros</h3>
     <section class="macro-grid">
       @for (m of macros(); track m.key) {
-        <div class="macro-card">
+        <button class="macro-card" (click)="openDrill(m.key)">
           <app-progress-ring [value]="m.eaten" [max]="m.target" [size]="64" [stroke]="7" [color]="m.color">
             <span class="macro-card__dot" [style.background]="m.color"></span>
           </app-progress-ring>
           <div class="macro-card__label">{{ m.label }}</div>
           <div class="macro-card__value">{{ m.eaten }} / {{ m.target }} g</div>
-        </div>
+        </button>
       }
     </section>
 
@@ -88,3 +88,49 @@
     </ion-fab>
   }
 </ion-content>
+
+<!-- Makro-Drill-Down Bottom Sheet -->
+<ion-modal
+  [isOpen]="drillMacro() !== null"
+  [breakpoints]="[0, 0.55, 0.9]"
+  [initialBreakpoint]="0.55"
+  (ionModalDidDismiss)="closeDrill()"
+>
+  <ng-template>
+    @if (drillData(); as drill) {
+      <ion-header class="ion-no-border">
+        <ion-toolbar>
+          <ion-title>
+            <span class="drill-title" [style.color]="drill.color">{{ drill.label }}</span>
+            <span class="drill-title__total"> — {{ drill.total }} {{ drill.unit }}</span>
+          </ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="closeDrill()">Schließen</ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        @if (drill.items.length === 0) {
+          <p class="drill-empty">Noch keine Einträge für heute.</p>
+        } @else {
+          <ion-list lines="none">
+            @for (item of drill.items; track item.label) {
+              <ion-item class="drill-item">
+                <ion-label>
+                  <div class="drill-item__name">{{ item.label }}</div>
+                  <div class="drill-item__bar">
+                    <div class="drill-item__fill" [style.width.%]="item.percent" [style.background]="drill.color"></div>
+                  </div>
+                </ion-label>
+                <ion-note slot="end" class="drill-item__val">
+                  {{ item.value }} {{ drill.unit }}
+                  <span class="drill-item__pct">({{ item.percent }}%)</span>
+                </ion-note>
+              </ion-item>
+            }
+          </ion-list>
+        }
+      </ion-content>
+    }
+  </ng-template>
+</ion-modal>

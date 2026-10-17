@@ -1,0 +1,59 @@
+ion-content {
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --padding-bottom: 24px;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 48px 20px;
+
+  &__icon {
+    font-size: 56px;
+    color: var(--ion-color-primary);
+  }
+
+  h2 { margin: 8px 0 0; font-weight: 800; }
+  p { margin: 0 0 12px; color: var(--nt-muted); }
+  ion-button { width: 100%; max-width: 320px; }
+}
+
+.content-spacer { height: 72px; }
+
+.section-sub {
+  margin: 16px 4px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nt-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.draft-total {
+  text-align: right;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nt-muted);
+  margin: 4px 4px 12px;
+}
+
+.add-btns {
+  margin-top: 8px;
+}
+
+.recipe-pick {
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--nt-surface);
+}
+
+.picker-error {
+  color: var(--ion-color-danger);
+  font-size: 13px;
+  text-align: center;
+  padding: 8px 0;
+}

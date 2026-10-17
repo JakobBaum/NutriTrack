@@ -36,6 +36,12 @@
               <ion-icon slot="start" name="add-circle-outline"></ion-icon>
               Tagebuch
             </ion-button>
+            @if (recipe.steps.length > 0) {
+              <ion-button fill="clear" size="small" color="success" (click)="startCook(recipe)">
+                <ion-icon slot="start" name="flame-outline"></ion-icon>
+                Kochen
+              </ion-button>
+            }
             <ion-button fill="clear" size="small" (click)="openEdit(recipe)">
               <ion-icon slot="start" name="create-outline"></ion-icon>
               Bearbeiten
@@ -282,7 +288,24 @@
         </ion-item>
       </ion-list>
 
-      <ion-button expand="block" class="ion-margin-top" (click)="runImport()" [disabled]="importBusy()">
+      <span class="field-label">oder Foto</span>
+      <div class="scan-row">
+        @if (nativeCamera) {
+          <ion-button size="small" fill="outline" (click)="importFromCamera()" [disabled]="importBusy() || importPhotoScanning()">
+            @if (importPhotoScanning()) { <ion-spinner name="dots"></ion-spinner> } @else {
+              <ion-icon slot="start" name="camera-outline"></ion-icon> Kamera
+            }
+          </ion-button>
+        }
+        <ion-button size="small" fill="outline" (click)="importPhotoInput.click()" [disabled]="importBusy() || importPhotoScanning()">
+          @if (importPhotoScanning()) { <ion-spinner name="dots"></ion-spinner> } @else {
+            <ion-icon slot="start" name="image-outline"></ion-icon> Foto auswählen
+          }
+        </ion-button>
+        <input #importPhotoInput type="file" accept="image/*" capture="environment" hidden (change)="onImportPhotoFile($event)" />
+      </div>
+
+      <ion-button expand="block" class="ion-margin-top" (click)="runImport()" [disabled]="importBusy() || importPhotoScanning()">
         @if (importBusy()) {
           <ion-spinner name="dots" slot="start"></ion-spinner> Importiere…
         } @else {
@@ -338,45 +361,105 @@
   </ng-template>
 </ion-modal>
 
-<!-- Barcode-Scanner modal (im Picker) -->
-<ion-modal [isOpen]="bcOpen()" (didPresent)="onBarcodePresent()" (didDismiss)="onBarcodeDismiss()">
+<!-- Barcode-Scanner modal (Vollbild, im Picker) -->
+<ion-modal [isOpen]="bcOpen()" cssClass="barcode-fullscreen-modal" (didPresent)="onBarcodePresent()" (didDismiss)="onBarcodeDismiss()">
   <ng-template>
-    <ion-header class="ion-no-border">
-      <ion-toolbar>
-        <ion-title>Barcode scannen</ion-title>
-        <ion-buttons slot="end">
-          <ion-button (click)="closeBarcode()">Schließen</ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-    </ion-header>
-    <ion-content class="ion-padding">
-      <div class="scanner">
-        <video id="ingBarcodeVideo" #ingBarcodeVideo class="scanner__video" muted autoplay playsinline></video>
-        <div class="scanner__frame"></div>
-      </div>
-      <p class="scan-hint">Halte den Strichcode in den Rahmen — oder gib ihn manuell ein.</p>
-      @if (bcError()) {
-        <ion-text color="danger"><p class="form-error">{{ bcError() }}</p></ion-text>
-      }
-      <ion-list inset="true">
-        <ion-item>
-          <ion-input
-            label="Barcode"
-            labelPlacement="stacked"
-            inputmode="numeric"
-            [(ngModel)]="manualBarcode"
-            (keyup.enter)="submitManualBarcode()"
-            placeholder="z.B. 4000417025005"
-          ></ion-input>
-        </ion-item>
-      </ion-list>
-      <ion-button expand="block" (click)="submitManualBarcode()" [disabled]="bcLooking()">
+    <div class="bc-fullscreen">
+      <video id="ingBarcodeVideo" #ingBarcodeVideo class="bc-video" muted autoplay playsinline></video>
+      <div class="bc-overlay">
+        <div class="bc-frame"></div>
         @if (bcLooking()) {
-          <ion-spinner name="dots" slot="start"></ion-spinner> Suche…
+          <p class="bc-status">Produkt wird gesucht…</p>
         } @else {
-          <ion-icon slot="start" name="search-outline"></ion-icon> Nachschlagen
+          <p class="bc-status">Barcode in den Rahmen halten</p>
         }
-      </ion-button>
-    </ion-content>
+        @if (bcError()) {
+          <p class="bc-error">{{ bcError() }}</p>
+        }
+      </div>
+      <ion-fab vertical="top" horizontal="end" slot="fixed" class="bc-close-fab">
+        <ion-fab-button size="small" color="dark" (click)="closeBarcode()">
+          <ion-icon name="close"></ion-icon>
+        </ion-fab-button>
+      </ion-fab>
+      <div class="bc-manual-btn-wrap">
+        <ion-button fill="solid" color="dark" size="small" (click)="toggleBcManual()">
+          <ion-icon slot="start" name="create-outline"></ion-icon>
+          Manuell eingeben
+        </ion-button>
+      </div>
+      @if (bcManualOpen()) {
+        <div class="bc-manual-panel">
+          <ion-list inset="true">
+            <ion-item>
+              <ion-input
+                label="Barcode"
+                labelPlacement="stacked"
+                inputmode="numeric"
+                [(ngModel)]="manualBarcode"
+                (keyup.enter)="submitManualBarcode()"
+                placeholder="z.B. 4000417025005"
+              ></ion-input>
+            </ion-item>
+          </ion-list>
+          <ion-button expand="block" (click)="submitManualBarcode()" [disabled]="bcLooking()">
+            @if (bcLooking()) {
+              <ion-spinner name="dots" slot="start"></ion-spinner> Suche…
+            } @else {
+              <ion-icon slot="start" name="search-outline"></ion-icon> Nachschlagen
+            }
+          </ion-button>
+        </div>
+      }
+    </div>
+  </ng-template>
+</ion-modal>
+
+<!-- Kochmodus (Vollbild) -->
+<ion-modal class="cook-fullscreen-modal" [isOpen]="cookRecipe() !== null" (ionModalDidDismiss)="closeCook()">
+  <ng-template>
+    @if (cookRecipe(); as recipe) {
+      <div class="cook">
+        <div class="cook__header">
+          <button class="cook__close" (click)="closeCook()" aria-label="Kochmodus beenden">
+            <ion-icon name="close-outline"></ion-icon>
+          </button>
+          <span class="cook__title">{{ recipe.title }}</span>
+          <span class="cook__counter">{{ cookStep() + 1 }} / {{ recipe.steps.length }}</span>
+        </div>
+
+        <div class="cook__progress">
+          <div class="cook__progress-fill" [style.width.%]="((cookStep() + 1) / recipe.steps.length) * 100"></div>
+        </div>
+
+        <div class="cook__body">
+          <div class="cook__step-num">Schritt {{ cookStep() + 1 }}</div>
+          <div class="cook__step-text">{{ recipe.steps[cookStep()] }}</div>
+        </div>
+
+        <div class="cook__nav">
+          <ion-button
+            fill="outline"
+            class="cook__nav-btn"
+            [disabled]="cookStep() === 0"
+            (click)="cookPrev()"
+          >
+            <ion-icon slot="icon-only" name="chevron-back-outline"></ion-icon>
+          </ion-button>
+
+          @if (cookStep() < recipe.steps.length - 1) {
+            <ion-button class="cook__nav-btn cook__nav-btn--next" (click)="cookNext()">
+              Weiter
+              <ion-icon slot="end" name="chevron-forward-outline"></ion-icon>
+            </ion-button>
+          } @else {
+            <ion-button class="cook__nav-btn cook__nav-btn--next" color="success" (click)="closeCook()">
+              <ion-icon slot="start" name="checkmark-outline"></ion-icon>
+              Fertig!
+            </ion-button>
+          }
+        </div>
+      </div>
+    }
   </ng-template>
 </ion-modal>

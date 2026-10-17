@@ -30,6 +30,10 @@ export class SettingsPage {
   readonly error = signal<string | null>(null);
   readonly savedToast = signal<string | null>(null);
 
+  readonly profileOpen = signal(false);
+  readonly aiOpen = signal(false);
+  readonly infoSection = signal<'anleitung' | 'datenschutz' | 'agb' | 'hilfe' | null>(null);
+
   // --- Profil-Formular (mit Werten aus gespeichertem Profil, sonst Defaults) ---
   private readonly existing = this.profileStore.profile();
   weightKg: number | null = this.existing?.weightKg ?? 80;
@@ -116,11 +120,13 @@ export class SettingsPage {
       updatedAt: new Date().toISOString(),
     };
     this.profileStore.setProfile(profile);
+    this.profileOpen.set(false);
     this.savedToast.set('Profil gespeichert — Tagesbedarf aktualisiert.');
   }
 
   saveAi(): void {
     this.settingsStore.setAi({ ...this.ai });
+    this.aiOpen.set(false);
     this.savedToast.set('KI-Einstellungen gespeichert.');
   }
 

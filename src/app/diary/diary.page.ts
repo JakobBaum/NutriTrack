@@ -38,6 +38,7 @@ interface EntryForm {
   fatG: number | null;
   fiberG: number | null;
   sugarG: number | null;
+  amountG: number | null;
 }
 
 const EMPTY_FORM: EntryForm = {
@@ -49,6 +50,7 @@ const EMPTY_FORM: EntryForm = {
   fatG: null,
   fiberG: null,
   sugarG: null,
+  amountG: null,
 };
 
 interface FastFoodForm {
@@ -120,6 +122,16 @@ export class DiaryPage implements OnDestroy {
 
   /** Gewähltes Rezept (für die ref des Eintrags), null bei manuell/Food. */
   private pickedRecipeId: string | null = null;
+  /** Basis-Nährwerte (per100g) des gewählten Food-Items für Mengenskalierung. */
+  baseFacts: NutritionFacts | null = null;
+
+  // --- Edit-Modal ---
+  readonly editOpen = signal(false);
+  private editId: string | null = null;
+  editForm: { label: string; meal: MealType; amountG: number | null } = {
+    label: '', meal: 'breakfast', amountG: null,
+  };
+  editBaseFacts: NutritionFacts | null = null;
 
   /** Freitext-Filter für die Rezept-Auswahl im Add-Modal. */
   readonly recipeQuery = signal('');
@@ -161,10 +173,23 @@ export class DiaryPage implements OnDestroy {
   /** Native Kamera nur auf dem Gerät; im Web → Datei-Upload-Fallback. */
   readonly nativeCamera = this.camera.isNativeCameraAvailable();
 
+  /** Zuletzt benutzte Lebensmittel (max. 5, ohne Rezepte). */
+  readonly recentFoods = computed(() => this.diary.recentFoods(5));
+
+  /** Zuletzt benutzte Rezepte (max. 3) aus Tagebuch-Einträgen. */
+  readonly recentRecipes = computed<Recipe[]>(() => {
+    const ids = this.diary.recentRecipeIds(3);
+    const all = this.recipeStore.recipes();
+    return ids
+      .map((id) => all.find((r) => r.id === id))
+      .filter((r): r is Recipe => !!r && !!r.factsPerServing);
+  });
+
   // --- Barcode scanner modal ---
   readonly bcOpen = signal(false);
   readonly bcError = signal<string | null>(null);
   readonly bcLooking = signal(false);
+  readonly bcManualOpen = signal(false);
   manualBarcode = '';
   private scanControls?: IScannerControls;
 
@@ -194,6 +219,7 @@ export class DiaryPage implements OnDestroy {
   openAdd(meal: MealType = 'breakfast'): void {
     this.form = { ...EMPTY_FORM, meal };
     this.pickedRecipeId = null;
+    this.baseFacts = null;
     this.recipeQuery.set('');
     this.customQuery.set('');
     this.showManualForm.set(false);
@@ -224,6 +250,35 @@ export class DiaryPage implements OnDestroy {
     this.diary.remove(id);
   }
 
+  openEdit(entry: DiaryEntry): void {
+    this.editId = entry.id;
+    this.editBaseFacts = entry.baseFacts ?? null;
+    this.editForm = {
+      label: entry.label,
+      meal: entry.meal,
+      amountG: entry.amountG ?? null,
+    };
+    this.editOpen.set(true);
+  }
+
+  closeEdit(): void {
+    this.editOpen.set(false);
+    this.editId = null;
+  }
+
+  saveEdit(): void {
+    if (!this.editId) return;
+    const patch: Parameters<typeof this.diary.update>[1] = {
+      label: this.editForm.label.trim() || undefined,
+      meal: this.editForm.meal,
+    };
+    if (this.editBaseFacts && this.editForm.amountG != null) {
+      patch.amountG = this.editForm.amountG;
+    }
+    this.diary.update(this.editId, patch);
+    this.closeEdit();
+  }
+
   private toNum(v: number | null): number {
     return typeof v === 'number' && Number.isFinite(v) ? v : 0;
   }
@@ -243,13 +298,16 @@ export class DiaryPage implements OnDestroy {
     }
   }
 
-  /** Schreibt Name + Nährwerte (pro 100 g) in das Formular. */
+  /** Schreibt Name + Nährwerte in das Formular und speichert baseFacts für Mengenskalierung. */
   private applyFacts(name: string, facts: NutritionFacts): void {
-    // Food/Barcode/Etikett → kein Rezeptbezug mehr.
     this.pickedRecipeId = null;
-    // Gefüllte Werte sichtbar machen (Felder sind sonst eingeklappt).
+    this.baseFacts = facts.basis === 'per100g' ? facts : null;
     this.showManualForm.set(true);
     this.form.label = name;
+    // Wenn per100g: Form zeigt Werte für 100g, Mengenfeld auf 100g vorbelegen.
+    if (facts.basis === 'per100g') {
+      this.form.amountG = 100;
+    }
     this.form.kcal = Math.round(facts.kcal);
     this.form.proteinG = Math.round(facts.proteinG);
     this.form.carbsG = Math.round(facts.carbsG);
@@ -324,15 +382,26 @@ export class DiaryPage implements OnDestroy {
   }
 
   // --- Barcode scanner ---
+  /** Übernimmt einen zuletzt benutzten Eintrag ins Formular. */
+  selectRecentFood(entry: DiaryEntry): void {
+    this.applyFacts(entry.label, entry.facts);
+    this.hint.set('Zuletzt benutzt übernommen — bei Bedarf anpassen.');
+  }
+
   openBarcode(): void {
     this.manualBarcode = '';
     this.bcError.set(null);
     this.bcLooking.set(false);
+    this.bcManualOpen.set(false);
     this.bcOpen.set(true);
   }
 
   closeBarcode(): void {
     this.bcOpen.set(false);
+  }
+
+  toggleBcManual(): void {
+    this.bcManualOpen.update((v) => !v);
   }
 
   /** ion-modal didPresent → Live-Scan starten, sofern der Browser es kann. */
@@ -413,29 +482,50 @@ export class DiaryPage implements OnDestroy {
       this.error.set('Bitte einen Namen eingeben.');
       return;
     }
-    const kcal = this.form.kcal;
-    if (kcal === null || !Number.isFinite(kcal) || kcal < 0) {
-      this.error.set('Bitte gültige Kalorien (kcal) eingeben.');
-      return;
+
+    let facts: NutritionFacts;
+    const amountG = this.form.amountG;
+
+    if (this.baseFacts && this.baseFacts.basis === 'per100g' && amountG != null && amountG > 0) {
+      // Skaliere Basis-Nährwerte auf die eingegebene Menge.
+      const f = this.baseFacts;
+      const factor = amountG / 100;
+      facts = {
+        kcal: Math.round(f.kcal * factor),
+        proteinG: Math.round(f.proteinG * factor * 10) / 10,
+        carbsG: Math.round(f.carbsG * factor * 10) / 10,
+        fatG: Math.round(f.fatG * factor * 10) / 10,
+        fiberG: f.fiberG != null ? Math.round(f.fiberG * factor * 10) / 10 : undefined,
+        sugarG: f.sugarG != null ? Math.round(f.sugarG * factor * 10) / 10 : undefined,
+        basis: 'perPortion',
+      };
+    } else {
+      const kcal = this.form.kcal;
+      if (kcal === null || !Number.isFinite(kcal) || kcal < 0) {
+        this.error.set('Bitte gültige Kalorien (kcal) eingeben.');
+        return;
+      }
+      facts = {
+        kcal: Math.round(kcal),
+        proteinG: this.toNum(this.form.proteinG),
+        carbsG: this.toNum(this.form.carbsG),
+        fatG: this.toNum(this.form.fatG),
+        fiberG: this.toNum(this.form.fiberG),
+        sugarG: this.toNum(this.form.sugarG),
+        basis: 'perPortion',
+      };
     }
-    const facts: NutritionFacts = {
-      kcal: Math.round(kcal),
-      proteinG: this.toNum(this.form.proteinG),
-      carbsG: this.toNum(this.form.carbsG),
-      fatG: this.toNum(this.form.fatG),
-      fiberG: this.toNum(this.form.fiberG),
-      sugarG: this.toNum(this.form.sugarG),
-      basis: 'perPortion',
-    };
+
     this.diary.add({
       dateISO: this.selectedDate(),
       meal: this.form.meal,
       label,
       ref: this.pickedRecipeId ? { kind: 'recipe', recipeId: this.pickedRecipeId } : undefined,
       servings: this.pickedRecipeId ? 1 : undefined,
+      amountG: amountG ?? undefined,
       facts,
+      baseFacts: this.baseFacts ?? undefined,
     });
-    // Nicht-Rezept-Einträge für spätere Wiederverwendung merken.
     if (!this.pickedRecipeId) this.customFoods.save(label, facts);
     this.closeAdd();
   }

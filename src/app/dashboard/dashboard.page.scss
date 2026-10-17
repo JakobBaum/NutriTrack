@@ -59,6 +59,8 @@ ion-content {
   box-shadow: var(--nt-shadow);
   padding: 28px 20px 24px;
   margin-top: 8px;
+  cursor: pointer;
+  &:active { opacity: 0.85; }
 
   &__center {
     display: flex;
@@ -128,6 +130,11 @@ ion-content {
   border-radius: var(--nt-radius-sm);
   box-shadow: var(--nt-shadow-sm);
   padding: 14px 8px;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+
+  &:active { opacity: 0.7; }
 
   &__dot {
     width: 12px;
@@ -144,6 +151,63 @@ ion-content {
   &__value {
     font-size: 11px;
     color: var(--nt-muted);
+  }
+}
+
+/* Drill-Down Sheet */
+.drill-title {
+  font-weight: 800;
+
+  &__total {
+    font-weight: 400;
+    font-size: 14px;
+    color: var(--nt-muted);
+  }
+}
+
+.drill-empty {
+  text-align: center;
+  color: var(--nt-muted);
+  padding: 32px 0;
+}
+
+.drill-item {
+  --padding-start: 0;
+  --inner-padding-end: 0;
+  margin-bottom: 4px;
+
+  &__name {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  &__bar {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--ion-color-light);
+    overflow: hidden;
+    width: 100%;
+  }
+
+  &__fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+  }
+
+  &__val {
+    font-size: 13px;
+    font-weight: 700;
+    text-align: right;
+    min-width: 80px;
+  }
+
+  &__pct {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--nt-muted);
+    display: block;
   }
 }
 

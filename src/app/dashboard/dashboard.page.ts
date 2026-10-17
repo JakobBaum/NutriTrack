@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { MealType } from '../core/models';
+import { MealType, NutritionFacts } from '../core/models';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { addDaysISO, dayLabel, toDateISO } from '../core/util/date';
@@ -11,6 +11,20 @@ interface MacroView {
   color: string;
   eaten: number;
   target: number;
+}
+
+interface DrillItem {
+  label: string;
+  value: number;
+  percent: number;
+}
+
+interface DrillData {
+  label: string;
+  unit: string;
+  total: number;
+  color: string;
+  items: DrillItem[];
 }
 
 interface MealView {
@@ -77,6 +91,47 @@ export class DashboardPage {
       kcal: Math.round(this.diary.kcalForMeal(date, d.type)),
     }));
   });
+
+  readonly drillMacro = signal<string | null>(null);
+
+  readonly drillData = computed<DrillData | null>(() => {
+    const key = this.drillMacro();
+    if (!key) return null;
+    const entries = this.diary.entriesForDate(this.selectedDate());
+    const color = key === 'kcal'
+      ? 'var(--nt-kcal)'
+      : (this.macros().find(m => m.key === key)?.color ?? 'var(--ion-color-primary)');
+    const label = key === 'kcal' ? 'Kalorien' : (this.macros().find(m => m.key === key)?.label ?? key);
+    const unit = key === 'kcal' ? 'kcal' : 'g';
+    const items = entries
+      .map(e => ({ label: e.label, value: this.factValue(e.facts, key) }))
+      .filter(d => d.value > 0)
+      .sort((a, b) => b.value - a.value);
+    const total = items.reduce((s, i) => s + i.value, 0);
+    return {
+      label, unit, color,
+      total: Math.round(total * 10) / 10,
+      items: items.map(i => ({
+        ...i,
+        value: Math.round(i.value * 10) / 10,
+        percent: total > 0 ? Math.round((i.value / total) * 100) : 0,
+      })),
+    };
+  });
+
+  private factValue(facts: NutritionFacts, key: string): number {
+    const map: Record<string, keyof NutritionFacts> = {
+      kcal: 'kcal', protein: 'proteinG', carbs: 'carbsG',
+      fat: 'fatG', fiber: 'fiberG', sugar: 'sugarG',
+    };
+    const prop = map[key];
+    if (!prop) return 0;
+    const v = facts[prop];
+    return typeof v === 'number' ? v : 0;
+  }
+
+  openDrill(key: string): void { this.drillMacro.set(key); }
+  closeDrill(): void { this.drillMacro.set(null); }
 
   prevDay(): void {
     this.selectedDate.update((d) => addDaysISO(d, -1));

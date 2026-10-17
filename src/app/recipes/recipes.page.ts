@@ -13,6 +13,7 @@ import { FoodItem, MealType, NutritionFacts, Recipe, RecipeIngredient } from '..
 import { AiService } from '../core/ai/ai.service';
 import { FOOD_PROVIDER } from '../core/food/food-provider';
 import { BarcodeScannerService } from '../core/scan/barcode-scanner.service';
+import { CameraService } from '../core/scan/camera.service';
 import { DiaryStore } from '../core/state/diary.store';
 import { RecipeDraft, RecipeStore } from '../core/state/recipe.store';
 import {
@@ -67,8 +68,12 @@ export class RecipesPage implements OnDestroy {
   private readonly diary = inject(DiaryStore);
   private readonly food = inject(FOOD_PROVIDER);
   private readonly barcode = inject(BarcodeScannerService);
+  private readonly camera = inject(CameraService);
   private readonly actionSheets = inject(ActionSheetController);
   private readonly ai = inject(AiService);
+
+  readonly nativeCamera = this.camera.isNativeCameraAvailable();
+  readonly importPhotoScanning = signal(false);
 
   readonly mealOptions = MEAL_OPTIONS;
 
@@ -101,10 +106,76 @@ export class RecipesPage implements OnDestroy {
   readonly pickerSearching = signal(false);
   readonly pickerError = signal<string | null>(null);
 
-  // --- Barcode-Scanner im Picker ---
+  /** Nimmt ein Rezept-Foto (native Kamera) auf und importiert es via KI. */
+  async importFromCamera(): Promise<void> {
+    this.importError.set(null);
+    this.importPhotoScanning.set(true);
+    try {
+      const base64 = await this.camera.takePhotoBase64();
+      await this.runImportFromBase64(base64);
+    } catch (e: unknown) {
+      this.importError.set(e instanceof Error ? e.message : 'Kamera nicht verfügbar.');
+    } finally {
+      this.importPhotoScanning.set(false);
+    }
+  }
+
+  /** Liest ein Rezept-Foto (Datei-Upload) und importiert es via KI. */
+  async onImportPhotoFile(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    this.importError.set(null);
+    this.importPhotoScanning.set(true);
+    try {
+      const base64 = await this.fileToBase64(file);
+      await this.runImportFromBase64(base64);
+    } catch (e: unknown) {
+      this.importError.set(e instanceof Error ? e.message : 'Foto-Import fehlgeschlagen.');
+    } finally {
+      this.importPhotoScanning.set(false);
+      input.value = '';
+    }
+  }
+
+  private async runImportFromBase64(base64: string): Promise<void> {
+    const res = await this.ai.importRecipe({ imageBase64: base64 });
+    this.form = {
+      title: res.title,
+      servings: res.servings || 2,
+      cookedWeightG: null,
+      ingredients: res.ingredients.map((i) => ({
+        name: i.name,
+        amount: i.amount,
+        unit: i.unit,
+        facts: i.facts,
+      })),
+      steps: res.steps.length ? [...res.steps] : [''],
+    };
+    this.editId.set(null);
+    this.error.set(null);
+    this.importOpen.set(false);
+    this.isModalOpen.set(true);
+    this.toastMessage.set('Rezept aus Foto erkannt — bitte prüfen und speichern.');
+  }
+
+  private fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result);
+        resolve(result.includes(',') ? result.split(',')[1] : result);
+      };
+      reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // --- Barcode-Scanner im Picker (Vollbild) ---
   readonly bcOpen = signal(false);
   readonly bcError = signal<string | null>(null);
   readonly bcLooking = signal(false);
+  readonly bcManualOpen = signal(false);
   manualBarcode = '';
   private scanControls?: IScannerControls;
 
@@ -323,11 +394,16 @@ export class RecipesPage implements OnDestroy {
     this.manualBarcode = '';
     this.bcError.set(null);
     this.bcLooking.set(false);
+    this.bcManualOpen.set(false);
     this.bcOpen.set(true);
   }
 
   closeBarcode(): void {
     this.bcOpen.set(false);
+  }
+
+  toggleBcManual(): void {
+    this.bcManualOpen.update((v) => !v);
   }
 
   async onBarcodePresent(): Promise<void> {
@@ -459,5 +535,29 @@ export class RecipesPage implements OnDestroy {
 
   onToastDismiss(): void {
     this.toastMessage.set(null);
+  }
+
+  // --- Kochmodus ---
+  readonly cookRecipe = signal<Recipe | null>(null);
+  readonly cookStep = signal(0);
+
+  startCook(recipe: Recipe): void {
+    this.cookRecipe.set(recipe);
+    this.cookStep.set(0);
+  }
+
+  closeCook(): void {
+    this.cookRecipe.set(null);
+    this.cookStep.set(0);
+  }
+
+  cookNext(): void {
+    const r = this.cookRecipe();
+    if (!r) return;
+    this.cookStep.update(s => Math.min(s + 1, r.steps.length - 1));
+  }
+
+  cookPrev(): void {
+    this.cookStep.update(s => Math.max(s - 1, 0));
   }
 }

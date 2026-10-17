@@ -1,0 +1,169 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar>
+    <ion-title>Mahlzeiten</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  @if (meals().length === 0) {
+    <div class="empty">
+      <ion-icon name="nutrition-outline" class="empty__icon"></ion-icon>
+      <h2>Noch keine Mahlzeiten</h2>
+      <p>Speichere häufige Mahlzeiten (Rezept + Lebensmittel kombiniert) und füge sie mit einem Tippen ins Tagebuch ein.</p>
+      <ion-button expand="block" (click)="openCreate()">Erste Mahlzeit anlegen</ion-button>
+    </div>
+  } @else {
+    <ion-list inset="true" lines="full">
+      @for (meal of meals(); track meal.id) {
+        <ion-item-sliding>
+          <ion-item>
+            <ion-icon slot="start" name="nutrition-outline" color="primary"></ion-icon>
+            <ion-label>
+              <h3>{{ meal.name }}</h3>
+              <p>{{ meal.entries.length }} Einträge · {{ totalKcal(meal) }} kcal</p>
+            </ion-label>
+            <ion-button slot="end" fill="clear" (click)="useMeal(meal)">
+              <ion-icon slot="icon-only" name="add-circle-outline"></ion-icon>
+            </ion-button>
+          </ion-item>
+          <ion-item-options side="end">
+            <ion-item-option color="danger" (click)="removeMeal(meal.id)">
+              <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+            </ion-item-option>
+          </ion-item-options>
+        </ion-item-sliding>
+      }
+    </ion-list>
+    <div class="content-spacer"></div>
+  }
+
+  <ion-fab slot="fixed" vertical="bottom" horizontal="end">
+    <ion-fab-button (click)="openCreate()" aria-label="Mahlzeit anlegen">
+      <ion-icon name="add"></ion-icon>
+    </ion-fab-button>
+  </ion-fab>
+
+  <ion-toast
+    [isOpen]="toastMessage() !== null"
+    [message]="toastMessage() ?? ''"
+    [duration]="2200"
+    position="bottom"
+    (didDismiss)="onToastDismiss()"
+  ></ion-toast>
+</ion-content>
+
+<!-- Neue Mahlzeit anlegen -->
+<ion-modal [isOpen]="createOpen()" (ionModalDidDismiss)="closeCreate()">
+  <ng-template>
+    <ion-header class="ion-no-border">
+      <ion-toolbar>
+        <ion-title>Mahlzeit anlegen</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="closeCreate()">Abbrechen</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      <ion-item>
+        <ion-input
+          label="Name der Mahlzeit"
+          labelPlacement="stacked"
+          placeholder="z. B. Frühstück Standard"
+          [(ngModel)]="draftName"
+        ></ion-input>
+      </ion-item>
+
+      <h4 class="section-sub">Zutaten &amp; Komponenten</h4>
+
+      @if (draftEntries.length > 0) {
+        <ion-list lines="none">
+          @for (entry of draftEntries; track entry.label; let i = $index) {
+            <ion-item>
+              <ion-label>
+                <div>{{ entry.label }}</div>
+                <p>{{ entry.facts.kcal }} kcal{{ entry.amountG ? ' · ' + entry.amountG + ' g' : '' }}</p>
+              </ion-label>
+              <ion-button slot="end" fill="clear" color="danger" (click)="removeEntry(i)">
+                <ion-icon slot="icon-only" name="close-circle-outline"></ion-icon>
+              </ion-button>
+            </ion-item>
+          }
+        </ion-list>
+        <div class="draft-total">Gesamt: {{ totalDraftKcal() }} kcal</div>
+      }
+
+      <div class="add-btns">
+        <ion-button expand="block" fill="outline" (click)="openPicker()">
+          <ion-icon slot="start" name="search-outline"></ion-icon>
+          Lebensmittel suchen
+        </ion-button>
+
+        @if (recipes().length > 0) {
+          <h4 class="section-sub">Rezept hinzufügen</h4>
+          <ion-list lines="none" class="recipe-pick">
+            @for (recipe of recipes(); track recipe.id) {
+              @if (recipe.factsPerServing) {
+                <ion-item button (click)="addRecipeToDraft(recipe)">
+                  <ion-icon slot="start" name="book-outline" color="primary"></ion-icon>
+                  <ion-label>
+                    <div>{{ recipe.title }}</div>
+                    <p>{{ recipe.factsPerServing.kcal }} kcal / Portion</p>
+                  </ion-label>
+                  <ion-icon slot="end" name="add-circle-outline" color="primary"></ion-icon>
+                </ion-item>
+              }
+            }
+          </ion-list>
+        }
+      </div>
+
+      <ion-button
+        expand="block"
+        class="ion-margin-top"
+        [disabled]="!draftName.trim() || draftEntries.length === 0"
+        (click)="saveMeal()"
+      >
+        Mahlzeit speichern
+      </ion-button>
+    </ion-content>
+  </ng-template>
+</ion-modal>
+
+<!-- Lebensmittel-Picker -->
+<ion-modal [isOpen]="pickerOpen()" (ionModalDidDismiss)="closePicker()">
+  <ng-template>
+    <ion-header class="ion-no-border">
+      <ion-toolbar>
+        <ion-title>Lebensmittel</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="closePicker()">Fertig</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      <ion-searchbar
+        [(ngModel)]="pickerQuery"
+        placeholder="Lebensmittel suchen"
+        (ionInput)="searchFood()"
+        [debounce]="400"
+      ></ion-searchbar>
+      @if (pickerSearching()) {
+        <ion-progress-bar type="indeterminate"></ion-progress-bar>
+      }
+      @if (pickerError()) {
+        <p class="picker-error">{{ pickerError() }}</p>
+      }
+      <ion-list lines="full">
+        @for (item of pickerResults(); track item.id) {
+          <ion-item button (click)="pickFood(item)">
+            <ion-label>
+              <div>{{ item.name }}</div>
+              <p>{{ item.facts.kcal }} kcal / {{ item.facts.basis === 'per100g' ? '100g' : 'Portion' }}</p>
+            </ion-label>
+            <ion-icon slot="end" name="add-circle-outline" color="primary"></ion-icon>
+          </ion-item>
+        }
+      </ion-list>
+    </ion-content>
+  </ng-template>
+</ion-modal>

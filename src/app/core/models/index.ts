@@ -119,6 +119,12 @@ export interface DiaryEntry {
   servings?: number;
   /** Tatsächlich angerechnete Nährwerte (bereits skaliert). */
   facts: NutritionFacts;
+  /**
+   * Basis-Nährwerte vor der Mengenskalierung (z.B. per 100 g aus OpenFoodFacts).
+   * Gesetzt, wenn der Eintrag über Food-Suche/Barcode erfasst wurde — ermöglicht
+   * nachträgliches Anpassen der Menge mit korrekter Neuskalierung.
+   */
+  baseFacts?: NutritionFacts;
   createdAt: string;
 }
 
@@ -168,6 +174,23 @@ export interface FastFoodSuggestion {
   rationale: string;
   /** Geschätzter Preis in EUR (optional). */
   estPrice?: number;
+}
+
+/** Ein Eintrag innerhalb einer gespeicherten Mahlzeit. */
+export interface SavedMealEntry {
+  label: string;
+  facts: NutritionFacts;
+  amountG?: number;
+  servings?: number;
+  ref: DiaryRef;
+}
+
+/** Eine gespeicherte Mahlzeitenvorlage (z. B. "Frühstück Standard"). */
+export interface SavedMeal {
+  id: string;
+  name: string;
+  entries: SavedMealEntry[];
+  createdAt: string;
 }
 
 /** Konfiguration eines KI-Anbieters (lokal gespeichert). */
