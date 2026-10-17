@@ -39,9 +39,10 @@ export class BarcodeScannerService {
           onResult(result.getText());
           return;
         }
-        // zxing liefert bei jedem Frame ohne Treffer einen NotFound-Fehler —
-        // das ist kein echter Fehler, daher nur andere Fehler weitergeben.
-        if (err && err.name !== 'NotFoundException' && onError) {
+        // zxing wirft bei jedem Frame ohne Treffer NotFoundException,
+        // ChecksumException oder FormatException — alles normale Scan-Frames.
+        // Nur echte Kamerafehler (DOMException: NotAllowed, NotFound …) weitergeben.
+        if (err && err instanceof DOMException && onError) {
           onError(err);
         }
       },
