@@ -126,6 +126,19 @@ ion-content {
   margin-top: 4px;
 }
 
+.search-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 0;
+
+  ion-searchbar {
+    flex: 1;
+    padding: 0;
+    --box-shadow: none;
+  }
+}
+
 // --- Alter inline scanner (nicht mehr genutzt, aber lassen wir ihn für Kompatibilität) ---
 .scanner {
   position: relative;

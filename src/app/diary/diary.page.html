@@ -134,16 +134,11 @@
       }
 
       <!-- Food-Textsuche (OpenFoodFacts) -->
-      <ion-searchbar
-        [(ngModel)]="searchQuery"
-        (keyup.enter)="searchFood()"
-        (ionClear)="searchResults.set([])"
-        placeholder="Lebensmittel suchen…"
-        inputmode="search"
-      ></ion-searchbar>
       <div class="scan-row">
-        <ion-button size="small" fill="outline" (click)="searchFood()" [disabled]="searching()">
-          @if (searching()) { <ion-spinner name="dots"></ion-spinner> } @else { Suchen }
+        <ion-button size="small" fill="outline" (click)="openSearch()" [disabled]="searching()">
+          @if (searching()) { <ion-spinner name="dots"></ion-spinner> } @else {
+            <ion-icon slot="start" name="search-outline"></ion-icon> Suchen
+          }
         </ion-button>
         <ion-button size="small" fill="outline" (click)="openBarcode()" [disabled]="scanning()">
           <ion-icon slot="start" name="barcode-outline"></ion-icon> Barcode
@@ -162,6 +157,22 @@
         </ion-button>
         <input #modalLabelInput type="file" accept="image/*" capture="environment" hidden (change)="onLabelFile($event)" />
       </div>
+      @if (searchOpen()) {
+        <div class="search-bar-row">
+          <ion-searchbar
+            #searchbar
+            [(ngModel)]="searchQuery"
+            (keyup.enter)="searchFood()"
+            (ionClear)="searchResults.set([])"
+            placeholder="Lebensmittel suchen…"
+            inputmode="search"
+            [autofocus]="true"
+          ></ion-searchbar>
+          <ion-button size="small" fill="solid" (click)="searchFood()" [disabled]="searching()">
+            @if (searching()) { <ion-spinner name="dots"></ion-spinner> } @else { Los }
+          </ion-button>
+        </div>
+      }
       @if (hint()) { <p class="scan-hint">{{ hint() }}</p> }
       @if (searchResults().length) {
         <ion-list inset="true" lines="full" class="search-results">

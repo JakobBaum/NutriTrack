@@ -173,8 +173,13 @@ export class DiaryPage implements OnDestroy {
   /** Native Kamera nur auf dem Gerät; im Web → Datei-Upload-Fallback. */
   readonly nativeCamera = this.camera.isNativeCameraAvailable();
 
-  /** Zuletzt benutzte Lebensmittel (max. 5, ohne Rezepte). */
-  readonly recentFoods = computed(() => this.diary.recentFoods(5));
+  /** Zuletzt benutzte Lebensmittel (max. 15, alle Kategorien). */
+  readonly recentFoods = computed(() => this.diary.recentFoods(15));
+
+  /** Steuert, ob die Suchleiste sichtbar ist. */
+  readonly searchOpen = signal(false);
+
+  openSearch(): void { this.searchOpen.set(true); }
 
   /** Zuletzt benutzte Rezepte (max. 3) aus Tagebuch-Einträgen. */
   readonly recentRecipes = computed<Recipe[]>(() => {
@@ -244,6 +249,7 @@ export class DiaryPage implements OnDestroy {
 
   closeAdd(): void {
     this.isModalOpen.set(false);
+    this.searchOpen.set(false);
   }
 
   remove(id: string): void {
@@ -321,6 +327,7 @@ export class DiaryPage implements OnDestroy {
     this.applyFacts(item.name, item.facts);
     this.searchResults.set([]);
     this.searchQuery = '';
+    this.searchOpen.set(false);
     this.hint.set('Werte pro 100 g übernommen — bei Bedarf anpassen.');
   }
 
