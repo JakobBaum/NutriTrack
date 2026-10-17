@@ -1,0 +1,9 @@
+{
+  "/off-search": {
+    "target": "https://search.openfoodfacts.org",
+    "secure": true,
+    "changeOrigin": true,
+    "pathRewrite": { "^/off-search": "/search" },
+    "logLevel": "info"
+  }
+}

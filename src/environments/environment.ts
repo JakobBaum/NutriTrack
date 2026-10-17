@@ -3,7 +3,9 @@
 // The list of file replacements can be found in `angular.json`.
 
 export const environment = {
-  production: false
+  production: false,
+  // Angular dev proxy forwards /off-search → https://search.openfoodfacts.org/search
+  offSearchUrl: '/off-search',
 };
 
 /*

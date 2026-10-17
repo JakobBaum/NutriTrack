@@ -4,12 +4,11 @@ import { firstValueFrom } from 'rxjs';
 import { FoodItem, NutritionFacts } from '../models';
 import { makeId } from '../util/id';
 import { FoodProvider } from './food-provider';
+import { environment } from '../../../environments/environment';
 
-// Freitextsuche über search-a-licious (eigener Suchdienst der OFF).
-const SEARCH_URL = 'https://search.openfoodfacts.org/search';
-// Autocomplete (Taxonomie) über search-a-licious.
-const AUTOCOMPLETE_URL = 'https://search.openfoodfacts.org/autocomplete';
-// Barcode exakt über Product Opener v3.
+// Freitextsuche: dev → proxied relative path; prod → direkt (CapacitorHttp bypasses CORS).
+const SEARCH_URL = environment.offSearchUrl;
+// Barcode exakt über Product Opener v3 (hat CORS *).
 const PRODUCT_V3_URL = 'https://world.openfoodfacts.org/api/v3/product';
 const FIELDS = 'code,product_name,brands,image_url,image_small_url,nutriments,serving_quantity';
 const LANGS = 'de,en';
