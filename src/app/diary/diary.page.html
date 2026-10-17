@@ -253,7 +253,7 @@
           </ion-item>
           @if (!baseFacts || form.amountG === null) {
             <ion-item>
-              <ion-input type="number" inputmode="numeric" label="Kalorien (kcal)" labelPlacement="stacked" [(ngModel)]="form.kcal" placeholder="0"></ion-input>
+              <ion-input type="number" inputmode="numeric" label="Kalorien (kcal)" labelPlacement="stacked" [(ngModel)]="form.kcal" placeholder=""></ion-input>
             </ion-item>
           } @else {
             <ion-item lines="none">
@@ -267,19 +267,19 @@
         <h4 class="form-sub">Makros (optional, in g)</h4>
         <ion-list inset="true">
           <ion-item>
-            <ion-input type="number" inputmode="numeric" label="Eiweiß" labelPlacement="stacked" [(ngModel)]="form.proteinG" placeholder="0"></ion-input>
+            <ion-input type="number" inputmode="numeric" label="Eiweiß" labelPlacement="stacked" [(ngModel)]="form.proteinG" placeholder=""></ion-input>
           </ion-item>
           <ion-item>
-            <ion-input type="number" inputmode="numeric" label="Kohlenhydrate" labelPlacement="stacked" [(ngModel)]="form.carbsG" placeholder="0"></ion-input>
+            <ion-input type="number" inputmode="numeric" label="Kohlenhydrate" labelPlacement="stacked" [(ngModel)]="form.carbsG" placeholder=""></ion-input>
           </ion-item>
           <ion-item>
-            <ion-input type="number" inputmode="numeric" label="Fett" labelPlacement="stacked" [(ngModel)]="form.fatG" placeholder="0"></ion-input>
+            <ion-input type="number" inputmode="numeric" label="Fett" labelPlacement="stacked" [(ngModel)]="form.fatG" placeholder=""></ion-input>
           </ion-item>
           <ion-item>
-            <ion-input type="number" inputmode="numeric" label="Ballaststoffe" labelPlacement="stacked" [(ngModel)]="form.fiberG" placeholder="0"></ion-input>
+            <ion-input type="number" inputmode="numeric" label="Ballaststoffe" labelPlacement="stacked" [(ngModel)]="form.fiberG" placeholder=""></ion-input>
           </ion-item>
           <ion-item>
-            <ion-input type="number" inputmode="numeric" label="Zucker" labelPlacement="stacked" [(ngModel)]="form.sugarG" placeholder="0"></ion-input>
+            <ion-input type="number" inputmode="numeric" label="Zucker" labelPlacement="stacked" [(ngModel)]="form.sugarG" placeholder=""></ion-input>
           </ion-item>
         </ion-list>
 
