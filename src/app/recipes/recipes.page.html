@@ -28,6 +28,23 @@
           </ion-card-subtitle>
         </ion-card-header>
         <ion-card-content>
+          @if (recipe.factsPerServing) {
+            <div class="recipe__macros">
+              <div class="recipe__macro">
+                <strong>{{ recipe.factsPerServing.kcal }}</strong><span>kcal</span>
+              </div>
+              <div class="recipe__macro">
+                <strong>{{ recipe.factsPerServing.proteinG }}g</strong><span>Eiweiß</span>
+              </div>
+              <div class="recipe__macro">
+                <strong>{{ recipe.factsPerServing.carbsG }}g</strong><span>Kohlenh.</span>
+              </div>
+              <div class="recipe__macro">
+                <strong>{{ recipe.factsPerServing.fatG }}g</strong><span>Fett</span>
+              </div>
+            </div>
+            <p class="recipe__total-kcal">Gesamt {{ recipe.factsPerServing.kcal * recipe.servings }} kcal · {{ recipe.servings }} Portionen</p>
+          }
           @if (recipe.ingredients.length) {
             <p class="recipe__ings">{{ recipe.ingredients.length }} Zutaten</p>
           }

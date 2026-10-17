@@ -48,6 +48,41 @@ ion-content {
 .recipe {
   margin: 10px 0;
 
+  &__macros {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    margin-bottom: 4px;
+  }
+
+  &__macro {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: var(--nt-surface-2, rgba(255,255,255,0.05));
+    border-radius: 8px;
+    padding: 6px 2px;
+
+    strong {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--ion-text-color);
+    }
+
+    span {
+      font-size: 10px;
+      color: var(--nt-muted);
+      margin-top: 1px;
+    }
+  }
+
+  &__total-kcal {
+    font-size: 11px;
+    color: var(--nt-muted);
+    margin: 2px 0 8px;
+    text-align: center;
+  }
+
   &__ings {
     margin: 0 0 8px;
     font-size: 13px;
