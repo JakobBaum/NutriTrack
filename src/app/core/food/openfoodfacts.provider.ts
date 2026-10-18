@@ -25,7 +25,7 @@ interface OffNutriments {
 interface OffProduct {
   code?: string;
   product_name?: string;
-  brands?: string;
+  brands?: string | string[];
   image_url?: string;
   image_small_url?: string;
   serving_quantity?: number | string;
@@ -130,7 +130,7 @@ export class OpenFoodFactsProvider implements FoodProvider {
       id: makeId('off'),
       source: 'openfoodfacts',
       name,
-      brand: p.brands?.split(',')[0]?.trim(),
+      brand: Array.isArray(p.brands) ? p.brands[0] : p.brands?.split(',')[0]?.trim(),
       barcode: p.code,
       facts,
       servingG: p.serving_quantity ? this.num(p.serving_quantity) : undefined,
