@@ -243,7 +243,10 @@
             </ion-item>
           </ion-list>
           @if (autoWeightG() > 0 && !form.cookedWeightG) {
-            <p class="auto-weight-hint">≈ {{ autoWeightG() }} g (Summe Zutaten)</p>
+            <p class="auto-weight-hint">
+              {{ autoWeightIsApprox() ? '≈' : '' }} {{ autoWeightG() }} g
+              ({{ autoWeightIsApprox() ? 'Näherung: EL≈15g, TL≈5g, Stk≈80g, Pck≈100g, Dose≈400g, Bund≈50g, Prise≈0.5g' : 'Summe Zutaten' }})
+            </p>
           }
         </div>
         <div>

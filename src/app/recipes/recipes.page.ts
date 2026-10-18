@@ -200,16 +200,26 @@ export class RecipesPage implements OnDestroy {
   }
 
   private calcTotalWeightG(ingredients: RecipeIngredient[]): number {
-    const toG: Record<string, number> = { g: 1, kg: 1000, ml: 1, l: 1000 };
-    return ingredients.reduce((sum, i) => {
+    const toG: Record<string, number> = {
+      g: 1, kg: 1000, ml: 1, l: 1000,
+      EL: 15, TL: 5, Prise: 0.5,
+      Stk: 80, Pck: 100, Dose: 400, Bund: 50,
+    };
+    return Math.round(ingredients.reduce((sum, i) => {
       const factor = toG[i.unit] ?? 0;
       return sum + i.amount * factor;
-    }, 0);
+    }, 0));
   }
 
   /** Automatisch berechnetes Gesamtgewicht für Anzeige im Formular. */
   autoWeightG(): number {
     return this.calcTotalWeightG(this.toIngredients());
+  }
+
+  /** True wenn Näherungseinheiten (EL, TL, Stk …) im Rezept vorkommen. */
+  autoWeightIsApprox(): boolean {
+    const exact = new Set(['g', 'kg', 'ml', 'l']);
+    return this.toIngredients().some((i) => !exact.has(i.unit));
   }
 
   total(): NutritionFacts {
