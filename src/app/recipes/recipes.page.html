@@ -141,7 +141,11 @@
                 </ion-label>
                 <div class="ing-qty" slot="end" (click)="$event.stopPropagation()">
                   <ion-input type="number" inputmode="decimal" [(ngModel)]="ing.amount" aria-label="Menge" placeholder="0"></ion-input>
-                  <ion-input class="ing-qty__unit" [(ngModel)]="ing.unit" aria-label="Einheit" placeholder="g"></ion-input>
+                  <ion-select class="ing-qty__unit" [(ngModel)]="ing.unit" aria-label="Einheit" interface="popover" placeholder="g">
+                    @for (u of unitOptions; track u) {
+                      <ion-select-option [value]="u">{{ u }}</ion-select-option>
+                    }
+                  </ion-select>
                 </div>
               </ion-item>
               <ion-item-options side="end">

@@ -178,10 +178,15 @@ ion-content {
   }
 
   &__unit {
-    min-width: 36px;
-    max-width: 44px;
+    min-width: 64px;
+    max-width: 80px;
+    --padding-start: 6px;
+    --padding-end: 4px;
     color: var(--nt-muted);
-    font-weight: 400;
+    font-weight: 600;
+    font-size: 13px;
+    border: 1px solid var(--nt-border, rgba(255,255,255,0.12));
+    border-radius: 6px;
   }
 }
 

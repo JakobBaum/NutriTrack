@@ -92,6 +92,8 @@ export class RecipesPage implements OnDestroy {
 
   readonly recipes = this.store.recipes;
 
+  readonly unitOptions = ['g', 'kg', 'ml', 'l', 'EL', 'TL', 'Stk', 'Prise', 'Bund', 'Dose', 'Pck'];
+
   readonly isModalOpen = signal(false);
   readonly editId = signal<string | null>(null);
   readonly error = signal<string | null>(null);
