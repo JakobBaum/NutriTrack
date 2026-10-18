@@ -177,6 +177,44 @@ ion-content {
   overflow-y: auto;
 }
 
+.ff-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: calc(100% - 24px);
+  margin: 8px 12px 4px;
+  padding: 14px 16px;
+  background: var(--nt-surface-2, rgba(255,255,255,0.06));
+  border: 1.5px solid rgba(56, 189, 248, 0.4);
+  border-radius: var(--nt-radius-sm, 12px);
+  color: var(--ion-color-primary);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+
+  ion-icon:first-child {
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  &__text {
+    flex: 1;
+  }
+
+  &__hint {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--nt-muted);
+  }
+
+  &__arrow {
+    font-size: 16px;
+    color: var(--nt-muted);
+    flex-shrink: 0;
+  }
+}
+
 .ff-card {
   margin: 12px 0;
 

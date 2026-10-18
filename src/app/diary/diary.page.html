@@ -1,11 +1,6 @@
 <ion-header class="ion-no-border">
   <ion-toolbar>
     <ion-title>Tagebuch</ion-title>
-    <ion-buttons slot="end">
-      <ion-button (click)="openFastfood()" aria-label="Fastfood-Helfer">
-        <ion-icon slot="icon-only" name="fast-food-outline"></ion-icon>
-      </ion-button>
-    </ion-buttons>
   </ion-toolbar>
   <ion-toolbar>
     <div class="date-nav">
@@ -28,6 +23,15 @@
       <span class="summary__target">von {{ targetKcal() }} kcal</span>
     }
   </div>
+
+  <button class="ff-btn" (click)="openFastfood()">
+    <ion-icon name="fast-food-outline"></ion-icon>
+    <span class="ff-btn__text">Fastfood-Helfer</span>
+    @if (targetKcal() > 0) {
+      <span class="ff-btn__hint">{{ targetKcal() - totalKcal() }} kcal übrig</span>
+    }
+    <ion-icon name="chevron-forward-outline" class="ff-btn__arrow"></ion-icon>
+  </button>
 
   @for (group of groups(); track group.type) {
     <div class="meal">
