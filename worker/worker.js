@@ -7,7 +7,7 @@
  *   wrangler secret put GEMINI_API_KEY
  */
 
-const GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_MODEL = 'gemini-3.8-flash';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 const CORS = {
