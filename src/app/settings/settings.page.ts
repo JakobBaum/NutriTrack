@@ -158,4 +158,44 @@ export class SettingsPage implements OnInit {
   onToastDismiss(): void {
     this.savedToast.set(null);
   }
+
+  async testConnection(): Promise<void> {
+    const url = this.settingsStore.ai().proxyUrl?.trim().replace(/\/$/, '');
+    if (!url) { this.debugLog.error('Keine Proxy-URL konfiguriert.'); return; }
+    this.debugLog.info(`Teste ${url} ...`);
+    this.logOpen.set(true);
+
+    // Test 1: OPTIONS (CORS preflight)
+    try {
+      const opts = await fetch(`${url}/off-search?q=test&page_size=1&fields=code`, { method: 'OPTIONS' });
+      const cors = opts.headers.get('Access-Control-Allow-Origin');
+      this.debugLog.info(`OPTIONS → ${opts.status} | CORS: ${cors ?? 'FEHLT!'}`);
+    } catch (e) {
+      this.debugLog.error(`OPTIONS fehlgeschlagen: ${(e as Error).message}`);
+    }
+
+    // Test 2: GET /off-search
+    try {
+      const resp = await fetch(`${url}/off-search?q=test&page_size=1&fields=code,product_name`);
+      const cors = resp.headers.get('Access-Control-Allow-Origin');
+      const body = await resp.text();
+      this.debugLog.log(resp.ok ? 'success' : 'error',
+        `GET /off-search → ${resp.status} | CORS: ${cors ?? 'FEHLT!'} | Body: ${body.slice(0, 80)}`);
+    } catch (e) {
+      this.debugLog.error(`GET /off-search fehlgeschlagen: ${(e as Error).message}`);
+    }
+
+    // Test 3: POST / (ohne API Key)
+    try {
+      const resp = await fetch(`${url}/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fn: 'ping', payload: {} }),
+      });
+      const cors = resp.headers.get('Access-Control-Allow-Origin');
+      this.debugLog.info(`POST / → ${resp.status} | CORS: ${cors ?? 'FEHLT!'}`);
+    } catch (e) {
+      this.debugLog.error(`POST / fehlgeschlagen: ${(e as Error).message}`);
+    }
+  }
 }
