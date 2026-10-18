@@ -237,10 +237,14 @@
           <span class="field-label">Fertig gekocht</span>
           <ion-list inset="true">
             <ion-item>
-              <ion-input type="number" inputmode="numeric" [(ngModel)]="form.cookedWeightG" placeholder="0"></ion-input>
+              <ion-input type="number" inputmode="numeric" [(ngModel)]="form.cookedWeightG"
+                [placeholder]="autoWeightG() > 0 ? autoWeightG().toString() : '0'"></ion-input>
               <ion-note slot="end">g</ion-note>
             </ion-item>
           </ion-list>
+          @if (autoWeightG() > 0 && !form.cookedWeightG) {
+            <p class="auto-weight-hint">≈ {{ autoWeightG() }} g (Summe Zutaten)</p>
+          }
         </div>
         <div>
           <span class="field-label">Portionen</span>
@@ -272,6 +276,9 @@
         <ion-icon name="add-outline"></ion-icon> Schritt hinzufügen
       </button>
 
+      @if (error()) {
+        <ion-text color="danger"><p class="form-error save-error">{{ error() }}</p></ion-text>
+      }
       <ion-button expand="block" class="ion-margin-top save-btn" (click)="save()">Rezept sichern</ion-button>
     </ion-content>
   </ng-template>

@@ -193,10 +193,23 @@ export class RecipesPage implements OnDestroy {
       .map((i) => ({
         name: i.name.trim(),
         amount: this.toNum(i.amount),
-        unit: i.unit.trim() || 'g',
+        unit: (i.unit ?? '').trim() || 'g',
         facts: i.facts,
         foodItemId: i.foodItemId,
       }));
+  }
+
+  private calcTotalWeightG(ingredients: RecipeIngredient[]): number {
+    const toG: Record<string, number> = { g: 1, kg: 1000, ml: 1, l: 1000 };
+    return ingredients.reduce((sum, i) => {
+      const factor = toG[i.unit] ?? 0;
+      return sum + i.amount * factor;
+    }, 0);
+  }
+
+  /** Automatisch berechnetes Gesamtgewicht für Anzeige im Formular. */
+  autoWeightG(): number {
+    return this.calcTotalWeightG(this.toIngredients());
   }
 
   total(): NutritionFacts {
@@ -481,25 +494,29 @@ export class RecipesPage implements OnDestroy {
   save(): void {
     const title = this.form.title.trim();
     if (!title) {
-      this.error.set('Bitte einen Titel eingeben.');
+      this.error.set('Titel fehlt — bitte einen Namen eintragen.');
       return;
     }
-    const servings = this.form.servings;
-    if (servings === null || !Number.isFinite(servings) || servings < 1) {
-      this.error.set('Portionen muss mindestens 1 sein.');
+    const servings = Number(this.form.servings);
+    if (!Number.isFinite(servings) || servings < 1) {
+      this.error.set('Portionen fehlt — bitte mindestens 1 eintragen.');
       return;
     }
     const ingredients = this.toIngredients();
     if (ingredients.length === 0) {
-      this.error.set('Bitte mindestens eine Zutat hinzufügen.');
+      this.error.set('Keine Zutaten — bitte mindestens eine Zutat hinzufügen.');
       return;
     }
     this.error.set(null);
 
+    const autoWeight = this.calcTotalWeightG(ingredients);
+
     const draft: RecipeDraft = {
       title,
       servings: Math.floor(servings),
-      cookedWeightG: this.form.cookedWeightG != null ? this.toNum(this.form.cookedWeightG) : undefined,
+      cookedWeightG: this.form.cookedWeightG != null && Number(this.form.cookedWeightG) > 0
+        ? Number(this.form.cookedWeightG)
+        : autoWeight > 0 ? autoWeight : undefined,
       ingredients,
       steps: this.form.steps.map((s) => s.trim()).filter(Boolean),
       origin: this._importOrigin,
