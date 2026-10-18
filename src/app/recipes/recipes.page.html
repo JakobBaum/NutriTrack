@@ -43,8 +43,16 @@
                 <strong>{{ recipe.factsPerServing.fatG }}g</strong><span>Fett</span>
               </div>
               <div class="recipe__macro">
-                <strong>{{ recipe.factsPerServing.fiberG }}g</strong><span>Ballast.</span>
+                <strong>{{ recipe.factsPerServing.fiberG ?? '–' }}{{ recipe.factsPerServing.fiberG != null ? 'g' : '' }}</strong><span>Ballast.</span>
               </div>
+              <div class="recipe__macro">
+                <strong>{{ recipe.factsPerServing.sugarG ?? '–' }}{{ recipe.factsPerServing.sugarG != null ? 'g' : '' }}</strong><span>Zucker</span>
+              </div>
+              @if (recipe.factsPerServing.saltG != null) {
+                <div class="recipe__macro">
+                  <strong>{{ recipe.factsPerServing.saltG }}g</strong><span>Salz</span>
+                </div>
+              }
             </div>
             <p class="recipe__total-kcal">Gesamt {{ recipe.factsPerServing.kcal * recipe.servings }} kcal · {{ recipe.servings }} Portionen</p>
           }
