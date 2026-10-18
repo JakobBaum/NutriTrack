@@ -59,7 +59,7 @@ export class OpenFoodFactsProvider implements FoodProvider {
 
   private searchUrl(): string {
     const proxy = this.settings.ai().proxyUrl?.trim();
-    return proxy ? `${proxy}/off-search` : SEARCH_URL_DEFAULT;
+    return proxy ? `${proxy.replace(/\/$/, '')}/off-search` : SEARCH_URL_DEFAULT;
   }
 
   async searchByText(query: string, limit = 12): Promise<FoodItem[]> {
