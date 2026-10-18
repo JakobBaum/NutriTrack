@@ -16,6 +16,7 @@ import {
   ShoppingPlanRequest,
   ShoppingPlanResult,
 } from './ai-provider';
+import { DebugLogService } from '../debug/debug-log.service';
 
 /**
  * KI-Anbieter über den **internen Proxy** ({@link server/anthropic-proxy}).
@@ -28,25 +29,28 @@ import {
 export class ProxyAiProvider implements AiProvider {
   private readonly http = inject(HttpClient);
   private readonly settings = inject(SettingsStore);
+  private readonly log = inject(DebugLogService);
 
   private async call<T>(fn: string, payload: unknown): Promise<T> {
     const url = this.settings.ai().proxyUrl?.trim();
     if (!url) throw new Error('Keine KI-Proxy-URL konfiguriert.');
+    this.log.info(`→ ${fn}`);
     try {
-      return await firstValueFrom(
+      const result = await firstValueFrom(
         this.http.post<T>(url, { fn, payload }, { headers: { 'content-type': 'application/json' } }),
       );
+      this.log.success(`✓ ${fn} OK`);
+      return result;
     } catch (err) {
       if (err instanceof HttpErrorResponse) {
-        if (err.status === 0) {
-          throw new Error(
-            `KI-Proxy nicht erreichbar (${url}). Prüfe ob der Cloudflare Worker deployed ist und CORS erlaubt.`,
-          );
-        }
-        throw new Error(
-          `KI-Proxy-Fehler ${err.status}: ${err.error?.error ?? err.error?.message ?? err.statusText}`,
-        );
+        const detail = err.error?.error ?? err.error?.message ?? err.statusText;
+        const msg = err.status === 0
+          ? `KI-Proxy nicht erreichbar (${url})`
+          : `KI-Proxy ${err.status}: ${detail}`;
+        this.log.error(`✗ ${fn}: ${msg}`);
+        throw new Error(msg);
       }
+      this.log.error(`✗ ${fn}: ${(err as Error).message}`);
       throw err;
     }
   }

@@ -78,6 +78,30 @@
     </ion-item>
   </ion-list>
 
+  <!-- Debug-Log -->
+  <h4 class="form-sub">Debug-Log</h4>
+  <ion-list inset="true" lines="none">
+    <ion-item button (click)="logOpen.set(!logOpen())">
+      <ion-icon slot="start" name="terminal-outline"></ion-icon>
+      <ion-label>Log anzeigen ({{ logEntries().length }})</ion-label>
+      <ion-icon slot="end" [name]="logOpen() ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
+    </ion-item>
+  </ion-list>
+  @if (logOpen()) {
+    <div class="debug-log">
+      <button class="debug-log__clear" (click)="debugLog.clear()">Log leeren</button>
+      @if (logEntries().length === 0) {
+        <p class="debug-log__empty">Noch keine Einträge.</p>
+      }
+      @for (entry of logEntries(); track $index) {
+        <div class="debug-log__entry" [class]="'debug-log__entry--' + entry.level">
+          <span class="debug-log__ts">{{ entry.ts }}</span>
+          <span class="debug-log__msg">{{ entry.msg }}</span>
+        </div>
+      }
+    </div>
+  }
+
   <div class="content-spacer"></div>
 
   <ion-toast

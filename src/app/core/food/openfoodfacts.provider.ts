@@ -6,6 +6,7 @@ import { makeId } from '../util/id';
 import { FoodProvider } from './food-provider';
 import { SettingsStore } from '../state/settings.store';
 import { environment } from '../../../environments/environment';
+import { DebugLogService } from '../debug/debug-log.service';
 
 // Freitextsuche: dev → proxied relative path; prod → direkt (CapacitorHttp bypasses CORS).
 // Wenn proxyUrl gesetzt: ${proxyUrl}/off-search (CF-Worker übernimmt den CORS-Proxy).
@@ -54,6 +55,7 @@ function isNotFound(e: unknown): boolean {
 export class OpenFoodFactsProvider implements FoodProvider {
   private readonly http = inject(HttpClient);
   private readonly settings = inject(SettingsStore);
+  private readonly log = inject(DebugLogService);
 
   private searchUrl(): string {
     const proxy = this.settings.ai().proxyUrl?.trim();
@@ -63,9 +65,11 @@ export class OpenFoodFactsProvider implements FoodProvider {
   async searchByText(query: string, limit = 12): Promise<FoodItem[]> {
     const q = query.trim();
     if (!q) return [];
+    const url = this.searchUrl();
+    this.log.info(`→ Suche "${q}" via ${url}`);
     try {
       const res = await firstValueFrom(
-        this.http.get<SearchResponse>(this.searchUrl(), {
+        this.http.get<SearchResponse>(url, {
           headers: OFF_HEADERS,
           params: {
             q,
@@ -75,11 +79,17 @@ export class OpenFoodFactsProvider implements FoodProvider {
           },
         }),
       );
-      return (res.hits ?? [])
+      const items = (res.hits ?? [])
         .map((p) => this.toFoodItem(p))
         .filter((f): f is FoodItem => f !== null);
+      this.log.success(`✓ ${items.length} Treffer für "${q}"`);
+      return items;
     } catch (e: unknown) {
-      if (isNotFound(e)) return [];
+      if (isNotFound(e)) { this.log.info(`Keine Treffer für "${q}"`); return []; }
+      const msg = e instanceof HttpErrorResponse
+        ? `HTTP ${e.status}: ${e.message}`
+        : (e instanceof Error ? e.message : String(e));
+      this.log.error(`✗ Suche "${q}": ${msg}`);
       throw e;
     }
   }

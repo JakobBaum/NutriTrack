@@ -7,6 +7,7 @@ import { RecipeStore } from '../core/state/recipe.store';
 import { CustomFoodStore } from '../core/state/custom-food.store';
 import { SettingsStore } from '../core/state/settings.store';
 import { ShoppingStore } from '../core/state/shopping.store';
+import { DebugLogService } from '../core/debug/debug-log.service';
 
 /**
  * Einstellungen: Profil erfassen → Tagesbedarf berechnen (deterministisch),
@@ -34,7 +35,11 @@ export class SettingsPage implements OnInit {
 
   readonly profileOpen = signal(false);
   readonly aiOpen = signal(false);
+  readonly logOpen = signal(false);
   readonly infoSection = signal<'anleitung' | 'datenschutz' | 'agb' | 'hilfe' | null>(null);
+
+  readonly debugLog = inject(DebugLogService);
+  readonly logEntries = this.debugLog.entries;
 
   // --- Profil-Formular (mit Werten aus gespeichertem Profil, sonst Defaults) ---
   private readonly existing = this.profileStore.profile();

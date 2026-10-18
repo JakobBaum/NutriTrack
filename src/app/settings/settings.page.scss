@@ -62,3 +62,52 @@ ion-content {
 .content-spacer {
   height: 40px;
 }
+
+.debug-log {
+  margin: 0 16px 16px;
+  background: #111;
+  border-radius: 8px;
+  padding: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+
+  &__clear {
+    background: #333;
+    color: #aaa;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 11px;
+    margin-bottom: 8px;
+    cursor: pointer;
+  }
+
+  &__empty {
+    color: #555;
+    font-size: 12px;
+    text-align: center;
+    margin: 8px 0;
+  }
+
+  &__entry {
+    display: flex;
+    gap: 8px;
+    font-size: 11px;
+    font-family: monospace;
+    padding: 2px 0;
+    border-bottom: 1px solid #1e1e1e;
+
+    &--info  { color: #aaa; }
+    &--success { color: #4caf50; }
+    &--error { color: #f44336; }
+  }
+
+  &__ts {
+    color: #555;
+    flex-shrink: 0;
+  }
+
+  &__msg {
+    word-break: break-all;
+  }
+}
