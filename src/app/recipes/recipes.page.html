@@ -56,7 +56,7 @@
             </div>
             <p class="recipe__total-kcal">Gesamt {{ recipe.factsPerServing.kcal * recipe.servings }} kcal · {{ recipe.servings }} Portionen</p>
           }
-          @if (recipe.ingredients.length) {
+          @if ((recipe.ingredients ?? []).length) {
             <p class="recipe__ings">{{ recipe.ingredients.length }} Zutaten</p>
           }
           <div class="recipe__actions">
@@ -64,7 +64,7 @@
               <ion-icon slot="start" name="add-circle-outline"></ion-icon>
               Tagebuch
             </ion-button>
-            @if (recipe.steps.length > 0) {
+            @if ((recipe.steps ?? []).length > 0) {
               <ion-button fill="clear" size="small" color="success" (click)="startCook(recipe)">
                 <ion-icon slot="start" name="flame-outline"></ion-icon>
                 Kochen

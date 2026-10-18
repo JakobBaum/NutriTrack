@@ -18,7 +18,11 @@ export class RecipeStore {
   private readonly storage = inject(StorageService);
 
   private readonly _recipes = signal<Recipe[]>(
-    this.storage.get<Recipe[]>(KEY_RECIPES, []),
+    this.storage.get<Recipe[]>(KEY_RECIPES, []).map(r => ({
+      ...r,
+      steps: r.steps ?? [],
+      ingredients: r.ingredients ?? [],
+    })),
   );
 
   /** Alle Rezepte, neueste zuerst. */
