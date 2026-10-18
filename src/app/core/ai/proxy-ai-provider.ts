@@ -44,7 +44,7 @@ export class ProxyAiProvider implements AiProvider {
           );
         }
         throw new Error(
-          `KI-Proxy-Fehler ${err.status}: ${err.error?.message ?? err.statusText}`,
+          `KI-Proxy-Fehler ${err.status}: ${err.error?.error ?? err.error?.message ?? err.statusText}`,
         );
       }
       throw err;

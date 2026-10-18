@@ -93,27 +93,45 @@ async function gemini(prompt, env, imageBase64 = null) {
       ]
     : [{ text: prompt }];
 
-  const resp = await fetch(
-    `${GEMINI_BASE}/${GEMINI_MODEL}:generateContent?key=${env.GEMINI_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts }] }),
-    },
-  );
-  if (!resp.ok) {
-    const err = await resp.text();
-    throw new Error(`Gemini-Fehler ${resp.status}: ${err}`);
+  let resp;
+  try {
+    resp = await fetch(
+      `${GEMINI_BASE}/${GEMINI_MODEL}:generateContent?key=${env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts }] }),
+      },
+    );
+  } catch (fetchErr) {
+    throw new Error(`Gemini nicht erreichbar: ${fetchErr.message}`);
   }
+
+  if (!resp.ok) {
+    let errBody = '';
+    try { errBody = await resp.text(); } catch { /* ignorieren */ }
+    // Gemini gibt bei falschem Key 400 mit { error: { message: "..." } } zurück
+    try {
+      const parsed = JSON.parse(errBody);
+      const msg = parsed?.error?.message ?? errBody;
+      throw new Error(`Gemini ${resp.status}: ${msg}`);
+    } catch (jsonErr) {
+      if (jsonErr.message.startsWith('Gemini')) throw jsonErr;
+      throw new Error(`Gemini ${resp.status}: ${errBody.slice(0, 200)}`);
+    }
+  }
+
   const data = await resp.json();
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  if (!text) throw new Error('Gemini hat leere Antwort zurückgegeben.');
+
   // JSON aus dem Antworttext extrahieren (Gemini umschließt manchmal mit ```json)
   const match = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
   if (match) {
     try { return JSON.parse(match[1] ?? match[0]); } catch { /* fällt durch */ }
   }
   try { return JSON.parse(text); } catch {
-    throw new Error('Gemini-Antwort konnte nicht als JSON geparst werden.');
+    throw new Error(`Gemini-Antwort kein JSON: ${text.slice(0, 200)}`);
   }
 }
 
