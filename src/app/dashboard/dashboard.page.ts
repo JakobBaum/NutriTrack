@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { MealType, NutritionFacts } from '../core/models';
+import { FastFoodSuggestion, MealType, NutritionFacts } from '../core/models';
+import { AiService } from '../core/ai/ai.service';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { addDaysISO, dayLabel, toDateISO } from '../core/util/date';
@@ -49,6 +50,45 @@ export class DashboardPage {
   private readonly profileStore = inject(ProfileStore);
   private readonly diary = inject(DiaryStore);
   private readonly router = inject(Router);
+  private readonly ai = inject(AiService);
+
+  // --- Fast Food Helper ---
+  readonly ffOpen = signal(false);
+  readonly ffLoading = signal(false);
+  readonly ffError = signal<string | null>(null);
+  readonly ffSuggestions = signal<FastFoodSuggestion[]>([]);
+  ffRestaurant = '';
+  ffBudget: number | null = null;
+
+  readonly restaurants = ['', 'McDonald\'s', 'Burger King', 'KFC', 'Subway', 'Döner', 'Pizza', 'Sushi'];
+
+  openFastFood(): void {
+    this.ffSuggestions.set([]);
+    this.ffError.set(null);
+    this.ffOpen.set(true);
+  }
+
+  async suggestFastfood(): Promise<void> {
+    this.ffError.set(null);
+    this.ffLoading.set(true);
+    try {
+      const suggestions = await this.ai.suggestFastfood({
+        kcalBudget: this.kcalRemaining(),
+        restaurant: this.ffRestaurant,
+        moneyBudget: this.ffBudget ?? undefined,
+        preference: 'high protein',
+      });
+      this.ffSuggestions.set(suggestions);
+    } catch (e: unknown) {
+      this.ffError.set(e instanceof Error ? e.message : 'Fehler beim Laden.');
+    } finally {
+      this.ffLoading.set(false);
+    }
+  }
+
+  closeFastFood(): void {
+    this.ffOpen.set(false);
+  }
 
   readonly selectedDate = signal(toDateISO());
   readonly dateLabel = computed(() => dayLabel(this.selectedDate()));
@@ -142,7 +182,7 @@ export class DashboardPage {
   }
 
   openSettings(): void {
-    void this.router.navigate(['/settings']);
+    void this.router.navigate(['/settings'], { queryParams: { setup: '1' } });
   }
 
   openDiary(): void {

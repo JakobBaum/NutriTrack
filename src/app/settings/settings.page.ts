@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { ActivityLevel, AiConfig, Goal, Sex, UserProfile } from '../core/models';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
@@ -18,8 +19,9 @@ import { ShoppingStore } from '../core/state/shopping.store';
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SettingsPage {
+export class SettingsPage implements OnInit {
   private readonly profileStore = inject(ProfileStore);
+  private readonly route = inject(ActivatedRoute);
   private readonly settingsStore = inject(SettingsStore);
   private readonly diary = inject(DiaryStore);
   private readonly recipes = inject(RecipeStore);
@@ -50,6 +52,7 @@ export class SettingsPage {
   readonly sexes: { value: Sex; label: string }[] = [
     { value: 'male', label: 'Männlich' },
     { value: 'female', label: 'Weiblich' },
+    { value: 'diverse', label: 'Divers' },
   ];
 
   readonly activities: { value: ActivityLevel; label: string }[] = [
@@ -77,6 +80,12 @@ export class SettingsPage {
     age: { min: 14, max: 100, label: 'Alter' },
     rateKgPerWeek: { min: 0.1, max: 1.5, label: 'Tempo' },
   } as const;
+
+  ngOnInit(): void {
+    if (this.route.snapshot.queryParamMap.get('setup') === '1') {
+      this.profileOpen.set(true);
+    }
+  }
 
   get showRate(): boolean {
     return this.goal !== 'maintain';

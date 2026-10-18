@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import {
@@ -32,9 +32,23 @@ export class ProxyAiProvider implements AiProvider {
   private async call<T>(fn: string, payload: unknown): Promise<T> {
     const url = this.settings.ai().proxyUrl?.trim();
     if (!url) throw new Error('Keine KI-Proxy-URL konfiguriert.');
-    return firstValueFrom(
-      this.http.post<T>(url, { fn, payload }, { headers: { 'content-type': 'application/json' } }),
-    );
+    try {
+      return await firstValueFrom(
+        this.http.post<T>(url, { fn, payload }, { headers: { 'content-type': 'application/json' } }),
+      );
+    } catch (err) {
+      if (err instanceof HttpErrorResponse) {
+        if (err.status === 0) {
+          throw new Error(
+            `KI-Proxy nicht erreichbar (${url}). Prüfe ob der Cloudflare Worker deployed ist und CORS erlaubt.`,
+          );
+        }
+        throw new Error(
+          `KI-Proxy-Fehler ${err.status}: ${err.error?.message ?? err.statusText}`,
+        );
+      }
+      throw err;
+    }
   }
 
   computeTargets(profile: UserProfile): Promise<DailyTarget> {

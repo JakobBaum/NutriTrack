@@ -165,18 +165,23 @@ ion-content {
   display: flex;
   align-items: center;
   gap: 4px;
-  max-width: 120px;
+  max-width: 128px;
 
   ion-input {
     --padding-start: 6px;
     --padding-end: 6px;
     text-align: right;
     font-weight: 600;
+    border: 1px solid var(--nt-border, rgba(255,255,255,0.12));
+    border-radius: 6px;
+    min-width: 56px;
   }
 
   &__unit {
-    max-width: 38px;
+    min-width: 36px;
+    max-width: 44px;
     color: var(--nt-muted);
+    font-weight: 400;
   }
 }
 
@@ -303,6 +308,24 @@ ion-content {
   margin: 8px 12px 0;
   font-size: 12px;
   color: var(--nt-muted);
+}
+
+.tiktok-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 4px 4px;
+  font-size: 12px;
+  color: var(--ion-color-warning);
+
+  ion-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  &--ok {
+    color: var(--ion-color-success);
+  }
 }
 
 .content-spacer {

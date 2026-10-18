@@ -152,6 +152,7 @@ export class RecipesPage implements OnDestroy {
       })),
       steps: res.steps.length ? [...res.steps] : [''],
     };
+    this._importOrigin = 'photo';
     this.editId.set(null);
     this.error.set(null);
     this.importOpen.set(false);
@@ -252,6 +253,10 @@ export class RecipesPage implements OnDestroy {
     this.importOpen.set(false);
   }
 
+  isTikTokUrl(url: string): boolean {
+    return /tiktok\.com/i.test(url);
+  }
+
   /** Parst Text/URL via KI zu einem Rezept und öffnet das Formular vorbefüllt. */
   async runImport(): Promise<void> {
     const text = this.importText.trim();
@@ -260,8 +265,15 @@ export class RecipesPage implements OnDestroy {
       this.importError.set('Bitte Text einfügen oder eine URL angeben.');
       return;
     }
+    if (url && this.isTikTokUrl(url) && !this.isLive()) {
+      this.importError.set(
+        'TikTok-Import benötigt den KI-Proxy. Bitte in den Einstellungen eine Proxy-URL eintragen oder den Beschreibungstext des Videos manuell hier einfügen.',
+      );
+      return;
+    }
     this.importError.set(null);
     this.importBusy.set(true);
+    const isTikTok = url && this.isTikTokUrl(url);
     try {
       const res = await this.ai.importRecipe({ text: text || undefined, url: url || undefined });
       this.form = {
@@ -276,13 +288,14 @@ export class RecipesPage implements OnDestroy {
         })),
         steps: res.steps.length ? [...res.steps] : [''],
       };
+      this._importOrigin = isTikTok ? 'tiktok' : (url ? 'url' : 'text');
       this.editId.set(null);
       this.error.set(null);
       this.importOpen.set(false);
       this.isModalOpen.set(true);
       this.toastMessage.set(
         this.isLive()
-          ? 'Rezept importiert — bitte prüfen und speichern.'
+          ? `Rezept${isTikTok ? ' aus TikTok' : ''} importiert — bitte prüfen und speichern.`
           : 'Rezept aus Text erkannt (Mock) — Nährwerte ggf. je Zutat ergänzen.',
       );
     } catch {
@@ -291,6 +304,8 @@ export class RecipesPage implements OnDestroy {
       this.importBusy.set(false);
     }
   }
+
+  private _importOrigin: 'own' | 'url' | 'tiktok' | 'photo' | 'text' = 'own';
 
   // --- Zutaten ---
   removeIngredient(index: number): void {
@@ -485,9 +500,10 @@ export class RecipesPage implements OnDestroy {
       cookedWeightG: this.form.cookedWeightG != null ? this.toNum(this.form.cookedWeightG) : undefined,
       ingredients,
       steps: this.form.steps.map((s) => s.trim()).filter(Boolean),
-      origin: 'own',
+      origin: this._importOrigin,
       factsPerServing: perServingFacts(ingredients, servings),
     };
+    this._importOrigin = 'own';
 
     const id = this.editId();
     if (id) this.store.update(id, draft);

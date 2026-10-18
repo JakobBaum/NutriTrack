@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { MealType, ShoppingItem, ShoppingList } from '../models';
 import { AiService } from '../ai/ai.service';
+import { MockAiProvider } from '../ai/mock-ai-provider';
 import { StorageService } from '../storage/storage.service';
 import { buildShoppingList } from '../shopping/shopping-generator';
 import { makeId } from '../util/id';
@@ -27,6 +28,7 @@ export class ShoppingStore {
   private readonly storage = inject(StorageService);
   private readonly recipes = inject(RecipeStore);
   private readonly ai = inject(AiService);
+  private readonly mock = inject(MockAiProvider);
 
   private readonly _list = signal<ShoppingList | null>(
     this.storage.get<ShoppingList | null>(KEY_LIST, null),
@@ -60,13 +62,20 @@ export class ShoppingStore {
    * inkl. Schätzpreisen. Persistiert das Ergebnis.
    */
   async generatePlan(opts: ShoppingPlanOptions): Promise<ShoppingList> {
-    const result = await this.ai.generateShoppingList({
+    const req = {
       persons: opts.persons,
       days: opts.days,
       meals: opts.meals,
       budget: opts.budget,
       store: opts.store,
       recipes: this.recipes.recipes(),
+    };
+    let result = await this.ai.generateShoppingList(req).catch(async (err: unknown) => {
+      if (this.ai.isLive()) {
+        // Proxy/KI-Fehler → Mock-Fallback, Fehler an Aufrufer weitergeben
+        throw err;
+      }
+      return this.mock.generateShoppingList(req);
     });
     const list: ShoppingList = {
       id: makeId('shopping'),

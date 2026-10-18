@@ -5,7 +5,7 @@
  *  - `*At`      = Zeitstempel  ISO 8601 "YYYY-MM-DDTHH:mm:ss.sssZ"
  */
 
-export type Sex = 'male' | 'female';
+export type Sex = 'male' | 'female' | 'diverse';
 export type Goal = 'lose' | 'maintain' | 'gain';
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 export type NutritionBasis = 'per100g' | 'perPortion';

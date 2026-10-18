@@ -22,7 +22,7 @@ const ACTIVITY_FACTORS: Record<ActivityLevel, number> = {
 };
 
 /** Untergrenzen für die Zufuhr, um unsichere Defizite zu vermeiden. */
-const MIN_KCAL = { male: 1500, female: 1200 } as const;
+const MIN_KCAL: Record<string, number> = { male: 1500, female: 1200, diverse: 1350 };
 
 /** Protein-Zielwerte in g pro kg Körpergewicht je Ziel. */
 const PROTEIN_G_PER_KG = { lose: 1.8, maintain: 1.6, gain: 2.0 } as const;
@@ -46,7 +46,10 @@ export class NutritionCalcService {
   /** Grundumsatz nach Mifflin-St Jeor (kcal/Tag). */
   basalMetabolicRate(p: UserProfile): number {
     const base = 10 * p.weightKg + 6.25 * p.heightCm - 5 * p.age;
-    return p.sex === 'male' ? base + 5 : base - 161;
+    if (p.sex === 'male') return base + 5;
+    if (p.sex === 'female') return base - 161;
+    // diverse: Mittelwert männlich/weiblich (−78 entspricht Durchschnitt von +5 und −161)
+    return base - 78;
   }
 
   /** Gesamtumsatz (TDEE) = BMR × Aktivitätsfaktor. */
@@ -67,7 +70,7 @@ export class NutritionCalcService {
     if (p.goal === 'lose') kcal = tdee - dailyDelta;
     else if (p.goal === 'gain') kcal = tdee + dailyDelta;
 
-    kcal = Math.max(kcal, MIN_KCAL[p.sex]);
+    kcal = Math.max(kcal, MIN_KCAL[p.sex] ?? 1350);
     kcal = Math.round(kcal);
 
     const proteinG = Math.round(PROTEIN_G_PER_KG[p.goal] * p.weightKg);

@@ -77,6 +77,16 @@
       }
     </ion-list>
 
+    <!-- Fast Food Helper Button -->
+    <button class="ff-btn" (click)="openFastFood()">
+      <ion-icon name="fast-food-outline"></ion-icon>
+      <div class="ff-btn__text">
+        <span class="ff-btn__title">Fast Food Hilfe</span>
+        <span class="ff-btn__sub">{{ kcalRemaining() }} kcal übrig — was passt?</span>
+      </div>
+      <ion-icon name="chevron-forward-outline" class="ff-btn__arrow"></ion-icon>
+    </button>
+
     <div class="content-spacer"></div>
   }
 
@@ -88,6 +98,67 @@
     </ion-fab>
   }
 </ion-content>
+
+<!-- Fast Food Helper Modal -->
+<ion-modal [isOpen]="ffOpen()" (ionModalDidDismiss)="closeFastFood()">
+  <ng-template>
+    <ion-header class="ion-no-border">
+      <ion-toolbar>
+        <ion-title>Fast Food Hilfe</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="closeFastFood()">Schließen</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      <p class="ff-hint">Noch <strong>{{ kcalRemaining() }} kcal</strong> übrig. Wähle ein Restaurant und bekomme passende Vorschläge.</p>
+
+      <ion-list inset="true">
+        <ion-item>
+          <ion-select label="Restaurant" labelPlacement="stacked" [(ngModel)]="ffRestaurant" interface="popover">
+            @for (r of restaurants; track r) {
+              <ion-select-option [value]="r">{{ r || 'Egal / Anderes' }}</ion-select-option>
+            }
+          </ion-select>
+        </ion-item>
+        <ion-item>
+          <ion-input type="number" inputmode="decimal" label="Geld-Budget (€, optional)" labelPlacement="stacked" [(ngModel)]="ffBudget" placeholder="z.B. 8"></ion-input>
+        </ion-item>
+      </ion-list>
+
+      <ion-button expand="block" class="ion-margin-horizontal" (click)="suggestFastfood()" [disabled]="ffLoading()">
+        @if (ffLoading()) {
+          <ion-spinner name="dots" slot="start"></ion-spinner> Suche…
+        } @else {
+          <ion-icon slot="start" name="sparkles-outline"></ion-icon> Vorschläge holen
+        }
+      </ion-button>
+
+      @if (ffError()) {
+        <ion-text color="danger"><p class="form-error ion-padding-horizontal">{{ ffError() }}</p></ion-text>
+      }
+
+      @if (ffSuggestions().length) {
+        <ion-list inset="true" lines="full" class="ff-results">
+          @for (s of ffSuggestions(); track s.itemName) {
+            <ion-item>
+              <ion-label class="ion-text-wrap">
+                <h3>{{ s.itemName }}</h3>
+                <p class="ff-macros">
+                  {{ s.facts.kcal }} kcal · {{ s.facts.proteinG }}g Eiweiß · {{ s.facts.carbsG }}g Kohlenh. · {{ s.facts.fatG }}g Fett
+                </p>
+                <p class="ff-rationale">{{ s.rationale }}</p>
+              </ion-label>
+              @if (s.estPrice != null) {
+                <ion-note slot="end">≈ {{ s.estPrice.toFixed(2) }} €</ion-note>
+              }
+            </ion-item>
+          }
+        </ion-list>
+      }
+    </ion-content>
+  </ng-template>
+</ion-modal>
 
 <!-- Makro-Drill-Down Bottom Sheet -->
 <ion-modal

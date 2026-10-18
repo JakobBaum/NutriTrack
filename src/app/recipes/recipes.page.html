@@ -139,9 +139,9 @@
                     <ion-icon [name]="isExpanded($index) ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
                   </button>
                 </ion-label>
-                <div class="ing-qty" slot="end">
-                  <ion-input type="number" inputmode="decimal" [(ngModel)]="ing.amount" aria-label="Menge"></ion-input>
-                  <ion-input class="ing-qty__unit" [(ngModel)]="ing.unit" aria-label="Einheit"></ion-input>
+                <div class="ing-qty" slot="end" (click)="$event.stopPropagation()">
+                  <ion-input type="number" inputmode="decimal" [(ngModel)]="ing.amount" aria-label="Menge" placeholder="0"></ion-input>
+                  <ion-input class="ing-qty__unit" [(ngModel)]="ing.unit" aria-label="Einheit" placeholder="g"></ion-input>
                 </div>
               </ion-item>
               <ion-item-options side="end">
@@ -297,16 +297,28 @@
         </ion-item>
       </ion-list>
 
-      <span class="field-label">oder Link</span>
+      <span class="field-label">oder Link (inkl. TikTok)</span>
       <ion-list inset="true">
         <ion-item>
           <ion-input
             [(ngModel)]="importUrl"
             inputmode="url"
-            placeholder="https://…"
+            placeholder="https://tiktok.com/… oder anderer Link"
           ></ion-input>
         </ion-item>
       </ion-list>
+      @if (isTikTokUrl(importUrl) && !isLive()) {
+        <p class="tiktok-hint">
+          <ion-icon name="logo-tiktok"></ion-icon>
+          TikTok-Import braucht den KI-Proxy. Alternativ: Rezepttext aus der Video-Beschreibung oben einfügen.
+        </p>
+      }
+      @if (isTikTokUrl(importUrl) && isLive()) {
+        <p class="tiktok-hint tiktok-hint--ok">
+          <ion-icon name="logo-tiktok"></ion-icon>
+          TikTok erkannt — der Proxy liest Titel und Beschreibung automatisch.
+        </p>
+      }
 
       <span class="field-label">oder Foto</span>
       <div class="scan-row">
