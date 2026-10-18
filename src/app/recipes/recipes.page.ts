@@ -513,10 +513,6 @@ export class RecipesPage implements OnDestroy {
       return;
     }
     const ingredients = this.toIngredients();
-    if (ingredients.length === 0) {
-      this.error.set('Keine Zutaten — bitte mindestens eine Zutat hinzufügen.');
-      return;
-    }
     this.error.set(null);
 
     const autoWeight = this.calcTotalWeightG(ingredients);
@@ -550,7 +546,6 @@ export class RecipesPage implements OnDestroy {
    * erst hier (beim Klick) abgefragt — sie wird nicht am Rezept gespeichert.
    */
   async logToDiary(recipe: Recipe): Promise<void> {
-    if (!recipe.factsPerServing) return;
     const sheet = await this.actionSheets.create({
       header: 'Als welche Mahlzeit loggen?',
       buttons: [
@@ -565,14 +560,16 @@ export class RecipesPage implements OnDestroy {
   }
 
   private logMeal(recipe: Recipe, meal: MealType): void {
-    if (!recipe.factsPerServing) return;
+    const facts = recipe.factsPerServing ?? {
+      kcal: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0, basis: 'perPortion' as const,
+    };
     this.diary.add({
       dateISO: toDateISO(),
       meal,
       label: recipe.title,
       ref: { kind: 'recipe', recipeId: recipe.id },
       servings: 1,
-      facts: recipe.factsPerServing,
+      facts,
     });
     const mealLabel = this.mealOptions.find((m) => m.value === meal)?.label ?? 'Tagebuch';
     this.toastMessage.set(`„${recipe.title}" als ${mealLabel} gelegt.`);
@@ -598,7 +595,7 @@ export class RecipesPage implements OnDestroy {
 
   cookNext(): void {
     const r = this.cookRecipe();
-    if (!r) return;
+    if (!r || !r.steps?.length) return;
     this.cookStep.update(s => Math.min(s + 1, r.steps.length - 1));
   }
 
