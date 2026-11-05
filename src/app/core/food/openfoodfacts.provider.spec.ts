@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import {
@@ -132,15 +132,36 @@ describe('OpenFoodFactsProvider — Suche (search-a-licious)', () => {
     expect((err as FoodLookupError).reason).toBe('rate-limit');
   });
 
-  it('meldet status 0 (CORS/offline) als offline', async () => {
-    // Act
-    const promise = provider.searchByText('reis');
-    const req = http.expectOne((r) => r.url === SEARCH_URL);
-    req.error(new ProgressEvent('error'), { status: 0, statusText: 'Unknown Error' });
+  describe('status 0', () => {
+    afterEach(() => vi.restoreAllMocks());
 
-    // Assert
-    const err = await promise.catch((e: unknown) => e);
-    expect((err as FoodLookupError).reason).toBe('offline');
+    it('meldet status 0 als offline, wenn das Gerät kein Netz hat', async () => {
+      // Arrange
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+
+      // Act
+      const promise = provider.searchByText('reis');
+      const req = http.expectOne((r) => r.url === SEARCH_URL);
+      req.error(new ProgressEvent('error'), { status: 0, statusText: 'Unknown Error' });
+
+      // Assert
+      const err = await promise.catch((e: unknown) => e);
+      expect((err as FoodLookupError).reason).toBe('offline');
+    });
+
+    it('meldet status 0 als Serverproblem, wenn das Gerät online ist (z. B. CORS-Abweisung)', async () => {
+      // Arrange
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+
+      // Act
+      const promise = provider.searchByText('reis');
+      const req = http.expectOne((r) => r.url === SEARCH_URL);
+      req.error(new ProgressEvent('error'), { status: 0, statusText: 'Unknown Error' });
+
+      // Assert
+      const err = await promise.catch((e: unknown) => e);
+      expect((err as FoodLookupError).reason).toBe('server');
+    });
   });
 
   it('wirft bei echtem Serverfehler (500) weiter', async () => {
@@ -207,5 +228,24 @@ describe('foodErrorMessage', () => {
     expect(foodErrorMessage(new FoodLookupError('offline', 'x'))).toContain('Keine Verbindung');
     expect(foodErrorMessage(new FoodLookupError('server', 'x'))).toContain('nicht erreichbar');
     expect(foodErrorMessage(new Error('?'))).toContain('bitte erneut versuchen');
+  });
+
+  it('nennt bei Serverproblem die Datenbank, nicht das Internet', () => {
+    // Act
+    const message = foodErrorMessage(new FoodLookupError('server', 'x'));
+
+    // Assert
+    expect(message).toBe(
+      'Lebensmittel-Datenbank gerade nicht erreichbar — bitte später erneut versuchen.',
+    );
+    expect(message).not.toContain('Internet');
+  });
+
+  it('nennt bei Offline das Internet', () => {
+    // Act
+    const message = foodErrorMessage(new FoodLookupError('offline', 'x'));
+
+    // Assert
+    expect(message).toBe('Keine Verbindung zur Lebensmittel-Datenbank — Internet prüfen.');
   });
 });
