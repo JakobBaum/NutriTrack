@@ -76,7 +76,7 @@ describe('GeminiAiProvider — Modell-Routing', () => {
     const req = http.expectOne(url('gemini-3.8-flash'));
 
     // Assert
-    expect(req.request.body.contents[0].parts[0].inline_data.data).toBe('deadbeef');
+    expect(req.request.body.contents[0].parts[0].inlineData.data).toBe('deadbeef');
     req.flush(geminiReply(LABEL_JSON));
     await promise;
   });

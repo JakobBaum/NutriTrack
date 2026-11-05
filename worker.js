@@ -1,147 +1,455 @@
 /**
  * NutriTrack Cloudflare Worker
- * - GET  /off-search  → OpenFoodFacts Suche (CORS-Proxy)
+ * - GET  /off-search  → OpenFoodFacts-Suche (CORS-Proxy, 1 h gecacht)
  * - POST /            → KI-Proxy für Gemini (fn + payload)
  *
- * Secrets (über Wrangler setzen):
+ * Secrets (über Wrangler/Dashboard setzen):
  *   wrangler secret put GEMINI_API_KEY
+ * Optional:
+ *   ALLOWED_ORIGINS  kommagetrennte Browser-Origins (ersetzt DEFAULT_ORIGINS)
+ *   AI_LIMITER       Rate-Limiting-Binding (wrangler.toml [[ratelimits]]) für POST /
+ *
+ * Sicherheit: Origin-Allowlist, Payload-Validierung + Größenlimits, Rate-Limit,
+ * SSRF-Schutz beim Rezept-Import, Key nur als Header. Der Proxy ist trotzdem
+ * öffentlich erreichbar (Origin lässt sich außerhalb von Browsern fälschen) —
+ * das Rate-Limit ist der eigentliche Kostenschutz.
  */
 
 const GEMINI_MODEL = 'gemini-3.8-flash';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+const OFF_SEARCH_URL = 'https://search.openfoodfacts.org/search';
+// OFF verlangt einen User-Agent mit App-Name + Kontakt (Browser dürfen ihn nicht setzen).
+const OFF_USER_AGENT = 'NutriTrack/1.0 (+https://github.com/JakobBaum/NutriTrack)';
+const PAGE_USER_AGENT = 'Mozilla/5.0 (compatible; NutriTrack/1.0; +https://github.com/JakobBaum/NutriTrack)';
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+const DEFAULT_ORIGINS = [
+  'https://jakobbaum.github.io',
+  'capacitor://localhost', // iOS-App
+  'ionic://localhost',
+  'https://localhost', // Android-App
+  'http://localhost',
+  'http://localhost:4200',
+  'http://localhost:8100',
+];
+
+const SEARCH_PARAMS = ['q', 'page', 'page_size', 'fields', 'langs', 'sort_by'];
+const MAX_QUERY_CHARS = 200;
+const MAX_PAGE_SIZE = 50;
+const SEARCH_CACHE_TTL_S = 3600;
+const PREFLIGHT_MAX_AGE_S = 86400;
+
+const MAX_BODY_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_CHARS = 9 * 1024 * 1024; // Base64 eines ~6-MB-Fotos
+const MAX_TEXT_CHARS = 20000;
+const MAX_PAGE_BYTES = 1024 * 1024;
+const MAX_PROMPT_PAGE_CHARS = 12000;
+const MAX_REDIRECTS = 3;
+const FETCH_TIMEOUT_MS = 10000;
+
+const AI_FUNCTIONS = {
+  generateShoppingList: { validate: validateShoppingRequest, run: generateShoppingList },
+  recognizeLabel: { validate: validateLabelRequest, run: recognizeLabel },
+  suggestFastfood: { validate: validateFastfoodRequest, run: suggestFastfood },
+  importRecipe: { validate: validateImportRequest, run: importRecipe },
+  computeTargets: { validate: validateProfile, run: computeTargets },
 };
+
+/** Fehler, die als 4xx an den Client gehen (Eingabe ist schuld, nicht der Server). */
+class ClientError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
 
 export default {
   async fetch(request, env) {
-    const url = new URL(request.url);
+    const origin = request.headers.get('Origin');
+    if (origin && !allowedOrigins(env).includes(origin)) {
+      return json({ error: 'Origin nicht erlaubt.' }, 403);
+    }
+    const cors = corsHeaders(origin);
 
-    // CORS preflight
     if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: CORS });
+      return new Response(null, { status: 204, headers: cors });
     }
 
-    // ── OpenFoodFacts Proxy ───────────────────────────────────────────
-    if (request.method === 'GET' && url.pathname === '/off-search') {
-      const searchUrl = new URL('https://search.openfoodfacts.org/search');
-      url.searchParams.forEach((v, k) => searchUrl.searchParams.set(k, v));
-      const resp = await fetch(searchUrl.toString(), {
-        headers: { 'User-Agent': 'NutriTrack/1.0' },
-      });
-      const body = await resp.text();
-      return new Response(body, {
-        status: resp.status,
-        headers: { 'Content-Type': 'application/json', ...CORS },
-      });
+    const url = new URL(request.url);
+    try {
+      if (request.method === 'GET' && url.pathname === '/off-search') {
+        return await offSearch(url, cors);
+      }
+      if (request.method === 'POST' && url.pathname === '/') {
+        return await aiProxy(request, env, cors);
+      }
+      return json({ error: 'Nicht gefunden.' }, 404, cors);
+    } catch (e) {
+      if (e instanceof ClientError) return json({ error: e.message }, e.status, cors);
+      console.error('Worker-Fehler:', e);
+      return json({ error: e?.message ?? 'Interner Fehler.' }, 500, cors);
     }
-
-    // ── KI-Proxy (POST /) ─────────────────────────────────────────────
-    if (request.method === 'POST' && url.pathname === '/') {
-      if (!env.GEMINI_API_KEY) {
-        return json({ error: 'GEMINI_API_KEY nicht konfiguriert.' }, 500);
-      }
-      let body;
-      try {
-        body = await request.json();
-      } catch {
-        return json({ error: 'Ungültiger JSON-Body.' }, 400);
-      }
-
-      const { fn, payload } = body;
-      try {
-        switch (fn) {
-          case 'generateShoppingList':
-            return json(await generateShoppingList(payload, env));
-          case 'recognizeLabel':
-            return json(await recognizeLabel(payload, env));
-          case 'suggestFastfood':
-            return json(await suggestFastfood(payload, env));
-          case 'importRecipe':
-            return json(await importRecipe(payload, env));
-          case 'computeTargets':
-            return json(await computeTargets(payload, env));
-          default:
-            return json({ error: `Unbekannte Funktion: ${fn}` }, 400);
-        }
-      } catch (e) {
-        return json({ error: e.message ?? 'Interner Fehler.' }, 500);
-      }
-    }
-
-    return new Response('Not found', { status: 404, headers: CORS });
   },
 };
 
-// ── Hilfsfunktionen ────────────────────────────────────────────────────
+// ── CORS ───────────────────────────────────────────────────────────────
 
-function json(data, status = 200) {
+function allowedOrigins(env) {
+  const configured = (env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  return configured.length > 0 ? configured : DEFAULT_ORIGINS;
+}
+
+function corsHeaders(origin) {
+  if (!origin) return {};
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    // User-Agent zulassen: ältere App-Versionen senden ihn, Safari/Firefox fragen dafür per Preflight.
+    'Access-Control-Allow-Headers': 'Content-Type, User-Agent',
+    'Access-Control-Max-Age': String(PREFLIGHT_MAX_AGE_S),
+    Vary: 'Origin',
+  };
+}
+
+function json(data, status = 200, cors = {}) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json', ...CORS },
+    headers: { 'Content-Type': 'application/json', ...cors },
   });
 }
 
+// ── OpenFoodFacts-Proxy ────────────────────────────────────────────────
+
+function buildSearchUrl(url) {
+  const q = (url.searchParams.get('q') ?? '').trim();
+  if (!q) throw new ClientError(400, 'Suchbegriff fehlt.');
+  if (q.length > MAX_QUERY_CHARS) throw new ClientError(400, 'Suchbegriff zu lang.');
+
+  const target = new URL(OFF_SEARCH_URL);
+  for (const key of SEARCH_PARAMS) {
+    const value = url.searchParams.get(key);
+    if (value !== null) target.searchParams.set(key, key === 'q' ? q : value);
+  }
+  const size = Number(target.searchParams.get('page_size') ?? 12);
+  const clamped = Number.isFinite(size) ? Math.min(Math.max(1, Math.round(size)), MAX_PAGE_SIZE) : 12;
+  target.searchParams.set('page_size', String(clamped));
+  return target;
+}
+
+async function offSearch(url, cors) {
+  const target = buildSearchUrl(url);
+  const cache = globalThis.caches?.default;
+  const cacheKey = new Request(target.toString());
+  const cached = cache ? await cache.match(cacheKey) : undefined;
+  if (cached) return withHeaders(cached, cors);
+
+  const resp = await fetch(target.toString(), {
+    headers: { 'User-Agent': OFF_USER_AGENT, Accept: 'application/json' },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  const passthrough = { 'Content-Type': 'application/json' };
+  const retryAfter = resp.headers.get('Retry-After');
+  if (retryAfter) passthrough['Retry-After'] = retryAfter;
+  const body = await resp.text();
+
+  if (resp.ok && cache) {
+    const toCache = new Response(body, {
+      status: 200,
+      headers: { ...passthrough, 'Cache-Control': `public, max-age=${SEARCH_CACHE_TTL_S}` },
+    });
+    await cache.put(cacheKey, toCache);
+  }
+  return new Response(body, { status: resp.status, headers: { ...passthrough, ...cors } });
+}
+
+function withHeaders(response, extra) {
+  const headers = new Headers(response.headers);
+  for (const [k, v] of Object.entries(extra)) headers.set(k, v);
+  return new Response(response.body, { status: response.status, headers });
+}
+
+// ── KI-Proxy ───────────────────────────────────────────────────────────
+
+async function aiProxy(request, env, cors) {
+  const declared = Number(request.headers.get('Content-Length') ?? 0);
+  if (declared > MAX_BODY_BYTES) throw new ClientError(413, 'Anfrage zu groß.');
+  const raw = await request.text();
+  if (raw.length > MAX_BODY_BYTES) throw new ClientError(413, 'Anfrage zu groß.');
+
+  let body;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    throw new ClientError(400, 'Ungültiger JSON-Body.');
+  }
+  const handler = Object.hasOwn(AI_FUNCTIONS, body?.fn) ? AI_FUNCTIONS[body.fn] : null;
+  if (!handler) throw new ClientError(400, `Unbekannte Funktion: ${String(body?.fn).slice(0, 40)}`);
+  const payload = handler.validate(body.payload ?? {});
+
+  if (!env.GEMINI_API_KEY) throw new ClientError(503, 'KI ist auf dem Server nicht konfiguriert.');
+  if (await isRateLimited(env, request)) {
+    return json({ error: 'Zu viele KI-Anfragen — bitte kurz warten.' }, 429, { ...cors, 'Retry-After': '60' });
+  }
+  return json(await handler.run(payload, env), 200, cors);
+}
+
+async function isRateLimited(env, request) {
+  if (typeof env.AI_LIMITER?.limit !== 'function') return false;
+  const key = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+  const { success } = await env.AI_LIMITER.limit({ key });
+  return !success;
+}
+
+// ── Eingabe-Validierung ────────────────────────────────────────────────
+
+function num(value, min, max, name) {
+  const n = Number(value);
+  if (value === null || value === '' || !Number.isFinite(n) || n < min || n > max) {
+    throw new ClientError(400, `${name} ungültig.`);
+  }
+  return n;
+}
+
+function optNum(value, min, max, name) {
+  return value === undefined || value === null || value === '' ? undefined : num(value, min, max, name);
+}
+
+/** Kürzt und entschärft Freitext für Prompts (keine Steuerzeichen). */
+function text(value, maxChars) {
+  if (value === undefined || value === null) return '';
+  return String(value).replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, ' ').trim().slice(0, maxChars);
+}
+
+function oneOf(value, allowed, name) {
+  if (!allowed.includes(value)) throw new ClientError(400, `${name} ungültig.`);
+  return value;
+}
+
+function image(value) {
+  if (typeof value !== 'string' || value.length === 0) throw new ClientError(400, 'Foto fehlt.');
+  if (value.length > MAX_IMAGE_CHARS) throw new ClientError(413, 'Foto zu groß.');
+  if (!/^[A-Za-z0-9+/=\r\n]+$/.test(value)) throw new ClientError(400, 'Foto ist kein Base64.');
+  return value;
+}
+
+const MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+function validateShoppingRequest(p) {
+  const meals = Array.isArray(p.meals) ? p.meals.filter((m) => MEALS.includes(m)) : [];
+  if (meals.length === 0) throw new ClientError(400, 'Mahlzeiten fehlen.');
+  return {
+    persons: num(p.persons, 1, 20, 'Personen'),
+    days: num(p.days, 1, 14, 'Tage'),
+    meals,
+    budget: optNum(p.budget, 0, 5000, 'Budget'),
+    store: text(p.store, 40),
+    recipeNames: (Array.isArray(p.recipes) ? p.recipes : []).slice(0, 30).map((r) => text(r?.title, 80)).filter(Boolean),
+  };
+}
+
+function validateLabelRequest(p) {
+  return { imageBase64: image(p.imageBase64), basis: oneOf(p.basis ?? 'per100g', ['per100g', 'perPortion'], 'Basis') };
+}
+
+function validateFastfoodRequest(p) {
+  return {
+    restaurant: text(p.restaurant, 60),
+    kcalBudget: num(p.kcalBudget, 50, 5000, 'Kalorienbudget'),
+    moneyBudget: optNum(p.moneyBudget, 0, 200, 'Geldbudget'),
+    preference: text(p.preference, 60),
+  };
+}
+
+function validateImportRequest(p) {
+  if (p.imageBase64) return { imageBase64: image(p.imageBase64) };
+  if (p.url) {
+    const url = text(p.url, 2048);
+    if (!isPublicHttpUrl(url)) throw new ClientError(400, 'Diese URL kann nicht importiert werden.');
+    return { url, text: text(p.text, MAX_TEXT_CHARS) };
+  }
+  const recipeText = text(p.text, MAX_TEXT_CHARS);
+  if (!recipeText) throw new ClientError(400, 'Rezept-Text, Link oder Foto fehlt.');
+  return { text: recipeText };
+}
+
+function validateProfile(p) {
+  return {
+    weightKg: num(p.weightKg, 25, 350, 'Gewicht'),
+    heightCm: num(p.heightCm, 100, 250, 'Größe'),
+    age: num(p.age, 12, 110, 'Alter'),
+    sex: oneOf(p.sex, ['male', 'female', 'diverse'], 'Geschlecht'),
+    activityLevel: text(p.activityLevel, 30),
+    goal: oneOf(p.goal, ['lose', 'maintain', 'gain'], 'Ziel'),
+    rateKgPerWeek: optNum(p.rateKgPerWeek, 0, 1.5, 'Tempo') ?? 0.5,
+  };
+}
+
+// ── SSRF-Schutz + Seitentext ───────────────────────────────────────────
+
+function isPrivateIPv4(host) {
+  const [a, b] = host.split('.').map(Number);
+  return a === 0 || a === 10 || a === 127 || a >= 224
+    || (a === 100 && b >= 64 && b <= 127)
+    || (a === 169 && b === 254)
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168);
+}
+
+/** Nur öffentliche http(s)-Ziele: keine IP-Literale aus privaten Netzen, kein localhost. */
+function isPublicHttpUrl(raw) {
+  let u;
+  try {
+    u = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+  if (u.username || u.password) return false;
+  const host = u.hostname.toLowerCase();
+  if (host === 'localhost' || /\.(localhost|local|internal|lan|home)$/.test(host)) return false;
+  if (host.startsWith('[') || host.includes(':')) return false; // IPv6-Literale
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return !isPrivateIPv4(host);
+  return host.includes('.');
+}
+
+async function readCapped(resp, maxBytes) {
+  const reader = resp.body?.getReader();
+  if (!reader) return '';
+  const chunks = [];
+  let total = 0;
+  while (total < maxBytes) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    total += value.byteLength;
+  }
+  await reader.cancel().catch(() => {});
+  const all = new Uint8Array(Math.min(total, maxBytes));
+  let offset = 0;
+  for (const c of chunks) {
+    const part = c.subarray(0, all.length - offset);
+    all.set(part, offset);
+    offset += part.length;
+    if (offset >= all.length) break;
+  }
+  return new TextDecoder().decode(all);
+}
+
+/** Holt eine Rezeptseite; jede Weiterleitung wird erneut gegen SSRF geprüft. */
+async function fetchPublicPage(startUrl) {
+  let current = startUrl;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    if (!isPublicHttpUrl(current)) throw new ClientError(400, 'Diese URL kann nicht importiert werden.');
+    const resp = await fetch(current, {
+      headers: { 'User-Agent': PAGE_USER_AGENT, Accept: 'text/html,application/xhtml+xml,text/plain' },
+      redirect: 'manual',
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    const location = resp.headers.get('Location');
+    if (resp.status >= 300 && resp.status < 400 && location) {
+      current = new URL(location, current).toString();
+      continue;
+    }
+    if (!resp.ok) throw new ClientError(422, `Rezeptseite antwortet mit HTTP ${resp.status}.`);
+    const type = resp.headers.get('Content-Type') ?? '';
+    if (!/text\/html|application\/xhtml|text\/plain/i.test(type)) {
+      throw new ClientError(422, 'Link zeigt auf keine Webseite.');
+    }
+    return readCapped(resp, MAX_PAGE_BYTES);
+  }
+  throw new ClientError(422, 'Zu viele Weiterleitungen.');
+}
+
+function findRecipeNode(node) {
+  if (!node || typeof node !== 'object') return null;
+  if (Array.isArray(node)) {
+    for (const n of node) {
+      const found = findRecipeNode(n);
+      if (found) return found;
+    }
+    return null;
+  }
+  const type = node['@type'];
+  if (type === 'Recipe' || (Array.isArray(type) && type.includes('Recipe'))) return node;
+  return node['@graph'] ? findRecipeNode(node['@graph']) : null;
+}
+
+/** Bevorzugt schema.org-Recipe (JSON-LD, haben fast alle Rezeptseiten), sonst sichtbarer Text. */
+function extractRecipeText(html) {
+  const blocks = html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+  for (const [, block] of blocks) {
+    try {
+      const recipe = findRecipeNode(JSON.parse(block));
+      if (recipe) return JSON.stringify(recipe).slice(0, MAX_PROMPT_PAGE_CHARS);
+    } catch {
+      // kaputtes JSON-LD → nächster Block / Fallback
+    }
+  }
+  return html
+    .replace(/<(script|style|noscript|svg)[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, MAX_PROMPT_PAGE_CHARS);
+}
+
+// ── Gemini ─────────────────────────────────────────────────────────────
+
 async function gemini(prompt, env, imageBase64 = null) {
   const parts = imageBase64
-    ? [
-        { inlineData: { mimeType: 'image/jpeg', data: imageBase64 } },
-        { text: prompt },
-      ]
+    ? [{ inlineData: { mimeType: 'image/jpeg', data: imageBase64 } }, { text: prompt }]
     : [{ text: prompt }];
 
   let resp;
   try {
-    resp = await fetch(
-      `${GEMINI_BASE}/${GEMINI_MODEL}:generateContent?key=${env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts }] }),
-      },
-    );
+    resp = await fetch(`${GEMINI_BASE}/${GEMINI_MODEL}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+      body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json' } }),
+      signal: AbortSignal.timeout(60000),
+    });
   } catch (fetchErr) {
     throw new Error(`Gemini nicht erreichbar: ${fetchErr.message}`);
   }
 
   if (!resp.ok) {
-    let errBody = '';
-    try { errBody = await resp.text(); } catch { /* ignorieren */ }
+    const errBody = await resp.text().catch(() => '');
+    let msg = errBody.slice(0, 200);
     try {
-      const parsed = JSON.parse(errBody);
-      const msg = parsed?.error?.message ?? errBody;
-      throw new Error(`Gemini ${resp.status}: ${msg}`);
-    } catch (jsonErr) {
-      if (jsonErr.message.startsWith('Gemini')) throw jsonErr;
-      throw new Error(`Gemini ${resp.status}: ${errBody.slice(0, 200)}`);
+      msg = JSON.parse(errBody)?.error?.message ?? msg;
+    } catch {
+      // Body war kein JSON — Rohtext reicht
     }
+    throw new Error(`Gemini ${resp.status}: ${msg}`);
   }
 
   const data = await resp.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  if (!text) throw new Error('Gemini hat leere Antwort zurückgegeben.');
+  const answer = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  if (!answer) throw new Error('Gemini hat leere Antwort zurückgegeben.');
 
-  const match = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+  const match = answer.match(/```json\s*([\s\S]*?)```/) ?? answer.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
   if (match) {
-    try { return JSON.parse(match[1] ?? match[0]); } catch { /* fällt durch */ }
+    try {
+      return JSON.parse(match[1] ?? match[0]);
+    } catch {
+      // fällt auf Gesamttext zurück
+    }
   }
-  try { return JSON.parse(text); } catch {
-    throw new Error(`Gemini-Antwort kein JSON: ${text.slice(0, 200)}`);
+  try {
+    return JSON.parse(answer);
+  } catch {
+    throw new Error(`Gemini-Antwort kein JSON: ${answer.slice(0, 200)}`);
   }
 }
 
 // ── KI-Funktionen ──────────────────────────────────────────────────────
 
 async function generateShoppingList(req, env) {
-  const recipeNames = (req.recipes ?? []).map(r => r.title).join(', ');
   const prompt = `Du bist ein Ernährungs-Assistent. Erstelle eine Einkaufsliste für ${req.persons} Person(en) für ${req.days} Tag(e).
 Mahlzeiten: ${req.meals.join(', ')}.
 ${req.budget ? `Budget: ca. ${req.budget} €.` : ''}
 ${req.store ? `Markt: ${req.store}.` : ''}
-${recipeNames ? `Vorhandene Rezepte als Basis: ${recipeNames}.` : ''}
+${req.recipeNames.length ? `Vorhandene Rezepte als Basis: ${req.recipeNames.join(', ')}.` : ''}
 
 Antworte NUR mit gültigem JSON (kein Markdown):
 {
@@ -191,42 +499,40 @@ Antworte NUR mit gültigem JSON-Array:
   return gemini(prompt, env);
 }
 
-async function importRecipe(req, env) {
-  let prompt;
-  if (req.imageBase64) {
-    prompt = `Extrahiere das Rezept aus diesem Foto. Gib Titel, Zutaten mit Mengen und Zubereitungsschritte zurück.`;
-  } else if (req.url) {
-    let pageText = '';
-    try {
-      const pageResp = await fetch(req.url, {
-        headers: { 'User-Agent': 'Mozilla/5.0 NutriTrack/1.0' },
-        redirect: 'follow',
-      });
-      const html = await pageResp.text();
-      pageText = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 4000);
-    } catch (e) {
-      pageText = req.text ?? '';
-    }
-    prompt = `Extrahiere das Rezept aus folgendem Webseitentext:\n\n${pageText}\n\nQuelle: ${req.url}`;
-  } else {
-    prompt = `Extrahiere das Rezept aus folgendem Text:\n\n${req.text ?? ''}`;
-  }
-
-  prompt += `\n\nAntworte NUR mit gültigem JSON:
+const IMPORT_SCHEMA = `Antworte NUR mit gültigem JSON:
 {
   "title": "string",
   "servings": number,
-  "ingredients": [{"name":"string","amount":number,"unit":"string"}],
-  "steps": ["string"],
-  "sourceUrl": "string oder null"
-}`;
-  return gemini(prompt, env, req.imageBase64 ?? null);
+  "ingredients": [{"name":"string","amount":number,"unit":"string",
+    "facts":{"kcal":number,"proteinG":number,"carbsG":number,"fatG":number,"fiberG":number,"sugarG":number,
+             "basis":"per100g"|"perPortion","portionG":number}}],
+  "steps": ["string"]
+}
+Mengen als Zahl, Einheit getrennt (z.B. "g","ml","EL","Stk"). servings als Ganzzahl (Standard 2).
+Nährwerte je Zutat: bei g/ml je 100 g (basis "per100g"), bei Stück/Löffel/Zehe für EINE Einheit
+(basis "perPortion", portionG = ungefähres Gewicht einer Einheit in g). Unbekannte Zutat → "facts" weglassen.
+Zutaten und Schritte auf Deutsch.`;
+
+async function importRecipe(req, env) {
+  let prompt;
+  if (req.imageBase64) {
+    prompt = 'Extrahiere das Rezept aus diesem Foto.';
+  } else if (req.url) {
+    const page = await fetchPublicPage(req.url).catch((e) => {
+      if (req.text) return req.text;
+      throw e;
+    });
+    prompt = `Extrahiere das Rezept aus folgendem Seiteninhalt (Quelle: ${req.url}):\n\n${extractRecipeText(page)}`;
+  } else {
+    prompt = `Extrahiere das Rezept aus folgendem Text:\n\n${req.text}`;
+  }
+  return gemini(`${prompt}\n\n${IMPORT_SCHEMA}`, env, req.imageBase64 ?? null);
 }
 
 async function computeTargets(profile, env) {
   const prompt = `Berechne den täglichen Kalorienbedarf und Makros für:
 Gewicht: ${profile.weightKg} kg, Größe: ${profile.heightCm} cm, Alter: ${profile.age}, Geschlecht: ${profile.sex}.
-Aktivität: ${profile.activityLevel}, Ziel: ${profile.goal}, Tempo: ${profile.rateKgPerWeek ?? 0.5} kg/Woche.
+Aktivität: ${profile.activityLevel}, Ziel: ${profile.goal}, Tempo: ${profile.rateKgPerWeek} kg/Woche.
 Verwende die Mifflin-St-Jeor-Formel.
 
 Antworte NUR mit gültigem JSON:

@@ -17,11 +17,12 @@ import {
   ShoppingPlanResult,
 } from './ai-provider';
 import { DebugLogService } from '../debug/debug-log.service';
+import { normalizeRecipeImport } from './recipe-import-normalize';
 
 /**
- * KI-Anbieter über den **internen Proxy** ({@link server/anthropic-proxy}).
+ * KI-Anbieter über den **internen Proxy** (Cloudflare-Worker `worker.js`).
  *
- * Alle Nutzer teilen sich EINEN serverseitigen Anthropic-Key; die App sendet
+ * Alle Nutzer teilen sich EINEN serverseitigen Gemini-Key; die App sendet
  * nur `{ fn, payload }` an die konfigurierte Proxy-URL und erhält das fertig
  * gemappte Ergebnis zurück. Kein Key im Client, fixe Prompts serverseitig.
  */
@@ -71,7 +72,8 @@ export class ProxyAiProvider implements AiProvider {
     return this.call<FastFoodSuggestion[]>('suggestFastfood', req);
   }
 
-  importRecipe(input: RecipeImportInput): Promise<RecipeImportResult> {
-    return this.call<RecipeImportResult>('importRecipe', input);
+  async importRecipe(input: RecipeImportInput): Promise<RecipeImportResult> {
+    const raw = await this.call<unknown>('importRecipe', input);
+    return normalizeRecipeImport(raw, input.url);
   }
 }

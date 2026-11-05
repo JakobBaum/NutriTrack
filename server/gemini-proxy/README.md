@@ -1,3 +1,5 @@
+> **Veraltet:** Der aktive Proxy ist [`/worker.js`](../../worker.js) (Cloudflare Worker, Deploy über `wrangler.toml`, Tests: `npm run test:worker`). Dieser Ordner bleibt nur als Referenz.
+
 # NutriTrack KI-Proxy (Gemini)
 
 Ein schlanker serverless Endpoint, damit **alle App-Nutzer denselben, internen**

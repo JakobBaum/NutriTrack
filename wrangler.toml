@@ -1,3 +1,13 @@
 name = "nutritrack"
 main = "worker.js"
 compatibility_date = "2024-01-01"
+
+# Kostenschutz für den KI-Proxy (POST /): max. 20 Anfragen je IP und Minute.
+# Fehlt das Binding (z.B. ältere Wrangler-Version), läuft der Worker ohne Limit weiter.
+[[ratelimits]]
+name = "AI_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 20
+  period = 60
