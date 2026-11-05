@@ -262,15 +262,20 @@
         }
         @case ('datenschutz') {
           <h3>Datenschutzerklärung</h3>
-          <p>Alle Daten (Profil, Tagebuch, Rezepte) werden <strong>ausschließlich lokal</strong> auf deinem Gerät gespeichert. Es werden keine persönlichen Daten an unsere Server übertragen.</p>
-          <p>Wenn du die KI-Funktion nutzt, werden Anfragen (z. B. Rezepttexte, Etikettenfotos) an den konfigurierten KI-Dienst (Google Gemini oder deinen eigenen Proxy) gesendet. Bitte beachte dabei die Datenschutzbestimmungen des jeweiligen Anbieters.</p>
-          <p>Barcode-Anfragen gehen an die Open Food Facts API (<em>openfoodfacts.org</em>), eine öffentliche, gemeinnützige Datenbank.</p>
+          <p><strong>Verantwortlich:</strong> Jakob Baumgartner, baumgartner.jakob12&#64;gmail.com</p>
+          <p><strong>Lokal gespeichert:</strong> Profil (Gewicht, Größe, Alter, Ziel), Tagebuch, Rezepte und Einstellungen liegen <strong>nur auf deinem Gerät</strong> (Browser-Speicher). Wir haben keinen Zugriff darauf. „Daten zurücksetzen“ löscht alles.</p>
+          <p><strong>Lebensmittelsuche:</strong> Dein Suchbegriff geht über unseren Proxy (Cloudflare Worker, Cloudflare Inc. als Auftragsverarbeiter) an Open Food Facts. Dabei werden technisch deine IP-Adresse und der Suchbegriff verarbeitet. Suchergebnisse werden bis zu 1 Stunde zwischengespeichert, ohne Bezug zu deiner Person. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Bereitstellung der Funktion).</p>
+          <p><strong>Barcode &amp; Preise:</strong> Barcode-Abfragen gehen direkt an Open Food Facts bzw. Open Prices (openfoodfacts.org, gemeinnützig, Frankreich). Dabei wird deine IP-Adresse übertragen.</p>
+          <p><strong>KI-Funktionen (optional):</strong> Nur wenn du sie nutzt, werden die jeweiligen Inhalte (Rezepttext oder -link, Etikett- oder Rezeptfoto, Einkaufs- und Fastfood-Wünsche) über den Proxy an Google Gemini (Google LLC) gesendet. Gesundheitsdaten wie Gewicht oder Größe werden dabei <strong>nicht</strong> übertragen. KI-Ergebnisse sind automatisch erzeugt und können falsch sein — bitte prüfen.</p>
+          <p><strong>Hosting:</strong> Die Web-App wird über GitHub Pages (GitHub Inc.) ausgeliefert. Dabei fallen Server-Logs mit IP-Adressen an.</p>
+          <p><strong>Deine Rechte:</strong> Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch und Datenübertragbarkeit (Art. 15–21 DSGVO). Kontakt per E-Mail. Beschwerden kannst du bei der österreichischen Datenschutzbehörde (dsb.gv.at) einreichen.</p>
         }
         @case ('agb') {
           <h3>Nutzungsbedingungen</h3>
-          <p>NutriTrack ist ein persönliches Ernährungstagebuch und dient ausschließlich zur Information. Es ersetzt keine professionelle Ernährungs- oder Gesundheitsberatung.</p>
+          <p>NutriTrack ist ein persönliches Ernährungstagebuch und dient ausschließlich zur Information. Es ist <strong>kein Medizinprodukt</strong> und ersetzt keine professionelle Ernährungs-, Gesundheits- oder ärztliche Beratung.</p>
           <p>Die berechneten Kalorienbedarfe sind Schätzwerte auf Basis anerkannter Formeln (Mifflin-St Jeor). Individuelle Abweichungen sind möglich.</p>
-          <p>Die App wird ohne Gewähr bereitgestellt. Der Entwickler übernimmt keine Haftung für Schäden, die durch die Nutzung der App entstehen.</p>
+          <p>Nährwertdaten stammen von <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (Lizenz: Open Database License, ODbL; Produktfotos: CC BY-SA). Sie werden von Freiwilligen gepflegt und können unvollständig oder fehlerhaft sein.</p>
+          <p>Die App wird ohne Gewähr bereitgestellt. Die Haftung für leichte Fahrlässigkeit ist ausgeschlossen, soweit gesetzlich zulässig.</p>
         }
         @case ('hilfe') {
           <h3>Hilfe &amp; Kontakt</h3>
