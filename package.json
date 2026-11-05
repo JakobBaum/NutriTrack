@@ -7,7 +7,8 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "lint": "ng lint"
+    "lint": "ng lint",
+    "test:worker": "node --test worker.test.mjs"
   },
   "private": true,
   "dependencies": {
@@ -45,7 +46,7 @@
     "jsdom": "^30.1.0",
     "typescript": "~6.0.0",
     "typescript-eslint": "^8.61.0",
-    "vitest": "~4.0.18"
+    "vitest": "^4.1.12"
   },
   "description": "An Ionic project"
 }

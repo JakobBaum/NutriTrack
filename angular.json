@@ -57,7 +57,10 @@
                   "with": "src/environments/environment.prod.ts"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "security": {
+                "autoCsp": true
+              }
             },
             "development": {
               "optimization": false,
