@@ -149,7 +149,7 @@
                 </p>
                 <p class="ff-rationale">{{ s.rationale }}</p>
               </ion-label>
-              @if (s.estPrice != null) {
+              @if (s.estPrice !== undefined) {
                 <ion-note slot="end">≈ {{ s.estPrice.toFixed(2) }} €</ion-note>
               }
             </ion-item>

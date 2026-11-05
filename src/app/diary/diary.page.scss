@@ -90,7 +90,7 @@ ion-content {
 .form-sub {
   margin: 16px 8px 4px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--nt-muted);
@@ -228,3 +228,9 @@ ion-content {
 .content-spacer {
   height: 80px;
 }
+
+// Hinweis unter der Menge: Slate-500 statt Ionic-Standardgrau (Kontrast >= 4.5:1 auf Weiß).
+.kcal-hint p {
+  color: var(--nt-muted);
+}
+

@@ -13,7 +13,7 @@
   @if (recipes().length === 0) {
     <div class="empty">
       <ion-icon name="restaurant-outline" class="empty__icon"></ion-icon>
-      <p>Noch keine Rezepte. Lege dein erstes Rezept an.</p>
+      <p>Noch keine Rezepte. Importiere eins per Link oder Text — oder lege es mit <strong>+</strong> selbst an.</p>
     </div>
   } @else {
     @for (recipe of recipes(); track recipe.id) {
@@ -43,12 +43,12 @@
                 <strong>{{ recipe.factsPerServing.fatG }}g</strong><span>Fett</span>
               </div>
               <div class="recipe__macro">
-                <strong>{{ recipe.factsPerServing.fiberG ?? '–' }}{{ recipe.factsPerServing.fiberG != null ? 'g' : '' }}</strong><span>Ballast.</span>
+                <strong>{{ recipe.factsPerServing.fiberG ?? '–' }}{{ recipe.factsPerServing.fiberG !== undefined ? 'g' : '' }}</strong><span>Ballast.</span>
               </div>
               <div class="recipe__macro">
-                <strong>{{ recipe.factsPerServing.sugarG ?? '–' }}{{ recipe.factsPerServing.sugarG != null ? 'g' : '' }}</strong><span>Zucker</span>
+                <strong>{{ recipe.factsPerServing.sugarG ?? '–' }}{{ recipe.factsPerServing.sugarG !== undefined ? 'g' : '' }}</strong><span>Zucker</span>
               </div>
-              @if (recipe.factsPerServing.saltG != null) {
+              @if (recipe.factsPerServing.saltG !== undefined) {
                 <div class="recipe__macro">
                   <strong>{{ recipe.factsPerServing.saltG }}g</strong><span>Salz</span>
                 </div>
@@ -411,6 +411,7 @@
             </ion-item>
           }
         </ion-list>
+        <p class="data-credit">Daten: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL)</p>
       }
     </ion-content>
   </ng-template>

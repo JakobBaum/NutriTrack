@@ -164,6 +164,9 @@
           </ion-item>
         }
       </ion-list>
+      @if (pickerResults().length) {
+        <p class="data-credit">Daten: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL)</p>
+      }
     </ion-content>
   </ng-template>
 </ion-modal>

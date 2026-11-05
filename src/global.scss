@@ -227,3 +227,64 @@
     }
   }
 }
+
+/* --- Feinschliff (make-interfaces-feel-better) --- */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// Ziffern gleich breit: kcal/Makros/Preise springen nicht, wenn sich Werte ändern.
+ion-app {
+  font-variant-numeric: tabular-nums;
+}
+
+h1,
+h2,
+h3,
+ion-title {
+  text-wrap: balance;
+}
+
+p,
+ion-note {
+  text-wrap: pretty;
+}
+
+// Native Spin-Buttons in Zahlenfeldern ausblenden — auf dem Handy reicht die Ziffern-Tastatur.
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+// Browser-Oberflächen in der App-Farbe statt Browser-Standard.
+::selection {
+  background: rgba(56, 189, 248, 0.28);
+}
+
+input,
+textarea {
+  caret-color: var(--ion-color-primary-shade);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ion-color-primary-shade);
+  outline-offset: 2px;
+}
+
+// ODbL-Quellenangabe unter Suchtreffern (Pflicht bei Nutzung der Open-Food-Facts-Daten).
+.data-credit {
+  margin: -4px 20px 12px;
+  font-size: 12px;
+  color: var(--nt-muted);
+
+  a {
+    color: inherit;
+  }
+}
