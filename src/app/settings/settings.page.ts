@@ -1,5 +1,7 @@
+import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { AlertController } from '@ionic/angular';
 import { ActivityLevel, AiConfig, Goal, Sex, UserProfile } from '../core/models';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
@@ -8,6 +10,7 @@ import { CustomFoodStore } from '../core/state/custom-food.store';
 import { SettingsStore } from '../core/state/settings.store';
 import { ShoppingStore } from '../core/state/shopping.store';
 import { DebugLogService } from '../core/debug/debug-log.service';
+import { resolveDebugMode, safeLocalStorage } from './debug-flag';
 
 /**
  * Einstellungen: Profil erfassen → Tagesbedarf berechnen (deterministisch),
@@ -28,6 +31,11 @@ export class SettingsPage implements OnInit {
   private readonly recipes = inject(RecipeStore);
   private readonly customFoods = inject(CustomFoodStore);
   private readonly shopping = inject(ShoppingStore);
+  private readonly alertCtrl = inject(AlertController);
+  private readonly win = inject(DOCUMENT).defaultView;
+
+  /** Entwickler-Werkzeuge nur mit `?debug=1` (Flag bleibt in localStorage erhalten). */
+  readonly debugMode = resolveDebugMode(this.win?.location.search ?? '', safeLocalStorage(this.win));
 
   readonly target = this.profileStore.target;
   readonly error = signal<string | null>(null);
@@ -75,8 +83,8 @@ export class SettingsPage implements OnInit {
   ];
 
   readonly providers = [
-    { value: 'mock', label: 'Mock (Test, offline)' },
-    { value: 'gemini', label: 'Gemini (Google)' },
+    { value: 'mock', label: 'Demo (ohne KI)' },
+    { value: 'gemini', label: 'Gemini direkt (eigener Key)' },
   ];
 
   private readonly ranges = {
@@ -142,6 +150,20 @@ export class SettingsPage implements OnInit {
     this.settingsStore.setAi({ ...this.ai });
     this.aiOpen.set(false);
     this.savedToast.set('KI-Einstellungen gespeichert.');
+  }
+
+  /** Fragt vor dem unwiderruflichen Löschen aller lokalen Daten nach. */
+  async confirmReset(): Promise<void> {
+    const alert = await this.alertCtrl.create({
+      header: 'Alle Daten löschen?',
+      message:
+        'Profil, Tagebuch, Rezepte, Einkaufsliste und Einstellungen werden von diesem Gerät gelöscht. Das lässt sich nicht rückgängig machen.',
+      buttons: [
+        { text: 'Abbrechen', role: 'cancel' },
+        { text: 'Löschen', role: 'destructive', handler: () => this.resetData() },
+      ],
+    });
+    await alert.present();
   }
 
   resetData(): void {

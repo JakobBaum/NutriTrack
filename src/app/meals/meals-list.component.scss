@@ -1,7 +1,5 @@
-ion-content {
-  --padding-start: 16px;
-  --padding-end: 16px;
-  --padding-bottom: 24px;
+:host {
+  display: block;
 }
 
 .empty {
@@ -14,7 +12,7 @@ ion-content {
 
   &__icon {
     font-size: 56px;
-    color: var(--ion-color-primary);
+    color: var(--nt-muted);
   }
 
   h2 { margin: 8px 0 0; font-weight: 800; }
@@ -22,7 +20,13 @@ ion-content {
   ion-button { width: 100%; max-width: 320px; }
 }
 
-.content-spacer { height: 72px; }
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  --padding-start: 0;
+  --padding-end: 0;
+}
 
 .section-sub {
   margin: 16px 4px 8px;

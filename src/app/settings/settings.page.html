@@ -1,6 +1,6 @@
 <ion-header class="ion-no-border">
   <ion-toolbar>
-    <ion-title>Profil</ion-title>
+    <ion-title role="heading" aria-level="1">Profil</ion-title>
   </ion-toolbar>
 </ion-header>
 
@@ -23,12 +23,12 @@
     </ion-card>
   }
 
-  <h4 class="form-sub">Konto</h4>
+  <h2 class="form-sub">Ziele &amp; KI</h2>
   <ion-list inset="true" lines="full">
     <ion-item button detail="true" (click)="profileOpen.set(true)">
       <ion-icon slot="start" name="body-outline"></ion-icon>
       <ion-label>Bedarfs-Berechner</ion-label>
-      <ion-note slot="end">{{ target() ? 'Konfiguriert' : 'Einrichten' }}</ion-note>
+      <ion-note slot="end" class="row-note">{{ target() ? target()!.kcal + ' kcal/Tag' : 'Einrichten' }}</ion-note>
     </ion-item>
     <ion-item button detail="true" (click)="aiOpen.set(true)">
       <ion-icon slot="start" name="sparkles-outline"></ion-icon>
@@ -36,7 +36,7 @@
     </ion-item>
   </ion-list>
 
-  <h4 class="form-sub">App</h4>
+  <h2 class="form-sub">App</h2>
   <ion-list inset="true" lines="full">
     <ion-item button detail="true" (click)="infoSection.set('anleitung')">
       <ion-icon slot="start" name="book-outline"></ion-icon>
@@ -46,19 +46,9 @@
       <ion-icon slot="start" name="help-circle-outline"></ion-icon>
       <ion-label>Hilfe &amp; Kontakt</ion-label>
     </ion-item>
-    <ion-item button detail="false" href="https://instagram.com" target="_blank" rel="noopener">
-      <ion-icon slot="start" name="logo-instagram"></ion-icon>
-      <ion-label>Social Media</ion-label>
-      <ion-icon slot="end" name="open-outline" style="font-size:16px;color:var(--ion-color-medium)"></ion-icon>
-    </ion-item>
-    <ion-item button detail="false">
-      <ion-icon slot="start" name="star-outline"></ion-icon>
-      <ion-label>App bewerten</ion-label>
-      <ion-icon slot="end" name="open-outline" style="font-size:16px;color:var(--ion-color-medium)"></ion-icon>
-    </ion-item>
   </ion-list>
 
-  <h4 class="form-sub">Rechtliches</h4>
+  <h2 class="form-sub">Rechtliches</h2>
   <ion-list inset="true" lines="full">
     <ion-item button detail="true" (click)="infoSection.set('datenschutz')">
       <ion-icon slot="start" name="shield-outline"></ion-icon>
@@ -70,40 +60,42 @@
     </ion-item>
   </ion-list>
 
-  <h4 class="form-sub">Daten</h4>
+  <h2 class="form-sub">Daten</h2>
   <ion-list inset="true" lines="none">
-    <ion-item button color="danger" (click)="resetData()">
+    <ion-item button detail="false" class="danger-row" (click)="confirmReset()">
       <ion-icon slot="start" name="trash-outline"></ion-icon>
       <ion-label>Alle lokalen Daten zurücksetzen</ion-label>
     </ion-item>
   </ion-list>
 
-  <!-- Debug-Log -->
-  <h4 class="form-sub">Debug-Log</h4>
-  <ion-list inset="true" lines="none">
-    <ion-item button (click)="logOpen.set(!logOpen())">
-      <ion-icon slot="start" name="terminal-outline"></ion-icon>
-      <ion-label>Log anzeigen ({{ logEntries().length }})</ion-label>
-      <ion-icon slot="end" [name]="logOpen() ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
-    </ion-item>
-    <ion-item button (click)="testConnection()">
-      <ion-icon slot="start" name="wifi-outline"></ion-icon>
-      <ion-label>Worker-Verbindung testen</ion-label>
-    </ion-item>
-  </ion-list>
-  @if (logOpen()) {
-    <div class="debug-log">
-      <button class="debug-log__clear" (click)="debugLog.clear()">Log leeren</button>
-      @if (logEntries().length === 0) {
-        <p class="debug-log__empty">Noch keine Einträge.</p>
-      }
-      @for (entry of logEntries(); track $index) {
-        <div class="debug-log__entry" [class]="'debug-log__entry--' + entry.level">
-          <span class="debug-log__ts">{{ entry.ts }}</span>
-          <span class="debug-log__msg">{{ entry.msg }}</span>
-        </div>
-      }
-    </div>
+  @if (debugMode) {
+    <!-- Debug-Log: nur mit ?debug=1 -->
+    <h2 class="form-sub">Debug-Log</h2>
+    <ion-list inset="true" lines="none">
+      <ion-item button detail="false" (click)="logOpen.set(!logOpen())">
+        <ion-icon slot="start" name="terminal-outline"></ion-icon>
+        <ion-label>Log anzeigen ({{ logEntries().length }})</ion-label>
+        <ion-icon slot="end" [name]="logOpen() ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
+      </ion-item>
+      <ion-item button detail="false" (click)="testConnection()">
+        <ion-icon slot="start" name="wifi-outline"></ion-icon>
+        <ion-label>Worker-Verbindung testen</ion-label>
+      </ion-item>
+    </ion-list>
+    @if (logOpen()) {
+      <div class="debug-log">
+        <button class="debug-log__clear" (click)="debugLog.clear()">Log leeren</button>
+        @if (logEntries().length === 0) {
+          <p class="debug-log__empty">Noch keine Einträge.</p>
+        }
+        @for (entry of logEntries(); track $index) {
+          <div class="debug-log__entry" [class]="'debug-log__entry--' + entry.level">
+            <span class="debug-log__ts">{{ entry.ts }}</span>
+            <span class="debug-log__msg">{{ entry.msg }}</span>
+          </div>
+        }
+      </div>
+    }
   }
 
   <div class="content-spacer"></div>
@@ -122,7 +114,7 @@
   <ng-template>
     <ion-header class="ion-no-border">
       <ion-toolbar>
-        <ion-title>Bedarfs-Berechner</ion-title>
+        <ion-title role="heading" aria-level="1">Bedarfs-Berechner</ion-title>
         <ion-buttons slot="end">
           <ion-button (click)="profileOpen.set(false)">Schließen</ion-button>
         </ion-buttons>
@@ -189,7 +181,7 @@
   <ng-template>
     <ion-header class="ion-no-border">
       <ion-toolbar>
-        <ion-title>KI-Verbindung</ion-title>
+        <ion-title role="heading" aria-level="1">KI-Verbindung</ion-title>
         <ion-buttons slot="end">
           <ion-button (click)="aiOpen.set(false)">Schließen</ion-button>
         </ion-buttons>
@@ -197,16 +189,16 @@
     </ion-header>
     <ion-content class="ion-padding">
       <p class="hint">
-        Empfohlen: <strong>KI-Proxy-URL</strong> eintragen — dann nutzen alle Geräte denselben
-        internen Server-Key, kein eigener Key nötig. Alternativ ein eigener Gemini-Key (nur lokal).
+        Die KI läuft über Google Gemini. Empfohlen: die Adresse des <strong>NutriTrack-KI-Servers</strong>
+        eintragen, dann ist kein eigener Key nötig. Alternativ nutzt du „Gemini direkt“ mit deinem eigenen Key (nur lokal gespeichert).
       </p>
       <ion-list inset="true">
         <ion-item>
-          <ion-input label="KI-Proxy-URL" labelPlacement="stacked" [(ngModel)]="ai.proxyUrl" inputmode="url" placeholder="https://nutritrack-ai.<account>.workers.dev"></ion-input>
+          <ion-input label="NutriTrack-KI-Server (URL)" labelPlacement="stacked" [(ngModel)]="ai.proxyUrl" inputmode="url" placeholder="https://nutritrack-ai.<account>.workers.dev"></ion-input>
         </ion-item>
       </ion-list>
-      <h4 class="form-sub">Eigener Key (optional)</h4>
-      <p class="hint">Nur nötig ohne Proxy. Wird ausschließlich lokal auf diesem Gerät gespeichert.</p>
+      <h2 class="form-sub">Eigener Key (optional)</h2>
+      <p class="hint">Nur nötig ohne KI-Server. Wird ausschließlich lokal auf diesem Gerät gespeichert.</p>
       <ion-list inset="true">
         <ion-item>
           <ion-select label="Anbieter" labelPlacement="stacked" [(ngModel)]="ai.provider" interface="popover">
@@ -237,7 +229,7 @@
   <ng-template>
     <ion-header class="ion-no-border">
       <ion-toolbar>
-        <ion-title>
+        <ion-title role="heading" aria-level="1">
           @switch (infoSection()) {
             @case ('anleitung') { Anleitung }
             @case ('datenschutz') { Datenschutzerklärung }
@@ -280,11 +272,11 @@
         @case ('hilfe') {
           <h3>Hilfe &amp; Kontakt</h3>
           <p>Bei Fragen oder Problemen wende dich an:</p>
-          <p><strong>E-Mail:</strong> baumgartner.jakob12&#64;gmail.com</p>
-          <p>Für Fehlerberichte und Feature-Anfragen kannst du uns auch direkt über die App kontaktieren.</p>
+          <p><strong>E-Mail:</strong> <a href="mailto:baumgartner.jakob12&#64;gmail.com">baumgartner.jakob12&#64;gmail.com</a></p>
+          <p>Für Fehlerberichte und Wünsche schreib einfach an diese Adresse.</p>
           <h4>Häufige Fragen</h4>
           <p><strong>Barcode wird nicht erkannt?</strong> Stelle sicher, dass genügend Licht vorhanden ist. Alternativ kannst du den Barcode manuell eingeben.</p>
-          <p><strong>KI funktioniert nicht?</strong> Prüfe in den KI-Einstellungen, ob ein gültiger API-Key oder Proxy eingetragen ist.</p>
+          <p><strong>KI funktioniert nicht?</strong> Prüfe unter „KI-Verbindung“, ob die Adresse des KI-Servers oder ein gültiger eigener Key eingetragen ist.</p>
           <p><strong>Daten verloren?</strong> Alle Daten werden lokal gespeichert. Wenn du die App deinstallierst, werden sie gelöscht.</p>
         }
       }

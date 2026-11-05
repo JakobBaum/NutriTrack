@@ -1,15 +1,14 @@
-.date-nav {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
+// Akzent-Textfarbe (barrierefrei, >= 4.5:1); Fallback, falls das Token noch fehlt.
+$accent: var(--nt-text-accent, #0369a1);
+$warn: #b45309;
 
-  &__label {
-    font-size: 17px;
-    font-weight: 700;
-    min-width: 96px;
-    text-align: center;
-  }
+// Klickfläche >= 44x44; das sichtbare Icon bleibt kompakt.
+.touch-btn {
+  --padding-start: 0;
+  --padding-end: 0;
+  min-width: 44px;
+  height: 44px;
+  margin: 0;
 }
 
 ion-content {
@@ -98,8 +97,14 @@ ion-content {
     }
   }
 
+  // Neutraler Satz; die Warnfarbe liegt nur auf der Zahl.
   &__over {
-    font-size: 13px;
+    font-size: 14px;
+    color: var(--nt-muted);
+  }
+
+  &__over-num {
+    color: $warn;
     font-weight: 700;
   }
 }
@@ -132,7 +137,7 @@ ion-content {
   padding: 14px 8px;
   border: none;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity 150ms ease-out;
 
   &:active { opacity: 0.7; }
 
@@ -149,12 +154,20 @@ ion-content {
   }
 
   &__value {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--nt-muted);
   }
 }
 
 /* Drill-Down Sheet */
+.drill-title__dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 50%;
+}
+
 .drill-title {
   font-weight: 800;
 
@@ -193,7 +206,7 @@ ion-content {
   &__fill {
     height: 100%;
     border-radius: 3px;
-    transition: width 0.3s ease;
+    transition: width 200ms ease-out;
   }
 
   &__val {
@@ -204,7 +217,7 @@ ion-content {
   }
 
   &__pct {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 400;
     color: var(--nt-muted);
     display: block;
@@ -217,7 +230,7 @@ ion-content {
   overflow: hidden;
 
   &__icon {
-    color: var(--ion-color-primary-shade);
+    color: $accent;
     font-size: 20px;
   }
 
@@ -227,8 +240,9 @@ ion-content {
   }
 }
 
+// Platz unter dem Inhalt, damit der FAB (56px + 16px Rand) nichts verdeckt.
 .content-spacer {
-  height: 72px;
+  height: 96px;
 }
 
 /* --- Fast Food Helper --- */
@@ -237,21 +251,22 @@ ion-content {
   align-items: center;
   gap: 14px;
   width: 100%;
+  min-height: 48px;
   margin: 20px 0 0;
-  padding: 14px 16px;
+  padding: 12px 16px;
   background: var(--nt-surface);
   border: 1px solid var(--nt-border);
   border-radius: var(--nt-radius);
   box-shadow: var(--nt-shadow-sm);
   cursor: pointer;
   text-align: left;
-  transition: opacity 0.15s;
+  transition: opacity 150ms ease-out;
 
   &:active { opacity: 0.75; }
 
   ion-icon:first-child {
     font-size: 28px;
-    color: var(--ion-color-warning);
+    color: $accent;
     flex-shrink: 0;
   }
 
@@ -278,30 +293,4 @@ ion-content {
     color: var(--nt-muted);
     flex-shrink: 0;
   }
-}
-
-.ff-hint {
-  margin: 4px 0 14px;
-  font-size: 14px;
-  color: var(--nt-muted);
-}
-
-.ff-results {
-  margin-top: 12px;
-}
-
-.ff-macros {
-  font-size: 12px;
-  color: var(--ion-color-primary);
-  margin: 2px 0;
-}
-
-.ff-rationale {
-  font-size: 12px;
-  color: var(--nt-muted);
-  margin: 0;
-}
-
-.form-error {
-  font-weight: 600;
 }

@@ -1,20 +1,16 @@
 <ion-header class="ion-no-border">
   <ion-toolbar>
-    <div class="date-nav">
-      <ion-button fill="clear" size="small" (click)="prevDay()" aria-label="Vorheriger Tag">
+    <ion-buttons slot="start">
+      <ion-button class="touch-btn" (click)="prevDay()" aria-label="Vorheriger Tag">
         <ion-icon slot="icon-only" name="chevron-back-outline"></ion-icon>
       </ion-button>
-      <span class="date-nav__label">{{ dateLabel() }}</span>
-      <ion-button
-        fill="clear"
-        size="small"
-        (click)="nextDay()"
-        [disabled]="isToday()"
-        aria-label="Nächster Tag"
-      >
+    </ion-buttons>
+    <ion-title role="heading" aria-level="1">{{ dateLabel() }}</ion-title>
+    <ion-buttons slot="end">
+      <ion-button class="touch-btn" (click)="nextDay()" [disabled]="isToday()" aria-label="Nächster Tag">
         <ion-icon slot="icon-only" name="chevron-forward-outline"></ion-icon>
       </ion-button>
-    </div>
+    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
@@ -28,7 +24,7 @@
     </div>
   } @else {
     <!-- Kalorien-Hero (klickbar → kcal-Drill) -->
-    <section class="hero" role="button" tabindex="0" (click)="openDrill('kcal')" (keydown.enter)="openDrill('kcal')">
+    <section class="hero" role="button" tabindex="0" aria-label="Kalorien im Detail anzeigen" (click)="openDrill('kcal')" (keydown.enter)="openDrill('kcal')">
       <app-progress-ring
         [value]="kcalEaten()"
         [max]="kcalTarget()"
@@ -37,52 +33,52 @@
         color="var(--nt-kcal)"
       >
         <div class="hero__center">
-          <div class="hero__big">{{ kcalRemaining() }}</div>
+          <div class="hero__big">{{ kcalRemaining() | ntNum:0 }}</div>
           <div class="hero__unit">kcal übrig</div>
         </div>
       </app-progress-ring>
       <div class="hero__meta">
-        <span><strong>{{ kcalEaten() }}</strong> gegessen</span>
+        <span><strong>{{ kcalEaten() | ntNum:0 }}</strong> gegessen</span>
         <span class="dot">·</span>
-        <span><strong>{{ kcalTarget() }}</strong> Ziel</span>
+        <span><strong>{{ kcalTarget() | ntNum:0 }}</strong> Ziel</span>
       </div>
-      @if (kcalOver()) {
-        <ion-text color="danger" class="hero__over">Tagesziel überschritten</ion-text>
+      @if (kcalOverBy() > 0) {
+        <span class="hero__over"><strong class="hero__over-num">{{ kcalOverBy() | ntNum:0 }}</strong> kcal über Ziel</span>
       }
     </section>
 
     <!-- Makro-Grid -->
-    <h3 class="section-title">Makros</h3>
+    <h2 class="section-title">Makros</h2>
     <section class="macro-grid">
       @for (m of macros(); track m.key) {
-        <button class="macro-card" (click)="openDrill(m.key)">
+        <button type="button" class="macro-card" (click)="openDrill(m.key)">
           <app-progress-ring [value]="m.eaten" [max]="m.target" [size]="64" [stroke]="7" [color]="m.color">
             <span class="macro-card__dot" [style.background]="m.color"></span>
           </app-progress-ring>
           <div class="macro-card__label">{{ m.label }}</div>
-          <div class="macro-card__value">{{ m.eaten }} / {{ m.target }} g</div>
+          <div class="macro-card__value">{{ m.eaten | ntNum }} / {{ m.target | ntNum }} g</div>
         </button>
       }
     </section>
 
     <!-- Mahlzeiten -->
-    <h3 class="section-title">Mahlzeiten</h3>
+    <h2 class="section-title">Mahlzeiten</h2>
     <ion-list inset="true" lines="full" class="meals">
       @for (meal of meals(); track meal.type) {
         <ion-item button detail="true" (click)="openDiary()">
           <ion-icon slot="start" [name]="meal.icon" class="meals__icon"></ion-icon>
           <ion-label>{{ meal.label }}</ion-label>
-          <ion-note slot="end">{{ meal.kcal }} kcal</ion-note>
+          <ion-note slot="end">{{ meal.kcal | ntNum:0 }} kcal</ion-note>
         </ion-item>
       }
     </ion-list>
 
-    <!-- Fast Food Helper Button -->
-    <button class="ff-btn" (click)="openFastFood()">
+    <!-- Fastfood-Helfer: Einstieg in den Helfer im Tagebuch -->
+    <button type="button" class="ff-btn" (click)="openFastfood()">
       <ion-icon name="fast-food-outline"></ion-icon>
       <div class="ff-btn__text">
-        <span class="ff-btn__title">Fast Food Hilfe</span>
-        <span class="ff-btn__sub">{{ kcalRemaining() }} kcal übrig — was passt?</span>
+        <span class="ff-btn__title">Fastfood-Helfer</span>
+        <span class="ff-btn__sub">{{ kcalRemaining() | ntNum:0 }} kcal übrig — was passt?</span>
       </div>
       <ion-icon name="chevron-forward-outline" class="ff-btn__arrow"></ion-icon>
     </button>
@@ -92,73 +88,12 @@
 
   @if (hasProfile()) {
     <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-      <ion-fab-button (click)="openDiary()" aria-label="Mahlzeit hinzufügen">
+      <ion-fab-button (click)="openAddForNow()" [attr.aria-label]="'Zu ' + currentMealLabel() + ' hinzufügen'">
         <ion-icon name="add"></ion-icon>
       </ion-fab-button>
     </ion-fab>
   }
 </ion-content>
-
-<!-- Fast Food Helper Modal -->
-<ion-modal [isOpen]="ffOpen()" (ionModalDidDismiss)="closeFastFood()">
-  <ng-template>
-    <ion-header class="ion-no-border">
-      <ion-toolbar>
-        <ion-title>Fast Food Hilfe</ion-title>
-        <ion-buttons slot="end">
-          <ion-button (click)="closeFastFood()">Schließen</ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-    </ion-header>
-    <ion-content class="ion-padding">
-      <p class="ff-hint">Noch <strong>{{ kcalRemaining() }} kcal</strong> übrig. Wähle ein Restaurant und bekomme passende Vorschläge.</p>
-
-      <ion-list inset="true">
-        <ion-item>
-          <ion-select label="Restaurant" labelPlacement="stacked" [(ngModel)]="ffRestaurant" interface="popover">
-            @for (r of restaurants; track r) {
-              <ion-select-option [value]="r">{{ r || 'Egal / Anderes' }}</ion-select-option>
-            }
-          </ion-select>
-        </ion-item>
-        <ion-item>
-          <ion-input type="number" inputmode="decimal" label="Geld-Budget (€, optional)" labelPlacement="stacked" [(ngModel)]="ffBudget" placeholder="z.B. 8"></ion-input>
-        </ion-item>
-      </ion-list>
-
-      <ion-button expand="block" class="ion-margin-horizontal" (click)="suggestFastfood()" [disabled]="ffLoading()">
-        @if (ffLoading()) {
-          <ion-spinner name="dots" slot="start"></ion-spinner> Suche…
-        } @else {
-          <ion-icon slot="start" name="sparkles-outline"></ion-icon> Vorschläge holen
-        }
-      </ion-button>
-
-      @if (ffError()) {
-        <ion-text color="danger"><p class="form-error ion-padding-horizontal">{{ ffError() }}</p></ion-text>
-      }
-
-      @if (ffSuggestions().length) {
-        <ion-list inset="true" lines="full" class="ff-results">
-          @for (s of ffSuggestions(); track s.itemName) {
-            <ion-item>
-              <ion-label class="ion-text-wrap">
-                <h3>{{ s.itemName }}</h3>
-                <p class="ff-macros">
-                  {{ s.facts.kcal }} kcal · {{ s.facts.proteinG }}g Eiweiß · {{ s.facts.carbsG }}g Kohlenh. · {{ s.facts.fatG }}g Fett
-                </p>
-                <p class="ff-rationale">{{ s.rationale }}</p>
-              </ion-label>
-              @if (s.estPrice !== undefined) {
-                <ion-note slot="end">≈ {{ s.estPrice.toFixed(2) }} €</ion-note>
-              }
-            </ion-item>
-          }
-        </ion-list>
-      }
-    </ion-content>
-  </ng-template>
-</ion-modal>
 
 <!-- Makro-Drill-Down Bottom Sheet -->
 <ion-modal
@@ -171,9 +106,10 @@
     @if (drillData(); as drill) {
       <ion-header class="ion-no-border">
         <ion-toolbar>
-          <ion-title>
-            <span class="drill-title" [style.color]="drill.color">{{ drill.label }}</span>
-            <span class="drill-title__total"> — {{ drill.total }} {{ drill.unit }}</span>
+          <ion-title role="heading" aria-level="2">
+            <span class="drill-title__dot" [style.background]="drill.color"></span>
+            <span class="drill-title">{{ drill.label }}</span>
+            <span class="drill-title__total"> — {{ drill.total | ntNum }} {{ drill.unit }}</span>
           </ion-title>
           <ion-buttons slot="end">
             <ion-button (click)="closeDrill()">Schließen</ion-button>
@@ -182,7 +118,7 @@
       </ion-header>
       <ion-content class="ion-padding">
         @if (drill.items.length === 0) {
-          <p class="drill-empty">Noch keine Einträge für heute.</p>
+          <p class="drill-empty">Noch keine Einträge an diesem Tag.</p>
         } @else {
           <ion-list lines="none">
             @for (item of drill.items; track item.label) {
@@ -194,7 +130,7 @@
                   </div>
                 </ion-label>
                 <ion-note slot="end" class="drill-item__val">
-                  {{ item.value }} {{ drill.unit }}
+                  {{ item.value | ntNum }} {{ drill.unit }}
                   <span class="drill-item__pct">({{ item.percent }}%)</span>
                 </ion-note>
               </ion-item>

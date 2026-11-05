@@ -1,7 +1,13 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MealType } from '../core/models';
-import { AiService } from '../core/ai/ai.service';
 import { ShoppingStore } from '../core/state/shopping.store';
+
+/** Eine wählbare Mahlzeit im Generator. */
+export interface MealToggle {
+  value: MealType;
+  label: string;
+  checked: boolean;
+}
 
 /**
  * Einkaufsliste: generiert einen Wocheneinkauf (Personen × Tage × Mahlzeiten ×
@@ -16,23 +22,27 @@ import { ShoppingStore } from '../core/state/shopping.store';
 })
 export class ShoppingPage {
   private readonly store = inject(ShoppingStore);
-  private readonly ai = inject(AiService);
 
   readonly list = this.store.list;
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+
+  /** Ob das Formular trotz vorhandener Liste aufgeklappt ist ("Neu generieren"). */
+  readonly formOpen = signal(false);
+  /** Ohne Liste immer sichtbar; mit Liste nur auf Wunsch (Checkliste bleibt oben). */
+  readonly showGenerator = computed(() => this.list() === null || this.formOpen());
 
   persons = 2;
   days = 5;
   budget: number | null = null;
   storeName = '';
 
-  readonly mealToggles: { value: MealType; label: string; checked: boolean }[] = [
+  readonly mealToggles = signal<MealToggle[]>([
     { value: 'breakfast', label: 'Frühstück', checked: false },
     { value: 'lunch', label: 'Mittag', checked: true },
     { value: 'dinner', label: 'Abend', checked: true },
     { value: 'snack', label: 'Snacks', checked: false },
-  ];
+  ]);
 
   readonly stores = ['', 'Spar', 'Billa', 'Hofer', 'Lidl', 'Penny'];
 
@@ -40,13 +50,24 @@ export class ShoppingPage {
   newItemAmount: number | null = null;
   newItemUnit = 'g';
 
-  /** Zeigt an, ob gerade gegen echten Claude-Anbieter geroutet wird. */
-  isLive(): boolean {
-    return this.ai.isLive();
+  toggleMeal(value: MealType): void {
+    this.mealToggles.update((meals) =>
+      meals.map((m) => (m.value === value ? { ...m, checked: !m.checked } : m)),
+    );
+  }
+
+  openGenerator(): void {
+    this.formOpen.set(true);
+  }
+
+  closeGenerator(): void {
+    this.formOpen.set(false);
   }
 
   async generate(): Promise<void> {
-    const meals = this.mealToggles.filter((m) => m.checked).map((m) => m.value);
+    const meals = this.mealToggles()
+      .filter((m) => m.checked)
+      .map((m) => m.value);
     this.error.set(null);
     this.loading.set(true);
     try {
@@ -57,6 +78,7 @@ export class ShoppingPage {
         budget: this.budget ?? undefined,
         store: this.storeName || undefined,
       });
+      this.formOpen.set(false);
     } catch (e: unknown) {
       this.error.set(e instanceof Error ? e.message : 'Generierung fehlgeschlagen.');
     } finally {
@@ -65,6 +87,13 @@ export class ShoppingPage {
   }
 
   toggle(index: number): void {
+    this.store.toggleItem(index);
+  }
+
+  /** Setzt den Haken auf den gewünschten Zustand; doppelte Events ändern nichts. */
+  setChecked(index: number, checked: boolean): void {
+    const item = this.list()?.items[index];
+    if (!item || item.checked === checked) return;
     this.store.toggleItem(index);
   }
 

@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { FastFoodSuggestion, MealType, NutritionFacts } from '../core/models';
-import { AiService } from '../core/ai/ai.service';
+import { MealType, NutritionFacts } from '../core/models';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { addDaysISO, dayLabel, toDateISO } from '../core/util/date';
+import { MEAL_DEFS, mealForHour, mealLabel } from '../diary/diary-helpers';
 
 interface MacroView {
   key: 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar';
@@ -50,45 +50,6 @@ export class DashboardPage {
   private readonly profileStore = inject(ProfileStore);
   private readonly diary = inject(DiaryStore);
   private readonly router = inject(Router);
-  private readonly ai = inject(AiService);
-
-  // --- Fast Food Helper ---
-  readonly ffOpen = signal(false);
-  readonly ffLoading = signal(false);
-  readonly ffError = signal<string | null>(null);
-  readonly ffSuggestions = signal<FastFoodSuggestion[]>([]);
-  ffRestaurant = '';
-  ffBudget: number | null = null;
-
-  readonly restaurants = ['', 'McDonald\'s', 'Burger King', 'KFC', 'Subway', 'Döner', 'Pizza', 'Sushi'];
-
-  openFastFood(): void {
-    this.ffSuggestions.set([]);
-    this.ffError.set(null);
-    this.ffOpen.set(true);
-  }
-
-  async suggestFastfood(): Promise<void> {
-    this.ffError.set(null);
-    this.ffLoading.set(true);
-    try {
-      const suggestions = await this.ai.suggestFastfood({
-        kcalBudget: this.kcalRemaining(),
-        restaurant: this.ffRestaurant,
-        moneyBudget: this.ffBudget ?? undefined,
-        preference: 'high protein',
-      });
-      this.ffSuggestions.set(suggestions);
-    } catch (e: unknown) {
-      this.ffError.set(e instanceof Error ? e.message : 'Fehler beim Laden.');
-    } finally {
-      this.ffLoading.set(false);
-    }
-  }
-
-  closeFastFood(): void {
-    this.ffOpen.set(false);
-  }
 
   readonly selectedDate = signal(toDateISO());
   readonly dateLabel = computed(() => dayLabel(this.selectedDate()));
@@ -103,7 +64,8 @@ export class DashboardPage {
   readonly kcalRemaining = computed(() =>
     Math.max(0, this.kcalTarget() - this.kcalEaten()),
   );
-  readonly kcalOver = computed(() => this.kcalEaten() > this.kcalTarget());
+  /** kcal über dem Tagesziel (0, solange das Ziel nicht überschritten ist). */
+  readonly kcalOverBy = computed(() => Math.max(0, this.kcalEaten() - this.kcalTarget()));
 
   readonly macros = computed<MacroView[]>(() => {
     const t = this.target();
@@ -120,13 +82,7 @@ export class DashboardPage {
 
   readonly meals = computed<MealView[]>(() => {
     const date = this.selectedDate();
-    const defs: { type: MealType; label: string; icon: string }[] = [
-      { type: 'breakfast', label: 'Frühstück', icon: 'cafe-outline' },
-      { type: 'lunch', label: 'Mittagessen', icon: 'fast-food-outline' },
-      { type: 'dinner', label: 'Abendessen', icon: 'restaurant-outline' },
-      { type: 'snack', label: 'Snacks', icon: 'ice-cream-outline' },
-    ];
-    return defs.map((d) => ({
+    return MEAL_DEFS.map((d) => ({
       ...d,
       kcal: Math.round(this.diary.kcalForMeal(date, d.type)),
     }));
@@ -187,5 +143,27 @@ export class DashboardPage {
 
   openDiary(): void {
     void this.router.navigate(['/diary']);
+  }
+
+  /** Mahlzeit, die zur aktuellen Uhrzeit passt (Ziel des FAB). */
+  currentMeal(): MealType {
+    return mealForHour(new Date().getHours());
+  }
+
+  currentMealLabel(): string {
+    return mealLabel(this.currentMeal());
+  }
+
+  /** FAB: öffnet im Tagebuch direkt das Add-Modal für die passende Mahlzeit. */
+  openAddForNow(): void {
+    const date = this.selectedDate();
+    const queryParams: Record<string, string> = { add: this.currentMeal() };
+    if (date !== toDateISO()) queryParams['date'] = date;
+    void this.router.navigate(['/diary'], { queryParams });
+  }
+
+  /** Öffnet den Fastfood-Helfer im Tagebuch (einzige Implementierung). */
+  openFastfood(): void {
+    void this.router.navigate(['/diary'], { queryParams: { fastfood: '1' } });
   }
 }

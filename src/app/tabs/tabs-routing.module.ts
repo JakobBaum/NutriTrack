@@ -1,5 +1,5 @@
-import { NgModule } from '@angular/core';
-import { RouterModule, Routes } from '@angular/router';
+import { NgModule, inject } from '@angular/core';
+import { Router, RouterModule, Routes } from '@angular/router';
 import { TabsPage } from './tabs.page';
 
 const routes: Routes = [
@@ -28,9 +28,10 @@ const routes: Routes = [
           import('../shopping/shopping.module').then((m) => m.ShoppingPageModule),
       },
       {
+        // Alte Mahlzeiten-Route: jetzt Segment „Mahlzeiten“ in den Rezepten.
         path: 'meals',
-        loadChildren: () =>
-          import('../meals/meals.module').then((m) => m.MealsPageModule),
+        redirectTo: () => inject(Router).parseUrl('/recipes?view=meals'),
+        pathMatch: 'full',
       },
       {
         path: 'settings',

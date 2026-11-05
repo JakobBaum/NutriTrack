@@ -1,3 +1,23 @@
+// Akzent-Textfarbe (barrierefrei, >= 4.5:1); Fallback, falls das Token noch fehlt.
+// SCSS-Variablen statt :host-Properties, weil Modals außerhalb des Hosts gerendert werden.
+$accent: var(--nt-text-accent, #0369a1);
+$warn: #b45309;
+$error: #be123c;
+
+// Klickfläche >= 44x44; das sichtbare Icon bleibt kompakt.
+.touch-btn {
+  --padding-start: 0;
+  --padding-end: 0;
+  min-width: 44px;
+  height: 44px;
+  margin: 0;
+
+  &--text {
+    --padding-start: 12px;
+    --padding-end: 12px;
+  }
+}
+
 .date-nav {
   display: flex;
   align-items: center;
@@ -29,7 +49,7 @@ ion-content {
     font-weight: 800;
     letter-spacing: -1px;
     line-height: 1;
-    color: var(--ion-color-primary-shade);
+    color: $accent;
   }
 
   &__unit {
@@ -42,6 +62,12 @@ ion-content {
     font-size: 12px;
     color: var(--nt-muted);
   }
+
+  // Warnfarbe nur auf der Zahl, der Satz bleibt neutral.
+  &__over {
+    color: $warn;
+    font-weight: 700;
+  }
 }
 
 .meal {
@@ -51,15 +77,16 @@ ion-content {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 0 12px;
+    padding: 0 0 0 12px;
   }
 
   &__icon {
     font-size: 18px;
-    color: var(--ion-color-primary-shade);
+    color: $accent;
   }
 
   &__label {
+    margin: 0;
     font-weight: 700;
     font-size: 15px;
   }
@@ -72,7 +99,7 @@ ion-content {
   }
 
   &__empty {
-    margin: 6px 16px 0;
+    margin: 0 16px;
     font-size: 13px;
     color: var(--nt-muted);
   }
@@ -85,6 +112,17 @@ ion-content {
 .form-error {
   margin: 0 0 8px;
   font-weight: 600;
+  color: $error;
+}
+
+.form-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 8px 4px;
+  font-size: 13px;
+  color: var(--nt-muted);
 }
 
 .form-sub {
@@ -96,75 +134,90 @@ ion-content {
   color: var(--nt-muted);
 }
 
-// Eigener Button, der die manuellen Eingabefelder einblendet
-.manual-cta {
+// Kompakte Reihe weiterer Quellen unter der Suche
+.sources {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 4px 8px 8px;
+}
+
+.source-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  width: 100%;
-  padding: 14px;
-  margin: 10px 0 4px;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 8px;
   background: var(--nt-surface-2);
-  border: 1.5px dashed rgba(56, 189, 248, 0.55);
+  border: 1px solid var(--nt-border);
   border-radius: var(--nt-radius-sm);
-  color: var(--ion-color-primary);
-  font-size: 15px;
-  font-weight: 700;
+  color: $accent;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
+  transition: opacity 150ms ease-out;
+
+  &:active { opacity: 0.7; }
+  &:disabled { opacity: 0.5; }
 
   ion-icon {
     font-size: 18px;
   }
 }
 
-.scan-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 8px;
-  margin-top: 4px;
-}
+// "Zuletzt benutzt": Hauptfläche loggt sofort, Stift-Button öffnet das Formular
+.recent {
+  --padding-start: 0;
+  --inner-padding-end: 0;
 
-.search-bar-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 8px 0;
-
-  ion-searchbar {
+  &__main {
+    display: flex;
     flex: 1;
-    padding: 0;
-    --box-shadow: none;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-height: 48px;
+    padding: 8px 8px 8px 16px;
+    background: transparent;
+    border: 0;
+    color: var(--ion-text-color);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  &__name {
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  &__meta {
+    font-size: 13px;
+    color: var(--nt-muted);
   }
 }
 
-// --- Alter inline scanner (nicht mehr genutzt, aber lassen wir ihn für Kompatibilität) ---
-.scanner {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  border-radius: var(--nt-radius);
-  overflow: hidden;
-  background: #000;
+.preview {
+  margin: 4px 8px 12px;
+  font-size: 14px;
+  color: var(--nt-muted);
 
-  &__video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-
-  &__frame {
-    position: absolute;
-    inset: 18% 12%;
-    border: 2px solid var(--ion-color-primary);
-    border-radius: 12px;
-    box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.25);
+  strong {
+    font-size: 20px;
+    color: var(--ion-text-color);
   }
 }
 
-// bc-* Vollbild-Scanner-Styles sind in global.scss
+.adjust {
+  padding-bottom: 8px;
+}
+
+.add-footer ion-toolbar {
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --padding-top: 8px;
+  --padding-bottom: 8px;
+}
 
 .scan-hint {
   margin: 8px 12px 0;
@@ -173,7 +226,7 @@ ion-content {
 }
 
 .search-results {
-  max-height: 240px;
+  max-height: 320px;
   overflow-y: auto;
 }
 
@@ -182,12 +235,12 @@ ion-content {
   align-items: center;
   gap: 10px;
   width: calc(100% - 24px);
+  min-height: 48px;
   margin: 8px 12px 4px;
-  padding: 14px 16px;
-  background: var(--nt-surface-2, rgba(255,255,255,0.06));
-  border: 1.5px solid rgba(56, 189, 248, 0.4);
+  padding: 12px 16px;
+  background: var(--nt-surface-2, rgba(255, 255, 255, 0.06));
+  border: 1.5px solid var(--nt-border);
   border-radius: var(--nt-radius-sm, 12px);
-  color: var(--ion-color-primary);
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
@@ -196,10 +249,12 @@ ion-content {
   ion-icon:first-child {
     font-size: 20px;
     flex-shrink: 0;
+    color: $accent;
   }
 
   &__text {
     flex: 1;
+    color: $accent;
   }
 
   &__hint {
@@ -215,8 +270,21 @@ ion-content {
   }
 }
 
+.ff-remaining {
+  margin: 0 12px;
+  font-size: 15px;
+  color: var(--ion-text-color);
+}
+
 .ff-card {
   margin: 12px 0;
+
+  ion-card-header {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
 
   p {
     margin: 0 0 6px;
@@ -225,12 +293,13 @@ ion-content {
   }
 }
 
+// Platz unter der Liste, damit der FAB weder "+" noch kcal-Werte verdeckt
+// (FAB 56px + 16px Rand + Luft).
 .content-spacer {
-  height: 80px;
+  height: 112px;
 }
 
-// Hinweis unter der Menge: Slate-500 statt Ionic-Standardgrau (Kontrast >= 4.5:1 auf Weiß).
-.kcal-hint p {
-  color: var(--nt-muted);
+// FAB-Speed-Dial: Ziele >= 44px
+ion-fab-list ion-fab-button {
+  --size: 48px;
 }
-

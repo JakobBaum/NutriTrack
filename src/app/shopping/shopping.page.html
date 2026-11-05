@@ -1,61 +1,85 @@
 <ion-header class="ion-no-border">
   <ion-toolbar>
-    <ion-title>Einkaufsliste</ion-title>
+    <ion-title role="heading" aria-level="1">Einkaufsliste</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content>
-  <ion-card class="generator">
-    <ion-card-content>
-      <div class="generator__row">
-        <ion-input type="number" inputmode="numeric" label="Personen" labelPlacement="stacked" [(ngModel)]="persons" fill="outline"></ion-input>
-        <ion-input type="number" inputmode="numeric" label="Tage" labelPlacement="stacked" [(ngModel)]="days" fill="outline"></ion-input>
-      </div>
-
-      <div class="generator__meals">
-        <span class="generator__sub">Mahlzeiten</span>
-        <div class="chips">
-          @for (m of mealToggles; track m.value) {
-            <ion-chip [class.on]="m.checked" (click)="m.checked = !m.checked">
-              <ion-icon [name]="m.checked ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
-              <ion-label>{{ m.label }}</ion-label>
-            </ion-chip>
-          }
+  @if (showGenerator()) {
+    <ion-card class="generator">
+      <ion-card-content>
+        <div class="generator__row">
+          <ion-input type="number" inputmode="numeric" label="Personen" labelPlacement="stacked" [(ngModel)]="persons" fill="outline"></ion-input>
+          <ion-input type="number" inputmode="numeric" label="Tage" labelPlacement="stacked" [(ngModel)]="days" fill="outline"></ion-input>
         </div>
-      </div>
 
-      <div class="generator__row">
-        <ion-input type="number" inputmode="decimal" label="Budget (€)" labelPlacement="stacked" [(ngModel)]="budget" placeholder="optional" fill="outline"></ion-input>
-        <ion-select label="Markt" labelPlacement="stacked" [(ngModel)]="storeName" interface="popover" fill="outline">
-          @for (s of stores; track s) {
-            <ion-select-option [value]="s">{{ s || 'egal' }}</ion-select-option>
+        <div class="generator__meals" role="group" aria-labelledby="meals-label">
+          <span class="generator__sub" id="meals-label">Mahlzeiten</span>
+          <div class="chips">
+            @for (m of mealToggles(); track m.value) {
+              <button
+                type="button"
+                class="meal-chip"
+                role="checkbox"
+                tabindex="0"
+                [attr.aria-checked]="m.checked"
+                [class.on]="m.checked"
+                (click)="toggleMeal(m.value)"
+              >
+                <ion-icon [name]="m.checked ? 'checkmark-circle' : 'ellipse-outline'" aria-hidden="true"></ion-icon>
+                {{ m.label }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="generator__row">
+          <ion-input type="number" inputmode="decimal" label="Budget (€)" labelPlacement="stacked" [(ngModel)]="budget" placeholder="optional" fill="outline"></ion-input>
+          <ion-select label="Markt" labelPlacement="stacked" [(ngModel)]="storeName" interface="popover" fill="outline">
+            @for (s of stores; track s) {
+              <ion-select-option [value]="s">{{ s || 'egal' }}</ion-select-option>
+            }
+          </ion-select>
+        </div>
+
+        <ion-button expand="block" class="generate-btn" (click)="generate()" [disabled]="loading()">
+          @if (loading()) {
+            <ion-spinner name="dots" slot="start"></ion-spinner> Generiere…
+          } @else {
+            <ion-icon slot="start" name="sparkles-outline"></ion-icon> Wocheneinkauf generieren
           }
-        </ion-select>
-      </div>
-
-      <ion-button expand="block" (click)="generate()" [disabled]="loading()">
-        @if (loading()) {
-          <ion-spinner name="dots" slot="start"></ion-spinner> Generiere…
-        } @else {
-          <ion-icon slot="start" name="sparkles-outline"></ion-icon> Wocheneinkauf generieren
+        </ion-button>
+        @if (list() !== null) {
+          <ion-button expand="block" fill="clear" class="cancel-btn" (click)="closeGenerator()">Abbrechen</ion-button>
         }
-      </ion-button>
-      <p class="provider-hint">
-        KI-Quelle: <strong>{{ isLive() ? 'Claude (live)' : 'Mock (offline, Schätzpreise)' }}</strong>
-      </p>
-      @if (error()) {
-        <ion-text color="danger"><p class="form-error">{{ error() }}</p></ion-text>
-      }
-    </ion-card-content>
-  </ion-card>
+        @if (error()) {
+          <ion-text color="danger"><p class="form-error" role="alert">{{ error() }}</p></ion-text>
+        }
+      </ion-card-content>
+    </ion-card>
+  }
 
   @if (list(); as l) {
+    @if (!showGenerator()) {
+      <div class="summary">
+        <span class="summary__text">
+          Einkauf für {{ l.persons }} {{ l.persons === 1 ? 'Person' : 'Personen' }}
+          @if ((l.days ?? null) !== null) { · {{ l.days }} {{ l.days === 1 ? 'Tag' : 'Tage' }} }
+        </span>
+        <ion-button fill="outline" class="summary__btn" (click)="openGenerator()">
+          <ion-icon slot="start" name="refresh-outline"></ion-icon>
+          Neu generieren
+        </ion-button>
+      </div>
+    }
+
     <div class="totals">
       @if ((l.estTotal ?? null) !== null) {
-        <span class="totals__sum" [class.over]="overBudget()">≈ {{ l.estTotal!.toFixed(2) }} €</span>
+        <span class="totals__sum" [class.over]="overBudget()">≈ {{ l.estTotal! | ntNum:2:2 }} €</span>
+        <span class="ai-badge">KI-Schätzung</span>
       }
       @if ((l.budget ?? null) !== null) {
-        <span class="totals__budget">Budget {{ l.budget!.toFixed(2) }} €</span>
+        <span class="totals__budget">Budget {{ l.budget! | ntNum:2:2 }} €</span>
       }
       @if ((l.days ?? null) !== null) {
         <span class="totals__meta">{{ l.persons }} P · {{ l.days }} Tage</span>
@@ -74,18 +98,26 @@
     <ion-list inset="true" lines="full">
       @for (item of l.items; track $index) {
         <ion-item-sliding>
-          <ion-item button (click)="toggle($index)">
-            <ion-checkbox slot="start" [checked]="item.checked" (ionChange)="toggle($index)"></ion-checkbox>
-            <ion-label [class.checked]="item.checked">
-              {{ item.name }}
-              <span class="qty">{{ item.amount }} {{ item.unit }}</span>
-            </ion-label>
-            @if ((item.estPrice ?? null) !== null) {
-              <ion-note slot="end">{{ item.estPrice!.toFixed(2) }} €</ion-note>
-            }
+          <ion-item class="check-row" detail="false" lines="full">
+            <ion-checkbox
+              class="check-row__box"
+              labelPlacement="end"
+              justify="start"
+              alignment="center"
+              [checked]="item.checked"
+              (ionChange)="setChecked($index, $event.detail.checked)"
+            >
+              <span class="check-row__text" [class.checked]="item.checked">
+                <span class="check-row__name">{{ item.name }}</span>
+                <span class="qty">
+                  {{ item.amount | ntNum:2 }} {{ item.unit }}
+                  @if ((item.estPrice ?? null) !== null) { · ≈ {{ item.estPrice! | ntNum:2:2 }} € }
+                </span>
+              </span>
+            </ion-checkbox>
           </ion-item>
           <ion-item-options side="end">
-            <ion-item-option color="danger" (click)="removeItem($index)">
+            <ion-item-option color="danger" (click)="removeItem($index)" aria-label="Position löschen">
               <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
             </ion-item-option>
           </ion-item-options>
@@ -96,21 +128,21 @@
       }
     </ion-list>
 
-    <h4 class="form-sub">Position hinzufügen</h4>
+    <h2 class="form-sub">Position hinzufügen</h2>
     <ion-list inset="true">
       <ion-item>
-        <ion-input class="add-name" [(ngModel)]="newItemName" placeholder="Artikel"></ion-input>
-        <ion-input class="add-amount" type="number" inputmode="decimal" [(ngModel)]="newItemAmount" placeholder="Menge"></ion-input>
-        <ion-input class="add-unit" [(ngModel)]="newItemUnit" placeholder="g"></ion-input>
-        <ion-button slot="end" fill="clear" size="small" (click)="addManual()" aria-label="Hinzufügen">
+        <ion-input class="add-name" [(ngModel)]="newItemName" placeholder="Artikel" aria-label="Artikel"></ion-input>
+        <ion-input class="add-amount" type="number" inputmode="decimal" [(ngModel)]="newItemAmount" placeholder="Menge" aria-label="Menge"></ion-input>
+        <ion-input class="add-unit" [(ngModel)]="newItemUnit" placeholder="g" aria-label="Einheit"></ion-input>
+        <ion-button slot="end" fill="clear" class="add-btn" (click)="addManual()" aria-label="Position hinzufügen">
           <ion-icon slot="icon-only" name="add-circle-outline"></ion-icon>
         </ion-button>
       </ion-item>
     </ion-list>
-    <p class="price-note">Preise sind KI-Schätzungen — echte Marktpreise folgen später.</p>
+    <p class="price-note">Preise sind KI-Schätzungen und können im Markt abweichen.</p>
   } @else {
     <div class="empty">
-      <ion-icon name="cart-outline" class="empty__icon"></ion-icon>
+      <ion-icon name="cart-outline" class="empty__icon" aria-hidden="true"></ion-icon>
       <p>Noch keine Liste. Gib Personen, Tage, Mahlzeiten &amp; Budget an und generiere.</p>
     </div>
   }

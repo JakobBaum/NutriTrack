@@ -1,12 +1,15 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { ActionSheetController } from '@ionic/angular';
-import { FoodItem, MealType, NutritionFacts, Recipe, SavedMeal, SavedMealEntry } from '../core/models';
+import { SharedModule } from '../shared/shared.module';
+import { NumPipe } from '../shared/num.pipe';
+import { FoodItem, MealType, NutritionFacts, Recipe, SavedMeal } from '../core/models';
 import { FOOD_PROVIDER } from '../core/food/food-provider';
 import { foodErrorMessage } from '../core/food/food-errors';
 import { DiaryStore } from '../core/state/diary.store';
 import { MealsStore } from '../core/state/meals.store';
 import { RecipeStore } from '../core/state/recipe.store';
 import { toDateISO } from '../core/util/date';
+import { UNDO_TOAST_BUTTONS, UNDO_TOAST_MS, UndoableDelete, settleUndoToast } from './undoable-delete';
 
 interface DraftEntry {
   label: string;
@@ -21,25 +24,36 @@ const MEAL_OPTIONS: { value: MealType; label: string }[] = [
   { value: 'snack', label: 'Snack' },
 ];
 
+/**
+ * Gespeicherte Mahlzeiten (Vorlagen aus Lebensmitteln und Rezepten): Liste,
+ * anlegen, ins Tagebuch übernehmen und löschen (mit Rückgängig). Wird in der
+ * Rezepte-Seite unter dem Segment „Mahlzeiten“ angezeigt.
+ */
 @Component({
-  selector: 'app-meals',
-  templateUrl: './meals.page.html',
-  styleUrls: ['./meals.page.scss'],
-  standalone: false,
+  selector: 'app-meals-list',
+  templateUrl: './meals-list.component.html',
+  styleUrls: ['./meals-list.component.scss'],
+  imports: [SharedModule, NumPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MealsPage {
+export class MealsListComponent implements OnDestroy {
   private readonly store = inject(MealsStore);
   private readonly diary = inject(DiaryStore);
   private readonly recipeStore = inject(RecipeStore);
   private readonly food = inject(FOOD_PROVIDER);
   private readonly actionSheets = inject(ActionSheetController);
 
-  readonly meals = this.store.meals;
+  private readonly deletion = new UndoableDelete((id) => this.store.remove(id));
+
+  /** Gespeicherte Mahlzeiten ohne die gerade zum Löschen vorgemerkte. */
+  readonly meals = computed(() => this.store.meals().filter((m) => m.id !== this.deletion.pendingId()));
   readonly recipes = this.recipeStore.recipes;
   readonly mealOptions = MEAL_OPTIONS;
 
   readonly toastMessage = signal<string | null>(null);
+  readonly undoOpen = signal(false);
+  readonly undoDuration = UNDO_TOAST_MS;
+  readonly undoButtons = UNDO_TOAST_BUTTONS;
 
   // --- Create modal ---
   readonly createOpen = signal(false);
@@ -52,6 +66,10 @@ export class MealsPage {
   readonly pickerResults = signal<FoodItem[]>([]);
   readonly pickerSearching = signal(false);
   readonly pickerError = signal<string | null>(null);
+
+  ngOnDestroy(): void {
+    this.deletion.flush();
+  }
 
   openCreate(): void {
     this.draftName = '';
@@ -68,7 +86,7 @@ export class MealsPage {
     if (this.draftEntries.length === 0) return;
     this.store.add({
       name: this.draftName.trim(),
-      entries: this.draftEntries.map(e => ({
+      entries: this.draftEntries.map((e) => ({
         label: e.label,
         facts: e.facts,
         amountG: e.amountG,
@@ -142,7 +160,7 @@ export class MealsPage {
     const sheet = await this.actionSheets.create({
       header: `„${meal.name}" als welche Mahlzeit?`,
       buttons: [
-        ...this.mealOptions.map(m => ({ text: m.label, data: m.value })),
+        ...this.mealOptions.map((m) => ({ text: m.label, data: m.value })),
         { text: 'Abbrechen', role: 'cancel' },
       ],
     });
@@ -161,12 +179,19 @@ export class MealsPage {
         ref: entry.ref,
       });
     }
-    const mealLabel = this.mealOptions.find(m => m.value === data)?.label ?? 'Tagebuch';
+    const mealLabel = this.mealOptions.find((m) => m.value === data)?.label ?? 'Tagebuch';
     this.toastMessage.set(`„${meal.name}" als ${mealLabel} eingetragen (${meal.entries.length} Einträge).`);
   }
 
+  /** Blendet die Mahlzeit aus und zeigt „Mahlzeit gelöscht – Rückgängig“. */
   removeMeal(id: string): void {
-    this.store.remove(id);
+    this.deletion.start(id);
+    this.undoOpen.set(true);
+  }
+
+  onUndoDismiss(event: CustomEvent<{ role?: string }>): void {
+    settleUndoToast(this.deletion, event.detail?.role);
+    this.undoOpen.set(false);
   }
 
   totalKcal(meal: SavedMeal): number {

@@ -4,9 +4,14 @@ import {
   ElementRef,
   OnDestroy,
   ViewChild,
+  computed,
+  effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute } from '@angular/router';
 import type { IScannerControls } from '@zxing/browser';
 import { ActionSheetController } from '@ionic/angular';
 import { FoodItem, MealType, NutritionFacts, Recipe, RecipeIngredient } from '../core/models';
@@ -24,6 +29,19 @@ import {
   ingredientFacts,
 } from '../core/nutrition/recipe-nutrition';
 import { toDateISO } from '../core/util/date';
+import { MealsListComponent } from '../meals/meals-list.component';
+import { UNDO_TOAST_BUTTONS, UNDO_TOAST_MS, UndoableDelete, settleUndoToast } from '../meals/undoable-delete';
+import {
+  APPROX_UNITS,
+  countMissingFacts,
+  hasApproxUnits,
+  isAiOrigin,
+  lowerBoundPrefix,
+  missingFactsLabel,
+  totalWeightG,
+} from './recipe-view';
+
+type RecipesView = 'recipes' | 'meals';
 
 interface IngredientForm {
   name: string;
@@ -72,6 +90,17 @@ export class RecipesPage implements OnDestroy {
   private readonly camera = inject(CameraService);
   private readonly actionSheets = inject(ActionSheetController);
   private readonly ai = inject(AiService);
+  private readonly route = inject(ActivatedRoute);
+
+  /** Segment „Rezepte | Mahlzeiten“; per `?view=meals` vorwählbar (alte Route /meals). */
+  readonly view = signal<RecipesView>('recipes');
+  private readonly queryParams = toSignal(this.route.queryParamMap);
+  private readonly mealsList = viewChild(MealsListComponent);
+
+  private readonly deletion = new UndoableDelete((id) => this.store.remove(id));
+  readonly undoOpen = signal(false);
+  readonly undoDuration = UNDO_TOAST_MS;
+  readonly undoButtons = UNDO_TOAST_BUTTONS;
 
   readonly nativeCamera = this.camera.isNativeCameraAvailable();
   readonly importPhotoScanning = signal(false);
@@ -91,7 +120,13 @@ export class RecipesPage implements OnDestroy {
 
   @ViewChild('ingBarcodeVideo') barcodeVideo?: ElementRef<HTMLVideoElement>;
 
-  readonly recipes = this.store.recipes;
+  /** Rezepte ohne das gerade zum Löschen vorgemerkte. */
+  readonly recipes = computed(() => this.store.recipes().filter((r) => r.id !== this.deletion.pendingId()));
+  readonly approxUnits = APPROX_UNITS;
+  readonly isAiOrigin = isAiOrigin;
+  readonly countMissingFacts = countMissingFacts;
+  readonly missingFactsLabel = missingFactsLabel;
+  readonly lowerBoundPrefix = lowerBoundPrefix;
 
   readonly unitOptions = ['g', 'kg', 'ml', 'l', 'EL', 'TL', 'Stk', 'Prise', 'Bund', 'Dose', 'Pck'];
 
@@ -183,8 +218,26 @@ export class RecipesPage implements OnDestroy {
   manualBarcode = '';
   private scanControls?: IScannerControls;
 
+  constructor() {
+    effect(() => {
+      const requested = this.queryParams()?.get('view');
+      if (requested === 'meals' || requested === 'recipes') this.view.set(requested);
+    });
+  }
+
   ngOnDestroy(): void {
     this.stopScanner();
+    this.deletion.flush();
+  }
+
+  onViewChange(event: CustomEvent<{ value?: string | number }>): void {
+    this.view.set(event.detail.value === 'meals' ? 'meals' : 'recipes');
+  }
+
+  /** Das Plus-Symbol legt je nach Segment ein Rezept oder eine Mahlzeit an. */
+  onFabClick(): void {
+    if (this.view() === 'meals') this.mealsList()?.openCreate();
+    else this.openAdd();
   }
 
   // --- Live-Nährwerte (aus den Zutaten berechnet) ---
@@ -201,15 +254,7 @@ export class RecipesPage implements OnDestroy {
   }
 
   private calcTotalWeightG(ingredients: RecipeIngredient[]): number {
-    const toG: Record<string, number> = {
-      g: 1, kg: 1000, ml: 1, l: 1000,
-      EL: 15, TL: 5, Prise: 0.5,
-      Stk: 80, Pck: 100, Dose: 400, Bund: 50,
-    };
-    return Math.round(ingredients.reduce((sum, i) => {
-      const factor = toG[i.unit] ?? 0;
-      return sum + i.amount * factor;
-    }, 0));
+    return totalWeightG(ingredients);
   }
 
   /** Automatisch berechnetes Gesamtgewicht für Anzeige im Formular. */
@@ -219,8 +264,7 @@ export class RecipesPage implements OnDestroy {
 
   /** True wenn Näherungseinheiten (EL, TL, Stk …) im Rezept vorkommen. */
   autoWeightIsApprox(): boolean {
-    const exact = new Set(['g', 'kg', 'ml', 'l']);
-    return this.toIngredients().some((i) => !exact.has(i.unit));
+    return hasApproxUnits(this.toIngredients());
   }
 
   total(): NutritionFacts {
@@ -235,8 +279,19 @@ export class RecipesPage implements OnDestroy {
     return hasNutrition(this.toIngredients());
   }
 
+  /** Zutaten im Formular ohne Nährwerte (zählen in der Summe als 0). */
+  missingCount(): number {
+    return countMissingFacts(this.toIngredients());
+  }
+
+  /** True, wenn das gerade bearbeitete Rezept aus einem KI-Import stammt. */
+  formIsAi(): boolean {
+    return isAiOrigin(this._importOrigin);
+  }
+
   // --- Modal öffnen/schließen ---
   openAdd(): void {
+    this._importOrigin = 'own';
     this.form = emptyForm();
     this.editId.set(null);
     this.error.set(null);
@@ -257,6 +312,7 @@ export class RecipesPage implements OnDestroy {
       })),
       steps: recipe.steps.length ? [...recipe.steps] : [''],
     };
+    this._importOrigin = recipe.origin ?? 'own';
     this.editId.set(recipe.id);
     this.error.set(null);
     this.isModalOpen.set(true);
@@ -293,7 +349,7 @@ export class RecipesPage implements OnDestroy {
     }
     if (url && this.isTikTokUrl(url) && !this.isLive()) {
       this.importError.set(
-        'TikTok-Import benötigt den KI-Proxy. Bitte in den Einstellungen eine Proxy-URL eintragen oder den Beschreibungstext des Videos manuell hier einfügen.',
+        'TikTok-Import braucht die KI-Verbindung. Richte sie im Profil ein oder füge den Beschreibungstext des Videos hier ein.',
       );
       return;
     }
@@ -322,7 +378,7 @@ export class RecipesPage implements OnDestroy {
       this.toastMessage.set(
         this.isLive()
           ? `Rezept${isTikTok ? ' aus TikTok' : ''} importiert — bitte prüfen und speichern.`
-          : 'Rezept aus Text erkannt (Mock) — Nährwerte ggf. je Zutat ergänzen.',
+          : 'Rezept aus Text erkannt — Nährwerte je Zutat prüfen oder ergänzen.',
       );
     } catch {
       this.importError.set('Import fehlgeschlagen — bitte Text einfügen oder erneut versuchen.');
@@ -538,8 +594,15 @@ export class RecipesPage implements OnDestroy {
     this.toastMessage.set(id ? 'Rezept aktualisiert.' : 'Rezept gespeichert.');
   }
 
+  /** Blendet das Rezept aus und zeigt „Rezept gelöscht – Rückgängig“. */
   remove(id: string): void {
-    this.store.remove(id);
+    this.deletion.start(id);
+    this.undoOpen.set(true);
+  }
+
+  onUndoDismiss(event: CustomEvent<{ role?: string }>): void {
+    settleUndoToast(this.deletion, event.detail?.role);
+    this.undoOpen.set(false);
   }
 
   /**

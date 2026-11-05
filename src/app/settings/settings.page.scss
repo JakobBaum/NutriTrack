@@ -4,9 +4,10 @@ ion-content {
 
 .target-card {
   margin: 12px;
-  background: linear-gradient(135deg, var(--ion-color-primary-tint), var(--ion-color-primary));
+  // Vollflächiges, ruhiges Blau (weiße Schrift 5,9:1) statt Verlauf und Glow.
+  background: var(--nt-text-accent, #0369a1);
   color: #fff;
-  box-shadow: 0 10px 28px rgba(56, 189, 248, 0.35);
+  box-shadow: var(--nt-shadow-sm);
 
   &__kcal {
     display: flex;
@@ -21,7 +22,6 @@ ion-content {
     .unit {
       font-size: 14px;
       font-weight: 600;
-      opacity: 0.9;
     }
   }
 
@@ -31,11 +31,32 @@ ion-content {
     gap: 6px 14px;
     margin-top: 10px;
     font-size: 12px;
-    opacity: 0.95;
 
     strong {
       font-size: 13px;
     }
+  }
+}
+
+ion-item {
+  --min-height: 48px;
+}
+
+// Sekundärwert rechts in einer Zeile (z. B. aktuelles Kalorienziel): 4,8:1 auf Weiß.
+.row-note {
+  --color: var(--nt-muted);
+  color: var(--nt-muted);
+  font-size: 14px;
+}
+
+// Zerstörerische Zeile: normales Item, roter Text mit 6,4:1 Kontrast.
+.danger-row {
+  --color: #be123c;
+  --color-activated: #9f1239;
+
+  ion-icon,
+  ion-label {
+    color: #be123c;
   }
 }
 
@@ -73,17 +94,18 @@ ion-content {
 
   &__clear {
     background: #333;
-    color: #aaa;
+    color: #d4d4d4;
     border: none;
     border-radius: 4px;
-    padding: 4px 10px;
-    font-size: 11px;
+    min-height: 44px;
+    padding: 4px 14px;
+    font-size: 12px;
     margin-bottom: 8px;
     cursor: pointer;
   }
 
   &__empty {
-    color: #555;
+    color: #9ca3af;
     font-size: 12px;
     text-align: center;
     margin: 8px 0;
@@ -97,13 +119,13 @@ ion-content {
     padding: 2px 0;
     border-bottom: 1px solid #1e1e1e;
 
-    &--info  { color: #aaa; }
-    &--success { color: #4caf50; }
-    &--error { color: #f44336; }
+    &--info  { color: #d4d4d4; }
+    &--success { color: #66bb6a; }
+    &--error { color: #ff7961; }
   }
 
   &__ts {
-    color: #555;
+    color: #9ca3af;
     flex-shrink: 0;
   }
 
