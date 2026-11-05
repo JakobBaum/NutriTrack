@@ -7,16 +7,20 @@ import {
   TestRequest,
 } from '@angular/common/http/testing';
 import { OpenFoodFactsProvider } from './openfoodfacts.provider';
+import { FoodLookupError, foodErrorMessage } from './food-errors';
+import { SettingsStore } from '../state/settings.store';
+import { environment } from '../../../environments/environment';
 
-const SEARCH_URL = 'https://search.openfoodfacts.org/search';
+const SEARCH_URL = environment.offSearchUrl;
 const PRODUCT_URL = 'https://world.openfoodfacts.org/api/v3/product';
 
-function product(name: string) {
+function product(name: string, extra: Record<string, unknown> = {}) {
   return {
     code: '111',
     product_name: name,
     brands: 'Marke',
     nutriments: { 'energy-kcal_100g': 123, proteins_100g: 5 },
+    ...extra,
   };
 }
 
@@ -24,6 +28,7 @@ let http: HttpTestingController;
 let provider: OpenFoodFactsProvider;
 
 beforeEach(() => {
+  localStorage.clear();
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     providers: [provideHttpClient(), provideHttpClientTesting()],
@@ -35,19 +40,74 @@ beforeEach(() => {
 afterEach(() => http.verify());
 
 describe('OpenFoodFactsProvider — Suche (search-a-licious)', () => {
-  it('nutzt /search mit q + page_size und mappt hits', async () => {
+  it('nutzt /search mit q und mappt hits', async () => {
     // Act
     const promise = provider.searchByText('reis', 20);
     const req: TestRequest = http.expectOne((r) => r.url === SEARCH_URL);
 
     // Assert
     expect(req.request.params.get('q')).toBe('reis');
-    expect(req.request.params.get('page_size')).toBe('20');
     req.flush({ hits: [product('Reis')] });
     const items = await promise;
     expect(items).toHaveLength(1);
     expect(items[0].name).toBe('Reis');
     expect(items[0].facts.kcal).toBe(123);
+  });
+
+  it('sendet keinen User-Agent-Header (löst in Safari/Firefox einen CORS-Preflight aus)', async () => {
+    // Act
+    const promise = provider.searchByText('reis');
+    const req = http.expectOne((r) => r.url === SEARCH_URL);
+
+    // Assert
+    expect(req.request.headers.has('User-Agent')).toBe(false);
+    req.flush({ hits: [] });
+    await promise;
+  });
+
+  it('nutzt die Proxy-URL aus den Einstellungen ohne doppelten Slash', async () => {
+    // Arrange
+    const settings = TestBed.inject(SettingsStore);
+    settings.setAi({ ...settings.ai(), proxyUrl: 'https://proxy.example/' });
+
+    // Act
+    const promise = provider.searchByText('reis');
+    const req = http.expectOne((r) => r.url === 'https://proxy.example/off-search');
+
+    // Assert
+    req.flush({ hits: [] });
+    await expect(promise).resolves.toEqual([]);
+  });
+
+  it('holt mehr Kandidaten und liefert höchstens limit Treffer', async () => {
+    // Arrange
+    const hits = Array.from({ length: 8 }, (_, i) => product(`Reis ${i}`));
+
+    // Act
+    const promise = provider.searchByText('reis', 3);
+    const req = http.expectOne((r) => r.url === SEARCH_URL);
+
+    // Assert
+    expect(Number(req.request.params.get('page_size'))).toBeGreaterThan(3);
+    req.flush({ hits });
+    await expect(promise).resolves.toHaveLength(3);
+  });
+
+  it('sortiert Produkte aus dem DACH-Raum bzw. mit deutschem Namen nach vorne', async () => {
+    // Arrange
+    const hits = [
+      product('Pomme jaune', { lang: 'fr', countries_tags: ['en:france'] }),
+      product('Apfel Chips', { lang: 'de', countries_tags: ['en:france'] }),
+      product('Äpfel aus Österreich', { lang: 'de', countries_tags: ['en:austria'] }),
+    ];
+
+    // Act
+    const promise = provider.searchByText('apfel');
+    http.expectOne((r) => r.url === SEARCH_URL).flush({ hits });
+
+    // Assert
+    const names = (await promise).map((i) => i.name);
+    expect(names).toEqual(['Äpfel aus Österreich', 'Apfel Chips', 'Pomme jaune']);
   });
 
   it('liefert [] bei 404 (nicht gefunden ist kein Netzwerkfehler)', async () => {
@@ -60,6 +120,29 @@ describe('OpenFoodFactsProvider — Suche (search-a-licious)', () => {
     await expect(promise).resolves.toEqual([]);
   });
 
+  it('meldet 429 als Rate-Limit statt als Netzwerkfehler', async () => {
+    // Act
+    const promise = provider.searchByText('reis');
+    const req = http.expectOne((r) => r.url === SEARCH_URL);
+    req.flush('slow down', { status: 429, statusText: 'Too Many Requests' });
+
+    // Assert
+    const err = await promise.catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(FoodLookupError);
+    expect((err as FoodLookupError).reason).toBe('rate-limit');
+  });
+
+  it('meldet status 0 (CORS/offline) als offline', async () => {
+    // Act
+    const promise = provider.searchByText('reis');
+    const req = http.expectOne((r) => r.url === SEARCH_URL);
+    req.error(new ProgressEvent('error'), { status: 0, statusText: 'Unknown Error' });
+
+    // Assert
+    const err = await promise.catch((e: unknown) => e);
+    expect((err as FoodLookupError).reason).toBe('offline');
+  });
+
   it('wirft bei echtem Serverfehler (500) weiter', async () => {
     // Act
     const promise = provider.searchByText('reis');
@@ -67,7 +150,8 @@ describe('OpenFoodFactsProvider — Suche (search-a-licious)', () => {
     req.flush('boom', { status: 500, statusText: 'Server Error' });
 
     // Assert
-    await expect(promise).rejects.toBeTruthy();
+    const err = await promise.catch((e: unknown) => e);
+    expect((err as FoodLookupError).reason).toBe('server');
   });
 });
 
@@ -92,14 +176,36 @@ describe('OpenFoodFactsProvider — Barcode (v3)', () => {
     await expect(promise).resolves.toBeNull();
   });
 
-  it('mappt einen Treffer', async () => {
+  it('mappt einen Treffer ohne User-Agent-Header', async () => {
     // Act
     const promise = provider.lookupByBarcode('111');
     const req = http.expectOne((r) => r.url === `${PRODUCT_URL}/111.json`);
-    req.flush({ status: 'success', product: product('Nutella') });
 
     // Assert
+    expect(req.request.headers.has('User-Agent')).toBe(false);
+    req.flush({ status: 'success', product: product('Nutella') });
     const item = await promise;
     expect(item?.name).toBe('Nutella');
+  });
+
+  it('meldet 429 beim Barcode als Rate-Limit', async () => {
+    // Act
+    const promise = provider.lookupByBarcode('111');
+    const req = http.expectOne((r) => r.url === `${PRODUCT_URL}/111.json`);
+    req.flush('slow down', { status: 429, statusText: 'Too Many Requests' });
+
+    // Assert
+    const err = await promise.catch((e: unknown) => e);
+    expect((err as FoodLookupError).reason).toBe('rate-limit');
+  });
+});
+
+describe('foodErrorMessage', () => {
+  it('liefert verständliche Texte je Fehlerart', () => {
+    // Assert
+    expect(foodErrorMessage(new FoodLookupError('rate-limit', 'x'))).toContain('Zu viele Anfragen');
+    expect(foodErrorMessage(new FoodLookupError('offline', 'x'))).toContain('Keine Verbindung');
+    expect(foodErrorMessage(new FoodLookupError('server', 'x'))).toContain('nicht erreichbar');
+    expect(foodErrorMessage(new Error('?'))).toContain('bitte erneut versuchen');
   });
 });

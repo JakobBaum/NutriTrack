@@ -12,6 +12,7 @@ import { ActionSheetController } from '@ionic/angular';
 import { FoodItem, MealType, NutritionFacts, Recipe, RecipeIngredient } from '../core/models';
 import { AiService } from '../core/ai/ai.service';
 import { FOOD_PROVIDER } from '../core/food/food-provider';
+import { foodErrorMessage } from '../core/food/food-errors';
 import { BarcodeScannerService } from '../core/scan/barcode-scanner.service';
 import { CameraService } from '../core/scan/camera.service';
 import { DiaryStore } from '../core/state/diary.store';
@@ -411,8 +412,8 @@ export class RecipesPage implements OnDestroy {
     try {
       this.pickerResults.set(await this.food.searchByText(q));
       if (this.pickerResults().length === 0) this.pickerError.set('Keine Treffer gefunden.');
-    } catch {
-      this.pickerError.set('Suche fehlgeschlagen — bitte erneut versuchen.');
+    } catch (e: unknown) {
+      this.pickerError.set(foodErrorMessage(e));
     } finally {
       this.pickerSearching.set(false);
     }
@@ -489,8 +490,8 @@ export class RecipesPage implements OnDestroy {
       }
       this.closeBarcode();
       this.pickFood(item);
-    } catch {
-      this.bcError.set('Barcode-Abfrage fehlgeschlagen — bitte erneut versuchen.');
+    } catch (e: unknown) {
+      this.bcError.set(foodErrorMessage(e));
     } finally {
       this.bcLooking.set(false);
     }

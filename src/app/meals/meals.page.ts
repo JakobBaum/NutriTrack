@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { ActionSheetController } from '@ionic/angular';
 import { FoodItem, MealType, NutritionFacts, Recipe, SavedMeal, SavedMealEntry } from '../core/models';
 import { FOOD_PROVIDER } from '../core/food/food-provider';
+import { foodErrorMessage } from '../core/food/food-errors';
 import { DiaryStore } from '../core/state/diary.store';
 import { MealsStore } from '../core/state/meals.store';
 import { RecipeStore } from '../core/state/recipe.store';
@@ -114,8 +115,8 @@ export class MealsPage {
     try {
       this.pickerResults.set(await this.food.searchByText(q));
       if (this.pickerResults().length === 0) this.pickerError.set('Keine Treffer.');
-    } catch {
-      this.pickerError.set('Suche fehlgeschlagen.');
+    } catch (e: unknown) {
+      this.pickerError.set(foodErrorMessage(e));
     } finally {
       this.pickerSearching.set(false);
     }

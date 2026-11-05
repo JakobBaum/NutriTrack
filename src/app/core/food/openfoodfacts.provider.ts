@@ -1,24 +1,30 @@
-import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { FoodItem, NutritionFacts } from '../models';
 import { makeId } from '../util/id';
 import { FoodProvider } from './food-provider';
+import { toFoodLookupError } from './food-errors';
 import { SettingsStore } from '../state/settings.store';
 import { environment } from '../../../environments/environment';
 import { DebugLogService } from '../debug/debug-log.service';
 
-// Freitextsuche: dev → proxied relative path; prod → direkt (CapacitorHttp bypasses CORS).
-// Wenn proxyUrl gesetzt: ${proxyUrl}/off-search (CF-Worker übernimmt den CORS-Proxy).
+// Freitextsuche: dev → Angular-Dev-Proxy; prod → NutriTrack-Worker (search.openfoodfacts.org
+// sendet keine CORS-Header). Eine eigene proxyUrl in den Einstellungen hat Vorrang.
 const SEARCH_URL_DEFAULT = environment.offSearchUrl;
 // Barcode exakt über Product Opener v3 (hat CORS *).
 const PRODUCT_V3_URL = 'https://world.openfoodfacts.org/api/v3/product';
 const FIELDS = 'code,product_name,brands,image_url,image_small_url,nutriments,serving_quantity';
+const SEARCH_FIELDS = `${FIELDS},lang,countries_tags`;
 const LANGS = 'de,en';
+// Mehr Kandidaten holen, damit nach dem DACH-Ranking genug passende übrig bleiben.
+const CANDIDATE_FACTOR = 2;
+const MAX_PAGE_SIZE = 50;
+const DACH_COUNTRIES = new Set(['en:austria', 'en:germany', 'en:switzerland']);
 
-const OFF_HEADERS = new HttpHeaders({
-  'User-Agent': 'NutriTrack/1.0 (https://github.com/jakob/nutritrack)',
-});
+// Bewusst KEIN eigener User-Agent-Header: Chrome verwirft ihn, Safari/Firefox schicken
+// dafür einen CORS-Preflight, den Proxy und OFF-Server ablehnen → Suche bricht ab.
+// Der Worker setzt den von OFF gewünschten User-Agent serverseitig.
 
 interface OffNutriments {
   [k: string]: number | string | undefined;
@@ -31,6 +37,8 @@ interface OffProduct {
   image_small_url?: string;
   serving_quantity?: number | string;
   nutriments?: OffNutriments;
+  lang?: string;
+  countries_tags?: string[];
 }
 interface SearchResponse {
   hits?: OffProduct[];
@@ -46,10 +54,25 @@ function isNotFound(e: unknown): boolean {
   return e instanceof HttpErrorResponse && e.status === 404;
 }
 
+/** Höher = relevanter für Nutzer im DACH-Raum (Produkt dort verkauft, deutscher Name). */
+function localeScore(p: OffProduct): number {
+  const soldInDach = (p.countries_tags ?? []).some((c) => DACH_COUNTRIES.has(c));
+  return (soldInDach ? 2 : 0) + (p.lang === 'de' ? 1 : 0);
+}
+
+/** Stabile Sortierung nach {@link localeScore}; Originalreihenfolge bleibt bei Gleichstand. */
+function rankForDach(products: readonly OffProduct[]): OffProduct[] {
+  return products
+    .map((p, i) => ({ p, i, s: localeScore(p) }))
+    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .map(({ p }) => p);
+}
+
 /**
  * Food-Datenquelle über die freie **OpenFoodFacts**-API (kein Key nötig).
  * Freitextsuche via **search-a-licious** (`/search`), Barcode-Lookup via
- * **Product Opener v3**. not-found (404) → leer/null statt Netzfehler.
+ * **Product Opener v3**. not-found (404) → leer/null; andere Fehler als
+ * {@link FoodLookupError} (offline / rate-limit / server).
  */
 @Injectable({ providedIn: 'root' })
 export class OpenFoodFactsProvider implements FoodProvider {
@@ -59,7 +82,7 @@ export class OpenFoodFactsProvider implements FoodProvider {
 
   private searchUrl(): string {
     const proxy = this.settings.ai().proxyUrl?.trim();
-    return proxy ? `${proxy.replace(/\/$/, '')}/off-search` : SEARCH_URL_DEFAULT;
+    return proxy ? `${proxy.replace(/\/+$/, '')}/off-search` : SEARCH_URL_DEFAULT;
   }
 
   async searchByText(query: string, limit = 12): Promise<FoodItem[]> {
@@ -70,27 +93,25 @@ export class OpenFoodFactsProvider implements FoodProvider {
     try {
       const res = await firstValueFrom(
         this.http.get<SearchResponse>(url, {
-          headers: OFF_HEADERS,
           params: {
             q,
-            page_size: String(limit),
-            fields: FIELDS,
+            page_size: String(Math.min(limit * CANDIDATE_FACTOR, MAX_PAGE_SIZE)),
+            fields: SEARCH_FIELDS,
             langs: LANGS,
           },
         }),
       );
-      const items = (res.hits ?? [])
+      const items = rankForDach(res.hits ?? [])
         .map((p) => this.toFoodItem(p))
-        .filter((f): f is FoodItem => f !== null);
+        .filter((f): f is FoodItem => f !== null)
+        .slice(0, limit);
       this.log.success(`✓ ${items.length} Treffer für "${q}"`);
       return items;
     } catch (e: unknown) {
       if (isNotFound(e)) { this.log.info(`Keine Treffer für "${q}"`); return []; }
-      const msg = e instanceof HttpErrorResponse
-        ? `HTTP ${e.status}: ${e.message}`
-        : (e instanceof Error ? e.message : String(e));
-      this.log.error(`✗ Suche "${q}": ${msg}`);
-      throw e;
+      const err = toFoodLookupError(e);
+      this.log.error(`✗ Suche "${q}" (${err.reason}): ${err.message}`);
+      throw err;
     }
   }
 
@@ -106,14 +127,16 @@ export class OpenFoodFactsProvider implements FoodProvider {
       const res = await firstValueFrom(
         this.http.get<ProductV3Response>(
           `${PRODUCT_V3_URL}/${encodeURIComponent(code)}.json`,
-          { headers: OFF_HEADERS, params: { fields: FIELDS } },
+          { params: { fields: FIELDS } },
         ),
       );
       if (!res.product || res.status === 'failure') return null;
       return this.toFoodItem(res.product);
     } catch (e: unknown) {
       if (isNotFound(e)) return null;
-      throw e;
+      const err = toFoodLookupError(e);
+      this.log.error(`✗ Barcode ${code} (${err.reason}): ${err.message}`);
+      throw err;
     }
   }
 

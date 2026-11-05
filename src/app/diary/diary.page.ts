@@ -12,6 +12,7 @@ import type { IScannerControls } from '@zxing/browser';
 import { DiaryEntry, FastFoodSuggestion, FoodItem, MealType, NutritionFacts, Recipe } from '../core/models';
 import { AiService } from '../core/ai/ai.service';
 import { FOOD_PROVIDER } from '../core/food/food-provider';
+import { foodErrorMessage } from '../core/food/food-errors';
 import { CameraService } from '../core/scan/camera.service';
 import { BarcodeScannerService } from '../core/scan/barcode-scanner.service';
 import { OpenPricesProvider } from '../core/price/open-prices.provider';
@@ -297,8 +298,8 @@ export class DiaryPage implements OnDestroy {
     try {
       this.searchResults.set(await this.food.searchByText(q));
       if (this.searchResults().length === 0) this.hint.set('Keine Treffer gefunden.');
-    } catch {
-      this.error.set('Suche fehlgeschlagen — bitte erneut versuchen.');
+    } catch (e: unknown) {
+      this.error.set(foodErrorMessage(e));
     } finally {
       this.searching.set(false);
     }
@@ -464,8 +465,8 @@ export class DiaryPage implements OnDestroy {
           ? `Barcode erkannt: ${item.name} — Werte pro 100 g. Realer Preis ca. ${price.avg.toFixed(2)} ${price.currency}.`
           : `Barcode erkannt: ${item.name} — Werte pro 100 g übernommen.`,
       );
-    } catch {
-      this.bcError.set('Barcode-Abfrage fehlgeschlagen — bitte erneut versuchen.');
+    } catch (e: unknown) {
+      this.bcError.set(foodErrorMessage(e));
     } finally {
       this.bcLooking.set(false);
     }

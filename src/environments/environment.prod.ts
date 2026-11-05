@@ -1,5 +1,6 @@
 export const environment = {
   production: true,
-  // On device: CapacitorHttp patches fetch() → native HTTP bypasses CORS
-  offSearchUrl: 'https://search.openfoodfacts.org/search',
+  // search.openfoodfacts.org sendet keine CORS-Header → Browser/PWA brauchen den
+  // NutriTrack-Worker als Proxy (setzt auch den von OFF gewünschten User-Agent).
+  offSearchUrl: 'https://nutritrack.baumgartner-jakob12.workers.dev/off-search',
 };
