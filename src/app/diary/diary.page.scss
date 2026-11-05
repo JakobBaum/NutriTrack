@@ -1,15 +1,13 @@
-// Akzent-Textfarbe (barrierefrei, >= 4.5:1); Fallback, falls das Token noch fehlt.
-// SCSS-Variablen statt :host-Properties, weil Modals außerhalb des Hosts gerendert werden.
-$accent: var(--nt-text-accent, #0369a1);
-$warn: #b45309;
-$error: #be123c;
+// Tagebuch im S1-Look "Sanft iOS" (siehe DESIGN.md). Nur Tokens aus src/theme/variables.scss.
+// Modals werden ausserhalb des Hosts gerendert, daher keine :host-Properties.
 
 // Klickfläche >= 44x44; das sichtbare Icon bleibt kompakt.
 .touch-btn {
   --padding-start: 0;
   --padding-end: 0;
-  min-width: 44px;
-  height: 44px;
+  --color: var(--nt-accent);
+  min-width: var(--nt-touch);
+  height: var(--nt-touch);
   margin: 0;
 
   &--text {
@@ -18,142 +16,347 @@ $error: #be123c;
   }
 }
 
-.date-nav {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-
-  &__label {
-    font-size: 16px;
-    font-weight: 700;
-    min-width: 96px;
-    text-align: center;
-  }
+// --- Seitenkopf -------------------------------------------------------------
+.page-header ion-toolbar {
+  --background: var(--nt-ground);
+  --min-height: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
 }
 
 ion-content {
-  --padding-start: 12px;
-  --padding-end: 12px;
+  --background: var(--nt-ground);
+  --color: var(--nt-ink);
 }
 
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nt-space-3);
+  padding: var(--nt-space-2) var(--nt-space-5) 0;
+
+  &__add ion-icon {
+    font-size: 20px;
+  }
+}
+
+.date-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--nt-space-1);
+  padding: 0 var(--nt-space-3);
+
+  &__label {
+    min-width: 96px;
+    text-align: center;
+    font-size: var(--nt-fs-headline);
+    font-weight: 600;
+    color: var(--nt-ink);
+  }
+}
+
+// --- Tages-Summe ------------------------------------------------------------
 .summary {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 2px;
-  padding: 20px 0 8px;
+  margin-top: var(--nt-space-2);
 
   &__kcal {
-    font-size: 40px;
-    font-weight: 800;
-    letter-spacing: -1px;
-    line-height: 1;
-    color: $accent;
+    font-size: var(--nt-fs-hero);
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+    color: var(--nt-kcal);
+    font-variant-numeric: tabular-nums;
   }
 
   &__unit {
-    font-size: 13px;
+    font-size: var(--nt-fs-body);
     font-weight: 600;
-    color: var(--nt-muted);
+    color: var(--nt-secondary);
   }
 
   &__target {
-    font-size: 12px;
-    color: var(--nt-muted);
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
   }
 
   // Warnfarbe nur auf der Zahl, der Satz bleibt neutral.
   &__over {
-    color: $warn;
+    color: var(--nt-over);
     font-weight: 700;
   }
 }
 
-.meal {
-  margin-top: 16px;
+// --- Inset-gruppierte Listen (Karte, Radius 20, Zeilen >= 56, inset Trenner) -
+.diary-list {
+  display: block;
+  margin: 0 var(--nt-space-4);
+  padding: 0;
+  background: var(--nt-card);
+  border-radius: var(--nt-radius-card);
+  overflow: hidden;
 
+  &--spaced {
+    margin-top: var(--nt-space-4);
+  }
+
+  ion-item {
+    --background: transparent;
+    --color: var(--nt-ink);
+    --min-height: 56px;
+    --padding-start: var(--nt-space-4);
+    --inner-padding-end: var(--nt-space-2);
+    --border-width: 0;
+    --inner-border-width: 0 0 0.5px 0;
+    --border-color: var(--nt-separator);
+    --ion-item-border-color: var(--nt-separator);
+
+    h3 {
+      margin: 0;
+      font-size: var(--nt-fs-headline);
+      font-weight: 600;
+      color: var(--nt-ink);
+    }
+
+    p {
+      margin: 2px 0 0;
+      font-size: var(--nt-fs-caption);
+      color: var(--nt-secondary);
+    }
+  }
+
+  ion-item:last-child,
+  ion-item-sliding:last-child ion-item {
+    --inner-border-width: 0;
+  }
+
+  // Formularfelder: Label klein, Wert 17 px
+  ion-input,
+  ion-select {
+    --padding-start: 0;
+    font-size: var(--nt-fs-headline);
+    color: var(--nt-ink);
+  }
+
+  ion-input,
+  ion-select {
+    --highlight-color-focused: var(--nt-accent);
+  }
+
+  &--flat {
+    margin: 0;
+    border-radius: 0;
+  }
+}
+
+// Akzent-Tint-Kreis (44 px) für Plus / Icon-Marker
+.tint-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--nt-touch);
+  height: var(--nt-touch);
+  border-radius: var(--nt-radius-pill);
+  background: var(--nt-accent-tint);
+  color: var(--nt-accent);
+
+  ion-icon {
+    font-size: 22px;
+  }
+}
+
+.kcal-note {
+  font-size: var(--nt-fs-body);
+  font-weight: 600;
+  color: var(--nt-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+// --- Mahlzeiten -------------------------------------------------------------
+.meal {
   &__head {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 0 0 0 12px;
+    gap: var(--nt-space-2);
+    margin: var(--nt-space-4) var(--nt-space-4) 0 var(--nt-space-5);
   }
 
   &__icon {
+    flex: none;
     font-size: 18px;
-    color: $accent;
+    color: var(--nt-secondary);
   }
 
   &__label {
+    flex: 1;
     margin: 0;
-    font-weight: 700;
-    font-size: 15px;
   }
 
   &__kcal {
-    margin-left: auto;
-    font-size: 13px;
+    font-size: var(--nt-fs-caption);
     font-weight: 600;
-    color: var(--nt-muted);
+    color: var(--nt-secondary);
+    font-variant-numeric: tabular-nums;
   }
 
   &__empty {
-    margin: 0 16px;
-    font-size: 13px;
-    color: var(--nt-muted);
-  }
-
-  ion-list {
-    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    min-height: 56px;
+    margin: 0;
+    padding: 0 var(--nt-space-4);
+    font-size: var(--nt-fs-body);
+    color: var(--nt-secondary);
   }
 }
 
-.form-error {
-  margin: 0 0 8px;
+// Fastfood-Helfer als Zeile mit Chevron
+.ff-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--nt-space-3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--nt-space-1) var(--nt-space-4) var(--nt-space-1) var(--nt-space-3);
+  background: transparent;
+  border: 0;
+  color: var(--nt-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:active {
+    background: var(--nt-ground);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--nt-focus);
+    outline-offset: -2px;
+  }
+
+  .tint-circle {
+    width: 36px;
+    height: 36px;
+
+    ion-icon {
+      font-size: 20px;
+    }
+  }
+
+  &__text {
+    flex: 1;
+    font-size: var(--nt-fs-headline);
+    font-weight: 600;
+  }
+
+  &__hint {
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+  }
+
+  &__arrow {
+    flex: none;
+    font-size: 14px;
+    color: var(--nt-secondary);
+  }
+}
+
+// Platz am Seitenende (Tab-Leiste bekommt globalen Abstand über ion-tabs ion-content)
+.content-spacer {
+  height: var(--nt-space-4);
+}
+
+// --- Sheets (Add / Fastfood / Edit) ----------------------------------------
+.sheet-grabber {
+  flex: none;
+  width: 36px;
+  height: 5px;
+  margin: var(--nt-space-2) auto 0;
+  border-radius: 3px;
+  background: #c7c7cc;
+}
+
+.sheet-header ion-toolbar {
+  --background: transparent;
+  --color: var(--nt-ink);
+  --min-height: 52px;
+
+  ion-title {
+    font-size: var(--nt-fs-headline);
+    font-weight: 600;
+    text-align: center;
+  }
+
+  ion-button {
+    --color: var(--nt-accent);
+    font-size: var(--nt-fs-headline);
+    font-weight: 400;
+    text-transform: none;
+    min-height: var(--nt-touch);
+  }
+}
+
+.sheet-content {
+  --background: var(--nt-ground);
+  --padding-bottom: var(--nt-space-6);
+}
+
+.sheet-action {
+  margin: var(--nt-space-4) var(--nt-space-4) 0;
+  --border-radius: var(--nt-radius-pill);
+  min-height: var(--nt-touch);
   font-weight: 600;
-  color: $error;
+}
+
+.form-error {
+  margin: 0 var(--nt-space-5) var(--nt-space-2);
+  font-size: var(--nt-fs-body);
+  font-weight: 600;
+  color: var(--nt-danger);
 }
 
 .form-note {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin: 0 8px 4px;
-  font-size: 13px;
-  color: var(--nt-muted);
+  gap: var(--nt-space-2);
+  margin: 0 var(--nt-space-5) var(--nt-space-1);
+  font-size: var(--nt-fs-caption);
+  color: var(--nt-secondary);
 }
 
-.form-sub {
-  margin: 16px 8px 4px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--nt-muted);
+ion-searchbar.nt-searchbar {
+  padding: var(--nt-space-2) var(--nt-space-4) 0;
+  --box-shadow: none;
+  font-size: var(--nt-fs-headline);
 }
 
-// Kompakte Reihe weiterer Quellen unter der Suche
+// Quellen-Kacheln (Barcode / Etikett / Rezept / Eigene / Mahlzeiten / Manuell)
 .sources {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin: 4px 8px 8px;
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  gap: var(--nt-space-2);
+  margin: var(--nt-space-4) var(--nt-space-4) var(--nt-space-1);
 }
 
 .source-btn {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 44px;
-  padding: 0 8px;
-  background: var(--nt-surface-2);
-  border: 1px solid var(--nt-border);
-  border-radius: var(--nt-radius-sm);
-  color: $accent;
-  font-size: 14px;
+  gap: 4px;
+  min-height: 64px;
+  padding: var(--nt-space-2);
+  background: var(--nt-card);
+  border: 0;
+  border-radius: var(--nt-radius-tile);
+  color: var(--nt-accent);
+  font: inherit;
+  font-size: var(--nt-fs-caption);
   font-weight: 600;
   cursor: pointer;
   transition: opacity 150ms ease-out;
@@ -161,8 +364,13 @@ ion-content {
   &:active { opacity: 0.7; }
   &:disabled { opacity: 0.5; }
 
+  &:focus-visible {
+    outline: 2px solid var(--nt-focus);
+    outline-offset: 2px;
+  }
+
   ion-icon {
-    font-size: 18px;
+    font-size: 24px;
   }
 }
 
@@ -174,132 +382,126 @@ ion-content {
   &__main {
     display: flex;
     flex: 1;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-    min-height: 48px;
-    padding: 8px 8px 8px 16px;
+    align-items: center;
+    gap: var(--nt-space-3);
+    min-height: 56px;
+    padding: var(--nt-space-2) var(--nt-space-2) var(--nt-space-2) var(--nt-space-4);
     background: transparent;
     border: 0;
-    color: var(--ion-text-color);
+    color: var(--nt-ink);
+    font: inherit;
     text-align: left;
     cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--nt-focus);
+      outline-offset: -2px;
+    }
+  }
+
+  &__text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
   }
 
   &__name {
-    font-size: 15px;
+    font-size: var(--nt-fs-headline);
     font-weight: 600;
   }
 
   &__meta {
-    font-size: 13px;
-    color: var(--nt-muted);
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
   }
 }
 
 .preview {
-  margin: 4px 8px 12px;
-  font-size: 14px;
-  color: var(--nt-muted);
+  margin: var(--nt-space-4) var(--nt-space-5) var(--nt-space-3);
+  font-size: var(--nt-fs-body);
+  color: var(--nt-secondary);
+  font-variant-numeric: tabular-nums;
 
   strong {
-    font-size: 20px;
-    color: var(--ion-text-color);
+    font-size: var(--nt-fs-title);
+    color: var(--nt-kcal);
   }
 }
 
 .adjust {
-  padding-bottom: 8px;
+  padding-bottom: var(--nt-space-2);
 }
 
 .add-footer ion-toolbar {
-  --padding-start: 16px;
-  --padding-end: 16px;
-  --padding-top: 8px;
-  --padding-bottom: 8px;
+  --background: var(--nt-ground);
+  --padding-start: var(--nt-space-4);
+  --padding-end: var(--nt-space-4);
+  --padding-top: var(--nt-space-2);
+  --padding-bottom: var(--nt-space-2);
+}
+
+.add-footer__save {
+  --border-radius: var(--nt-radius-pill);
+  min-height: var(--nt-touch);
+  font-weight: 600;
 }
 
 .scan-hint {
-  margin: 8px 12px 0;
-  font-size: 12px;
-  color: var(--nt-muted);
-}
-
-.search-results {
-  max-height: 320px;
-  overflow-y: auto;
-}
-
-.ff-btn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: calc(100% - 24px);
-  min-height: 48px;
-  margin: 8px 12px 4px;
-  padding: 12px 16px;
-  background: var(--nt-surface-2, rgba(255, 255, 255, 0.06));
-  border: 1.5px solid var(--nt-border);
-  border-radius: var(--nt-radius-sm, 12px);
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-  text-align: left;
-
-  ion-icon:first-child {
-    font-size: 20px;
-    flex-shrink: 0;
-    color: $accent;
-  }
-
-  &__text {
-    flex: 1;
-    color: $accent;
-  }
-
-  &__hint {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--nt-muted);
-  }
-
-  &__arrow {
-    font-size: 16px;
-    color: var(--nt-muted);
-    flex-shrink: 0;
-  }
+  margin: var(--nt-space-2) var(--nt-space-5) 0;
+  font-size: var(--nt-fs-caption);
+  color: var(--nt-secondary);
 }
 
 .ff-remaining {
-  margin: 0 12px;
-  font-size: 15px;
-  color: var(--ion-text-color);
+  margin: 0 var(--nt-space-5);
+  font-size: var(--nt-fs-body);
+  color: var(--nt-ink);
 }
 
 .ff-card {
-  margin: 12px 0;
+  margin: var(--nt-space-3) var(--nt-space-4);
+  background: var(--nt-card);
+  border-radius: var(--nt-radius-card);
+  box-shadow: none;
 
   ion-card-header {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 4px;
+    gap: var(--nt-space-1);
+  }
+
+  ion-card-title {
+    color: var(--nt-ink);
+    font-size: var(--nt-fs-headline);
+  }
+
+  ion-card-subtitle {
+    color: var(--nt-secondary);
+    text-transform: none;
   }
 
   p {
     margin: 0 0 6px;
-    font-size: 13px;
-    color: var(--nt-muted);
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
   }
 }
 
-// Platz unter der Liste, damit der FAB weder "+" noch kcal-Werte verdeckt
-// (FAB 56px + 16px Rand + Luft).
-.content-spacer {
-  height: 112px;
+.data-credit {
+  margin: var(--nt-space-3) var(--nt-space-5) 0;
+  font-size: var(--nt-fs-caption);
+  color: var(--nt-secondary);
+
+  a {
+    color: var(--nt-accent);
+  }
 }
 
-// FAB-Speed-Dial: Ziele >= 44px
-ion-fab-list ion-fab-button {
-  --size: 48px;
+@media (prefers-reduced-motion: reduce) {
+  .source-btn {
+    transition: none;
+  }
 }

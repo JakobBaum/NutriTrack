@@ -6,7 +6,8 @@
     <ion-button expand="block" (click)="openCreate()">Erste Mahlzeit anlegen</ion-button>
   </div>
 } @else {
-  <ion-list inset="true" lines="full">
+  <h2 class="nt-section-header">Gespeicherte Mahlzeiten</h2>
+  <ion-list class="nt-grouped" lines="none">
     @for (meal of meals(); track meal.id) {
       <ion-item-sliding>
         <ion-item>
@@ -58,7 +59,7 @@
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
-      <ion-item>
+      <ion-item class="name-item">
         <ion-input
           label="Name der Mahlzeit"
           labelPlacement="stacked"
@@ -67,10 +68,10 @@
         ></ion-input>
       </ion-item>
 
-      <h2 class="section-sub">Zutaten &amp; Komponenten</h2>
+      <h2 class="section-sub nt-section-header">Zutaten &amp; Komponenten</h2>
 
       @if (draftEntries.length > 0) {
-        <ion-list lines="none">
+        <ion-list class="nt-grouped" lines="none">
           @for (entry of draftEntries; track entry.label; let i = $index) {
             <ion-item>
               <ion-label>
@@ -93,8 +94,8 @@
         </ion-button>
 
         @if (recipes().length > 0) {
-          <h2 class="section-sub">Rezept hinzufügen</h2>
-          <ion-list lines="none" class="recipe-pick">
+          <h2 class="section-sub nt-section-header">Rezept hinzufügen</h2>
+          <ion-list lines="none" class="recipe-pick nt-grouped">
             @for (recipe of recipes(); track recipe.id) {
               @if (recipe.factsPerServing) {
                 <ion-item button (click)="addRecipeToDraft(recipe)">
@@ -135,7 +136,7 @@
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
-      <ion-searchbar
+      <ion-searchbar class="nt-searchbar"
         [(ngModel)]="pickerQuery"
         placeholder="Lebensmittel suchen"
         (ionInput)="searchFood()"
@@ -147,7 +148,7 @@
       @if (pickerError()) {
         <p class="picker-error">{{ pickerError() }}</p>
       }
-      <ion-list lines="full">
+      <ion-list class="nt-grouped" lines="none">
         @for (item of pickerResults(); track item.id) {
           <ion-item button (click)="pickFood(item)">
             <ion-label>

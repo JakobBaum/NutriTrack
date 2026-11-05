@@ -1,10 +1,63 @@
+// Schwebende Kapsel-Tab-Bar (S1): links/rechts 16, unten Safe-Area + 8, Hoehe 64.
+ion-tab-bar {
+  position: absolute;
+  left: var(--nt-tabbar-inset);
+  right: var(--nt-tabbar-inset);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+  height: var(--nt-tabbar-height);
+  padding: 6px;
+  box-sizing: border-box;
+  contain: none;
+  border-radius: calc(var(--nt-tabbar-height) / 2);
+  background: var(--nt-tabbar-bg);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  box-shadow:
+    0 0 0 0.5px var(--nt-tabbar-ring),
+    var(--nt-shadow-float);
+  --background: transparent;
+  --border: 0;
+}
+
 ion-tab-button {
+  --color: var(--nt-tab-inactive);
+  --color-selected: var(--nt-accent);
+  --background-focused: transparent;
+  --ripple-color: transparent;
+  --padding-start: 2px;
+  --padding-end: 2px;
+  border-radius: calc((var(--nt-tabbar-height) - 12px) / 2);
+  min-width: var(--nt-touch);
+  transition: background-color 150ms ease;
+
   ion-icon {
     font-size: 22px;
   }
 
   ion-label {
-    font-size: 11px;
+    // 12 px: "Tagebuch" passt so auch bei 375 px Breite ohne Abschneiden.
+    font-size: 12px;
     font-weight: 600;
+    letter-spacing: 0;
+    white-space: nowrap;
+    overflow: visible;
+  }
+
+  // Aktiver Tab: weisse Pille mit Akzent-Text
+  &.tab-selected {
+    background: var(--nt-card);
+    box-shadow: 0 1px 3px rgba(28, 28, 30, 0.12);
+  }
+}
+
+@media (max-width: 360px) {
+  ion-tab-button ion-label {
+    font-size: 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ion-tab-button {
+    transition: none;
   }
 }

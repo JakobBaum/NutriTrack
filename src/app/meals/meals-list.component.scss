@@ -15,9 +15,9 @@
     color: var(--nt-muted);
   }
 
-  h2 { margin: 8px 0 0; font-weight: 800; }
+  h2 { margin: 8px 0 0; font-size: var(--nt-fs-title); font-weight: 700; color: var(--nt-ink); }
   p { margin: 0 0 12px; color: var(--nt-muted); }
-  ion-button { width: 100%; max-width: 320px; }
+  ion-button { width: 100%; max-width: 320px; --border-radius: var(--nt-radius-pill); min-height: var(--nt-touch); }
 }
 
 .icon-btn {
@@ -28,21 +28,53 @@
   --padding-end: 0;
 }
 
+// Abschnittskopf: globale .nt-section-header, im Sheet ohne extra Einzug (Content hat Padding)
 .section-sub {
-  margin: 16px 4px 8px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--nt-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  margin: var(--nt-space-5) var(--nt-space-1) var(--nt-space-2);
+}
+
+.nt-grouped {
+  // Sheet-Inhalt hat bereits Padding; Liste auf der Seite behaelt den globalen Einzug
+  ion-item-sliding {
+    display: block;
+    padding: 0;
+    min-height: 0;
+
+    &::after {
+      display: none;
+    }
+  }
+
+  ion-item {
+    --inner-border-width: 0 0 0.5px 0;
+    --inner-border-color: var(--nt-separator);
+  }
+
+  ion-item-sliding:last-child ion-item,
+  ion-item:last-child {
+    --inner-border-width: 0;
+  }
+}
+
+ion-modal .nt-grouped {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.name-item {
+  --background: var(--nt-card);
+  --min-height: 56px;
+  border-radius: var(--nt-radius-card);
+  overflow: hidden;
 }
 
 .draft-total {
   text-align: right;
   font-size: 13px;
-  font-weight: 700;
-  color: var(--nt-muted);
-  margin: 4px 4px 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--nt-secondary);
+  margin: var(--nt-space-2) var(--nt-space-1) var(--nt-space-3);
 }
 
 .add-btns {
@@ -50,9 +82,7 @@
 }
 
 .recipe-pick {
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--nt-surface);
+  background: var(--nt-card);
 }
 
 .picker-error {

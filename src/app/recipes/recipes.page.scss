@@ -1,3 +1,19 @@
+ion-header ion-toolbar.view-bar {
+  --background: var(--nt-ground);
+  --padding-start: var(--nt-space-4);
+  --padding-end: var(--nt-space-4);
+  --border-width: 0;
+}
+
+.page-head {
+  padding: calc(var(--nt-space-4) + env(safe-area-inset-top, 0px)) var(--nt-space-5) var(--nt-space-2);
+  background: var(--nt-ground);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nt-space-3);
+}
+
 ion-segment {
   min-height: 44px;
 }
@@ -7,9 +23,24 @@ ion-segment-button {
 }
 
 ion-content {
-  --padding-start: 12px;
-  --padding-end: 12px;
-  --padding-top: 8px;
+  --background: var(--nt-ground);
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: var(--nt-space-2);
+}
+
+// Modals: Felder als inset gruppierte Karten
+ion-modal ion-list[inset='true'] {
+  margin: 0 0 var(--nt-space-2);
+  border-radius: var(--nt-radius-card);
+  background: var(--nt-card);
+  overflow: hidden;
+}
+
+ion-modal ion-item {
+  --background: var(--nt-card);
+  --min-height: 44px;
+  --inner-border-color: var(--nt-separator);
 }
 
 .empty {
@@ -32,56 +63,66 @@ ion-content {
 }
 
 .recipe {
-  margin: 10px 0;
+  margin: 0 var(--nt-space-4) var(--nt-space-3);
+  padding: var(--nt-space-4);
+
+  &__title {
+    margin: 0 0 var(--nt-space-3);
+    font-size: var(--nt-fs-headline);
+    font-weight: 600;
+    color: var(--nt-ink);
+  }
 
   &__macros {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
-    gap: 4px;
-    margin-bottom: 4px;
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: var(--nt-space-2);
+    margin-bottom: var(--nt-space-1);
   }
 
   &__macro {
     display: flex;
     flex-direction: column;
     align-items: center;
-    background: var(--nt-surface-2);
-    border-radius: 8px;
-    padding: 6px 2px;
+    background: var(--nt-ground);
+    border-radius: 12px;
+    padding: var(--nt-space-2) 2px;
 
     strong {
-      font-size: 14px;
-      font-weight: 700;
-      color: var(--ion-text-color);
+      font-size: var(--nt-fs-body);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--nt-ink);
     }
 
     span {
-      font-size: 10px;
-      color: var(--nt-muted);
+      font-size: 11px;
+      color: var(--nt-secondary);
       margin-top: 1px;
     }
   }
 
   &__meta {
-    margin: 6px 0 0;
-    font-size: 13px;
-    color: var(--nt-muted);
+    margin: var(--nt-space-2) 0 0;
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
   }
 
   &__missing {
     display: flex;
     align-items: center;
     gap: 4px;
-    margin: 4px 0 0;
-    font-size: 13px;
-    color: var(--nt-muted);
+    margin: var(--nt-space-1) 0 0;
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
   }
 
   &__actions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 2px;
-    margin-top: 6px;
+    gap: var(--nt-space-2);
+    margin-top: var(--nt-space-3);
 
     ion-button {
       height: 44px;
@@ -89,11 +130,25 @@ ion-content {
     }
   }
 
+  &__btn {
+    --border-radius: var(--nt-radius-pill);
+    --background: var(--nt-accent);
+    --color: var(--nt-on-accent);
+    --box-shadow: none;
+    font-weight: 600;
+
+    &--tint {
+      --background: var(--nt-accent-tint);
+      --color: var(--nt-accent);
+    }
+  }
+
   &__icon-btn {
     min-width: 44px;
+    --border-radius: var(--nt-radius-pill);
 
     &--first {
-      margin-inline-start: auto;
+      margin-inline-start: auto !important;
     }
   }
 }
@@ -103,19 +158,34 @@ ion-content {
   font-weight: 600;
 }
 
-// Abschnitts-Label (uppercase, gedämpft) — wie in der Referenz
+// Abschnitts-Label: globale .nt-section-header, hier nur kompakter Abstand im Sheet
 .field-label {
   display: block;
-  margin: 18px 6px 6px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--nt-muted);
+  margin: var(--nt-space-5) var(--nt-space-1) 6px;
+  font-size: var(--nt-fs-caption);
+  font-weight: 400;
 }
 
 // Gestrichelte Aktions-Buttons: "Rezept importieren", "+ Zutat/Schritt hinzufügen"
-.import-cta,
+.import-group {
+  margin-bottom: var(--nt-space-3);
+
+  .import-cta {
+    width: 100%;
+    background: transparent;
+    border: 0;
+    color: var(--nt-accent);
+    font-size: var(--nt-fs-headline);
+    font-weight: 400;
+    text-align: left;
+    cursor: pointer;
+
+    ion-icon:not(.nt-grouped__chevron) {
+      font-size: 22px;
+    }
+  }
+}
+
 .dashed-add {
   display: flex;
   align-items: center;
@@ -124,28 +194,19 @@ ion-content {
   width: 100%;
   min-height: 44px;
   padding: 14px;
-  margin: 8px 0 4px;
-  background: transparent;
-  border: 1.5px dashed var(--nt-border);
-  border-radius: var(--nt-radius-sm);
-  color: var(--nt-text-accent);
-  font-size: 15px;
-  font-weight: 700;
+  margin: var(--nt-space-2) 0 4px;
+  background: var(--nt-accent-tint);
+  border: 0;
+  border-radius: var(--nt-radius-pill);
+  color: var(--nt-accent);
+  font-size: var(--nt-fs-body);
+  font-weight: 600;
   cursor: pointer;
 
   ion-icon {
     font-size: 18px;
   }
 
-  &--accent {
-    border-color: var(--nt-text-accent);
-  }
-}
-
-.import-cta {
-  margin: 4px 0 10px;
-  background: var(--nt-surface-2);
-  border-color: var(--nt-text-accent);
 }
 
 // Editierbarer Zutatname (ersetzt die frühere read-only Überschrift)
@@ -201,11 +262,10 @@ ion-content {
 
 // Live-Nährwertkarte
 .nutri-card {
-  margin: 14px 2px 4px;
-  padding: 14px 16px;
-  background: var(--nt-surface);
-  border: 1px solid var(--nt-border);
-  border-radius: var(--nt-radius);
+  margin: var(--nt-space-4) 0 var(--nt-space-1);
+  padding: var(--nt-space-4);
+  background: var(--nt-card);
+  border-radius: var(--nt-radius-card);
 
   &__head {
     display: flex;

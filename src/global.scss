@@ -265,12 +265,12 @@ input[type='number'] {
 
 // Browser-Oberflächen in der App-Farbe statt Browser-Standard.
 ::selection {
-  background: rgba(56, 189, 248, 0.28);
+  background: rgba(11, 122, 85, 0.22);
 }
 
 input,
 textarea {
-  caret-color: var(--ion-color-primary-shade);
+  caret-color: var(--nt-accent);
 }
 
 :focus-visible {
@@ -279,7 +279,7 @@ textarea {
 }
 
 // ODbL-Quellenangabe unter Suchtreffern (Pflicht bei Nutzung der Open-Food-Facts-Daten).
-// Text --nt-muted (6.0:1 auf #f4f8fc), Link --nt-text-accent (5.6:1) + Unterstreichung.
+// Text --nt-muted (5.5:1 auf #f7f5f1), Link --nt-text-accent (4.8:1) + Unterstreichung.
 .data-credit {
   margin: -4px 20px 12px;
   font-size: 12px;
@@ -292,7 +292,7 @@ textarea {
   }
 }
 
-/* --- Primäre Buttons: vollflächiges Akzent-Blau, weißer Text (5.9:1), kein Verlauf/Glow --- */
+/* --- Primäre Buttons: vollflächiges Akzent-Teal, weißer Text (5.2:1), kein Verlauf/Glow --- */
 // „Primär“ = ohne color-Attribut, color="primary" oder .ion-color-primary.
 // Toolbar-Buttons (ion-buttons) bleiben Text-Buttons und werden unten behandelt.
 ion-button:not([fill='outline']):not([fill='clear']):not(ion-buttons ion-button):is(
@@ -300,21 +300,22 @@ ion-button:not([fill='outline']):not([fill='clear']):not(ion-buttons ion-button)
     [color='primary'],
     .ion-color-primary
   ) {
-  --background: var(--nt-text-accent);
-  --background-activated: #075985;
-  --background-hover: #075985;
-  --background-focused: #075985;
+  --background: var(--nt-accent);
+  --background-activated: var(--ion-color-primary-shade);
+  --background-hover: var(--ion-color-primary-shade);
+  --background-focused: var(--ion-color-primary-shade);
   --color: #ffffff;
-  --box-shadow: 0 2px 6px rgba(3, 105, 161, 0.22);
+  --box-shadow: none;
+  font-weight: 600;
 
   // Mit color-Attribut setzt Ionic den Hintergrund im Shadow-DOM aus --ion-color-base.
   &::part(native) {
-    background: var(--nt-text-accent);
+    background: var(--nt-accent);
     color: #ffffff;
   }
 }
 
-// Outline/Clear in Primär: Text und Rahmen in Akzent-Blau (5.9:1 auf Weiß).
+// Outline/Clear in Primär: Text und Rahmen in Akzent-Teal (5.2:1 auf Weiß).
 ion-button:is([fill='outline'], [fill='clear']):is(:not([color]), [color='primary'], .ion-color-primary),
 ion-buttons ion-button:not([fill='solid']):is(:not([color]), [color='primary'], .ion-color-primary) {
   --color: var(--nt-text-accent);
@@ -352,13 +353,13 @@ ion-tab-button.ion-focused::part(native) {
 }
 
 /* --- Wiederverwendbare Bausteine --- */
-// Kennzeichnung geschätzter Werte (KI, Preise): 5.2:1 (#0369a1 auf #e0f2fe).
+// Kennzeichnung geschätzter Werte (KI, Preise): 5.4:1 (dunkler Akzent auf Tint).
 .ai-badge {
   display: inline-block;
   padding: 2px 8px;
   border-radius: 999px;
-  background: #e0f2fe;
-  color: #0369a1;
+  background: var(--nt-accent-tint);
+  color: var(--ion-color-primary-shade);
   font-size: 12px;
   font-weight: 600;
   line-height: 1.4;
@@ -398,4 +399,210 @@ ion-tab-button.ion-focused::part(native) {
 // Der dunkle Material-Toast behält das helle Primär (7:1).
 ion-toast.ios {
   --button-color: var(--nt-text-accent);
+}
+
+
+/* =========================================================================
+ * S1 "Sanft iOS" - wiederverwendbare iOS-Muster (siehe DESIGN.md)
+ * ========================================================================= */
+
+// Inset-gruppierte Karte: weisse Flaeche, Radius 20, Zeilen >= 44 px, 0.5px Trenner (inset).
+.nt-grouped {
+  margin: 0 var(--nt-space-4);
+  padding: 0;
+  list-style: none;
+  background: var(--nt-card);
+  border-radius: var(--nt-radius-card);
+  overflow: hidden;
+
+  > * {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--nt-space-2);
+    min-height: var(--nt-grouped-row-min);
+    padding: 0 var(--nt-space-4);
+    box-sizing: border-box;
+  }
+
+  > *:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: var(--nt-space-4);
+    right: 0;
+    bottom: 0;
+    height: var(--nt-hairline);
+    background: var(--nt-separator);
+  }
+
+  // Ionic-Items in der Gruppe: gleiche Optik
+  ion-item {
+    --background: transparent;
+    --inner-border-width: 0 0 0.5px 0;
+    --inner-border-color: var(--nt-separator);
+    --min-height: var(--nt-grouped-row-min);
+    --padding-start: var(--nt-space-4);
+    --inner-padding-end: var(--nt-space-4);
+    display: block;
+    padding: 0;
+    &::after {
+      display: none;
+    }
+    &:last-child {
+      --inner-border-width: 0;
+    }
+  }
+}
+
+.nt-grouped__chevron {
+  margin-left: auto;
+  flex: none;
+  color: var(--nt-secondary);
+  font-size: 14px;
+}
+
+// Abschnittskopf ueber einer Gruppe: 13 px, Grossbuchstaben, secondary.
+.nt-section-header {
+  margin: var(--nt-space-6) calc(var(--nt-space-4) + var(--nt-space-5)) var(--nt-space-2);
+  font-size: var(--nt-fs-caption);
+  font-weight: 400;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--nt-secondary);
+}
+
+.nt-large-title {
+  margin: 0;
+  font-size: var(--nt-fs-large-title);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--nt-ink);
+}
+
+.nt-subtitle {
+  margin: 2px 0 0;
+  font-size: var(--nt-fs-body);
+  color: var(--nt-secondary);
+}
+
+// Karte (freistehend)
+.nt-card {
+  margin: 0 var(--nt-space-4);
+  padding: var(--nt-space-5);
+  background: var(--nt-card);
+  border-radius: var(--nt-radius-card);
+  box-sizing: border-box;
+}
+
+// Pills: Hoehe 44 px, Radius = Hoehe/2
+.nt-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--nt-touch);
+  padding: 0 18px;
+  border: 0;
+  border-radius: var(--nt-radius-pill);
+  background: var(--nt-accent);
+  color: var(--nt-on-accent);
+  font: inherit;
+  font-size: var(--nt-fs-headline);
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+
+  &:active {
+    opacity: 0.8;
+  }
+
+  &--secondary,
+  &.nt-pill--secondary {
+    background: var(--nt-accent-tint);
+    color: var(--ion-color-primary-shade); // 5.4:1 auf Tint
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--nt-focus);
+    outline-offset: 2px;
+  }
+}
+
+// Eingabefelder im iOS-Stil: Radius 12, Fokus mit Akzent-Ring
+.nt-input,
+ion-searchbar.nt-searchbar {
+  --border-radius: var(--nt-radius-input);
+  --background: var(--nt-track);
+  --box-shadow: none;
+  --color: var(--nt-ink);
+  --placeholder-color: var(--nt-secondary);
+  --placeholder-opacity: 1;
+}
+
+.nt-input:focus-within,
+ion-searchbar.nt-searchbar.searchbar-has-focus {
+  --box-shadow: 0 0 0 2px var(--nt-accent);
+}
+
+// Sheet-Modals (ion-modal ohne Fullscreen-Klassen): Radius 28 oben, Grabber
+ion-modal:not(.barcode-fullscreen-modal):not(.cook-fullscreen-modal) {
+  --border-radius: var(--nt-radius-sheet) var(--nt-radius-sheet) 0 0;
+  --background: var(--nt-ground);
+  --box-shadow: var(--nt-shadow-float);
+
+  &::part(handle) {
+    width: 36px;
+    height: 5px;
+    margin-top: 6px;
+    border-radius: 3px;
+    background: #c7c7cc;
+    opacity: 1;
+  }
+}
+
+// Segment (iOS): graue Spur, Radius 9, aktiver Reiter weiss (Radius 7, kleiner Schatten), 44 px, keine Grossbuchstaben
+ion-segment {
+  --background: rgba(118, 118, 128, 0.12);
+  min-height: var(--nt-touch);
+  padding: 2px;
+  border-radius: 9px;
+}
+
+ion-segment-button {
+  --color: var(--nt-ink);
+  --color-checked: var(--nt-ink);
+  --indicator-color: #ffffff;
+  --indicator-box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 0.5px 1px rgba(0, 0, 0, 0.08);
+  --border-radius: 7px;
+  min-height: var(--nt-touch);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+ion-segment-button.segment-button-checked {
+  font-weight: 600;
+}
+
+// iOS-Schreibweise: keine Grossbuchstaben auf Buttons (Material-Default abschalten)
+ion-button {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+ion-segment-button.ion-focused::part(native) {
+  outline: 2px solid var(--nt-focus);
+  outline-offset: -2px;
+}
+
+// Ionic-Controls: Tastaturfokus sichtbar
+ion-input.has-focus,
+ion-textarea.has-focus,
+ion-select:focus-within {
+  --highlight-color-focused: var(--nt-accent);
+}
+
+// Inhalt in den Tabs bekommt Platz unter der schwebenden Kapsel-Bar.
+ion-tabs ion-content {
+  --padding-bottom: calc(var(--nt-tabbar-height) + 24px + env(safe-area-inset-bottom, 0px));
 }

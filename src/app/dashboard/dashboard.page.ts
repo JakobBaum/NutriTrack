@@ -7,9 +7,11 @@ import { addDaysISO, dayLabel, toDateISO } from '../core/util/date';
 import { MEAL_DEFS, mealForHour, mealLabel } from '../diary/diary-helpers';
 
 interface MacroView {
-  key: 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar';
+  key: 'kcal' | 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar';
   label: string;
+  unit: string;
   color: string;
+  track: string;
   eaten: number;
   target: number;
 }
@@ -36,7 +38,7 @@ interface MealView {
 }
 
 /**
- * Tages-Dashboard ("Heute"): großer Kalorienring + Makro-Grid + Mahlzeiten.
+ * Tages-Dashboard ("Heute"): Kalorien-Hero + sechs Nährwertringe + Mahlzeiten.
  * Liest Ziel (ProfileStore) und Verzehr (DiaryStore) reaktiv über Signals.
  */
 @Component({
@@ -54,6 +56,12 @@ export class DashboardPage {
   readonly selectedDate = signal(toDateISO());
   readonly dateLabel = computed(() => dayLabel(this.selectedDate()));
   readonly isToday = computed(() => this.selectedDate() === toDateISO());
+  /** Ausgeschriebenes Datum fuer die Navigationsleiste, z.B. "Donnerstag, 5. November". */
+  readonly fullDate = computed(() =>
+    new Intl.DateTimeFormat('de-AT', { weekday: 'long', day: 'numeric', month: 'long' }).format(
+      new Date(`${this.selectedDate()}T12:00:00`),
+    ),
+  );
 
   readonly hasProfile = this.profileStore.hasProfile;
   readonly target = this.profileStore.target;
@@ -72,11 +80,12 @@ export class DashboardPage {
     const e = this.totals();
     if (!t) return [];
     return [
-      { key: 'protein', label: 'Eiweiß', color: 'var(--nt-protein)', eaten: Math.round(e.proteinG), target: t.proteinG },
-      { key: 'carbs', label: 'Kohlenh.', color: 'var(--nt-carbs)', eaten: Math.round(e.carbsG), target: t.carbsG },
-      { key: 'fat', label: 'Fett', color: 'var(--nt-fat)', eaten: Math.round(e.fatG), target: t.fatG },
-      { key: 'fiber', label: 'Ballastst.', color: 'var(--nt-fiber)', eaten: Math.round(e.fiberG), target: t.fiberG },
-      { key: 'sugar', label: 'Zucker', color: 'var(--nt-sugar)', eaten: Math.round(e.sugarG), target: t.sugarG },
+      { key: 'kcal', label: 'Kalorien', unit: 'kcal', color: 'var(--nt-kcal)', track: 'var(--nt-track)', eaten: Math.round(e.kcal), target: t.kcal },
+      { key: 'protein', label: 'Eiweiß', unit: 'g', color: 'var(--nt-protein)', track: 'var(--nt-track)', eaten: Math.round(e.proteinG), target: t.proteinG },
+      { key: 'carbs', label: 'Kohlenhydrate', unit: 'g', color: 'var(--nt-carbs)', track: 'var(--nt-track)', eaten: Math.round(e.carbsG), target: t.carbsG },
+      { key: 'fat', label: 'Fett', unit: 'g', color: 'var(--nt-fat)', track: 'var(--nt-track)', eaten: Math.round(e.fatG), target: t.fatG },
+      { key: 'fiber', label: 'Ballaststoffe', unit: 'g', color: 'var(--nt-fiber)', track: 'var(--nt-track)', eaten: Math.round(e.fiberG), target: t.fiberG },
+      { key: 'sugar', label: 'Zucker', unit: 'g', color: 'var(--nt-sugar)', track: 'var(--nt-track)', eaten: Math.round(e.sugarG), target: t.sugarG },
     ];
   });
 

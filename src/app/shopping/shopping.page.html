@@ -95,7 +95,7 @@
       </div>
     }
 
-    <ion-list inset="true" lines="full">
+    <ion-list class="nt-grouped" lines="full">
       @for (item of l.items; track $index) {
         <ion-item-sliding>
           <ion-item class="check-row" detail="false" lines="full">
@@ -128,8 +128,8 @@
       }
     </ion-list>
 
-    <h2 class="form-sub">Position hinzufügen</h2>
-    <ion-list inset="true">
+    <h2 class="nt-section-header">Position hinzufügen</h2>
+    <ion-list class="nt-grouped">
       <ion-item>
         <ion-input class="add-name" [(ngModel)]="newItemName" placeholder="Artikel" aria-label="Artikel"></ion-input>
         <ion-input class="add-amount" type="number" inputmode="decimal" [(ngModel)]="newItemAmount" placeholder="Menge" aria-label="Menge"></ion-input>

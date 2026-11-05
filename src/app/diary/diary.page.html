@@ -1,22 +1,26 @@
-<ion-header class="ion-no-border">
-  <ion-toolbar>
-    <ion-title role="heading" aria-level="1">Tagebuch</ion-title>
-  </ion-toolbar>
-  <ion-toolbar>
-    <div class="date-nav">
-      <ion-button fill="clear" class="touch-btn" (click)="prevDay()" aria-label="Vorheriger Tag">
-        <ion-icon slot="icon-only" name="chevron-back-outline"></ion-icon>
-      </ion-button>
-      <span class="date-nav__label" aria-live="polite">{{ dateLabel() }}</span>
-      <ion-button fill="clear" class="touch-btn" (click)="nextDay()" [disabled]="isToday()" aria-label="Nächster Tag">
-        <ion-icon slot="icon-only" name="chevron-forward-outline"></ion-icon>
-      </ion-button>
-    </div>
-  </ion-toolbar>
+<ion-header class="ion-no-border page-header">
+  <ion-toolbar></ion-toolbar>
 </ion-header>
 
 <ion-content>
-  <div class="summary">
+  <div class="page-head">
+    <h1 class="nt-large-title">Tagebuch</h1>
+    <button type="button" class="nt-pill page-head__add" (click)="openAdd()" aria-label="Eintrag hinzufügen">
+      <ion-icon name="add" aria-hidden="true"></ion-icon> Eintragen
+    </button>
+  </div>
+
+  <div class="date-nav">
+    <ion-button fill="clear" class="touch-btn" (click)="prevDay()" aria-label="Vorheriger Tag">
+      <ion-icon slot="icon-only" name="chevron-back-outline"></ion-icon>
+    </ion-button>
+    <span class="date-nav__label" aria-live="polite">{{ dateLabel() }}</span>
+    <ion-button fill="clear" class="touch-btn" (click)="nextDay()" [disabled]="isToday()" aria-label="Nächster Tag">
+      <ion-icon slot="icon-only" name="chevron-forward-outline"></ion-icon>
+    </ion-button>
+  </div>
+
+  <div class="summary nt-card">
     <span class="summary__kcal">{{ totalKcal() | ntNum:0 }}</span>
     <span class="summary__unit">kcal gegessen</span>
     @if (overKcal() > 0) {
@@ -26,33 +30,35 @@
     }
   </div>
 
-  <button type="button" class="ff-btn" (click)="openFastfood()">
-    <ion-icon name="fast-food-outline"></ion-icon>
-    <span class="ff-btn__text">Fastfood-Helfer</span>
-    @if (remainingKcal() > 0) {
-      <span class="ff-btn__hint">{{ remainingKcal() | ntNum:0 }} kcal übrig</span>
-    }
-    <ion-icon name="chevron-forward-outline" class="ff-btn__arrow"></ion-icon>
-  </button>
+  <div class="diary-list diary-list--spaced">
+    <button type="button" class="ff-btn" (click)="openFastfood()">
+      <span class="tint-circle" aria-hidden="true"><ion-icon name="fast-food-outline"></ion-icon></span>
+      <span class="ff-btn__text">Fastfood-Helfer</span>
+      @if (remainingKcal() > 0) {
+        <span class="ff-btn__hint">{{ remainingKcal() | ntNum:0 }} kcal übrig</span>
+      }
+      <ion-icon name="chevron-forward-outline" class="ff-btn__arrow" aria-hidden="true"></ion-icon>
+    </button>
+  </div>
 
   @for (group of groups(); track group.type) {
     <section class="meal">
       <div class="meal__head">
-        <ion-icon [name]="group.icon" class="meal__icon"></ion-icon>
-        <h2 class="meal__label">{{ group.label }}</h2>
+        <ion-icon [name]="group.icon" class="meal__icon" aria-hidden="true"></ion-icon>
+        <h2 class="meal__label nt-section-header">{{ group.label }}</h2>
         <span class="meal__kcal">{{ group.kcal | ntNum:0 }} kcal</span>
-        <ion-button fill="clear" class="touch-btn" (click)="openAdd(group.type)" [attr.aria-label]="'Zu ' + group.label + ' hinzufügen'">
+        <ion-button fill="clear" class="touch-btn meal__add" (click)="openAdd(group.type)" [attr.aria-label]="'Zu ' + group.label + ' hinzufügen'">
           <ion-icon slot="icon-only" name="add-circle-outline"></ion-icon>
         </ion-button>
       </div>
 
       @if (group.entries.length === 0) {
-        <p class="meal__empty">Noch nichts erfasst.</p>
+        <div class="diary-list"><p class="meal__empty">Noch nichts erfasst.</p></div>
       } @else {
-        <ion-list inset="true" lines="full">
+        <ion-list class="diary-list" lines="none">
           @for (entry of group.entries; track entry.id) {
             <ion-item-sliding>
-              <ion-item button detail="false" (click)="openEdit(entry)">
+              <ion-item button detail="false" lines="none" (click)="openEdit(entry)">
                 <ion-label>
                   <h3>{{ entry.label }}</h3>
                   <p>
@@ -60,7 +66,7 @@
                     E {{ entry.facts.proteinG | ntNum }} g · KH {{ entry.facts.carbsG | ntNum }} g · F {{ entry.facts.fatG | ntNum }} g
                   </p>
                 </ion-label>
-                <ion-note slot="end">{{ entry.facts.kcal | ntNum:0 }} kcal</ion-note>
+                <ion-note slot="end" class="kcal-note">{{ entry.facts.kcal | ntNum:0 }} kcal</ion-note>
               </ion-item>
               <ion-item-options side="end">
                 <ion-item-option color="primary" (click)="openEdit(entry)" aria-label="Eintrag bearbeiten">
@@ -78,49 +84,33 @@
   }
 
   <div class="content-spacer"></div>
-
-  <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-    <ion-fab-button aria-label="Eintrag hinzufügen">
-      <ion-icon name="add"></ion-icon>
-    </ion-fab-button>
-    <ion-fab-list side="top">
-      <ion-fab-button color="medium" (click)="openAdd()" aria-label="Suchen" title="Suchen">
-        <ion-icon name="search-outline"></ion-icon>
-      </ion-fab-button>
-      <ion-fab-button color="medium" (click)="openAddManual()" aria-label="Manuell eintragen" title="Manuell eintragen">
-        <ion-icon name="create-outline"></ion-icon>
-      </ion-fab-button>
-      <ion-fab-button color="medium" (click)="openBarcode()" aria-label="Barcode scannen" title="Barcode scannen">
-        <ion-icon name="barcode-outline"></ion-icon>
-      </ion-fab-button>
-      <ion-fab-button color="medium" (click)="startLabelScan(labelInput)" aria-label="Etikett scannen" title="Etikett scannen">
-        <ion-icon name="image-outline"></ion-icon>
-      </ion-fab-button>
-    </ion-fab-list>
-  </ion-fab>
-  <input #labelInput type="file" accept="image/*" capture="environment" hidden (change)="onLabelFile($event)" />
 </ion-content>
 
 <!-- Add-entry modal: Suchen → Menge → Speichern -->
 <ion-modal [isOpen]="isModalOpen()" (didPresent)="focusSearch()" (didDismiss)="closeAdd()">
   <ng-template>
-    <ion-header class="ion-no-border">
+    <div class="sheet-grabber" aria-hidden="true"></div>
+    <ion-header class="ion-no-border sheet-header">
       <ion-toolbar>
-        @if (view() !== 'search') {
-          <ion-buttons slot="start">
+        <ion-buttons slot="start">
+          @if (view() !== 'search') {
             <ion-button (click)="backToSearch()" aria-label="Zurück zur Suche">
               <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
             </ion-button>
+          } @else {
+            <ion-button (click)="closeAdd()">Abbrechen</ion-button>
+          }
+        </ion-buttons>
+        <ion-title role="heading" aria-level="2">{{ modalTitle() }}</ion-title>
+        @if (view() !== 'search') {
+          <ion-buttons slot="end">
+            <ion-button (click)="closeAdd()">Abbrechen</ion-button>
           </ion-buttons>
         }
-        <ion-title role="heading" aria-level="2">{{ modalTitle() }}</ion-title>
-        <ion-buttons slot="end">
-          <ion-button (click)="closeAdd()">Schließen</ion-button>
-        </ion-buttons>
       </ion-toolbar>
     </ion-header>
 
-    <ion-content class="ion-padding">
+    <ion-content class="sheet-content">
       @if (error()) {
         <p class="form-error" role="alert">{{ error() }}</p>
       }
@@ -129,6 +119,7 @@
         @case ('search') {
           <ion-searchbar
             #searchbar
+            class="nt-searchbar"
             [ngModel]="searchQuery"
             (ngModelChange)="onSearchInput($event)"
             (keyup.enter)="searchFood()"
@@ -141,29 +132,29 @@
 
           <div class="sources" role="group" aria-label="Weitere Quellen">
             <button type="button" class="source-btn" (click)="openBarcode()">
-              <ion-icon name="barcode-outline"></ion-icon> Barcode
+              <ion-icon name="barcode-outline" aria-hidden="true"></ion-icon> <span>Barcode</span>
             </button>
             <button type="button" class="source-btn" (click)="startLabelScan(modalLabelInput)" [disabled]="scanning()">
-              @if (scanning()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="image-outline"></ion-icon> }
-              Etikett
+              @if (scanning()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="image-outline" aria-hidden="true"></ion-icon> }
+              <span>Etikett</span>
             </button>
             @if (hasLoggableRecipes()) {
               <button type="button" class="source-btn" (click)="showView('recipes')">
-                <ion-icon name="book-outline"></ion-icon> Rezept
+                <ion-icon name="book-outline" aria-hidden="true"></ion-icon> <span>Rezept</span>
               </button>
             }
             @if (hasCustomFoods()) {
               <button type="button" class="source-btn" (click)="showView('saved')">
-                <ion-icon name="bookmark-outline"></ion-icon> Eigene
+                <ion-icon name="bookmark-outline" aria-hidden="true"></ion-icon> <span>Eigene</span>
               </button>
             }
             @if (hasSavedMeals()) {
               <button type="button" class="source-btn" (click)="showView('meals')">
-                <ion-icon name="albums-outline"></ion-icon> Mahlzeiten
+                <ion-icon name="albums-outline" aria-hidden="true"></ion-icon> <span>Mahlzeiten</span>
               </button>
             }
             <button type="button" class="source-btn" (click)="openManualEntry()">
-              <ion-icon name="create-outline"></ion-icon> Manuell
+              <ion-icon name="create-outline" aria-hidden="true"></ion-icon> <span>Manuell</span>
             </button>
           </div>
           <input #modalLabelInput type="file" accept="image/*" capture="environment" hidden (change)="onLabelFile($event)" />
@@ -174,28 +165,33 @@
             }
             @if (searchHint()) { <p class="scan-hint" role="status">{{ searchHint() }}</p> }
             @if (searchResults().length) {
-              <ion-list inset="true" lines="full" class="search-results">
+              <h3 class="nt-section-header">Treffer</h3>
+              <ion-list class="diary-list" lines="none">
                 @for (item of searchResults(); track item.id) {
-                  <ion-item button detail="false" (click)="selectFood(item)">
+                  <ion-item button detail="false" lines="none" (click)="selectFood(item)">
                     <ion-label>
                       <h3>{{ item.name }}</h3>
                       <p>{{ item.brand }}@if (item.brand) { · }{{ item.facts.kcal | ntNum:0 }} kcal / 100 g</p>
                     </ion-label>
+                    <span slot="end" class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
                   </ion-item>
                 }
               </ion-list>
               <p class="data-credit">Daten: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL)</p>
             }
           } @else if (recentFoods().length || recentRecipes().length) {
-            <h3 class="form-sub">Zuletzt benutzt</h3>
-            <ion-list inset="true" lines="full">
+            <h3 class="nt-section-header">Zuletzt benutzt</h3>
+            <ion-list class="diary-list" lines="none">
               @for (entry of recentFoods(); track entry.id) {
-                <ion-item class="recent">
+                <ion-item class="recent" lines="none">
                   <button type="button" class="recent__main" (click)="quickAddRecent(entry)" [attr.aria-label]="entry.label + ' direkt hinzufügen'">
-                    <span class="recent__name">{{ entry.label }}</span>
-                    <span class="recent__meta">
-                      @if (entry.amountG) { {{ entry.amountG | ntNum }} g · }{{ entry.facts.kcal | ntNum:0 }} kcal
+                    <span class="recent__text">
+                      <span class="recent__name">{{ entry.label }}</span>
+                      <span class="recent__meta">
+                        @if (entry.amountG) { {{ entry.amountG | ntNum }} g · }{{ entry.facts.kcal | ntNum:0 }} kcal
+                      </span>
                     </span>
+                    <span class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
                   </button>
                   <ion-button slot="end" fill="clear" class="touch-btn" (click)="editRecent(entry)" [attr.aria-label]="entry.label + ' vor dem Speichern anpassen'">
                     <ion-icon slot="icon-only" name="create-outline"></ion-icon>
@@ -203,10 +199,13 @@
                 </ion-item>
               }
               @for (recipe of recentRecipes(); track recipe.id) {
-                <ion-item class="recent">
+                <ion-item class="recent" lines="none">
                   <button type="button" class="recent__main" (click)="quickAddRecipe(recipe)" [attr.aria-label]="recipe.title + ' direkt hinzufügen'">
-                    <span class="recent__name">{{ recipe.title }}</span>
-                    <span class="recent__meta">1 Portion · {{ recipe.factsPerServing?.kcal | ntNum:0 }} kcal</span>
+                    <span class="recent__text">
+                      <span class="recent__name">{{ recipe.title }}</span>
+                      <span class="recent__meta">1 Portion · {{ recipe.factsPerServing?.kcal | ntNum:0 }} kcal</span>
+                    </span>
+                    <span class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
                   </button>
                   <ion-button slot="end" fill="clear" class="touch-btn" (click)="selectRecipe(recipe)" [attr.aria-label]="recipe.title + ' vor dem Speichern anpassen'">
                     <ion-icon slot="icon-only" name="create-outline"></ion-icon>
@@ -220,6 +219,7 @@
 
         @case ('recipes') {
           <ion-searchbar
+            class="nt-searchbar"
             [ngModel]="recipeQuery()"
             (ngModelChange)="recipeQuery.set($event)"
             placeholder="Rezept suchen…"
@@ -227,9 +227,9 @@
             inputmode="search"
           ></ion-searchbar>
           @if (recipeOptions().length) {
-            <ion-list inset="true" lines="full">
+            <ion-list class="diary-list" lines="none">
               @for (recipe of recipeOptions(); track recipe.id) {
-                <ion-item button detail="false" (click)="selectRecipe(recipe)">
+                <ion-item button detail="false" lines="none" (click)="selectRecipe(recipe)">
                   <ion-label>
                     <h3>{{ recipe.title }}</h3>
                     <p>{{ recipe.factsPerServing?.kcal | ntNum:0 }} kcal / Portion</p>
@@ -244,6 +244,7 @@
 
         @case ('saved') {
           <ion-searchbar
+            class="nt-searchbar"
             [ngModel]="customQuery()"
             (ngModelChange)="customQuery.set($event)"
             placeholder="Eigene Lebensmittel suchen…"
@@ -251,9 +252,9 @@
             inputmode="search"
           ></ion-searchbar>
           @if (customFoodOptions().length) {
-            <ion-list inset="true" lines="full">
+            <ion-list class="diary-list" lines="none">
               @for (food of customFoodOptions(); track food.id) {
-                <ion-item button detail="false" (click)="selectCustomFood(food)">
+                <ion-item button detail="false" lines="none" (click)="selectCustomFood(food)">
                   <ion-label>
                     <h3>{{ food.name }}</h3>
                     <p>{{ food.facts.kcal | ntNum:0 }} kcal</p>
@@ -268,9 +269,9 @@
 
         @case ('meals') {
           <p class="scan-hint">Tippe auf eine Mahlzeit, um alle Einträge direkt zu „{{ selectedMealLabel() }}“ hinzuzufügen.</p>
-          <ion-list inset="true" lines="full">
+          <ion-list class="diary-list" lines="none">
             @for (meal of savedMeals(); track meal.id) {
-              <ion-item button detail="false" (click)="quickAddSavedMeal(meal)">
+              <ion-item button detail="false" lines="none" (click)="quickAddSavedMeal(meal)">
                 <ion-label>
                   <h3>{{ meal.name }}</h3>
                   <p>{{ meal.entries.length }} Einträge · {{ mealKcal(meal) | ntNum:0 }} kcal</p>
@@ -286,16 +287,16 @@
           }
           @if (formHint()) { <p class="scan-hint">{{ formHint() }}</p> }
 
-          <ion-list inset="true">
-            <ion-item>
+          <ion-list class="diary-list" lines="none">
+            <ion-item lines="none">
               <ion-input label="Name" labelPlacement="stacked" [(ngModel)]="form.label" placeholder="z. B. Haferflocken" enterkeyhint="done"></ion-input>
             </ion-item>
             @if (quantityUnit === 'portion') {
-              <ion-item>
+              <ion-item lines="none">
                 <ion-input type="number" inputmode="decimal" label="Portionen" labelPlacement="stacked" [ngModel]="form.servings" (ngModelChange)="setServings($event)"></ion-input>
               </ion-item>
             } @else {
-              <ion-item>
+              <ion-item lines="none">
                 <ion-input type="number" inputmode="decimal" [label]="quantityUnit === 'g' ? 'Menge (g)' : 'Menge (g, optional)'" labelPlacement="stacked" [ngModel]="form.amountG" (ngModelChange)="setAmount($event)" placeholder="z. B. 150">
                   <ion-note slot="end">g</ion-note>
                 </ion-input>
@@ -311,36 +312,36 @@
             E {{ form.proteinG | ntNum }} g · KH {{ form.carbsG | ntNum }} g · F {{ form.fatG | ntNum }} g
           </p>
 
-          <ion-accordion-group [value]="adjustOpen()" (ionChange)="setAdjustOpen($event.detail.value)">
+          <ion-accordion-group class="diary-list diary-list--spaced" [value]="adjustOpen()" (ionChange)="setAdjustOpen($event.detail.value)">
             <ion-accordion value="adjust">
-              <ion-item slot="header" lines="full">
+              <ion-item slot="header" lines="none">
                 <ion-label>Nährwerte anpassen</ion-label>
               </ion-item>
               <div slot="content" class="adjust">
-                <ion-list>
-                  <ion-item>
+                <ion-list class="diary-list diary-list--flat" lines="none">
+                  <ion-item lines="none">
                     <ion-select label="Mahlzeit" labelPlacement="stacked" [(ngModel)]="form.meal" interface="popover">
                       @for (opt of mealOptions; track opt.value) {
                         <ion-select-option [value]="opt.value">{{ opt.label }}</ion-select-option>
                       }
                     </ion-select>
                   </ion-item>
-                  <ion-item>
+                  <ion-item lines="none">
                     <ion-input type="number" inputmode="numeric" label="Kalorien (kcal)" labelPlacement="stacked" [(ngModel)]="form.kcal"></ion-input>
                   </ion-item>
-                  <ion-item>
+                  <ion-item lines="none">
                     <ion-input type="number" inputmode="decimal" label="Eiweiß (g)" labelPlacement="stacked" [(ngModel)]="form.proteinG"></ion-input>
                   </ion-item>
-                  <ion-item>
+                  <ion-item lines="none">
                     <ion-input type="number" inputmode="decimal" label="Kohlenhydrate (g)" labelPlacement="stacked" [(ngModel)]="form.carbsG"></ion-input>
                   </ion-item>
-                  <ion-item>
+                  <ion-item lines="none">
                     <ion-input type="number" inputmode="decimal" label="Fett (g)" labelPlacement="stacked" [(ngModel)]="form.fatG"></ion-input>
                   </ion-item>
-                  <ion-item>
+                  <ion-item lines="none">
                     <ion-input type="number" inputmode="decimal" label="Ballaststoffe (g)" labelPlacement="stacked" [(ngModel)]="form.fiberG"></ion-input>
                   </ion-item>
-                  <ion-item>
+                  <ion-item lines="none">
                     <ion-input type="number" inputmode="decimal" label="Zucker (g)" labelPlacement="stacked" [(ngModel)]="form.sugarG"></ion-input>
                   </ion-item>
                 </ion-list>
@@ -364,7 +365,8 @@
 <!-- Fastfood-Helfer modal (einzige Implementierung; Dashboard verlinkt hierher) -->
 <ion-modal [isOpen]="ffOpen()" (didDismiss)="closeFastfood()">
   <ng-template>
-    <ion-header class="ion-no-border">
+    <div class="sheet-grabber" aria-hidden="true"></div>
+    <ion-header class="ion-no-border sheet-header">
       <ion-toolbar>
         <ion-title role="heading" aria-level="2">Fastfood-Helfer</ion-title>
         <ion-buttons slot="end">
@@ -372,7 +374,7 @@
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
-    <ion-content class="ion-padding">
+    <ion-content class="sheet-content">
       @if (targetKcal() > 0) {
         <p class="ff-remaining"><strong>{{ remainingKcal() | ntNum:0 }} kcal</strong> übrig</p>
       }
@@ -380,21 +382,21 @@
       @if (error()) {
         <p class="form-error" role="alert">{{ error() }}</p>
       }
-      <ion-list inset="true">
-        <ion-item>
+      <ion-list class="diary-list" lines="none">
+        <ion-item lines="none">
           <ion-input label="Restaurant" labelPlacement="stacked" [(ngModel)]="ff.restaurant" placeholder="z. B. McDonald’s"></ion-input>
         </ion-item>
-        <ion-item>
+        <ion-item lines="none">
           <ion-input type="number" inputmode="numeric" label="kcal-Budget" labelPlacement="stacked" [(ngModel)]="ff.kcalBudget" placeholder="z. B. 800"></ion-input>
         </ion-item>
-        <ion-item>
+        <ion-item lines="none">
           <ion-input type="number" inputmode="decimal" label="Geld-Budget (€)" labelPlacement="stacked" [(ngModel)]="ff.moneyBudget" placeholder="optional"></ion-input>
         </ion-item>
-        <ion-item>
+        <ion-item lines="none">
           <ion-input label="Priorität" labelPlacement="stacked" [(ngModel)]="ff.preference" placeholder="viel Protein"></ion-input>
         </ion-item>
       </ion-list>
-      <ion-button expand="block" (click)="runFastfood()" [disabled]="ffLoading()">
+      <ion-button expand="block" class="sheet-action" (click)="runFastfood()" [disabled]="ffLoading()">
         @if (ffLoading()) {
           <ion-spinner name="dots" slot="start"></ion-spinner> Suche…
         } @else {
@@ -427,7 +429,8 @@
 <!-- Edit-Eintrag modal -->
 <ion-modal [isOpen]="editOpen()" (didDismiss)="closeEdit()">
   <ng-template>
-    <ion-header class="ion-no-border">
+    <div class="sheet-grabber" aria-hidden="true"></div>
+    <ion-header class="ion-no-border sheet-header">
       <ion-toolbar>
         <ion-title role="heading" aria-level="2">Eintrag bearbeiten</ion-title>
         <ion-buttons slot="end">
@@ -435,12 +438,12 @@
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
-    <ion-content class="ion-padding">
-      <ion-list inset="true">
-        <ion-item>
+    <ion-content class="sheet-content">
+      <ion-list class="diary-list" lines="none">
+        <ion-item lines="none">
           <ion-input label="Name" labelPlacement="stacked" [(ngModel)]="editForm.label"></ion-input>
         </ion-item>
-        <ion-item>
+        <ion-item lines="none">
           <ion-select label="Mahlzeit" labelPlacement="stacked" [(ngModel)]="editForm.meal" interface="popover">
             @for (opt of mealOptions; track opt.value) {
               <ion-select-option [value]="opt.value">{{ opt.label }}</ion-select-option>
@@ -448,15 +451,15 @@
           </ion-select>
         </ion-item>
         @if (editBaseFacts) {
-          <ion-item>
+          <ion-item lines="none">
             <ion-input type="number" inputmode="decimal" label="Menge (g)" labelPlacement="stacked" [(ngModel)]="editForm.amountG">
               <ion-note slot="end">g</ion-note>
             </ion-input>
           </ion-item>
         }
       </ion-list>
-      <ion-button expand="block" class="ion-margin-top" (click)="saveEdit()">Speichern</ion-button>
-      <ion-button expand="block" fill="outline" color="danger" class="ion-margin-top" (click)="deleteFromEdit()">
+      <ion-button expand="block" class="sheet-action" (click)="saveEdit()">Speichern</ion-button>
+      <ion-button expand="block" fill="outline" color="danger" class="sheet-action" (click)="deleteFromEdit()">
         <ion-icon slot="start" name="trash-outline"></ion-icon> Eintrag löschen
       </ion-button>
     </ion-content>
@@ -502,7 +505,7 @@
       @if (bcManualOpen()) {
         <div class="bc-manual-panel">
           <ion-list inset="true">
-            <ion-item>
+            <ion-item lines="none">
               <ion-input
                 label="Barcode"
                 labelPlacement="stacked"

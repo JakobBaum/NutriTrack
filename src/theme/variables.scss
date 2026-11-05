@@ -1,154 +1,225 @@
-// NutriTrack Theme — hell, modern, mobile-first, hellblauer Akzent.
-// Farbrichtung: Hellblau (Sky). Formen/Layout orientiert an moderner
-// Mobile-App-Inspiration (muz.li): große weiche Rundkarten, viel Weißraum,
-// zarte Schatten, Pill-Buttons, klare Typo. KEINE dunkle/rote Palette.
-// Ionic Theming: https://ionicframework.com/docs/theming/
+// NutriTrack Theme "S1 Sanft iOS" - iOS-nah, hell, ruhig. Details: DESIGN.md.
+// Aufbau: 1) Primitive (rohe Werte)  2) Semantik (Bedeutung)  3) Komponenten  4) Ionic-Mapping.
+// Kontrastwerte (WCAG) stehen an den Farben. Dunkelmodus ist bewusst aus (color-scheme: light);
+// alle Semantik-Tokens sind so benannt, dass spaeter ein Dark-Set darauf mappen kann.
 
 :root {
-  // --- Markenfarbe: frisches Hellblau (Sky) ---
-  --ion-color-primary: #38bdf8;
-  --ion-color-primary-rgb: 56, 189, 248;
+  // ---------------------------------------------------------------------------
+  // 1) PRIMITIVE
+  // ---------------------------------------------------------------------------
+  --p-white: #ffffff;
+  --p-ground: #f7f5f1;    // warmer Grund
+  --p-track: #e6e2da;     // Ring-/Balkenspur
+  --p-sep: #e7e3da;       // Trennlinien
+  --p-gray-500: #636366;  // Sekundaer: 5.5:1 auf #f7f5f1, 6.0:1 auf #fff
+  --p-gray-700: #48484a;  // inaktiver Tab, 9.1:1 auf #fff
+  --p-gray-900: #1c1c1e;  // Tinte, 16.8:1 auf #fff
+  --p-teal-600: #0f7a6b;  // Akzent/kcal/Eiweiss: 5.2:1 auf #fff, 4.8:1 auf #f7f5f1, 4.1:1 auf Spur
+  --p-teal-100: #e1f0ec;  // Akzent-Tint; Text darauf: --ion-color-primary-shade #0d6b5e (5.4:1)
+  --p-blue-600: #2563c9;  // Kohlenhydrate: 5.7:1 auf #fff, 4.4:1 auf Spur
+  --p-amber-700: #a15c07; // Fett: 5.2:1 auf #fff, 4.0:1 auf Spur
+  --p-olive-700: #4c7a1e; // Ballaststoffe: 5.1:1 auf #fff, 4.0:1 auf Spur (gruener, heller als die Hauptmakros)
+  --p-rose-700: #a3267f;  // Zucker: 6.7:1 auf #fff, 5.2:1 auf Spur
+  --p-violet-600: #5b4bc4; // Eiweiss: 6.5:1 auf #fff, 5.0:1 auf Spur
+  --p-cyan-800: #0a5f8a;  // Wasser: 7.0:1 auf #fff, 5.4:1 auf Spur
+  --p-red-700: #c62839;   // Ueber-Ziel/Gefahr, 5.6:1 auf #fff, 4.3:1 auf Spur
+
+  // ---------------------------------------------------------------------------
+  // 2) SEMANTIK
+  // ---------------------------------------------------------------------------
+  --nt-ground: var(--p-ground);
+  --nt-card: var(--p-white);
+  --nt-ink: var(--p-gray-900);
+  --nt-secondary: var(--p-gray-500);
+  --nt-separator: var(--p-sep);
+  --nt-tab-inactive: var(--p-gray-700);
+  --nt-accent: var(--p-teal-600);
+  --nt-accent-tint: var(--p-teal-100);
+  --nt-on-accent: #ffffff;
+  --nt-danger: var(--p-red-700);
+  --nt-focus: var(--p-teal-600);
+
+  // Naehrwerte: Vollfarbe (Text >= 4.5:1) + Spur (Ring >= 3:1 gegen Spur)
+  --nt-kcal: var(--p-teal-600);
+  --nt-kcal-track: var(--p-track);
+  --nt-protein: var(--p-violet-600);
+  --nt-protein-track: var(--p-track);
+  --nt-carbs: var(--p-blue-600);
+  --nt-carbs-track: var(--p-track);
+  --nt-fat: var(--p-amber-700);
+  --nt-fat-track: var(--p-track);
+  --nt-fiber: var(--p-olive-700);
+  --nt-fiber-track: var(--p-track);
+  --nt-sugar: var(--p-rose-700);
+  --nt-sugar-track: var(--p-track);
+  --nt-water: var(--p-cyan-800);
+  --nt-water-track: var(--p-track);
+  --nt-over: var(--p-red-700); // Ueber-Ziel - nur dafuer
+  --nt-track: var(--p-track);
+
+  // Radien
+  --nt-radius-card: 20px;
+  --nt-radius-sheet: 28px;
+  --nt-radius-input: 12px;
+  --nt-radius-tile: 16px;
+  --nt-radius-pill: 999px;
+
+  // Abstaende
+  --nt-space-1: 4px;
+  --nt-space-2: 8px;
+  --nt-space-3: 12px;
+  --nt-space-4: 16px;
+  --nt-space-5: 20px;
+  --nt-space-6: 24px;
+
+  // Typografie
+  --nt-fs-caption: 13px;
+  --nt-fs-body: 15px;
+  --nt-fs-headline: 17px;
+  --nt-fs-title: 22px;
+  --nt-fs-large-title: 34px;
+  --nt-fs-hero: 40px;
+
+  // Schatten / Linien
+  --nt-shadow: 0 1px 2px rgba(28, 28, 30, 0.04), 0 4px 16px rgba(28, 28, 30, 0.05);
+  --nt-shadow-sm: 0 1px 2px rgba(28, 28, 30, 0.05);
+  --nt-shadow-float: 0 8px 24px rgba(28, 28, 30, 0.14);
+  --nt-hairline: 0.5px;
+  --nt-touch: 44px;
+
+  // ---------------------------------------------------------------------------
+  // 3) KOMPONENTEN
+  // ---------------------------------------------------------------------------
+  --nt-tabbar-height: 64px;
+  --nt-tabbar-inset: 16px;
+  --nt-tabbar-bg: rgba(255, 255, 255, 0.85);
+  --nt-tabbar-ring: rgba(28, 28, 30, 0.1);
+  --nt-grouped-row-min: 44px;
+
+  // ---------------------------------------------------------------------------
+  // Alt-Aliase (bestehende Seiten): zeigen auf die neuen Werte
+  // ---------------------------------------------------------------------------
+  --nt-radius: var(--nt-radius-card);
+  --nt-radius-sm: var(--nt-radius-tile);
+  --nt-gap: var(--nt-space-4);
+  --nt-muted: var(--nt-secondary);
+  --nt-text-accent: var(--nt-accent);
+  --nt-surface: var(--nt-card);
+  --nt-surface-2: var(--nt-ground);
+  --nt-bg: var(--nt-ground);
+  --nt-border: var(--nt-separator);
+
+  // ---------------------------------------------------------------------------
+  // 4) IONIC-MAPPING
+  // ---------------------------------------------------------------------------
+  --ion-color-primary: #0f7a6b;
+  --ion-color-primary-rgb: 15, 122, 107;
   --ion-color-primary-contrast: #ffffff;
   --ion-color-primary-contrast-rgb: 255, 255, 255;
-  --ion-color-primary-shade: #0ea5e9;
-  --ion-color-primary-tint: #7dd3fc;
+  --ion-color-primary-shade: #0d6b5e;
+  --ion-color-primary-tint: #268677;
 
-  --ion-color-danger: #f43f5e;
-  --ion-color-danger-rgb: 244, 63, 94;
+  --ion-color-danger: #c62839;
+  --ion-color-danger-rgb: 198, 40, 57;
+  --ion-color-danger-contrast: #ffffff;
+  --ion-color-danger-contrast-rgb: 255, 255, 255;
+  --ion-color-danger-shade: #ae2332;
+  --ion-color-danger-tint: #cc3e4d;
 
-  // --- Flächen & Text (helles, kühles, ruhiges UI) ---
-  --ion-background-color: #f4f8fc;
-  --ion-background-color-rgb: 244, 248, 252;
-  --ion-text-color: #0f172a;
-  --ion-text-color-rgb: 15, 23, 42;
+  --ion-background-color: #f7f5f1;
+  --ion-background-color-rgb: 247, 245, 241;
+  --ion-text-color: #1c1c1e;
+  --ion-text-color-rgb: 28, 28, 30;
 
-  --ion-toolbar-background: #f4f8fc;
+  --ion-toolbar-background: #f7f5f1;
+  --ion-toolbar-color: #1c1c1e;
   --ion-item-background: #ffffff;
+  --ion-item-border-color: #e7e3da;
   --ion-card-background: #ffffff;
+  --ion-tab-bar-background: transparent;
+  --ion-tab-bar-color: #48484a;
+  --ion-tab-bar-color-selected: #0f7a6b;
+  --ion-placeholder-color: #636366;
+  --ion-placeholder-opacity: 1;
 
-  // --- Graustufen (slate, hell) ---
-  --ion-color-step-50: #f1f5f9;
-  --ion-color-step-100: #e8eef5;
-  --ion-color-step-150: #dde6f0;
-  --ion-color-step-200: #d7e0eb;
-  --ion-color-step-400: #94a3b8;
-  --ion-color-step-600: #526071;
-  --ion-color-step-850: #1e293b;
+  --ion-color-step-50: #f7f5f1;
+  --ion-color-step-100: #efece6;
+  --ion-color-step-150: #e7e3da;
+  --ion-color-step-200: #dcd8cf;
+  --ion-color-step-400: #8e8e93;
+  --ion-color-step-600: #636366;
+  --ion-color-step-850: #2c2c2e;
 
-  // --- NutriTrack-eigene Design-Tokens ---
-  --nt-radius: 24px;
-  --nt-radius-sm: 16px;
-  --nt-gap: 16px;
-  --nt-shadow: 0 10px 30px rgba(15, 23, 42, 0.07);
-  --nt-shadow-sm: 0 2px 12px rgba(15, 23, 42, 0.05);
-  // Gedämpfter Text: 6.4:1 auf #fff, 6.0:1 auf #f4f8fc, 5.5:1 auf #e8eef5 (AA).
-  --nt-muted: #526071;
-  // Akzent-Blau für Text/Icons/Fokus auf hellen Flächen: 5.9:1 auf #fff, 5.6:1 auf #f4f8fc.
-  // Die Markenfarbe #38bdf8 (2.1:1) bleibt Flächen, Ringen und Dekoration vorbehalten.
-  --nt-text-accent: #0369a1;
-  --nt-surface: #ffffff;
-  --nt-surface-2: #f1f6fb;
-  --nt-bg: #f4f8fc;
-  --nt-border: #e2e9f1;
-
-  // Semantische Makro-Farben (mehrdimensionale Palette)
-  --nt-kcal: #38bdf8;    // Kalorien — hellblau (Primär)
-  --nt-protein: #3b82f6; // Eiweiß — blau
-  --nt-carbs: #f59e0b;   // Kohlenhydrate — amber
-  --nt-fat: #8b5cf6;     // Fett — violett
-  --nt-fiber: #10b981;   // Ballaststoffe — grün
-  --nt-sugar: #d946ef;   // Zucker — fuchsia (3.5:1 auf Weiß), bewusst nicht der Warnton
-  --nt-water: #38bdf8;   // Wasser — hellblau
-  --nt-over: #f43f5e;    // Über-Ziel — Warnung (nur dafür verwenden)
-
-  // Ring-/Balken-Hintergrund (ungefüllter Teil)
-  --nt-track: #e8eef5;
-
-  // Weiche, moderne System-Schrift
-  --ion-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    'Helvetica Neue', sans-serif;
+  --ion-font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto,
+    'Helvetica Neue', system-ui, sans-serif;
 }
 
 :root {
   color-scheme: light;
 }
 
-// Flache, helle Toolbar ohne harte Trennlinie
 ion-toolbar {
   --border-width: 0 !important;
   --border-color: transparent;
-  --background: var(--nt-bg);
-  --color: var(--ion-text-color);
+  --background: var(--nt-ground);
+  --color: var(--nt-ink);
 }
 
 ion-title {
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.2px;
 }
 
 ion-content {
-  --background: var(--nt-bg);
+  --background: var(--nt-ground);
 }
 
-// Karten/Items durchgängig abgerundet, weiße Flächen, zarte Schatten
 ion-card,
 ion-list[inset] {
-  border-radius: var(--nt-radius);
-  box-shadow: var(--nt-shadow);
+  border-radius: var(--nt-radius-card);
+  box-shadow: none;
 }
 
 ion-card {
-  background: var(--nt-surface);
+  background: var(--nt-card);
 }
 
-// Tab-Bar: hell, flach, hellblauer aktiver Zustand
+// Schwebende Kapsel-Tab-Bar (Details in tabs.page.scss)
 ion-tab-bar {
-  --background: #ffffff;
+  --background: transparent;
   --border: 0;
-  box-shadow: 0 -6px 24px rgba(15, 23, 42, 0.05);
-  padding-top: 4px;
-  padding-bottom: 4px;
 }
 
 ion-tab-button {
-  --color: var(--nt-muted);
-  --color-selected: var(--nt-text-accent);
+  --color: var(--nt-tab-inactive);
+  --color-selected: var(--nt-accent);
 }
 
-// Segment (Material-Modus): Ionic färbt aktives Label und Indikator sonst mit
-// #38bdf8 (2,0:1) — Akzent-Blau erfüllt AA. iOS-Modus nutzt --color-checked nicht.
-ion-segment-button {
-  --color-checked: var(--nt-text-accent);
-  --indicator-color: var(--nt-text-accent);
-}
-
-// Button-Form; Farben/Fokus für primäre Buttons stehen in global.scss.
 ion-button {
-  --border-radius: var(--nt-radius-sm);
+  --border-radius: var(--nt-radius-pill);
 }
 
 ion-button[expand='block'] {
-  font-weight: 700;
+  font-weight: 600;
 }
 
-// FAB: ruhige, vollflächige Akzentfarbe (weißes Icon 5.9:1), kein Verlauf, kein Glow.
+// FAB (falls noch verwendet): Akzent-Flaeche, weisses Icon, kein Glow.
 ion-fab-button {
-  --background: var(--nt-text-accent);
-  --background-activated: #075985;
-  --background-hover: #075985;
-  --background-focused: #075985;
+  --background: var(--nt-accent);
+  --background-activated: var(--ion-color-primary-shade);
+  --background-hover: var(--ion-color-primary-shade);
+  --background-focused: var(--ion-color-primary-shade);
   --color: #ffffff;
-  --box-shadow: 0 4px 12px rgba(3, 105, 161, 0.28);
+  --box-shadow: var(--nt-shadow-float);
 }
 
 ion-fab-button::part(native) {
-  background: var(--nt-text-accent);
+  background: var(--nt-accent);
   color: #ffffff;
 }
 
-// ion-note ist standardmäßig #a6a6a6 (2.4:1) — auf gedämpften Text anheben.
 ion-note {
-  --color: var(--nt-muted);
+  --color: var(--nt-secondary);
 }
 
 ion-item {

@@ -5,7 +5,7 @@
         <ion-icon slot="icon-only" name="chevron-back-outline"></ion-icon>
       </ion-button>
     </ion-buttons>
-    <ion-title role="heading" aria-level="1">{{ dateLabel() }}</ion-title>
+    <ion-title class="nav-date">{{ fullDate() }}</ion-title>
     <ion-buttons slot="end">
       <ion-button class="touch-btn" (click)="nextDay()" [disabled]="isToday()" aria-label="Nächster Tag">
         <ion-icon slot="icon-only" name="chevron-forward-outline"></ion-icon>
@@ -23,75 +23,76 @@
       <ion-button expand="block" (click)="openSettings()">Profil einrichten</ion-button>
     </div>
   } @else {
-    <!-- Kalorien-Hero (klickbar → kcal-Drill) -->
-    <section class="hero" role="button" tabindex="0" aria-label="Kalorien im Detail anzeigen" (click)="openDrill('kcal')" (keydown.enter)="openDrill('kcal')">
-      <app-progress-ring
-        [value]="kcalEaten()"
-        [max]="kcalTarget()"
-        [size]="208"
-        [stroke]="16"
-        color="var(--nt-kcal)"
-      >
-        <div class="hero__center">
-          <div class="hero__big">{{ kcalRemaining() | ntNum:0 }}</div>
-          <div class="hero__unit">kcal übrig</div>
-        </div>
-      </app-progress-ring>
-      <div class="hero__meta">
-        <span><strong>{{ kcalEaten() | ntNum:0 }}</strong> gegessen</span>
-        <span class="dot">·</span>
-        <span><strong>{{ kcalTarget() | ntNum:0 }}</strong> Ziel</span>
+    <!-- Kopf: Grosstitel + Datum, primaere Eintragen-Pille (ersetzt den FAB, gleiche Aktion) -->
+    <div class="head">
+      <div class="head__text">
+        <h1 class="nt-large-title">{{ dateLabel() }}</h1>
       </div>
-      @if (kcalOverBy() > 0) {
-        <span class="hero__over"><strong class="hero__over-num">{{ kcalOverBy() | ntNum:0 }}</strong> kcal über Ziel</span>
-      }
-    </section>
+      <button type="button" class="nt-pill head__add" (click)="openAddForNow()" [attr.aria-label]="'Zu ' + currentMealLabel() + ' hinzufügen'">
+        <ion-icon name="add" aria-hidden="true"></ion-icon>
+        Eintragen
+      </button>
+    </div>
 
-    <!-- Makro-Grid -->
-    <h2 class="section-title">Makros</h2>
-    <section class="macro-grid">
+    <!-- Hero: kcal übrig (öffnet den Kalorien-Drill), gegessen / Ziel -->
+    <section class="hero" aria-label="Kalorien">
+      <button type="button" class="hero__main" aria-label="Kalorien im Detail anzeigen" (click)="openDrill('kcal')">
+        <span class="hero__big">{{ kcalRemaining() | ntNum:0 }}</span>
+        <span class="hero__unit">kcal übrig</span>
+      </button>
+      <div class="hero__meta">
+        <div><strong>{{ kcalEaten() | ntNum:0 }}</strong> gegessen</div>
+        <div><strong>{{ kcalTarget() | ntNum:0 }}</strong> Ziel</div>
+      </div>
+    </section>
+    @if (kcalOverBy() > 0) {
+      <p class="hero__over"><strong class="hero__over-num">{{ kcalOverBy() | ntNum:0 }}</strong> kcal über Ziel</p>
+    }
+
+    <!-- Nährwerte: 3 x 2 Ringe; jede Kachel öffnet den Drill -->
+    <section class="nt-card macros" aria-label="Nährwerte">
       @for (m of macros(); track m.key) {
-        <button type="button" class="macro-card" (click)="openDrill(m.key)">
-          <app-progress-ring [value]="m.eaten" [max]="m.target" [size]="64" [stroke]="7" [color]="m.color">
-            <span class="macro-card__dot" [style.background]="m.color"></span>
+        <button type="button" class="macros__col" [attr.aria-label]="m.label + ' ' + (m.eaten | ntNum) + ' von ' + (m.target | ntNum) + ' ' + m.unit + ', Details anzeigen'" (click)="openDrill(m.key)">
+          <app-progress-ring [value]="m.eaten" [max]="m.target" [color]="m.color" [track]="m.track" [size]="68" [stroke]="6">
+            <span class="macros__num">{{ m.eaten | ntNum }}</span>
           </app-progress-ring>
-          <div class="macro-card__label">{{ m.label }}</div>
-          <div class="macro-card__value">{{ m.eaten | ntNum }} / {{ m.target | ntNum }} g</div>
+          <span class="macros__text">
+            <span class="macros__label">{{ m.label }}</span>
+            <span class="macros__val">{{ m.eaten | ntNum }} / {{ m.target | ntNum }} {{ m.unit }}</span>
+          </span>
         </button>
       }
     </section>
 
     <!-- Mahlzeiten -->
-    <h2 class="section-title">Mahlzeiten</h2>
-    <ion-list inset="true" lines="full" class="meals">
+    <h2 class="nt-section-header">Mahlzeiten</h2>
+    <ul class="nt-grouped">
       @for (meal of meals(); track meal.type) {
-        <ion-item button detail="true" (click)="openDiary()">
-          <ion-icon slot="start" [name]="meal.icon" class="meals__icon"></ion-icon>
-          <ion-label>{{ meal.label }}</ion-label>
-          <ion-note slot="end">{{ meal.kcal | ntNum:0 }} kcal</ion-note>
-        </ion-item>
+        <li class="row">
+          <button type="button" class="row__btn" (click)="openDiary()">
+            <ion-icon [name]="meal.icon" class="row__icon" aria-hidden="true"></ion-icon>
+            <span class="row__label">{{ meal.label }}</span>
+            <span class="row__note">{{ meal.kcal | ntNum:0 }} kcal</span>
+            <ion-icon name="chevron-forward-outline" class="nt-grouped__chevron" aria-hidden="true"></ion-icon>
+          </button>
+        </li>
       }
-    </ion-list>
+    </ul>
 
     <!-- Fastfood-Helfer: Einstieg in den Helfer im Tagebuch -->
-    <button type="button" class="ff-btn" (click)="openFastfood()">
-      <ion-icon name="fast-food-outline"></ion-icon>
-      <div class="ff-btn__text">
-        <span class="ff-btn__title">Fastfood-Helfer</span>
-        <span class="ff-btn__sub">{{ kcalRemaining() | ntNum:0 }} kcal übrig — was passt?</span>
-      </div>
-      <ion-icon name="chevron-forward-outline" class="ff-btn__arrow"></ion-icon>
-    </button>
-
-    <div class="content-spacer"></div>
-  }
-
-  @if (hasProfile()) {
-    <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-      <ion-fab-button (click)="openAddForNow()" [attr.aria-label]="'Zu ' + currentMealLabel() + ' hinzufügen'">
-        <ion-icon name="add"></ion-icon>
-      </ion-fab-button>
-    </ion-fab>
+    <h2 class="nt-section-header">Helfer</h2>
+    <ul class="nt-grouped">
+      <li class="row">
+        <button type="button" class="row__btn" (click)="openFastfood()">
+          <ion-icon name="fast-food-outline" class="row__icon" aria-hidden="true"></ion-icon>
+          <span class="row__stack">
+            <span class="row__label">Fastfood-Helfer</span>
+            <span class="row__sub">{{ kcalRemaining() | ntNum:0 }} kcal übrig — was passt?</span>
+          </span>
+          <ion-icon name="chevron-forward-outline" class="nt-grouped__chevron" aria-hidden="true"></ion-icon>
+        </button>
+      </li>
+    </ul>
   }
 </ion-content>
 

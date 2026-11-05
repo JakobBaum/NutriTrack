@@ -1,35 +1,55 @@
 ion-content {
-  --padding-start: 12px;
-  --padding-end: 12px;
-  --padding-top: 8px;
+  --background: var(--nt-ground);
+  --padding-top: var(--nt-space-2);
 }
 
+ion-toolbar {
+  --background: var(--nt-ground);
+}
+
+ion-title {
+  font-size: var(--nt-fs-large-title);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--nt-ink);
+}
+
+// Generator: freistehende weisse Karte (klappt per Neu generieren / Abbrechen auf und zu).
 .generator {
-  margin: 4px 0 8px;
+  margin: var(--nt-space-1) var(--nt-space-4) var(--nt-space-2);
+  background: var(--nt-card);
+  border-radius: var(--nt-radius-card);
+  box-shadow: none;
 
   &__row {
     display: flex;
-    gap: 12px;
-    margin-bottom: 14px;
+    gap: var(--nt-space-3);
+    margin-bottom: var(--nt-space-4);
   }
 
   &__meals {
-    margin-bottom: 12px;
+    margin-bottom: var(--nt-space-3);
   }
 
   &__sub {
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--nt-muted);
+    font-size: var(--nt-fs-caption);
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    color: var(--nt-secondary);
+  }
+
+  ion-input,
+  ion-select {
+    --border-radius: var(--nt-radius-input);
+    --highlight-color-focused: var(--nt-accent);
   }
 }
 
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
-
+  gap: var(--nt-space-2);
+  margin-top: var(--nt-space-2);
 }
 
 // Mahlzeiten-Chips: echte Buttons (role=checkbox), 44 px hoch, per Tastatur erreichbar.
@@ -37,48 +57,60 @@ ion-content {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 44px;
-  padding: 0 16px;
-  border: 1px solid var(--nt-border);
-  border-radius: 22px;
-  background: var(--nt-surface);
-  color: var(--ion-text-color);
+  min-height: var(--nt-touch);
+  padding: 0 var(--nt-space-4);
+  border: 0;
+  border-radius: var(--nt-radius-pill);
+  background: var(--nt-track);
+  color: var(--nt-ink);
   font: inherit;
-  font-size: 14px;
+  font-size: var(--nt-fs-body);
   cursor: pointer;
-  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+  transition: background-color 120ms ease, color 120ms ease;
 
   ion-icon {
     font-size: 20px;
+    color: var(--nt-secondary);
   }
 
-  // Gewählt: #0369a1 auf #e0f2fe = 5,6:1
+  // Gewaehlt: Akzent auf Tint
   &.on {
-    background: #e0f2fe;
-    border-color: var(--nt-text-accent, #0369a1);
-    color: var(--nt-text-accent, #0369a1);
-    font-weight: 700;
+    background: var(--nt-accent-tint);
+    color: var(--nt-accent);
+    font-weight: 600;
+
+    ion-icon {
+      color: var(--nt-accent);
+    }
   }
 
   &:focus-visible {
-    outline: 2px solid var(--nt-text-accent, #0369a1);
+    outline: 2px solid var(--nt-focus);
     outline-offset: 2px;
   }
 }
 
-// Primär- und Outline-Buttons: flächig, ohne Verlauf und Glow.
+@media (prefers-reduced-motion: reduce) {
+  .meal-chip {
+    transition: none;
+  }
+}
+
+// Primaer = Akzent-Pille; Sekundaer = Tint-Pille.
 .generate-btn {
-  --background: var(--nt-text-accent, #0369a1);
-  --background-activated: #075985;
-  --color: #fff;
+  --background: var(--nt-accent);
+  --background-activated: var(--nt-accent);
+  --color: var(--nt-on-accent);
   --box-shadow: none;
-  --border-radius: var(--nt-radius-sm);
-  min-height: 48px;
+  --border-radius: var(--nt-radius-pill);
+  min-height: var(--nt-touch);
+  font-weight: 600;
 }
 
 .cancel-btn {
-  --color: var(--nt-text-accent, #0369a1);
-  min-height: 44px;
+  --color: var(--nt-accent);
+  --border-radius: var(--nt-radius-pill);
+  min-height: var(--nt-touch);
 }
 
 // Kompakte Zusammenfassung, sobald eine Liste existiert.
@@ -86,51 +118,52 @@ ion-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 4px 8px 0;
+  gap: var(--nt-space-3);
+  padding: var(--nt-space-1) var(--nt-space-5) 0;
 
   &__text {
     flex: 1 1 auto;
     min-width: 0;
-    font-size: 14px;
-    color: var(--nt-muted);
+    font-size: var(--nt-fs-body);
+    color: var(--nt-secondary);
     text-wrap: balance;
   }
 
   &__btn {
-    --color: var(--nt-text-accent, #0369a1);
-    --border-color: var(--nt-text-accent, #0369a1);
-    --background: transparent;
+    --color: var(--nt-accent);
+    --background: var(--nt-accent-tint);
+    --border-width: 0;
     --box-shadow: none;
-    --border-radius: var(--nt-radius-sm);
+    --border-radius: var(--nt-radius-pill);
     flex-shrink: 0;
-    min-height: 44px;
+    min-height: var(--nt-touch);
     margin: 0;
   }
 }
 
 .add-btn {
-  --color: var(--nt-text-accent, #0369a1);
+  --color: var(--nt-accent);
   --box-shadow: none;
-  min-height: 44px;
-  min-width: 44px;
+  min-height: var(--nt-touch);
+  min-width: var(--nt-touch);
 }
 
 .form-error {
-  margin: 8px 2px 0;
+  margin: var(--nt-space-2) 2px 0;
   font-weight: 600;
 }
 
 .totals {
   display: flex;
   align-items: baseline;
-  gap: 12px;
-  padding: 12px 8px 4px;
+  gap: var(--nt-space-3);
+  padding: var(--nt-space-3) var(--nt-space-5) var(--nt-space-1);
 
   &__sum {
-    font-size: 24px;
-    font-weight: 800;
-    color: var(--nt-text-accent, #0369a1);
+    font-size: 28px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--nt-accent);
 
     &.over {
       color: var(--nt-over);
@@ -139,12 +172,29 @@ ion-content {
 
   &__budget,
   &__meta {
-    font-size: 12px;
-    color: var(--nt-muted);
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+    font-variant-numeric: tabular-nums;
   }
 
   &__meta {
     margin-left: auto;
+  }
+}
+
+// Einkaufszeilen in der gruppierten Karte
+ion-list.nt-grouped {
+  background: var(--nt-card);
+  padding: 0;
+
+  ion-item-sliding {
+    display: block;
+    padding: 0;
+  }
+
+  ion-item {
+    --min-height: var(--nt-grouped-row-min);
+    --background: transparent;
   }
 }
 
@@ -156,59 +206,59 @@ ion-content {
   &__box {
     width: 100%;
     min-height: 56px;
-    padding: 6px 16px;
+    padding: 6px var(--nt-space-4);
     box-sizing: border-box;
+    --size: 24px;
+    --checkbox-background-checked: var(--nt-accent);
+    --border-color-checked: var(--nt-accent);
+    --checkmark-color: var(--nt-on-accent);
   }
 
   &__text {
     display: flex;
     flex-direction: column;
-    margin-left: 4px;
+    margin-left: var(--nt-space-2);
 
     &.checked {
       text-decoration: line-through;
-      color: var(--nt-muted);
+      color: var(--nt-secondary);
     }
   }
 
   &__name {
-    font-size: 16px;
+    font-size: var(--nt-fs-headline);
   }
 }
 
 .qty {
   display: block;
-  font-size: 12px;
-  color: var(--nt-muted);
+  font-size: var(--nt-fs-caption);
+  color: var(--nt-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
 .price-note {
-  margin: 10px 14px 0;
-  font-size: 11px;
-  color: var(--nt-muted);
+  margin: var(--nt-space-3) var(--nt-space-5) 0;
+  font-size: var(--nt-fs-caption);
+  color: var(--nt-secondary);
 }
 
 .suggested {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 4px;
-  padding: 8px 6px 0;
+  gap: var(--nt-space-1);
+  padding: var(--nt-space-2) var(--nt-space-4) 0;
 
   &__label {
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--nt-muted);
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
   }
-}
 
-.form-sub {
-  margin: 16px 8px 4px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--nt-muted);
+  ion-chip {
+    --background: var(--nt-accent-tint);
+    --color: var(--nt-accent);
+  }
 }
 
 .add-name {
@@ -226,17 +276,17 @@ ion-content {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 8px;
-  padding: 40px 20px;
+  gap: var(--nt-space-2);
+  padding: 40px var(--nt-space-5);
 
   &__icon {
     font-size: 48px;
-    color: var(--ion-color-step-400);
+    color: var(--nt-secondary);
   }
 
   p {
     margin: 0;
-    color: var(--nt-muted);
+    color: var(--nt-secondary);
   }
 }
 

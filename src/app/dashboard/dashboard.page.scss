@@ -1,7 +1,3 @@
-// Akzent-Textfarbe (barrierefrei, >= 4.5:1); Fallback, falls das Token noch fehlt.
-$accent: var(--nt-text-accent, #0369a1);
-$warn: #b45309;
-
 // Klickfläche >= 44x44; das sichtbare Icon bleibt kompakt.
 .touch-btn {
   --padding-start: 0;
@@ -12,9 +8,10 @@ $warn: #b45309;
 }
 
 ion-content {
-  --padding-start: 16px;
-  --padding-end: 16px;
-  --padding-bottom: 24px;
+  --background: var(--nt-ground);
+  --padding-start: var(--nt-space-4);
+  --padding-end: var(--nt-space-4);
+  --padding-bottom: var(--nt-space-6);
 }
 
 /* --- Empty state --- */
@@ -33,12 +30,12 @@ ion-content {
 
   h2 {
     margin: 8px 0 0;
-    font-weight: 800;
+    font-weight: 700;
   }
 
   p {
     margin: 0 0 12px;
-    color: var(--nt-muted);
+    color: var(--nt-secondary);
   }
 
   ion-button {
@@ -47,115 +44,216 @@ ion-content {
   }
 }
 
-/* --- Kalorien-Hero --- */
+/* --- Kopf: Grosstitel + Eintragen-Pille --- */
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--nt-space-3);
+  padding: var(--nt-space-2) 4px var(--nt-space-4);
+
+  &__text {
+    min-width: 0;
+  }
+
+  &__add {
+    flex: none;
+
+    ion-icon {
+      font-size: 20px;
+    }
+  }
+}
+
+// Gruppen/Header sitzen im Content-Padding; die globalen Seitenränder entfallen hier.
+.nt-grouped {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.nt-section-header {
+  margin-left: var(--nt-space-5);
+  margin-right: var(--nt-space-5);
+}
+
+.nav-date {
+  font-size: var(--nt-fs-body);
+  font-weight: 600;
+}
+
+/* --- Hero: kcal übrig, ohne Karte auf dem Grund --- */
 .hero {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  background: var(--nt-surface);
-  border-radius: var(--nt-radius);
-  box-shadow: var(--nt-shadow);
-  padding: 28px 20px 24px;
-  margin-top: 8px;
-  cursor: pointer;
-  &:active { opacity: 0.85; }
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--nt-space-3);
+  padding: var(--nt-space-2) 4px var(--nt-space-4);
 
-  &__center {
+  &__main {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
+    min-height: var(--nt-touch);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--nt-focus);
+      outline-offset: 4px;
+      border-radius: 8px;
+    }
   }
 
   &__big {
-    font-size: 46px;
-    font-weight: 800;
-    letter-spacing: -1px;
+    font-size: 60px;
+    font-weight: 700;
     line-height: 1;
+    letter-spacing: -1.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--nt-accent);
   }
 
   &__unit {
-    margin-top: 4px;
-    font-size: 13px;
-    color: var(--nt-muted);
-    font-weight: 600;
+    margin-top: 6px;
+    font-size: var(--nt-fs-headline);
+    font-weight: 500;
+    color: var(--nt-ink);
   }
 
   &__meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--nt-muted);
-    font-size: 14px;
+    text-align: right;
+    font-size: var(--nt-fs-body);
+    line-height: 22px;
+    color: var(--nt-secondary);
+    font-variant-numeric: tabular-nums;
 
     strong {
-      color: var(--ion-text-color);
-    }
-
-    .dot {
-      opacity: 0.5;
+      color: var(--nt-ink);
+      font-weight: 600;
     }
   }
 
   // Neutraler Satz; die Warnfarbe liegt nur auf der Zahl.
   &__over {
-    font-size: 14px;
-    color: var(--nt-muted);
+    margin: 0 4px var(--nt-space-3);
+    font-size: var(--nt-fs-body);
+    color: var(--nt-secondary);
   }
 
   &__over-num {
-    color: $warn;
+    color: var(--nt-over);
     font-weight: 700;
   }
 }
 
-/* --- Section titles --- */
-.section-title {
-  margin: 24px 4px 12px;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--nt-muted);
-}
-
-/* --- Makro-Grid (Bento) --- */
-.macro-grid {
+/* --- Nährwertringe: 3 x 2 Raster in einer weissen Karte --- */
+.macros {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--nt-space-4) 0;
+  margin: 0;
+  padding: var(--nt-space-4) var(--nt-space-1);
 
-.macro-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  background: var(--nt-surface);
-  border-radius: var(--nt-radius-sm);
-  box-shadow: var(--nt-shadow-sm);
-  padding: 14px 8px;
-  border: none;
-  cursor: pointer;
-  transition: opacity 150ms ease-out;
+  &__col {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--nt-space-2);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
 
-  &:active { opacity: 0.7; }
+    &:focus-visible {
+      outline: 2px solid var(--nt-focus);
+      outline-offset: 2px;
+      border-radius: 12px;
+    }
+  }
 
-  &__dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    display: inline-block;
+  &__num {
+    font-size: var(--nt-fs-headline);
+    font-weight: 600;
+    color: var(--nt-ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    white-space: nowrap;
+    font-size: 12px;
+    line-height: 18px;
+    color: var(--nt-secondary);
+    font-variant-numeric: tabular-nums;
   }
 
   &__label {
-    font-size: 12px;
-    font-weight: 700;
+    color: var(--nt-ink);
+    font-weight: 600;
+  }
+}
+
+/* --- Zeilen (Mahlzeiten, Helfer) --- */
+.row {
+  padding: 0;
+
+  &__btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--nt-space-3);
+    min-height: var(--nt-grouped-row-min);
+    padding: var(--nt-space-2) var(--nt-space-4);
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-size: var(--nt-fs-headline);
+    color: var(--nt-ink);
+    text-align: left;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--nt-focus);
+      outline-offset: -2px;
+    }
   }
 
-  &__value {
-    font-size: 12px;
-    color: var(--nt-muted);
+  &__icon {
+    flex: none;
+    font-size: 22px;
+    color: var(--nt-accent);
+  }
+
+  &__label {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__note {
+    font-variant-numeric: tabular-nums;
+    font-size: var(--nt-fs-body);
+    color: var(--nt-secondary);
+  }
+
+  &__stack {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__sub {
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
   }
 }
 
@@ -169,18 +267,18 @@ ion-content {
 }
 
 .drill-title {
-  font-weight: 800;
+  font-weight: 700;
 
   &__total {
     font-weight: 400;
     font-size: 14px;
-    color: var(--nt-muted);
+    color: var(--nt-secondary);
   }
 }
 
 .drill-empty {
   text-align: center;
-  color: var(--nt-muted);
+  color: var(--nt-secondary);
   padding: 32px 0;
 }
 
@@ -198,7 +296,7 @@ ion-content {
   &__bar {
     height: 6px;
     border-radius: 3px;
-    background: var(--ion-color-light);
+    background: var(--nt-separator);
     overflow: hidden;
     width: 100%;
   }
@@ -207,6 +305,10 @@ ion-content {
     height: 100%;
     border-radius: 3px;
     transition: width 200ms ease-out;
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
   }
 
   &__val {
@@ -219,78 +321,7 @@ ion-content {
   &__pct {
     font-size: 12px;
     font-weight: 400;
-    color: var(--nt-muted);
+    color: var(--nt-secondary);
     display: block;
-  }
-}
-
-/* --- Mahlzeiten --- */
-.meals {
-  border-radius: var(--nt-radius);
-  overflow: hidden;
-
-  &__icon {
-    color: $accent;
-    font-size: 20px;
-  }
-
-  ion-note {
-    font-weight: 700;
-    color: var(--nt-muted);
-  }
-}
-
-// Platz unter dem Inhalt, damit der FAB (56px + 16px Rand) nichts verdeckt.
-.content-spacer {
-  height: 96px;
-}
-
-/* --- Fast Food Helper --- */
-.ff-btn {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  min-height: 48px;
-  margin: 20px 0 0;
-  padding: 12px 16px;
-  background: var(--nt-surface);
-  border: 1px solid var(--nt-border);
-  border-radius: var(--nt-radius);
-  box-shadow: var(--nt-shadow-sm);
-  cursor: pointer;
-  text-align: left;
-  transition: opacity 150ms ease-out;
-
-  &:active { opacity: 0.75; }
-
-  ion-icon:first-child {
-    font-size: 28px;
-    color: $accent;
-    flex-shrink: 0;
-  }
-
-  &__text {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  &__title {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--ion-text-color);
-  }
-
-  &__sub {
-    font-size: 12px;
-    color: var(--nt-muted);
-  }
-
-  &__arrow {
-    font-size: 18px;
-    color: var(--nt-muted);
-    flex-shrink: 0;
   }
 }

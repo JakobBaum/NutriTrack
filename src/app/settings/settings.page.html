@@ -23,8 +23,8 @@
     </ion-card>
   }
 
-  <h2 class="form-sub">Ziele &amp; KI</h2>
-  <ion-list inset="true" lines="full">
+  <h2 class="nt-section-header">Ziele &amp; KI</h2>
+  <ion-list class="nt-grouped" lines="full">
     <ion-item button detail="true" (click)="profileOpen.set(true)">
       <ion-icon slot="start" name="body-outline"></ion-icon>
       <ion-label>Bedarfs-Berechner</ion-label>
@@ -36,8 +36,8 @@
     </ion-item>
   </ion-list>
 
-  <h2 class="form-sub">App</h2>
-  <ion-list inset="true" lines="full">
+  <h2 class="nt-section-header">App</h2>
+  <ion-list class="nt-grouped" lines="full">
     <ion-item button detail="true" (click)="infoSection.set('anleitung')">
       <ion-icon slot="start" name="book-outline"></ion-icon>
       <ion-label>Anleitung</ion-label>
@@ -48,8 +48,8 @@
     </ion-item>
   </ion-list>
 
-  <h2 class="form-sub">Rechtliches</h2>
-  <ion-list inset="true" lines="full">
+  <h2 class="nt-section-header">Rechtliches</h2>
+  <ion-list class="nt-grouped" lines="full">
     <ion-item button detail="true" (click)="infoSection.set('datenschutz')">
       <ion-icon slot="start" name="shield-outline"></ion-icon>
       <ion-label>Datenschutzerklärung</ion-label>
@@ -60,8 +60,8 @@
     </ion-item>
   </ion-list>
 
-  <h2 class="form-sub">Daten</h2>
-  <ion-list inset="true" lines="none">
+  <h2 class="nt-section-header">Daten</h2>
+  <ion-list class="nt-grouped" lines="none">
     <ion-item button detail="false" class="danger-row" (click)="confirmReset()">
       <ion-icon slot="start" name="trash-outline"></ion-icon>
       <ion-label>Alle lokalen Daten zurücksetzen</ion-label>
@@ -70,8 +70,8 @@
 
   @if (debugMode) {
     <!-- Debug-Log: nur mit ?debug=1 -->
-    <h2 class="form-sub">Debug-Log</h2>
-    <ion-list inset="true" lines="none">
+    <h2 class="nt-section-header">Debug-Log</h2>
+    <ion-list class="nt-grouped" lines="none">
       <ion-item button detail="false" (click)="logOpen.set(!logOpen())">
         <ion-icon slot="start" name="terminal-outline"></ion-icon>
         <ion-label>Log anzeigen ({{ logEntries().length }})</ion-label>
@@ -124,7 +124,7 @@
       @if (error()) {
         <ion-text color="danger"><p class="form-error ion-padding-horizontal">{{ error() }}</p></ion-text>
       }
-      <ion-list inset="true">
+      <ion-list class="nt-grouped">
         <ion-item>
           <ion-input type="number" inputmode="decimal" label="Gewicht (kg)" labelPlacement="stacked" [(ngModel)]="weightKg"></ion-input>
         </ion-item>
@@ -192,14 +192,14 @@
         Die KI läuft über Google Gemini. Empfohlen: die Adresse des <strong>NutriTrack-KI-Servers</strong>
         eintragen, dann ist kein eigener Key nötig. Alternativ nutzt du „Gemini direkt“ mit deinem eigenen Key (nur lokal gespeichert).
       </p>
-      <ion-list inset="true">
+      <ion-list class="nt-grouped">
         <ion-item>
           <ion-input label="NutriTrack-KI-Server (URL)" labelPlacement="stacked" [(ngModel)]="ai.proxyUrl" inputmode="url" placeholder="https://nutritrack-ai.<account>.workers.dev"></ion-input>
         </ion-item>
       </ion-list>
-      <h2 class="form-sub">Eigener Key (optional)</h2>
+      <h2 class="nt-section-header">Eigener Key (optional)</h2>
       <p class="hint">Nur nötig ohne KI-Server. Wird ausschließlich lokal auf diesem Gerät gespeichert.</p>
-      <ion-list inset="true">
+      <ion-list class="nt-grouped">
         <ion-item>
           <ion-select label="Anbieter" labelPlacement="stacked" [(ngModel)]="ai.provider" interface="popover">
             @for (p of providers; track p.value) {
@@ -217,7 +217,7 @@
           <ion-input type="password" label="API-Key" labelPlacement="stacked" [(ngModel)]="ai.apiKey" [clearOnEdit]="false" autocomplete="off" placeholder="Gemini-API-Key"></ion-input>
         </ion-item>
       </ion-list>
-      <ion-button expand="block" fill="outline" class="ion-margin-horizontal" (click)="saveAi()">
+      <ion-button expand="block" class="ion-margin-horizontal" (click)="saveAi()">
         KI-Einstellungen speichern
       </ion-button>
     </ion-content>

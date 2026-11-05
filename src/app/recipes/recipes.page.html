@@ -1,7 +1,12 @@
 <ion-header class="ion-no-border">
-  <ion-toolbar>
-    <ion-title role="heading" aria-level="1">{{ view() === 'meals' ? 'Mahlzeiten' : 'Rezepte' }}</ion-title>
-  </ion-toolbar>
+  <div class="page-head">
+    <h1 class="nt-large-title" role="heading" aria-level="1">{{ view() === 'meals' ? 'Mahlzeiten' : 'Rezepte' }}</h1>
+    <!-- Ersetzt den FAB (gleiche Aktion), lag sonst hinter der schwebenden Tab-Leiste -->
+    <button type="button" class="nt-pill page-head__add" (click)="onFabClick()" [attr.aria-label]="view() === 'meals' ? 'Mahlzeit anlegen' : 'Rezept hinzufügen'">
+      <ion-icon name="add" aria-hidden="true"></ion-icon>
+      Neu
+    </button>
+  </div>
   <ion-toolbar class="view-bar">
     <ion-segment [value]="view()" (ionChange)="onViewChange($any($event))" aria-label="Ansicht">
       <ion-segment-button value="recipes"><ion-label>Rezepte</ion-label></ion-segment-button>
@@ -14,10 +19,13 @@
   @if (view() === 'meals') {
     <app-meals-list></app-meals-list>
   } @else {
-  <button class="import-cta" (click)="openImport()">
-    <ion-icon name="download-outline" aria-hidden="true"></ion-icon>
-    <span>Rezept importieren (Text oder Link)</span>
-  </button>
+  <div class="nt-grouped import-group">
+    <button class="import-cta" (click)="openImport()">
+      <ion-icon name="download-outline" aria-hidden="true"></ion-icon>
+      <span>Rezept importieren (Text oder Link)</span>
+      <ion-icon name="chevron-forward-outline" class="nt-grouped__chevron" aria-hidden="true"></ion-icon>
+    </button>
+  </div>
 
   @if (recipes().length === 0) {
     <div class="empty">
@@ -27,11 +35,9 @@
   } @else {
     @for (recipe of recipes(); track recipe.id) {
       @let missing = countMissingFacts(recipe.ingredients);
-      <ion-card class="recipe">
-        <ion-card-header>
-          <ion-card-title>{{ recipe.title }}</ion-card-title>
-        </ion-card-header>
-        <ion-card-content>
+      <article class="nt-card recipe">
+        <h2 class="recipe__title">{{ recipe.title }}</h2>
+        <div class="recipe__body">
           @if (recipe.factsPerServing; as f) {
             <div class="recipe__macros">
               <div class="recipe__macro">
@@ -71,12 +77,12 @@
             </p>
           }
           <div class="recipe__actions">
-            <ion-button fill="clear" (click)="logToDiary(recipe)">
+            <ion-button class="recipe__btn" fill="solid" (click)="logToDiary(recipe)">
               <ion-icon slot="start" name="add-circle-outline" aria-hidden="true"></ion-icon>
               Tagebuch
             </ion-button>
             @if (recipe.steps.length > 0) {
-              <ion-button fill="clear" (click)="startCook(recipe)">
+              <ion-button class="recipe__btn recipe__btn--tint" fill="solid" (click)="startCook(recipe)">
                 <ion-icon slot="start" name="flame-outline" aria-hidden="true"></ion-icon>
                 Kochen
               </ion-button>
@@ -88,19 +94,14 @@
               <ion-icon slot="icon-only" name="trash-outline" aria-hidden="true"></ion-icon>
             </ion-button>
           </div>
-        </ion-card-content>
-      </ion-card>
+        </div>
+      </article>
     }
   }
   }
 
   <div class="content-spacer"></div>
 
-  <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-    <ion-fab-button (click)="onFabClick()" [attr.aria-label]="view() === 'meals' ? 'Mahlzeit anlegen' : 'Rezept hinzufügen'">
-      <ion-icon name="add" aria-hidden="true"></ion-icon>
-    </ion-fab-button>
-  </ion-fab>
 
   <ion-toast
     [isOpen]="toastMessage() !== null"
@@ -136,7 +137,7 @@
         <ion-text color="danger"><p class="form-error">{{ error() }}</p></ion-text>
       }
 
-      <span class="field-label">Name</span>
+      <span class="field-label nt-section-header">Name</span>
       <ion-list inset="true">
         <ion-item>
           <ion-input [(ngModel)]="form.title" aria-label="Name" placeholder="zum Beispiel Linsen-Dal"></ion-input>
@@ -144,7 +145,7 @@
       </ion-list>
 
       <!-- Zutaten -->
-      <h2 class="field-label">Zutaten</h2>
+      <h2 class="field-label nt-section-header">Zutaten</h2>
       @if (form.ingredients.length) {
         <ion-list inset="true" lines="full">
           @for (ing of form.ingredients; track trackIndex($index)) {
@@ -260,7 +261,7 @@
       <!-- Fertig gekocht + Portionen -->
       <div class="two-col">
         <div>
-          <span class="field-label">Fertig gekocht</span>
+          <span class="field-label nt-section-header">Fertig gekocht</span>
           <ion-list inset="true">
             <ion-item>
               <ion-input type="number" inputmode="numeric" [(ngModel)]="form.cookedWeightG"
@@ -285,7 +286,7 @@
           }
         </div>
         <div>
-          <span class="field-label">Portionen</span>
+          <span class="field-label nt-section-header">Portionen</span>
           <ion-list inset="true">
             <ion-item>
               <ion-input type="number" inputmode="numeric" [(ngModel)]="form.servings" placeholder="4"></ion-input>
@@ -295,7 +296,7 @@
       </div>
 
       <!-- Zubereitung -->
-      <h2 class="field-label">Zubereitung</h2>
+      <h2 class="field-label nt-section-header">Zubereitung</h2>
       @for (step of form.steps; track trackIndex($index)) {
         <div class="step-row">
           <span class="step-row__no">{{ $index + 1 }}</span>
@@ -343,7 +344,7 @@
         <ion-text color="danger"><p class="form-error">{{ importError() }}</p></ion-text>
       }
 
-      <span class="field-label">Rezept-Text</span>
+      <span class="field-label nt-section-header">Rezept-Text</span>
       <ion-list inset="true">
         <ion-item>
           <ion-textarea
@@ -355,7 +356,7 @@
         </ion-item>
       </ion-list>
 
-      <span class="field-label">oder Link (inkl. TikTok)</span>
+      <span class="field-label nt-section-header">oder Link (inkl. TikTok)</span>
       <ion-list inset="true">
         <ion-item>
           <ion-input
@@ -378,7 +379,7 @@
         </p>
       }
 
-      <span class="field-label">oder Foto</span>
+      <span class="field-label nt-section-header">oder Foto</span>
       <div class="scan-row">
         @if (nativeCamera) {
           <ion-button size="small" fill="outline" (click)="importFromCamera()" [disabled]="importBusy() || importPhotoScanning()">
@@ -418,7 +419,7 @@
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
-      <ion-searchbar
+      <ion-searchbar class="nt-searchbar"
         [(ngModel)]="pickerQuery"
         (keyup.enter)="searchFood()"
         (ionClear)="pickerResults.set([])"
