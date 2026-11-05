@@ -32,7 +32,7 @@
   --ion-color-step-150: #dde6f0;
   --ion-color-step-200: #d7e0eb;
   --ion-color-step-400: #94a3b8;
-  --ion-color-step-600: #64748b;
+  --ion-color-step-600: #526071;
   --ion-color-step-850: #1e293b;
 
   // --- NutriTrack-eigene Design-Tokens ---
@@ -41,14 +41,15 @@
   --nt-gap: 16px;
   --nt-shadow: 0 10px 30px rgba(15, 23, 42, 0.07);
   --nt-shadow-sm: 0 2px 12px rgba(15, 23, 42, 0.05);
-  --nt-muted: #64748b;
+  // Gedämpfter Text: 6.4:1 auf #fff, 6.0:1 auf #f4f8fc, 5.5:1 auf #e8eef5 (AA).
+  --nt-muted: #526071;
+  // Akzent-Blau für Text/Icons/Fokus auf hellen Flächen: 5.9:1 auf #fff, 5.6:1 auf #f4f8fc.
+  // Die Markenfarbe #38bdf8 (2.1:1) bleibt Flächen, Ringen und Dekoration vorbehalten.
+  --nt-text-accent: #0369a1;
   --nt-surface: #ffffff;
   --nt-surface-2: #f1f6fb;
   --nt-bg: #f4f8fc;
   --nt-border: #e2e9f1;
-
-  // Hellblauer Verlauf für primäre Flächen (Buttons, FAB, Hero)
-  --nt-primary-gradient: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 50%, #0ea5e9 100%);
 
   // Semantische Makro-Farben (mehrdimensionale Palette)
   --nt-kcal: #38bdf8;    // Kalorien — hellblau (Primär)
@@ -56,9 +57,9 @@
   --nt-carbs: #f59e0b;   // Kohlenhydrate — amber
   --nt-fat: #8b5cf6;     // Fett — violett
   --nt-fiber: #10b981;   // Ballaststoffe — grün
-  --nt-sugar: #f43f5e;   // Zucker — rosé
+  --nt-sugar: #d946ef;   // Zucker — fuchsia (3.5:1 auf Weiß), bewusst nicht der Warnton
   --nt-water: #38bdf8;   // Wasser — hellblau
-  --nt-over: #f43f5e;    // Über-Ziel — Warnung
+  --nt-over: #f43f5e;    // Über-Ziel — Warnung (nur dafür verwenden)
 
   // Ring-/Balken-Hintergrund (ungefüllter Teil)
   --nt-track: #e8eef5;
@@ -111,26 +112,43 @@ ion-tab-bar {
 
 ion-tab-button {
   --color: var(--nt-muted);
-  --color-selected: var(--ion-color-primary-shade);
+  --color-selected: var(--nt-text-accent);
 }
 
-// Primäre Buttons als Pill im hellblauen Verlauf
+// Segment (Material-Modus): Ionic färbt aktives Label und Indikator sonst mit
+// #38bdf8 (2,0:1) — Akzent-Blau erfüllt AA. iOS-Modus nutzt --color-checked nicht.
+ion-segment-button {
+  --color-checked: var(--nt-text-accent);
+  --indicator-color: var(--nt-text-accent);
+}
+
+// Button-Form; Farben/Fokus für primäre Buttons stehen in global.scss.
 ion-button {
   --border-radius: var(--nt-radius-sm);
 }
 
 ion-button[expand='block'] {
-  --background: var(--nt-primary-gradient);
-  --background-activated: var(--ion-color-primary-shade);
-  --box-shadow: 0 10px 24px rgba(56, 189, 248, 0.35);
-  --color: #ffffff;
   font-weight: 700;
 }
 
-// FAB im hellblauen Verlauf
+// FAB: ruhige, vollflächige Akzentfarbe (weißes Icon 5.9:1), kein Verlauf, kein Glow.
 ion-fab-button {
-  --background: var(--nt-primary-gradient);
-  --box-shadow: 0 10px 24px rgba(56, 189, 248, 0.45);
+  --background: var(--nt-text-accent);
+  --background-activated: #075985;
+  --background-hover: #075985;
+  --background-focused: #075985;
+  --color: #ffffff;
+  --box-shadow: 0 4px 12px rgba(3, 105, 161, 0.28);
+}
+
+ion-fab-button::part(native) {
+  background: var(--nt-text-accent);
+  color: #ffffff;
+}
+
+// ion-note ist standardmäßig #a6a6a6 (2.4:1) — auf gedämpften Text anheben.
+ion-note {
+  --color: var(--nt-muted);
 }
 
 ion-item {

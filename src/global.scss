@@ -274,17 +274,128 @@ textarea {
 }
 
 :focus-visible {
-  outline: 2px solid var(--ion-color-primary-shade);
+  outline: 2px solid var(--nt-text-accent);
   outline-offset: 2px;
 }
 
 // ODbL-Quellenangabe unter Suchtreffern (Pflicht bei Nutzung der Open-Food-Facts-Daten).
+// Text --nt-muted (6.0:1 auf #f4f8fc), Link --nt-text-accent (5.6:1) + Unterstreichung.
 .data-credit {
   margin: -4px 20px 12px;
   font-size: 12px;
   color: var(--nt-muted);
 
   a {
-    color: inherit;
+    color: var(--nt-text-accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
+}
+
+/* --- Primäre Buttons: vollflächiges Akzent-Blau, weißer Text (5.9:1), kein Verlauf/Glow --- */
+// „Primär“ = ohne color-Attribut, color="primary" oder .ion-color-primary.
+// Toolbar-Buttons (ion-buttons) bleiben Text-Buttons und werden unten behandelt.
+ion-button:not([fill='outline']):not([fill='clear']):not(ion-buttons ion-button):is(
+    :not([color]),
+    [color='primary'],
+    .ion-color-primary
+  ) {
+  --background: var(--nt-text-accent);
+  --background-activated: #075985;
+  --background-hover: #075985;
+  --background-focused: #075985;
+  --color: #ffffff;
+  --box-shadow: 0 2px 6px rgba(3, 105, 161, 0.22);
+
+  // Mit color-Attribut setzt Ionic den Hintergrund im Shadow-DOM aus --ion-color-base.
+  &::part(native) {
+    background: var(--nt-text-accent);
+    color: #ffffff;
+  }
+}
+
+// Outline/Clear in Primär: Text und Rahmen in Akzent-Blau (5.9:1 auf Weiß).
+ion-button:is([fill='outline'], [fill='clear']):is(:not([color]), [color='primary'], .ion-color-primary),
+ion-buttons ion-button:not([fill='solid']):is(:not([color]), [color='primary'], .ion-color-primary) {
+  --color: var(--nt-text-accent);
+  --border-color: var(--nt-text-accent);
+
+  &::part(native) {
+    color: var(--nt-text-accent);
+  }
+}
+
+ion-button[fill='outline']:is(:not([color]), [color='primary'], .ion-color-primary)::part(native) {
+  border-color: var(--nt-text-accent);
+}
+
+/* --- Sichtbarer Tastaturfokus für Ionic-Controls --- */
+// Ionic setzt `outline: none` und markiert Tastaturfokus nur mit `.ion-focused`.
+ion-button.ion-focused::part(native),
+ion-fab-button.ion-focused::part(native),
+ion-segment-button.ion-focused::part(native) {
+  outline: 2px solid var(--nt-text-accent);
+  outline-offset: 2px;
+}
+
+// Innen liegende Ringe, damit Items/Tabs nicht vom Container abgeschnitten werden.
+ion-item.ion-focused,
+ion-tab-button.ion-focused,
+ion-chip.ion-focused,
+ion-chip:focus-visible {
+  outline: 2px solid var(--nt-text-accent);
+  outline-offset: -2px;
+}
+
+ion-tab-button.ion-focused::part(native) {
+  outline: none;
+}
+
+/* --- Wiederverwendbare Bausteine --- */
+// Kennzeichnung geschätzter Werte (KI, Preise): 5.2:1 (#0369a1 auf #e0f2fe).
+.ai-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+// Nur für Screenreader sichtbar.
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+// Bewegung reduzieren, wenn das System es wünscht (gilt für Light DOM; Ionic-Shadow-DOM-
+// Animationen laufen über die Web Animations API und folgen separat dem System-Setting).
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0s !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+// Toast-Aktion („Rückgängig“): iOS-Toasts sind hell, dort ist Primär #38bdf8 nur 2,0:1.
+// Der dunkle Material-Toast behält das helle Primär (7:1).
+ion-toast.ios {
+  --button-color: var(--nt-text-accent);
 }
