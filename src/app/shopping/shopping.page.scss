@@ -461,3 +461,17 @@ ion-item-option {
 .price-btn {
   font-size: var(--nt-fs-caption);
 }
+
+// FAB: schwebt rechts über der Tab-Leiste, ohne sie zu überlappen.
+.add-fab {
+  bottom: calc(var(--nt-tabbar-height) + 24px + env(safe-area-inset-bottom, 0px));
+  right: var(--nt-space-4);
+
+  ion-fab-button {
+    --background: var(--nt-accent);
+    --background-activated: var(--nt-accent);
+    --color: #fff;
+    width: 56px;
+    height: 56px;
+  }
+}

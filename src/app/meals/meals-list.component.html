@@ -10,20 +10,23 @@
   <ion-list class="nt-grouped" lines="none">
     @for (meal of meals(); track meal.id) {
       <ion-item-sliding>
-        <ion-item>
+        <ion-item button detail="false" [attr.aria-label]="'„' + meal.name + '“ bearbeiten'" (click)="openEdit(meal)">
           <ion-icon slot="start" name="nutrition-outline" color="primary" aria-hidden="true"></ion-icon>
           <ion-label>
             <h3>{{ meal.name }}</h3>
             <p>{{ meal.entries.length }} Einträge · {{ totalKcal(meal) | ntNum: 0 }} kcal</p>
           </ion-label>
-          <ion-button slot="end" fill="clear" class="icon-btn" [attr.aria-label]="'„' + meal.name + '“ ins Tagebuch eintragen'" (click)="useMeal(meal)">
+          <ion-button slot="end" fill="clear" class="icon-btn" [attr.aria-label]="'„' + meal.name + '“ ins Tagebuch eintragen'" (click)="$event.stopPropagation(); useMeal(meal)">
             <ion-icon slot="icon-only" name="add-circle-outline" aria-hidden="true"></ion-icon>
           </ion-button>
-          <ion-button slot="end" fill="clear" color="danger" class="icon-btn nt-hover-delete" [attr.aria-label]="'„' + meal.name + '“ löschen'" (click)="removeMeal(meal.id)">
+          <ion-button slot="end" fill="clear" color="danger" class="icon-btn nt-hover-delete" [attr.aria-label]="'„' + meal.name + '“ löschen'" (click)="$event.stopPropagation(); removeMeal(meal.id)">
             <ion-icon slot="icon-only" name="trash-outline" aria-hidden="true"></ion-icon>
           </ion-button>
         </ion-item>
         <ion-item-options side="end">
+          <ion-item-option color="primary" [attr.aria-label]="'„' + meal.name + '“ bearbeiten'" (click)="openEdit(meal)">
+            <ion-icon slot="icon-only" name="create-outline" aria-hidden="true"></ion-icon>
+          </ion-item-option>
           <ion-item-option color="danger" [attr.aria-label]="'„' + meal.name + '“ löschen'" (click)="removeMeal(meal.id)">
             <ion-icon slot="icon-only" name="trash-outline" aria-hidden="true"></ion-icon>
           </ion-item-option>
@@ -55,7 +58,7 @@
   <ng-template>
     <ion-header class="ion-no-border">
       <ion-toolbar>
-        <ion-title role="heading" aria-level="2">Mahlzeit anlegen</ion-title>
+        <ion-title role="heading" aria-level="2">{{ editingId() ? 'Mahlzeit bearbeiten' : 'Mahlzeit anlegen' }}</ion-title>
         <ion-buttons slot="end">
           <ion-button (click)="closeCreate()">Abbrechen</ion-button>
         </ion-buttons>
@@ -75,12 +78,24 @@
 
       @if (draftEntries.length > 0) {
         <ion-list class="nt-grouped" lines="none">
-          @for (entry of draftEntries; track entry.label; let i = $index) {
+          @for (entry of draftEntries; track i; let i = $index) {
             <ion-item>
               <ion-label>
                 <div>{{ entry.label }}</div>
-                <p>{{ entry.facts.kcal | ntNum: 0 }} kcal{{ entry.amountG ? ' · ' + (entry.amountG | ntNum: 0) + ' g' : '' }}</p>
+                <p>{{ entry.facts.kcal | ntNum: 0 }} kcal</p>
               </ion-label>
+              @if (entry.amountG) {
+                <ion-input
+                  slot="end"
+                  class="amount-input"
+                  type="number"
+                  inputmode="decimal"
+                  aria-label="Menge in Gramm"
+                  [value]="entry.amountG"
+                  (ionChange)="setEntryAmount(i, $event)"
+                ></ion-input>
+                <span slot="end" class="amount-unit" aria-hidden="true">g</span>
+              }
               <ion-button slot="end" fill="clear" color="danger" class="icon-btn" [attr.aria-label]="'„' + entry.label + '“ entfernen'" (click)="removeEntry(i)">
                 <ion-icon slot="icon-only" name="close-circle-outline" aria-hidden="true"></ion-icon>
               </ion-button>
@@ -142,32 +157,7 @@
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
-      <ion-searchbar class="nt-searchbar"
-        [(ngModel)]="pickerQuery"
-        placeholder="Lebensmittel suchen"
-        (ionInput)="searchFood()"
-        [debounce]="400"
-      ></ion-searchbar>
-      @if (pickerSearching()) {
-        <ion-progress-bar type="indeterminate"></ion-progress-bar>
-      }
-      @if (pickerError()) {
-        <p class="picker-error">{{ pickerError() }}</p>
-      }
-      <ion-list class="nt-grouped" lines="none">
-        @for (item of pickerResults(); track item.id) {
-          <ion-item button (click)="pickFood(item)">
-            <ion-label>
-              <div>{{ item.name }}</div>
-              <p>{{ item.facts.kcal | ntNum: 0 }} kcal / {{ item.facts.basis === 'per100g' ? '100 g' : 'Portion' }}</p>
-            </ion-label>
-            <ion-icon slot="end" name="add-circle-outline" color="primary" aria-hidden="true"></ion-icon>
-          </ion-item>
-        }
-      </ion-list>
-      @if (pickerResults().length) {
-        <p class="data-credit">Daten: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL)</p>
-      }
+      <nt-food-search [allowManual]="false" (picked)="pickFood($event)"></nt-food-search>
     </ion-content>
   </ng-template>
 </ion-modal>

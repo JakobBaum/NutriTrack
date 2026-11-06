@@ -1,0 +1,39 @@
+<ion-searchbar
+  #searchbar
+  class="nt-searchbar"
+  [ngModel]="search.query"
+  (ngModelChange)="search.onInput($event)"
+  (keyup.enter)="pickFirst()"
+  [debounce]="search.debounceMs"
+  [placeholder]="placeholder()"
+  aria-label="Lebensmittel suchen"
+  inputmode="search"
+  enterkeyhint="search"
+></ion-searchbar>
+
+<ng-content></ng-content>
+
+@if (search.query.trim()) {
+  @if (search.searching()) {
+    <p class="scan-hint" role="status"><ion-spinner name="dots"></ion-spinner> Suche läuft…</p>
+  }
+  @if (error(); as message) { <p class="scan-hint" role="alert">{{ message }}</p> }
+  @if (search.hint()) { <p class="scan-hint" role="status">{{ search.hint() }}</p> }
+  @if (allowManual() && search.noResults() && !search.searching()) {
+    <button type="button" class="inline-action" (click)="manualEntry.emit(search.query.trim())">
+      <ion-icon name="create-outline" aria-hidden="true"></ion-icon> Manuell eintragen
+    </button>
+  }
+  @if (search.results().length) {
+    <h3 class="nt-section-header">Treffer</h3>
+    <ion-list class="results" [class.results--stale]="search.searching()" lines="none" [attr.aria-busy]="search.searching()">
+      @for (item of search.results(); track item.id) {
+        <ion-item button detail="false" lines="none" (click)="pick(item)">
+          <nt-food-row [item]="item"></nt-food-row>
+          <span slot="end" class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
+        </ion-item>
+      }
+    </ion-list>
+    <p class="data-credit">Daten: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL)</p>
+  }
+}

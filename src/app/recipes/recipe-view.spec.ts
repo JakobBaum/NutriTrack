@@ -9,6 +9,9 @@ import {
   importBlockReason,
   importErrorMessage,
   isValidYield,
+  ingredientsLabel,
+  recipeDisplayFacts,
+  recipeMetaLine,
   moreUnits,
   unitChips,
   lowerBoundNote,
@@ -135,5 +138,31 @@ describe('Einheiten-Chips und Import-Texte', () => {
     expect(importErrorMessage(new Error('x'), true)).toMatch(/Keine Verbindung/);
     expect(importErrorMessage(new Error('Keine Zutaten erkannt.'))).toContain('Keine Zutaten erkannt.');
     expect(importErrorMessage(null)).toMatch(/unbekannt/);
+  });
+});
+
+describe('recipe-view Anzeige', () => {
+  it('nutzt Singular und Plural für Zutaten und Portionen', () => {
+    expect(ingredientsLabel(1)).toBe('1 Zutat');
+    expect(ingredientsLabel(3)).toBe('3 Zutaten');
+    expect(servingsLabel(2)).toBe('2 Portionen');
+  });
+
+  it('baut die Meta-Zeile mit kcal gesamt', () => {
+    const r = { servings: 2, ingredients: [{ name: 'a', amount: 1, unit: 'g' }] };
+    expect(recipeMetaLine(r, 2)).toBe('2 Portionen · 1 Zutat · 4 kcal gesamt');
+  });
+
+  it('korrigiert gespeicherte kcal, die kleiner als die Makro-Energie sind (2 kcal bei 2,2 g Fett)', () => {
+    const stale: NutritionFacts = { kcal: 2, proteinG: 0.4, carbsG: 0.4, fatG: 2.2, basis: 'perPortion' };
+    const f = recipeDisplayFacts({ servings: 2, ingredients: [], factsPerServing: stale });
+    expect(f?.kcal).toBeGreaterThanOrEqual(20);
+  });
+
+  it('rechnet aus Zutaten neu, wenn Werte vorliegen', () => {
+    const ingredients = [{ name: 'Öl', amount: 10, unit: 'g', facts: { kcal: 5, proteinG: 0, carbsG: 0, fatG: 100, basis: 'per100g' as const } }];
+    const f = recipeDisplayFacts({ servings: 2, ingredients, factsPerServing: undefined });
+    expect(f?.fatG).toBe(5);
+    expect(f?.kcal).toBeGreaterThanOrEqual(35);
   });
 });

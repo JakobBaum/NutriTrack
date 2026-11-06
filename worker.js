@@ -16,6 +16,15 @@
  */
 
 const GEMINI_MODEL = 'gemini-3.8-flash';
+// Zweites, leichteres Modell, falls das Hauptmodell überlastet bleibt.
+const GEMINI_FALLBACK_MODEL = 'gemini-3.8-flash-lite';
+const GEMINI_RETRIES = 2; // zusätzliche Versuche pro Modell bei 500/503/429
+const GEMINI_BACKOFF_BASE_MS = 600;
+const GEMINI_TOTAL_BUDGET_MS = 50000; // Gesamtzeit über alle Versuche
+const GEMINI_ATTEMPT_TIMEOUT_MS = 25000;
+const GEMINI_RETRY_AFTER_S = 60;
+const OVERLOADED_MESSAGE = 'Die KI ist gerade überlastet — bitte in einer Minute erneut versuchen.';
+const TRANSIENT_STATUSES = new Set([429, 500, 503]);
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const OFF_SEARCH_URL = 'https://search.openfoodfacts.org/search';
 // OFF verlangt einen User-Agent mit App-Name + Kontakt (Browser dürfen ihn nicht setzen).
@@ -62,6 +71,9 @@ class ClientError extends Error {
   }
 }
 
+/** Gemini dauerhaft überlastet/limitiert → 503 mit Retry-After statt 500. */
+class OverloadedError extends Error {}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin');
@@ -84,6 +96,9 @@ export default {
       }
       return json({ error: 'Nicht gefunden.' }, 404, cors);
     } catch (e) {
+      if (e instanceof OverloadedError) {
+        return json({ error: OVERLOADED_MESSAGE }, 503, { ...cors, 'Retry-After': String(GEMINI_RETRY_AFTER_S) });
+      }
       if (e instanceof ClientError) return json({ error: e.message }, e.status, cors);
       console.error('Worker-Fehler:', e);
       return json({ error: e?.message ?? 'Interner Fehler.' }, 500, cors);
@@ -395,33 +410,71 @@ function extractRecipeText(html) {
 
 // ── Gemini ─────────────────────────────────────────────────────────────
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Ein Gemini-Request; liefert die (ggf. fehlerhafte) Response oder wirft bei Netzfehlern. */
+async function geminiRequest(model, body, env, timeoutMs) {
+  return fetch(`${GEMINI_BASE}/${model}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+    body,
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+}
+
+/**
+ * Hauptmodell mit Retry (Backoff + Jitter, innerhalb des Gesamtbudgets),
+ * danach Fallback-Modell. Gibt die erste erfolgreiche Response zurück;
+ * bleibt alles transient kaputt → OverloadedError, sonst Error mit Status.
+ */
+async function geminiWithFallback(body, env) {
+  const deadline = Date.now() + GEMINI_TOTAL_BUDGET_MS;
+  let lastTransient = false;
+  let lastError = null;
+  // Modellnamen per Worker-Variable überschreibbar (wrangler.toml [vars]), ohne Code-Deploy.
+  const models = [env.GEMINI_MODEL || GEMINI_MODEL, env.GEMINI_FALLBACK_MODEL || GEMINI_FALLBACK_MODEL];
+  for (const model of models) {
+    for (let attempt = 0; attempt <= GEMINI_RETRIES; attempt++) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw new OverloadedError('Gemini-Zeitbudget erschöpft');
+      let resp;
+      try {
+        resp = await geminiRequest(model, body, env, Math.min(GEMINI_ATTEMPT_TIMEOUT_MS, remaining));
+      } catch (fetchErr) {
+        lastTransient = true;
+        lastError = new Error(`Gemini nicht erreichbar: ${fetchErr.message}`);
+        resp = null;
+      }
+      if (resp?.ok) return resp;
+      if (resp) {
+        const errBody = await resp.text().catch(() => '');
+        let msg = errBody.slice(0, 200);
+        try {
+          msg = JSON.parse(errBody)?.error?.message ?? msg;
+        } catch {
+          // Body war kein JSON — Rohtext reicht
+        }
+        lastTransient = TRANSIENT_STATUSES.has(resp.status);
+        lastError = new Error(`Gemini ${resp.status}: ${msg}`);
+        if (!lastTransient) throw lastError;
+      }
+      if (attempt < GEMINI_RETRIES) {
+        const backoff = GEMINI_BACKOFF_BASE_MS * 2 ** attempt + Math.random() * 250;
+        if (deadline - Date.now() <= backoff) break;
+        await sleep(backoff);
+      }
+    }
+  }
+  if (lastTransient) throw new OverloadedError(lastError?.message ?? 'Gemini überlastet');
+  throw lastError ?? new Error('Gemini nicht erreichbar.');
+}
+
 async function gemini(prompt, env, imageBase64 = null) {
   const parts = imageBase64
     ? [{ inlineData: { mimeType: 'image/jpeg', data: imageBase64 } }, { text: prompt }]
     : [{ text: prompt }];
-
-  let resp;
-  try {
-    resp = await fetch(`${GEMINI_BASE}/${GEMINI_MODEL}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-      body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json' } }),
-      signal: AbortSignal.timeout(60000),
-    });
-  } catch (fetchErr) {
-    throw new Error(`Gemini nicht erreichbar: ${fetchErr.message}`);
-  }
-
-  if (!resp.ok) {
-    const errBody = await resp.text().catch(() => '');
-    let msg = errBody.slice(0, 200);
-    try {
-      msg = JSON.parse(errBody)?.error?.message ?? msg;
-    } catch {
-      // Body war kein JSON — Rohtext reicht
-    }
-    throw new Error(`Gemini ${resp.status}: ${msg}`);
-  }
+  const body = JSON.stringify({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json' } });
+  const resp = await geminiWithFallback(body, env);
 
   const data = await resp.json();
   const answer = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';

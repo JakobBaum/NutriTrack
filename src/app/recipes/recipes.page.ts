@@ -51,6 +51,8 @@ import {
   missingFactsLabel,
   servingsLabel,
   totalWeightG,
+  recipeDisplayFacts,
+  recipeMetaLine,
 } from './recipe-view';
 
 type RecipesView = 'recipes' | 'meals';
@@ -156,6 +158,12 @@ export class RecipesPage implements OnDestroy {
   readonly optionalGramsLabel = optionalGramsLabel;
   readonly quickUnits = QUICK_UNITS;
   readonly servingsLabel = servingsLabel;
+  readonly recipeFacts = recipeDisplayFacts;
+
+  /** Meta-Zeile „2 Portionen · 1 Zutat · 4 kcal gesamt“. */
+  metaLine(recipe: Recipe): string {
+    return recipeMetaLine(recipe, recipeDisplayFacts(recipe)?.kcal);
+  }
 
   readonly unitOptions = UNIT_OPTIONS;
 
@@ -506,6 +514,12 @@ export class RecipesPage implements OnDestroy {
     this.form.ingredients = this.form.ingredients.filter((_, i) => i !== index);
   }
 
+  /** „Manuell eintragen“ aus der Suche: leere Zutat mit dem Suchbegriff als Name. */
+  addManualFromSearch(name: string): void {
+    this.form.ingredients = [...this.form.ingredients, { name: name.trim(), amount: null, unit: 'g' }];
+    this.closePicker();
+  }
+
   addManualIngredient(): void {
     this.form.ingredients = [...this.form.ingredients, { name: '', amount: null, unit: 'g' }];
   }
@@ -767,7 +781,7 @@ export class RecipesPage implements OnDestroy {
   }
 
   private logMeal(recipe: Recipe, meal: MealType, portions: number): void {
-    const perPortion = recipe.factsPerServing ?? {
+    const perPortion = recipeDisplayFacts(recipe) ?? {
       kcal: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0, basis: 'perPortion' as const,
     };
     // Eintrag speichert die tatsächlich gegessene Summe; servings = gegessene Portionen (Tagebuch rechnet daraus je Portion zurück).

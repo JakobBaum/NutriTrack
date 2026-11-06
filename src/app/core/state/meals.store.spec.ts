@@ -22,4 +22,23 @@ describe('MealsStore', () => {
     TestBed.resetTestingModule();
     expect(TestBed.inject(MealsStore).meals()).toHaveLength(0);
   });
+
+  it('update() behält id und Anlagedatum und erzeugt kein Duplikat', () => {
+    // Arrange
+    const store = TestBed.inject(MealsStore);
+    const created = store.add({ name: 'Frühstück', entries: [] });
+
+    // Act
+    const updated = store.update(created.id, { name: '  Brunch ', entries: [] });
+
+    // Assert
+    expect(updated?.id).toBe(created.id);
+    expect(updated?.createdAt).toBe(created.createdAt);
+    expect(store.meals()).toHaveLength(1);
+    expect(store.meals()[0].name).toBe('Brunch');
+  });
+
+  it('update() liefert null für unbekannte id', () => {
+    expect(TestBed.inject(MealsStore).update('nope', { name: 'x', entries: [] })).toBeNull();
+  });
 });

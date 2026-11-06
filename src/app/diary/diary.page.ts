@@ -30,7 +30,7 @@ import { blankFieldsFor, readLabelOffline } from './label-scan';
 import { FASTFOOD_CHAINS, FastFoodForm, defaultKcalBudget } from './fastfood-options';
 import { formatNum } from '../shared/num.pipe';
 import { countMissingFacts } from '../recipes/recipe-view';
-import { DiarySearch } from './diary-search';
+import { NtFoodSearchComponent } from '../shared/food-search/food-search.component';
 import { confirmDiscardSheet, pickMealSheet } from './diary-sheets';
 import { lightHaptic } from './haptics';
 import { hasMacros, withDerivedKcal } from './nutrient-fields';
@@ -155,7 +155,7 @@ export class DiaryPage implements OnDestroy {
   private readonly sheetCtrl = inject(ActionSheetController);
 
   @ViewChild('barcodeVideo') barcodeVideo?: ElementRef<HTMLVideoElement>;
-  @ViewChild('searchbar') searchbar?: { setFocus(): Promise<void> };
+  @ViewChild(NtFoodSearchComponent) foodSearch?: NtFoodSearchComponent;
   @ViewChild(AmountRowComponent) amountRow?: AmountRowComponent;
 
   /** Roher Tipptext je Zahlenfeld (erhält z. B. "1," beim Tippen mit Komma). */
@@ -279,8 +279,6 @@ export class DiaryPage implements OnDestroy {
   readonly savedMeals = this.mealsStore.meals;
   readonly hasSavedMeals = computed(() => this.mealsStore.meals().length > 0);
 
-  // --- Food search ---
-  readonly search = new DiarySearch(this.food, (message) => this.error.set(message));
   readonly scanning = signal(false);
 
   /** Native Kamera nur auf dem Gerät; im Web → Datei-Upload-Fallback. */
@@ -378,7 +376,7 @@ export class DiaryPage implements OnDestroy {
     this.scaleBase = null;
     this.recipeQuery.set('');
     this.customQuery.set('');
-    this.search.reset();
+    this.foodSearch?.reset();
     this.formHint.set(null);
     this.isAiEstimate.set(false);
     this.isPartialSource = false;
@@ -413,7 +411,7 @@ export class DiaryPage implements OnDestroy {
 
   /** ion-modal didPresent → Suchfeld fokussieren, damit sofort getippt werden kann. */
   focusSearch(): void {
-    setTimeout(() => void this.searchbar?.setFocus(), SEARCH_FOCUS_DELAY_MS);
+    setTimeout(() => this.foodSearch?.focus(), SEARCH_FOCUS_DELAY_MS);
   }
 
   showView(next: AddView): void {
@@ -507,7 +505,7 @@ export class DiaryPage implements OnDestroy {
     this.scaleBase = null;
     this.pickedRecipeId = null;
     this.pickedBrand = undefined;
-    const label = this.search.query.trim();
+    const label = this.foodSearch?.query.trim() ?? '';
     this.addDirty = false;
     this.kcalManual = false;
     this.form = { ...this.form, ...EMPTY_FIELDS, label, amountG: null, servings: null };
@@ -571,12 +569,6 @@ export class DiaryPage implements OnDestroy {
   /** Beschriftung der Schnellwahl-Chips (g/ml ohne, kg/l mit bis zu 2 Nachkommastellen). */
   readonly chipText = formatChipAmount;
   readonly mealLabelOf = mealLabel;
-
-  /** Enter im Suchfeld wählt den ersten Treffer. */
-  async pickFirstResult(): Promise<void> {
-    const first = await this.search.pickFirst();
-    if (first) this.selectFood(first);
-  }
 
   /** Chip-Klick-Handler (als Funktion fürs Template-Outlet). */
   readonly pickAmountFn = (value: number): void => this.pickAmount(value);
@@ -700,7 +692,6 @@ export class DiaryPage implements OnDestroy {
   /** Übernimmt einen Suchtreffer (Nährwerte pro 100 g) ins Formular. */
   selectFood(item: FoodItem): void {
     this.applyFacts(item.name, item.facts, { brand: item.brand });
-    this.search.clearAfterPick();
   }
 
   /** Übernimmt ein Rezept (Nährwerte je Portion) ins Formular; Menge = Portionen. */

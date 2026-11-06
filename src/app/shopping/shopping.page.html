@@ -13,6 +13,7 @@
 
 <ion-content>
   <div class="page-col">
+  @if (addOpen()) {
   <div class="add-bar">
     <div class="add-row">
       <ion-input #addName class="add-name" enterkeyhint="done" [(ngModel)]="newItemName" (keyup.enter)="addManual()" placeholder="Artikel" aria-label="Artikel" fill="outline"></ion-input>
@@ -29,6 +30,7 @@
       </div>
     </div>
   </div>
+  }
   @if (showGenerator()) {
     <ion-card class="generator">
       <ion-card-content>
@@ -277,10 +279,15 @@
   } @else {
     <div class="empty">
       <ion-icon name="cart-outline" class="empty__icon" aria-hidden="true"></ion-icon>
-      <p>Noch keine Liste. Trage oben Positionen ein oder generiere einen Wocheneinkauf.</p>
+      <p>Noch keine Liste. Tippe auf „+“, um Artikel hinzuzufügen, oder generiere einen Wocheneinkauf.</p>
     </div>
   }
 
   <div class="content-spacer"></div>
   </div>
+  <ion-fab slot="fixed" vertical="bottom" horizontal="end" class="add-fab">
+    <ion-fab-button (click)="toggleAdd()" [attr.aria-label]="addOpen() ? 'Eingabe schließen' : 'Artikel hinzufügen'" [attr.aria-expanded]="addOpen()">
+      <ion-icon [name]="addOpen() ? 'close-outline' : 'add-outline'"></ion-icon>
+    </ion-fab-button>
+  </ion-fab>
 </ion-content>

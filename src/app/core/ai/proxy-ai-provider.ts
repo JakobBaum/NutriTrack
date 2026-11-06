@@ -17,6 +17,7 @@ import {
   ShoppingPlanResult,
 } from './ai-provider';
 import { DebugLogService } from '../debug/debug-log.service';
+import { friendlyAiErrorMessage } from './ai-errors';
 import { normalizeRecipeImport } from './recipe-import-normalize';
 
 /**
@@ -44,11 +45,8 @@ export class ProxyAiProvider implements AiProvider {
       return result;
     } catch (err) {
       if (err instanceof HttpErrorResponse) {
-        const detail = err.error?.error ?? err.error?.message ?? err.statusText;
-        const msg = err.status === 0
-          ? `KI-Proxy nicht erreichbar (${url})`
-          : `KI-Proxy ${err.status}: ${detail}`;
-        this.log.error(`✗ ${fn}: ${msg}`);
+        const msg = friendlyAiErrorMessage(err.status);
+        this.log.error(`✗ ${fn}: HTTP ${err.status} ${err.error?.error ?? err.statusText ?? ''}`.trim());
         throw new Error(msg);
       }
       this.log.error(`✗ ${fn}: ${(err as Error).message}`);

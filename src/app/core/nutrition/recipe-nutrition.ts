@@ -15,6 +15,24 @@ function round1(v: number): number {
   return Math.round(v * 10) / 10;
 }
 
+/** Mindestanteil der Makro-Energie (4/4/9 kcal je g), den die kcal-Angabe erreichen muss. */
+const MIN_KCAL_SHARE = 0.75;
+
+/** Energie aus Eiweiß, Kohlenhydraten und Fett (Atwater: 4/4/9 kcal je g). */
+export function macroKcal(f: Pick<NutritionFacts, 'proteinG' | 'carbsG' | 'fatG'>): number {
+  return 4 * (f.proteinG || 0) + 4 * (f.carbsG || 0) + 9 * (f.fatG || 0);
+}
+
+/**
+ * Macht kcal und Makros konsistent: Liegt die kcal-Angabe deutlich unter der Energie
+ * der Makros (z. B. 2 kcal bei 2,2 g Fett), ist sie falsch erfasst und wird aus den Makros berechnet.
+ */
+export function reconcileKcal(f: NutritionFacts): NutritionFacts {
+  const fromMacros = macroKcal(f);
+  if (fromMacros <= 0 || (f.kcal || 0) >= fromMacros * MIN_KCAL_SHARE) return f;
+  return { ...f, kcal: Math.round(fromMacros) };
+}
+
 /**
  * Nährwerte einer einzelnen Zutat, skaliert auf ihre Menge.
  *
@@ -46,8 +64,10 @@ export function ingredientFacts(ing: RecipeIngredient): NutritionFacts {
     factor = amount;
   }
 
+  // Konsistenz auf der Bezugsmenge prüfen, bevor kleine Mengen runden.
+  const base = reconcileKcal(facts);
   return {
-    kcal: Math.round((facts.kcal || 0) * factor),
+    kcal: Math.round((base.kcal || 0) * factor),
     proteinG: round1((facts.proteinG || 0) * factor),
     carbsG: round1((facts.carbsG || 0) * factor),
     fatG: round1((facts.fatG || 0) * factor),

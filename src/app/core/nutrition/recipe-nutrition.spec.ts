@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NutritionFacts, RecipeIngredient } from '../models';
-import { ingredientFacts, totalFacts, perServingFacts, hasNutrition } from './recipe-nutrition';
+import { ingredientFacts, totalFacts, perServingFacts, hasNutrition, reconcileKcal } from './recipe-nutrition';
 
 const per100g = (kcal: number, p = 0, c = 0, f = 0): NutritionFacts => ({
   kcal,
@@ -100,5 +100,23 @@ describe('perServingFacts mit halben Portionen', () => {
 
   it('je Portion × Portionen ergibt wieder das Gesamt (Rezeptkarte "Gesamt")', () => {
     expect(perServingFacts(items, 2.5).kcal * 2.5).toBe(totalFacts(items).kcal);
+  });
+});
+
+describe('kcal-Konsistenz', () => {
+  it('hebt zu niedrige kcal auf die Makro-Energie an', () => {
+    const f = reconcileKcal({ kcal: 4, proteinG: 8, carbsG: 8, fatG: 44, basis: 'per100g' });
+    expect(f.kcal).toBe(460);
+  });
+
+  it('lässt plausible kcal unverändert', () => {
+    const f: NutritionFacts = { kcal: 130, proteinG: 2.7, carbsG: 28, fatG: 0.3, basis: 'per100g' };
+    expect(reconcileKcal(f)).toBe(f);
+  });
+
+  it('ergibt je Portion nie weniger kcal als die Makros hergeben', () => {
+    const odd = ing({ amount: 1, unit: 'g', facts: per100g(4, 8, 8, 44) });
+    const p = perServingFacts([odd], 2);
+    expect(p.kcal * 1).toBeGreaterThanOrEqual(Math.floor((4 * p.proteinG + 4 * p.carbsG + 9 * p.fatG) * 0.7));
   });
 });

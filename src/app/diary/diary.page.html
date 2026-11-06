@@ -140,19 +140,7 @@
 
       @switch (view()) {
         @case ('search') {
-          <ion-searchbar
-            #searchbar
-            class="nt-searchbar"
-            [ngModel]="search.query"
-            (ngModelChange)="search.onInput($event)"
-            (keyup.enter)="pickFirstResult()"
-            [debounce]="search.debounceMs"
-            placeholder="Lebensmittel suchen…"
-            aria-label="Lebensmittel suchen"
-            inputmode="search"
-            enterkeyhint="search"
-          ></ion-searchbar>
-
+          <nt-food-search #foodSearch (picked)="selectFood($event)" (manualEntry)="openManualEntry()">
           <div class="sources" role="group" aria-label="Weitere Quellen">
             <button type="button" class="source-btn" (click)="openBarcode()">
               <ion-icon name="barcode-outline" aria-hidden="true"></ion-icon> <span>Barcode</span>
@@ -182,29 +170,9 @@
           </div>
           <input #modalLabelInput type="file" accept="image/*" capture="environment" hidden (change)="onLabelFile($event)" />
 
-          @if (search.query.trim()) {
-            @if (search.searching()) {
-              <p class="scan-hint" role="status"><ion-spinner name="dots"></ion-spinner> Suche läuft…</p>
-            }
-            @if (search.hint()) { <p class="scan-hint" role="status">{{ search.hint() }}</p> }
-            @if (search.noResults() && !search.searching()) {
-              <button type="button" class="inline-action" (click)="openManualEntry()">
-                <ion-icon name="create-outline" aria-hidden="true"></ion-icon> Manuell eintragen
-              </button>
-            }
-            @if (search.results().length) {
-              <h3 class="nt-section-header">Treffer</h3>
-              <ion-list class="diary-list results" [class.results--stale]="search.searching()" lines="none" [attr.aria-busy]="search.searching()">
-                @for (item of search.results(); track item.id) {
-                  <ion-item button detail="false" lines="none" (click)="selectFood(item)">
-                    <nt-food-row [item]="item"></nt-food-row>
-                    <span slot="end" class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
-                  </ion-item>
-                }
-              </ion-list>
-              <p class="data-credit">Daten: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL)</p>
-            }
-          } @else if (recentFoods().length || recentRecipes().length) {
+          </nt-food-search>
+
+          @if (!foodSearch.query.trim() && (recentFoods().length || recentRecipes().length)) {
             <h3 class="nt-section-header">Zuletzt benutzt · für {{ selectedMealLabel() }}</h3>
             <ion-list class="diary-list" lines="none">
               @for (entry of recentFoods(); track entry.id) {

@@ -65,4 +65,31 @@ export function register({ test }) {
     assert.equal(e?.servings, 0.5);
     assert.equal(e?.facts.kcal, 100);
   });
+
+  test('recipes: gespeichertes Rezept über das Karten-Menü bearbeiten (gleiche id)', seed(), async (page) => {
+    await createRecipe(page);
+    const before = (await readStore(page, 'recipes')).find((r) => r.title === TITLE);
+    const card = page.locator('article.recipe', { hasText: TITLE });
+    await card.locator('.recipe__icon-btn').click();
+    await pickActionSheet(page, 'Bearbeiten');
+    const modal = topModal(page);
+    await modal.locator('ion-title', { hasText: 'Rezept bearbeiten' }).waitFor();
+    assert.equal(await byAria(modal, 'Name').inputValue(), TITLE, 'Editor nicht vorbefüllt');
+    await fillAndBlur(byAria(modal, 'Name'), TITLE + ' neu');
+    await modal.locator('.save-btn').click();
+    await settle(page);
+    const all = await readStore(page, 'recipes');
+    assert.equal(all.length, 1);
+    assert.equal(all[0].id, before.id);
+    assert.equal(all[0].title, TITLE + ' neu');
+  });
+
+  test('recipes: Detail-Sheet hat Bearbeiten', seed(), async (page) => {
+    await createRecipe(page);
+    await page.locator('.recipe__title-btn', { hasText: TITLE }).click();
+    const sheet = topModal(page);
+    await sheet.locator('ion-button', { hasText: 'Bearbeiten' }).first().click();
+    await settle(page);
+    await topModal(page).locator('ion-title', { hasText: 'Rezept bearbeiten' }).waitFor();
+  });
 }

@@ -43,6 +43,8 @@ export function register({ test }) {
 
   test('shopping: Artikel mit Enter hinzufügen', seed({ shopping: SHOPPING }), async (page) => {
     await go(page, 'shopping');
+    // Eingabeleiste ist hinter dem schwebenden "+"-Button verborgen
+    await page.locator('ion-fab.add-fab ion-fab-button').click();
     const name = page.locator('ion-input.add-name input');
     await name.fill('Hafermilch');
     await page.locator('ion-input.add-amount input').fill('1,5');

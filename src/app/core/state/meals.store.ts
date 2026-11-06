@@ -29,6 +29,16 @@ export class MealsStore {
     return meal;
   }
 
+  /** Aktualisiert eine Mahlzeit; id und Anlagedatum bleiben erhalten. null, wenn es sie nicht gibt. */
+  update(id: string, draft: SavedMealDraft): SavedMeal | null {
+    const current = this._meals().find(m => m.id === id);
+    if (!current) return null;
+    const next: SavedMeal = { ...current, name: draft.name.trim() || 'Mahlzeit', entries: draft.entries };
+    this._meals.update(list => list.map(m => (m.id === id ? next : m)));
+    this.persist();
+    return next;
+  }
+
   remove(id: string): void {
     this._meals.update(list => list.filter(m => m.id !== id));
     this.persist();

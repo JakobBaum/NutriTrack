@@ -7,14 +7,15 @@ import { ProgressRingComponent } from './progress-ring/progress-ring.component';
 import { NtFoodRowComponent } from './food-row/food-row.component';
 import { NtStepperComponent } from './stepper/stepper.component';
 import { NtDateNavComponent } from './date-nav/date-nav.component';
+import { NtFoodSearchComponent } from './food-search/food-search.component';
 
 /**
  * Bündelt wiederverwendbare UI-Bausteine und die üblichen Standard-Module,
  * damit Feature-Module nur `SharedModule` importieren müssen.
  */
 @NgModule({
-  declarations: [ProgressRingComponent, NtFoodRowComponent, NtStepperComponent, NtDateNavComponent],
+  declarations: [ProgressRingComponent, NtFoodRowComponent, NtStepperComponent, NtDateNavComponent, NtFoodSearchComponent],
   imports: [CommonModule, FormsModule, IonicModule],
-  exports: [CommonModule, FormsModule, IonicModule, ProgressRingComponent, NtFoodRowComponent, NtStepperComponent, NtDateNavComponent],
+  exports: [CommonModule, FormsModule, IonicModule, ProgressRingComponent, NtFoodRowComponent, NtStepperComponent, NtDateNavComponent, NtFoodSearchComponent],
 })
 export class SharedModule {}

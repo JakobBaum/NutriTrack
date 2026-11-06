@@ -2,22 +2,14 @@ import { ChangeDetectionStrategy, Component, OnDestroy, computed, inject, signal
 import { ActionSheetController, AlertController } from '@ionic/angular';
 import { SharedModule } from '../shared/shared.module';
 import { NumPipe } from '../shared/num.pipe';
-import { FoodItem, MealType, NutritionFacts, Recipe, SavedMeal } from '../core/models';
-import { FOOD_PROVIDER } from '../core/food/food-provider';
-import { foodErrorMessage } from '../core/food/food-errors';
+import { FoodItem, MealType, NutritionFacts, Recipe, SavedMeal, SavedMealEntry } from '../core/models';
 import { DiaryStore } from '../core/state/diary.store';
 import { MealsStore } from '../core/state/meals.store';
 import { RecipeStore } from '../core/state/recipe.store';
 import { toDateISO } from '../core/util/date';
 import { confirmDiscard } from './confirm-discard';
-import { isMealDraftDirty, mealSaveBlockReason } from './meal-draft';
+import { isMealDraftChanged, mealSaveBlockReason, rescaleEntryAmount } from './meal-draft';
 import { UNDO_TOAST_BUTTONS, UNDO_TOAST_MS, UndoableDelete, settleUndoToast } from './undoable-delete';
-
-interface DraftEntry {
-  label: string;
-  facts: NutritionFacts;
-  amountG?: number;
-}
 
 const MEAL_OPTIONS: { value: MealType; label: string }[] = [
   { value: 'breakfast', label: 'Frühstück' },
@@ -42,7 +34,6 @@ export class MealsListComponent implements OnDestroy {
   private readonly store = inject(MealsStore);
   private readonly diary = inject(DiaryStore);
   private readonly recipeStore = inject(RecipeStore);
-  private readonly food = inject(FOOD_PROVIDER);
   private readonly actionSheets = inject(ActionSheetController);
   private readonly alerts = inject(AlertController);
   private allowClose = false;
@@ -62,14 +53,14 @@ export class MealsListComponent implements OnDestroy {
   // --- Create modal ---
   readonly createOpen = signal(false);
   draftName = '';
-  draftEntries: DraftEntry[] = [];
+  draftEntries: SavedMealEntry[] = [];
+  /** id der gerade bearbeiteten Mahlzeit; null = neue Mahlzeit. */
+  readonly editingId = signal<string | null>(null);
+  /** Ausgangszustand des Entwurfs (für „Verwerfen?“). */
+  private baseline: { name: string; entries: SavedMealEntry[] } = { name: '', entries: [] };
 
   // --- Food search within create modal ---
   readonly pickerOpen = signal(false);
-  pickerQuery = '';
-  readonly pickerResults = signal<FoodItem[]>([]);
-  readonly pickerSearching = signal(false);
-  readonly pickerError = signal<string | null>(null);
 
   ngOnDestroy(): void {
     this.deletion.flush();
@@ -82,14 +73,25 @@ export class MealsListComponent implements OnDestroy {
 
   /** canDismiss: bei ungespeichertem Entwurf „Verwerfen?“. */
   readonly canDismissCreate = async (): Promise<boolean> => {
-    if (this.allowClose || !isMealDraftDirty(this.draftName, this.draftEntries.length)) return true;
+    if (this.allowClose || !isMealDraftChanged(this.baseline, this.draftName, this.draftEntries)) return true;
     return confirmDiscard(this.alerts);
   };
 
   openCreate(): void {
+    this.openDraft(null, '', []);
+  }
+
+  /** Öffnet den Editor mit den Daten einer gespeicherten Mahlzeit. */
+  openEdit(meal: SavedMeal): void {
+    this.openDraft(meal.id, meal.name, meal.entries);
+  }
+
+  private openDraft(id: string | null, name: string, entries: SavedMealEntry[]): void {
     this.allowClose = false;
-    this.draftName = '';
-    this.draftEntries = [];
+    this.editingId.set(id);
+    this.draftName = name;
+    this.draftEntries = [...entries];
+    this.baseline = { name, entries: [...entries] };
     this.createOpen.set(true);
   }
 
@@ -100,15 +102,10 @@ export class MealsListComponent implements OnDestroy {
 
   saveMeal(): void {
     if (this.saveBlockReason()) return;
-    this.store.add({
-      name: this.draftName.trim(),
-      entries: this.draftEntries.map((e) => ({
-        label: e.label,
-        facts: e.facts,
-        amountG: e.amountG,
-        ref: { kind: 'manual' },
-      })),
-    });
+    const draft = { name: this.draftName, entries: this.draftEntries };
+    const id = this.editingId();
+    if (id) this.store.update(id, draft);
+    else this.store.add(draft);
     this.allowClose = true;
     this.createOpen.set(false);
     this.toastMessage.set(`„${this.draftName.trim()}" gespeichert.`);
@@ -122,39 +119,29 @@ export class MealsListComponent implements OnDestroy {
     return Math.round(this.draftEntries.reduce((s, e) => s + e.facts.kcal, 0));
   }
 
+  /** Ändert die Menge eines Eintrags (g); Nährwerte werden mitskaliert. */
+  setEntryAmount(index: number, event: Event): void {
+    const value = Number((event as CustomEvent<{ value?: string | number | null }>).detail?.value);
+    if (!(value > 0)) return;
+    this.draftEntries = this.draftEntries.map((e, i) => (i === index ? rescaleEntryAmount(e, value) : e));
+  }
+
   addRecipeToDraft(recipe: Recipe): void {
     if (!recipe.factsPerServing) return;
     this.draftEntries = [...this.draftEntries, {
       label: recipe.title,
       facts: recipe.factsPerServing,
+      ref: { kind: 'manual' },
     }];
   }
 
   // --- Food picker ---
   openPicker(): void {
-    this.pickerQuery = '';
-    this.pickerResults.set([]);
-    this.pickerError.set(null);
     this.pickerOpen.set(true);
   }
 
   closePicker(): void {
     this.pickerOpen.set(false);
-  }
-
-  async searchFood(): Promise<void> {
-    const q = this.pickerQuery.trim();
-    if (!q) return;
-    this.pickerError.set(null);
-    this.pickerSearching.set(true);
-    try {
-      this.pickerResults.set(await this.food.searchByText(q));
-      if (this.pickerResults().length === 0) this.pickerError.set('Keine Treffer.');
-    } catch (e: unknown) {
-      this.pickerError.set(foodErrorMessage(e));
-    } finally {
-      this.pickerSearching.set(false);
-    }
   }
 
   pickFood(item: FoodItem): void {
@@ -168,7 +155,7 @@ export class MealsListComponent implements OnDestroy {
       fatG: Math.round(item.facts.fatG * factor * 10) / 10,
       basis: 'perPortion',
     };
-    this.draftEntries = [...this.draftEntries, { label: item.name, facts: scaled, amountG }];
+    this.draftEntries = [...this.draftEntries, { label: item.name, facts: scaled, amountG, ref: { kind: 'manual' } }];
     this.closePicker();
   }
 

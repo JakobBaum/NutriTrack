@@ -17,6 +17,17 @@ beforeEach(() => {
   TestBed.configureTestingModule({ providers: [provideHttpClient()] });
 });
 
+describe('ShoppingPage add FAB', () => {
+  it('toggles the add form open and closed', () => {
+    const { page } = createPage();
+    expect(page.addOpen()).toBe(false);
+    page.toggleAdd();
+    expect(page.addOpen()).toBe(true);
+    page.toggleAdd();
+    expect(page.addOpen()).toBe(false);
+  });
+});
+
 describe('ShoppingPage manual add', () => {
   it('keeps a blank amount empty instead of defaulting to 1', () => {
     const { page, store } = createPage();

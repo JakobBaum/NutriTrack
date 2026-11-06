@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { AI_ERROR_MESSAGES } from './ai-errors';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -69,24 +70,26 @@ describe('ProxyAiProvider', () => {
     expect(res.sourceUrl).toBe('https://x.test');
   });
 
-  it('meldet Status 0 als „nicht erreichbar"', async () => {
+  it('meldet Status 0 als Offline-Hinweis', async () => {
     const p = provider.computeTargets(profile);
     http.expectOne(PROXY).error(new ProgressEvent('error'), { status: 0 });
-    await expect(p).rejects.toThrow(`KI-Proxy nicht erreichbar (${PROXY})`);
+    await expect(p).rejects.toThrow(AI_ERROR_MESSAGES.offline);
     expect(log.entries()[0].level).toBe('error');
   });
 
-  it('übernimmt die Fehlermeldung aus dem Body (error → message → statusText)', async () => {
-    const p1 = provider.computeTargets(profile);
-    http.expectOne(PROXY).flush({ error: 'Quota' }, { status: 500, statusText: 'Server Error' });
-    await expect(p1).rejects.toThrow('KI-Proxy 500: Quota');
-
-    const p2 = provider.computeTargets(profile);
-    http.expectOne(PROXY).flush({ message: 'Zu groß' }, { status: 413, statusText: 'Too Large' });
-    await expect(p2).rejects.toThrow('KI-Proxy 413: Zu groß');
-
-    const p3 = provider.computeTargets(profile);
-    http.expectOne(PROXY).flush(null, { status: 502, statusText: 'Bad Gateway' });
-    await expect(p3).rejects.toThrow('KI-Proxy 502: Bad Gateway');
+  it('mappt HTTP-Status auf freundliche Meldungen statt rohem "500: Gemini 503"', async () => {
+    const cases: Array<[number, string]> = [
+      [503, AI_ERROR_MESSAGES.overloaded],
+      [500, AI_ERROR_MESSAGES.overloaded],
+      [429, AI_ERROR_MESSAGES.rateLimited],
+      [401, AI_ERROR_MESSAGES.unauthorized],
+      [403, AI_ERROR_MESSAGES.unauthorized],
+      [413, AI_ERROR_MESSAGES.generic],
+    ];
+    for (const [status, message] of cases) {
+      const p = provider.computeTargets(profile);
+      http.expectOne(PROXY).flush({ error: 'Gemini 503' }, { status, statusText: 'x' });
+      await expect(p).rejects.toThrow(message);
+    }
   });
 });

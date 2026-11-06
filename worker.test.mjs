@@ -219,6 +219,62 @@ describe('POST / (KI-Proxy)', () => {
   });
 });
 
+describe('POST / — Gemini überlastet (Retry, Fallback, 503)', () => {
+  const realSetTimeout = globalThis.setTimeout;
+  const errReply = (status) =>
+    new Response(JSON.stringify({ error: { message: 'overloaded' } }), { status });
+  const run = () => worker.fetch(post({ fn: 'computeTargets', payload: PROFILE }), ENV);
+  const OK = { kcal: 2000, proteinG: 150, carbsG: 200, fatG: 60, fiberG: 30, sugarG: 40 };
+
+  beforeEach(() => {
+    // Backoff-Pausen überspringen, Timeouts der Fetch-Signale bleiben unberührt (unref'd intern).
+    globalThis.setTimeout = (fn, _ms, ...a) => realSetTimeout(fn, 0, ...a);
+  });
+  afterEach(() => {
+    globalThis.setTimeout = realSetTimeout;
+  });
+
+  it('wiederholt ein 503 und liefert danach das Ergebnis', async () => {
+    let n = 0;
+    mockFetch(() => (++n < 3 ? errReply(503) : geminiReply(OK)));
+    const res = await run();
+    assert.equal(res.status, 200);
+    assert.equal(upstream.length, 3);
+    assert.ok(upstream.every((u) => u.url.includes('gemini-3.8-flash:')));
+  });
+
+  it('fällt nach erschöpften Retries auf das Fallback-Modell zurück', async () => {
+    mockFetch((url) => (url.includes('flash-lite') ? geminiReply(OK) : errReply(503)));
+    const res = await run();
+    assert.equal(res.status, 200);
+    assert.equal(upstream.length, 4);
+    assert.ok(upstream[3].url.includes('gemini-3.8-flash-lite:'));
+  });
+
+  it('antwortet 503 mit deutscher Meldung und Retry-After, wenn alles überlastet ist', async () => {
+    mockFetch(() => errReply(503));
+    const res = await run();
+    assert.equal(res.status, 503);
+    assert.equal(res.headers.get('Retry-After'), '60');
+    assert.match((await res.json()).error, /überlastet/);
+    assert.equal(upstream.length, 6);
+  });
+
+  it('wiederholt 429 und 500 ebenfalls', async () => {
+    let n = 0;
+    mockFetch(() => (++n === 1 ? errReply(429) : ++n === 3 ? errReply(500) : geminiReply(OK)));
+    const res = await run();
+    assert.equal(res.status, 200);
+  });
+
+  it('wiederholt keine permanenten Fehler (400) und gibt 500 zurück', async () => {
+    mockFetch(() => errReply(400));
+    const res = await run();
+    assert.equal(res.status, 500);
+    assert.equal(upstream.length, 1);
+  });
+});
+
 describe('importRecipe — SSRF-Schutz und Seitentext', () => {
   for (const url of ['http://localhost/admin', 'http://127.0.0.1:8080/', 'http://10.0.0.5/', 'http://169.254.169.254/latest', 'file:///etc/passwd', 'http://[::1]/']) {
     it(`blockiert interne/unsichere URL ${url}`, async () => {

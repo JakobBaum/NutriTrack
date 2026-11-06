@@ -145,6 +145,7 @@ export class ShoppingPage implements OnDestroy {
     { read: ElementRef },
   );
   newItemUnit = 'g';
+  readonly addOpen = signal(false);
 
   toggleMeal(value: MealType): void {
     this.mealToggles.update((meals) =>
@@ -360,6 +361,12 @@ export class ShoppingPage implements OnDestroy {
     if (role !== 'confirm') return;
     const raw = String(data?.values?.price ?? '').trim();
     this.store.setItemPrice(index, raw === '' ? null : parseDecimal(raw));
+  }
+
+  toggleAdd(): void {
+    const next = !this.addOpen();
+    this.addOpen.set(next);
+    if (next) setTimeout(() => void this.addNameInput()?.nativeElement.setFocus?.(), 50);
   }
 
   addManual(): void {

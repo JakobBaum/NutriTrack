@@ -1,5 +1,7 @@
-import { NutritionFacts, RecipeIngredient, RecipeOrigin } from '../core/models';
+import { NutritionFacts, Recipe, RecipeIngredient, RecipeOrigin } from '../core/models';
+import { hasNutrition, perServingFacts, reconcileKcal } from '../core/nutrition/recipe-nutrition';
 import { UNIT_WEIGHT_G, countMissingFacts } from '../core/nutrition/units-weight';
+import { formatNum } from '../shared/num.pipe';
 
 // Re-Export: Bestandsimporte (z. B. Diary) bleiben unverändert gültig.
 export { UNIT_WEIGHT_G, countMissingFacts };
@@ -33,6 +35,27 @@ export function missingFactsLabel(count: number): string {
 export function servingsLabel(servings: number): string {
   const text = String(servings).replace('.', ',');
   return `${text} ${servings === 1 ? 'Portion' : 'Portionen'}`;
+}
+
+/** „1 Zutat“ / „3 Zutaten“. */
+export function ingredientsLabel(count: number): string {
+  return `${count} ${count === 1 ? 'Zutat' : 'Zutaten'}`;
+}
+
+/**
+ * Nährwerte je Portion für die Anzeige: aus den Zutaten neu berechnet (heilt ältere,
+ * inkonsistent gespeicherte Werte), sonst die gespeicherten Werte mit konsistenter kcal.
+ */
+export function recipeDisplayFacts(recipe: Pick<Recipe, 'ingredients' | 'servings' | 'factsPerServing'>): NutritionFacts | undefined {
+  if (hasNutrition(recipe.ingredients)) return perServingFacts(recipe.ingredients, recipe.servings);
+  return recipe.factsPerServing ? reconcileKcal(recipe.factsPerServing) : undefined;
+}
+
+/** Eine Meta-Zeile: „2 Portionen · 1 Zutat · 4 kcal gesamt“. */
+export function recipeMetaLine(recipe: Pick<Recipe, 'servings' | 'ingredients'>, perServingKcal: number | undefined): string {
+  const parts = [servingsLabel(recipe.servings), ingredientsLabel(recipe.ingredients.length)];
+  if (perServingKcal !== undefined) parts.push(`${formatNum(perServingKcal * recipe.servings, 0)} kcal gesamt`);
+  return parts.join(' · ');
 }
 
 /** Präfix „≥ “, wenn die Summe wegen fehlender Zutatenwerte nur eine Untergrenze ist. */

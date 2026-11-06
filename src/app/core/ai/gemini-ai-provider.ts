@@ -17,6 +17,7 @@ import {
   ShoppingPlanResult,
 } from './ai-provider';
 import { SHOPPING_CATEGORIES, categorizeName, normalizeCategory } from '../shopping/shopping-category';
+import { friendlyAiErrorMessage } from './ai-errors';
 import { normalizeRecipeImport } from './recipe-import-normalize';
 
 const DEFAULT_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -251,9 +252,7 @@ export class GeminiAiProvider implements AiProvider {
         await new Promise((r) => setTimeout(r, 600 * (i + 1)));
       }
     }
-    if (lastErr instanceof HttpErrorResponse && lastErr.status === 503) {
-      throw new Error('Gemini ist gerade überlastet (503) — bitte in ein paar Sekunden erneut versuchen.');
-    }
+    if (lastErr instanceof HttpErrorResponse) throw new Error(friendlyAiErrorMessage(lastErr.status));
     throw lastErr;
   }
 

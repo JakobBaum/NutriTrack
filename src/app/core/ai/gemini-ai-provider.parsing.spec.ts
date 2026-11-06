@@ -176,7 +176,7 @@ describe('GeminiAiProvider — Retry', () => {
   it('meldet nach 3× 503 „überlastet"', async () => {
     vi.useFakeTimers();
     const p = provider.computeTargets(profile);
-    const assertion = expect(p).rejects.toThrow(/überlastet \(503\)/);
+    const assertion = expect(p).rejects.toThrow(/gerade überlastet/);
     http.expectOne(URL_FLASH).flush(null, { status: 503, statusText: 'Unavailable' });
     await vi.advanceTimersByTimeAsync(600);
     http.expectOne(URL_FLASH).flush(null, { status: 503, statusText: 'Unavailable' });
@@ -185,10 +185,16 @@ describe('GeminiAiProvider — Retry', () => {
     await assertion;
   });
 
+  it('meldet 401 als ungültigen Schlüssel', async () => {
+    const p = provider.computeTargets(profile);
+    http.expectOne(URL_FLASH).flush(null, { status: 401, statusText: 'Unauthorized' });
+    await expect(p).rejects.toThrow(/Schlüssel/);
+  });
+
   it('wiederholt bei 400 nicht und reicht den Fehler weiter', async () => {
     const p = provider.computeTargets(profile);
     http.expectOne(URL_FLASH).flush({ error: 'bad' }, { status: 400, statusText: 'Bad Request' });
-    await expect(p).rejects.toMatchObject({ status: 400 });
+    await expect(p).rejects.toThrow(/fehlgeschlagen/);
     http.expectNone(URL_FLASH);
   });
 });

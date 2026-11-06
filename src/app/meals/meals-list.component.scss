@@ -104,3 +104,17 @@ ion-modal ion-buttons ion-button {
   font-size: 13px;
   color: var(--ion-color-medium);
 }
+
+// Mengen-Eingabe je Eintrag (Gramm)
+.amount-input {
+  flex: none;
+  width: 72px;
+  min-height: var(--nt-touch);
+  text-align: right;
+  --padding-start: 0;
+}
+
+.amount-unit {
+  color: var(--nt-secondary);
+  font-size: var(--nt-fs-caption);
+}
