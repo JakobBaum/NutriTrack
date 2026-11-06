@@ -235,6 +235,39 @@ ion-content {
       outline-offset: -2px;
     }
   }
+
+  // "Wie gestern": zweite Zeile mit eingeruecktem Trenner (wie .nt-grouped)
+  &__empty-copy {
+    position: relative;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: var(--nt-space-4);
+      right: 0;
+      border-top: 0.5px solid var(--nt-separator);
+    }
+  }
+
+  &__empty-count {
+    margin-left: auto;
+    font-size: var(--nt-fs-caption);
+    font-weight: 400;
+    color: var(--nt-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+// "Tag kopieren" unter der Datumsnavigation
+.day-actions {
+  display: flex;
+  justify-content: center;
+  padding: var(--nt-space-1) var(--nt-space-4) 0;
+
+  &__copy ion-icon {
+    font-size: 18px;
+  }
 }
 
 // Fastfood-Helfer als Zeile mit Chevron
@@ -583,4 +616,23 @@ ion-searchbar.nt-searchbar {
   .source-btn {
     transition: none;
   }
+}
+
+// Einheiten-Auswahl (g / kg / ml / l) unter der Mengeneingabe
+.unit-picker {
+  padding: var(--nt-space-2) var(--nt-space-5) 0;
+}
+
+// Schnellwahl-Chips unter der Mengeneingabe
+.quick-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nt-space-2);
+  padding: var(--nt-space-2) var(--nt-space-5) 0;
+}
+
+.quick-chip {
+  min-height: 44px;
+  min-width: 44px;
+  padding-inline: var(--nt-space-4);
 }

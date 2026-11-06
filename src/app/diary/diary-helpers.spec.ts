@@ -1,4 +1,4 @@
-import { NutritionFacts } from '../core/models';
+import { DiaryEntry, NutritionFacts } from '../core/models';
 import {
   EMPTY_FIELDS,
   factsFromFields,
@@ -9,10 +9,22 @@ import {
   isValidAmount,
   rebaseTo100,
   unitForName,
+  unitFactor,
+  baseUnitOf,
+  toBaseAmount,
+  fromBaseAmount,
+  formatAmount,
   mealForHour,
   mealLabel,
   scaleFacts,
   toNumberOrNull,
+  quickAmounts,
+  numberToInputText,
+  inputTextFor,
+  convertAmount,
+  lastAmountForLabel,
+  perServingFacts,
+  editBaseFor,
 } from './diary-helpers';
 
 const OATS_PER_100G: NutritionFacts = {
@@ -122,6 +134,80 @@ describe('toNumberOrNull', () => {
     expect(toNumberOrNull(null)).toBeNull();
     expect(toNumberOrNull('abc')).toBeNull();
   });
+
+  it('wertet Leerzeichen und Hex-Schreibweise nicht als Zahl', () => {
+    expect(toNumberOrNull(' ')).toBeNull();
+    expect(toNumberOrNull('0x1A')).toBeNull();
+  });
+});
+
+describe('perServingFacts', () => {
+  it('rechnet Gesamtwerte mehrerer Portionen auf eine Portion zurück', () => {
+    const total: NutritionFacts = { kcal: 1000, proteinG: 40, carbsG: 100, fatG: 30, basis: 'perPortion' };
+    expect(perServingFacts(total, 2)).toMatchObject({ kcal: 500, proteinG: 20, carbsG: 50, fatG: 15 });
+  });
+
+  it('lässt Werte bei 1 oder fehlenden/ungültigen Portionen unverändert', () => {
+    const one: NutritionFacts = { kcal: 300, proteinG: 1, carbsG: 2, fatG: 3, basis: 'perPortion' };
+    expect(perServingFacts(one, 1)).toBe(one);
+    expect(perServingFacts(one, undefined)).toBe(one);
+    expect(perServingFacts(one, 0)).toBe(one);
+  });
+});
+
+describe('editBaseFor', () => {
+  const base: DiaryEntry = {
+    id: 'm1',
+    dateISO: '2026-10-13',
+    meal: 'breakfast',
+    label: 'Orangensaft',
+    ref: { kind: 'manual' },
+    amountG: 500,
+    unit: 'l',
+    facts: { kcal: 225, proteinG: 3.5, carbsG: 50, fatG: 1, basis: 'perPortion' },
+    createdAt: '2026-10-13T07:00:00.000Z',
+  };
+
+  it('leitet für manuelle Einträge mit Menge Werte pro 100 ab', () => {
+    expect(editBaseFor(base)).toMatchObject({ kcal: 45, proteinG: 0.7, carbsG: 10, fatG: 0.2, basis: 'per100g' });
+  });
+
+  it('nutzt gespeicherte baseFacts und liefert ohne Menge null', () => {
+    const stored: NutritionFacts = { kcal: 40, proteinG: 1, carbsG: 9, fatG: 0, basis: 'per100g' };
+    expect(editBaseFor({ ...base, baseFacts: stored })).toBe(stored);
+    expect(editBaseFor({ ...base, amountG: undefined })).toBeNull();
+  });
+});
+
+describe('lastAmountForLabel', () => {
+  const mk = (id: string, label: string, amountG: number | undefined, createdAt: string): DiaryEntry => ({
+    id,
+    dateISO: '2026-10-13',
+    meal: 'breakfast',
+    label,
+    ref: { kind: 'manual' },
+    amountG,
+    facts: { kcal: 1, proteinG: 0, carbsG: 0, fatG: 0, basis: 'perPortion' },
+    createdAt,
+  });
+  const entries = [
+    mk('a', 'Haferflocken', 50, '2026-10-12T07:00:00.000Z'),
+    mk('b', 'haferflocken ', 80, '2026-10-13T07:00:00.000Z'),
+    mk('c', 'Haferflocken', undefined, '2026-10-13T08:00:00.000Z'),
+  ];
+
+  it('liefert die neueste Menge zum Namen (ohne Groß-/Kleinschreibung)', () => {
+    expect(lastAmountForLabel(entries, 'Haferflocken')).toBe(80);
+  });
+
+  it('ignoriert den gerade bearbeiteten Eintrag', () => {
+    expect(lastAmountForLabel(entries, 'Haferflocken', 'b')).toBe(50);
+    expect(lastAmountForLabel([entries[1]], 'Haferflocken', 'b')).toBeNull();
+  });
+
+  it('liefert null für leeren Namen', () => {
+    expect(lastAmountForLabel(entries, '  ')).toBeNull();
+  });
 });
 
 describe('amount and unit helpers', () => {
@@ -147,5 +233,79 @@ describe('amount and unit helpers', () => {
     const a = scaleFacts(OATS_PER_100G, 1);
     expect(factsDiffer(a, { ...a })).toBe(false);
     expect(factsDiffer(a, { ...a, kcal: a.kcal + 1 })).toBe(true);
+  });
+});
+
+describe('Mengeneinheiten', () => {
+  it('unitFactor: kg und l sind 1000, g und ml 1', () => {
+    expect(unitFactor('kg')).toBe(1000);
+    expect(unitFactor('l')).toBe(1000);
+    expect(unitFactor('g')).toBe(1);
+    expect(unitFactor('ml')).toBe(1);
+  });
+
+  it('baseUnitOf liefert g bzw. ml', () => {
+    expect(baseUnitOf('kg')).toBe('g');
+    expect(baseUnitOf('g')).toBe('g');
+    expect(baseUnitOf('l')).toBe('ml');
+    expect(baseUnitOf('ml')).toBe('ml');
+  });
+
+  it('toBaseAmount rechnet in Basiseinheit um', () => {
+    expect(toBaseAmount(0.5, 'kg')).toBe(500);
+    expect(toBaseAmount(1.2, 'l')).toBe(1200);
+    expect(toBaseAmount(250, 'g')).toBe(250);
+  });
+
+  it('fromBaseAmount rundet auf höchstens 3 Nachkommastellen', () => {
+    expect(fromBaseAmount(250, 'l')).toBe(0.25);
+    expect(fromBaseAmount(1, 'kg')).toBe(0.001);
+    expect(fromBaseAmount(1 / 3, 'g')).toBe(0.333);
+    expect(fromBaseAmount(250, 'ml')).toBe(250);
+  });
+
+  it('convertAmount verliert beim Wechsel g -> kg -> g keine Kleinstmengen', () => {
+    const kg = convertAmount(0.4, 'g', 'kg');
+    expect(convertAmount(kg, 'kg', 'g')).toBeCloseTo(0.4, 9);
+    expect(toBaseAmount(convertAmount(kg, 'kg', 'g'), 'g')).toBe(0.4);
+    expect(convertAmount(0.25, 'l', 'ml')).toBe(250);
+  });
+
+  it('numberToInputText rundet nur die Anzeige', () => {
+    expect(numberToInputText(0.0004)).toBe('0,0004');
+    expect(numberToInputText(0.12340000000000001)).toBe('0,1234');
+  });
+
+  it('formatAmount nutzt Dezimalkomma und Einheit', () => {
+    expect(formatAmount(250, 'g')).toBe('250 g');
+    expect(formatAmount(500, 'l')).toBe('0,5 l');
+    expect(formatAmount(1200, 'kg')).toBe('1,2 kg');
+    expect(formatAmount(250)).toBe('250 g');
+  });
+});
+
+describe('quickAmounts', () => {
+  it('returns 50-200 for g and ml', () => {
+    expect(quickAmounts('g')).toEqual([50, 100, 150, 200]);
+    expect(quickAmounts('ml')).toEqual([50, 100, 150, 200]);
+  });
+  it('returns 0.1-1 for kg and l', () => {
+    expect(quickAmounts('kg')).toEqual([0.1, 0.25, 0.5, 1]);
+    expect(quickAmounts('l')).toEqual([0.1, 0.25, 0.5, 1]);
+  });
+});
+
+describe('number input text', () => {
+  it('formats with decimal comma', () => {
+    expect(numberToInputText(1.5)).toBe('1,5');
+    expect(numberToInputText(null)).toBe('');
+  });
+  it('keeps raw typing text while it matches the value', () => {
+    expect(inputTextFor('1,', 1)).toBe('1,');
+    expect(inputTextFor('1,5', 1.5)).toBe('1,5');
+  });
+  it('falls back to formatted value when raw is stale', () => {
+    expect(inputTextFor('1,5', 2)).toBe('2');
+    expect(inputTextFor(undefined, 0.25)).toBe('0,25');
   });
 });

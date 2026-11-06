@@ -47,3 +47,23 @@ describe('ShoppingStore total', () => {
     expect(store.list()?.estTotal).toBe(3);
   });
 });
+
+describe('mergeKept mit manueller Position ohne Menge', () => {
+  it('behält die generierte Menge, wenn die behaltene Position Menge 0 hat', () => {
+    const prev: ShoppingItem[] = [{ name: 'Reis', amount: 0, unit: 'g', checked: false }];
+    const generated: ShoppingItem[] = [{ name: 'reis', amount: 300, unit: 'g', checked: false, estPrice: 1.2 }];
+
+    const merged = mergeKept(prev, generated);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0].amount).toBe(300);
+    expect(merged[0].name).toBe('Reis');
+  });
+
+  it('behält die Menge der behaltenen Position, wenn sie > 0 ist', () => {
+    const prev: ShoppingItem[] = [{ name: 'Reis', amount: 500, unit: 'g', checked: true }];
+    const generated: ShoppingItem[] = [{ name: 'Reis', amount: 300, unit: 'g', checked: false }];
+
+    expect(mergeKept(prev, generated)[0].amount).toBe(500);
+  });
+});

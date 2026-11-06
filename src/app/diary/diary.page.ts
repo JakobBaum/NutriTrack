@@ -10,16 +10,16 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, ParamMap, Router } from '@angular/router';
-import { ToastController } from '@ionic/angular';
+import { AlertController, ToastController } from '@ionic/angular';
 import type { IScannerControls } from '@zxing/browser';
-import { DiaryEntry, FastFoodSuggestion, FoodItem, MealType, NutritionFacts, Recipe, SavedMeal } from '../core/models';
+import { AmountUnit, DiaryEntry, FastFoodSuggestion, FoodItem, MealType, NutritionFacts, Recipe, SavedMeal } from '../core/models';
 import { AiService } from '../core/ai/ai.service';
 import { FOOD_PROVIDER } from '../core/food/food-provider';
 import { foodErrorMessage } from '../core/food/food-errors';
 import { CameraService } from '../core/scan/camera.service';
 import { BarcodeScannerService } from '../core/scan/barcode-scanner.service';
 import { OpenPricesProvider } from '../core/price/open-prices.provider';
-import { DiaryStore, NewDiaryEntry } from '../core/state/diary.store';
+import { CopySource, DiaryStore, NewDiaryEntry } from '../core/state/diary.store';
 import { MealsStore } from '../core/state/meals.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { RecipeStore } from '../core/state/recipe.store';
@@ -27,6 +27,7 @@ import { CustomFood, CustomFoodStore } from '../core/state/custom-food.store';
 import { addDaysISO, dayLabel, toDateISO } from '../core/util/date';
 import { formatNum } from '../shared/num.pipe';
 import { countMissingFacts } from '../recipes/recipe-view';
+import { copyFromButtonText, copyFromText, copySourceOptionText, entriesKcal, entryCountText } from './diary-copy';
 import {
   EMPTY_FIELDS,
   EntryFields,
@@ -42,7 +43,18 @@ import {
   rebaseTo100,
   scaleFacts,
   toNumberOrNull,
+  quickAmounts,
+  inputTextFor,
   unitForName,
+  AMOUNT_UNITS,
+  formatAmount,
+  baseUnitOf,
+  fromBaseAmount,
+  toBaseAmount,
+  convertAmount,
+  lastAmountForLabel,
+  perServingFacts,
+  editBaseFor,
 } from './diary-helpers';
 
 interface MealGroup {
@@ -51,6 +63,8 @@ interface MealGroup {
   icon: string;
   entries: DiaryEntry[];
   kcal: number;
+  /** Letzter früherer Tag mit Einträgen dieser Mahlzeit; nur gesetzt, wenn die Mahlzeit leer ist. */
+  copySource: CopySource | null;
 }
 
 type AddView = 'search' | 'form' | 'recipes' | 'saved' | 'meals';
@@ -71,6 +85,7 @@ interface EntryForm extends EntryFields {
 
 interface ApplyOptions {
   amountG?: number;
+  unit?: AmountUnit;
   servings?: number;
   recipeId?: string;
   isAi?: boolean;
@@ -97,9 +112,13 @@ const DEFAULT_AMOUNT_G = 100;
 const MAX_RECENT_FOODS = 8;
 const SEARCH_DEBOUNCE_MS = 400;
 const SEARCH_FOCUS_DELAY_MS = 60;
+const AMOUNT_FOCUS_DELAY_MS = 150;
 const SCROLL_TO_MEAL_DELAY_MS = 150;
 const TOAST_MS = 2500;
 const TOAST_UNDO_MS = 5000;
+/** rawTexts-Schlüssel des Add-Formulars (Menge, Portionen, Nährwerte). */
+const ADD_FORM_TEXT_KEYS: readonly string[] = ['amount', 'servings', ...Object.keys(EMPTY_FIELDS)];
+const EDIT_FORM_TEXT_KEYS: readonly string[] = ['editAmount'];
 
 /**
  * Tagebuch: Einträge je Mahlzeit. Hinzufügen läuft über ein Modal, das sofort
@@ -127,9 +146,22 @@ export class DiaryPage implements OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly toastCtrl = inject(ToastController);
+  private readonly alertCtrl = inject(AlertController);
 
   @ViewChild('barcodeVideo') barcodeVideo?: ElementRef<HTMLVideoElement>;
   @ViewChild('searchbar') searchbar?: { setFocus(): Promise<void> };
+  @ViewChild('amountInput') amountInput?: {
+    setFocus(): Promise<void>;
+    getInputElement(): Promise<HTMLInputElement>;
+  };
+
+  /** Roher Tipptext je Zahlenfeld (erhält z. B. "1," beim Tippen mit Komma). */
+  private readonly rawTexts: Record<string, string> = {};
+
+  /** Verwirft den Tipptext der genannten Felder (sonst zeigt ein neuer Eintrag z. B. noch "1,"). */
+  private clearRawTexts(keys: readonly string[]): void {
+    keys.forEach((key) => delete this.rawTexts[key]);
+  }
 
   readonly selectedDate = signal(toDateISO());
   readonly dateLabel = computed(() => dayLabel(this.selectedDate()));
@@ -150,9 +182,13 @@ export class DiaryPage implements OnDestroy {
     return MEAL_DEFS.map((d) => {
       const entries = this.diary.entriesForMeal(date, d.type);
       const kcal = entries.reduce((s, e) => s + (e.facts.kcal || 0), 0);
-      return { ...d, entries, kcal: Math.round(kcal) };
+      const copySource = entries.length === 0 ? this.diary.findCopySource(date, d.type) : null;
+      return { ...d, entries, kcal: Math.round(kcal), copySource };
     });
   });
+
+  /** Frühere Tage (max. 7 zurück) mit Einträgen, für „Tag kopieren“. */
+  readonly daySources = computed(() => this.diary.copySources(this.selectedDate()));
 
   readonly mealOptions: { value: MealType; label: string }[] = MEAL_DEFS.map((m) => ({
     value: m.type,
@@ -181,6 +217,12 @@ export class DiaryPage implements OnDestroy {
   private pickedRecipeId: string | null = null;
   /** Bezugswerte für die Mengenskalierung; null bei manueller Eingabe. */
   scaleBase: ScaleBase | null = null;
+  /** Gewählte Einheit der Mengeneingabe; form.amountG zeigt den Wert in dieser Einheit. */
+  amountUnit: AmountUnit = 'g';
+  /** True, sobald die Einheit manuell gewählt wurde (stoppt die Namens-Vorgabe). */
+  private unitTouched = false;
+  readonly amountUnits = AMOUNT_UNITS;
+  readonly formatAmount = formatAmount;
 
   // --- Edit-Modal ---
   readonly editOpen = signal(false);
@@ -188,6 +230,8 @@ export class DiaryPage implements OnDestroy {
   editForm: { label: string; meal: MealType; amountG: number | null } = {
     label: '', meal: 'breakfast', amountG: null,
   };
+  /** Einheit im Bearbeiten-Dialog; editForm.amountG zeigt den Wert in dieser Einheit. */
+  editUnit: AmountUnit = 'g';
   editBaseFacts: NutritionFacts | null = null;
   editError: string | null = null;
 
@@ -316,6 +360,9 @@ export class DiaryPage implements OnDestroy {
   // --- Add modal: öffnen / schließen / navigieren ---
   openAdd(meal: MealType = this.currentMeal()): void {
     this.form = { ...EMPTY_FORM, meal };
+    this.clearRawTexts(ADD_FORM_TEXT_KEYS);
+    this.amountUnit = 'g';
+    this.unitTouched = false;
     this.pickedRecipeId = null;
     this.scaleBase = null;
     this.recipeQuery.set('');
@@ -379,9 +426,33 @@ export class DiaryPage implements OnDestroy {
     return this.scaleBase?.unit ?? null;
   }
 
-  /** Einheit der Mengeneingabe (ml für Flüssigkeiten, sonst g). */
-  get amountUnit(): 'g' | 'ml' {
-    return unitForName(this.form.label);
+  /** Basiseinheit der Quelle (Hinweis „kcal pro 100 g/ml“). */
+  get baseUnit(): 'g' | 'ml' {
+    return baseUnitOf(this.amountUnit);
+  }
+
+  /** Eingegebene Menge in Basiseinheit (g bzw. ml); null bei leerer/ungültiger Eingabe. */
+  private get baseAmount(): number | null {
+    const v = this.form.amountG;
+    return v == null ? null : toBaseAmount(v, this.amountUnit);
+  }
+
+  /** Wechselt die Einheit und rechnet den gezeigten Wert um (Menge bleibt gleich). */
+  setAmountUnit(unit: unknown): void {
+    if (!AMOUNT_UNITS.includes(unit as AmountUnit) || unit === this.amountUnit) return;
+    const next = unit as AmountUnit;
+    // Ungerundet umrechnen, damit g -> kg -> g keine Kleinstmengen verliert.
+    const v = this.form.amountG;
+    this.form = { ...this.form, amountG: v == null ? null : convertAmount(v, this.amountUnit, next) };
+    this.amountUnit = next;
+    this.unitTouched = true;
+  }
+
+  /** Name geändert: bei manueller Eingabe die Einheit vorschlagen, solange nicht manuell gewählt. */
+  setLabel(value: unknown): void {
+    const label = typeof value === 'string' ? value : '';
+    this.form = { ...this.form, label };
+    if (!this.scaleBase && !this.unitTouched) this.amountUnit = unitForName(label);
   }
 
   /** True, wenn das gewählte Rezept Zutaten ohne Nährwerte hat. */
@@ -390,8 +461,17 @@ export class DiaryPage implements OnDestroy {
   }
 
   /** Einheit des Eintrags im Bearbeiten-Dialog. */
-  get editEntryUnit(): 'g' | 'ml' {
-    return this.editEntry?.unit ?? 'g';
+  get editEntryUnit(): AmountUnit {
+    return this.editUnit;
+  }
+
+  /** Bearbeiten-Dialog: Einheit wechseln, gezeigten Wert umrechnen. */
+  setEditUnit(unit: unknown): void {
+    if (!AMOUNT_UNITS.includes(unit as AmountUnit) || unit === this.editUnit) return;
+    const next = unit as AmountUnit;
+    const v = this.editForm.amountG;
+    this.editForm = { ...this.editForm, amountG: v == null ? null : convertAmount(v, this.editUnit, next) };
+    this.editUnit = next;
   }
 
   /** kcal pro 100 g der gewählten Quelle (Hinweis unter der Mengeneingabe). */
@@ -403,7 +483,11 @@ export class DiaryPage implements OnDestroy {
   openManualEntry(): void {
     this.scaleBase = null;
     this.pickedRecipeId = null;
-    this.form = { ...this.form, ...EMPTY_FIELDS, label: this.searchQuery.trim(), amountG: null, servings: null };
+    const label = this.searchQuery.trim();
+    this.form = { ...this.form, ...EMPTY_FIELDS, label, amountG: null, servings: null };
+    this.clearRawTexts(ADD_FORM_TEXT_KEYS);
+    this.amountUnit = unitForName(label);
+    this.unitTouched = false;
     this.formHint.set(null);
     this.isAiEstimate.set(false);
     this.isPartialSource = false;
@@ -412,12 +496,74 @@ export class DiaryPage implements OnDestroy {
     this.view.set('form');
   }
 
+  /** Anzeigetext eines Zahlenfelds (Dezimalkomma, Tipptext bleibt erhalten). */
+  numText(key: string, value: number | null): string {
+    return inputTextFor(this.rawTexts[key], value);
+  }
+
+  /** Markiert beim Fokus den gesamten Feldinhalt, damit Tippen ihn ersetzt. */
+  selectAllOnFocus(event: Event): void {
+    const el = event.target as { getInputElement?: () => Promise<HTMLInputElement> } | null;
+    void el?.getInputElement?.().then((input) => input.select());
+  }
+
+  /** Nährwert-Feld (kcal/Eiweiß/...) aus Texteingabe setzen. */
+  setField(key: keyof EntryFields, value: unknown): void {
+    this.rawTexts[key] = String(value ?? '');
+    this.form = { ...this.form, [key]: toNumberOrNull(value) };
+  }
+
+  setFastFoodField(key: 'kcalBudget' | 'moneyBudget', value: unknown): void {
+    this.rawTexts['ff.' + key] = String(value ?? '');
+    this.ff = { ...this.ff, [key]: toNumberOrNull(value) };
+  }
+
+  setEditAmount(value: unknown): void {
+    this.rawTexts['editAmount'] = String(value ?? '');
+    this.editForm = { ...this.editForm, amountG: toNumberOrNull(value) };
+  }
+
+  /** Schnellwahl-Mengen in der aktuellen Einheit des Formulars. */
+  get quickAmountOptions(): readonly number[] {
+    return quickAmounts(this.amountUnit);
+  }
+
+  get editQuickAmountOptions(): readonly number[] {
+    return quickAmounts(this.editUnit);
+  }
+
+  /**
+   * Letzte geloggte Menge (in aktueller Einheit) für das gewählte Lebensmittel, sonst null.
+   * `excludeId`: der gerade bearbeitete Eintrag zählt nicht als „zuletzt“.
+   */
+  lastAmountFor(label: string, unit: AmountUnit, excludeId?: string | null): number | null {
+    const amount = lastAmountForLabel(this.diary.entries(), label, excludeId);
+    return amount == null ? null : fromBaseAmount(amount, unit);
+  }
+
+  /** ID des Eintrags im Bearbeiten-Dialog (für „wie zuletzt“). */
+  get editEntryId(): string | null {
+    return this.editEntry?.id ?? null;
+  }
+
+  pickAmount(value: number): void {
+    delete this.rawTexts['amount'];
+    this.setAmount(value);
+  }
+
+  pickEditAmount(value: number): void {
+    delete this.rawTexts['editAmount'];
+    this.setEditAmount(value);
+  }
+
   setAmount(value: unknown): void {
+    if (typeof value === 'string') this.rawTexts['amount'] = value;
     this.form = { ...this.form, amountG: toNumberOrNull(value) };
     this.rescale();
   }
 
   setServings(value: unknown): void {
+    if (typeof value === 'string') this.rawTexts['servings'] = value;
     this.form = { ...this.form, servings: toNumberOrNull(value) };
     this.rescale();
   }
@@ -430,7 +576,7 @@ export class DiaryPage implements OnDestroy {
   private rescale(): void {
     const base = this.scaleBase;
     if (!base) return;
-    const factor = base.unit === 'g' ? (this.form.amountG ?? 0) / 100 : (this.form.servings ?? 0);
+    const factor = base.unit === 'g' ? (this.baseAmount ?? 0) / 100 : (this.form.servings ?? 0);
     if (factor <= 0) return;
     this.form = { ...this.form, ...fieldsFromFacts(scaleFacts(base.facts, factor)) };
   }
@@ -439,11 +585,16 @@ export class DiaryPage implements OnDestroy {
   private applyFacts(name: string, facts: NutritionFacts, opts: ApplyOptions = {}): void {
     this.ensureAddOpen();
     const unit: QuantityUnit = facts.basis === 'per100g' ? 'g' : 'portion';
-    const amountG = unit === 'g' ? (opts.amountG ?? DEFAULT_AMOUNT_G) : null;
+    const baseAmount = unit === 'g' ? (opts.amountG ?? DEFAULT_AMOUNT_G) : null;
+    const shownUnit = opts.unit ?? unitForName(name);
+    const amountG = baseAmount == null ? null : fromBaseAmount(baseAmount, shownUnit);
     const servings = unit === 'portion' ? (opts.servings ?? 1) : null;
-    const factor = unit === 'g' ? (amountG ?? 0) / 100 : (servings ?? 0);
+    const factor = unit === 'g' ? (baseAmount ?? 0) / 100 : (servings ?? 0);
 
     this.scaleBase = { facts, unit };
+    this.clearRawTexts(ADD_FORM_TEXT_KEYS);
+    this.amountUnit = shownUnit;
+    this.unitTouched = false;
     this.pickedRecipeId = opts.recipeId ?? null;
     this.form = {
       ...this.form,
@@ -458,6 +609,14 @@ export class DiaryPage implements OnDestroy {
     this.error.set(null);
     this.adjustOpen.set(undefined);
     this.view.set('form');
+    setTimeout(() => this.focusAmount(), AMOUNT_FOCUS_DELAY_MS);
+  }
+
+  /** Fokussiert das Mengenfeld und markiert den Inhalt, damit Tippen ihn ersetzt. */
+  private focusAmount(): void {
+    const input = this.amountInput;
+    if (!input) return;
+    void input.setFocus().then(() => input.getInputElement()).then((el) => el.select());
   }
 
   // --- Suche ---
@@ -519,10 +678,15 @@ export class DiaryPage implements OnDestroy {
   editRecent(entry: DiaryEntry): void {
     const base = entry.baseFacts?.basis === 'per100g' ? entry.baseFacts : null;
     if (base) {
-      this.applyFacts(entry.label, base, { amountG: entry.amountG ?? DEFAULT_AMOUNT_G });
+      this.applyFacts(entry.label, base, { amountG: entry.amountG ?? DEFAULT_AMOUNT_G, unit: entry.unit });
       return;
     }
-    this.applyFacts(entry.label, entry.facts);
+    // entry.facts gelten für alle Portionen -> auf eine Portion zurückrechnen.
+    this.applyFacts(entry.label, perServingFacts(entry.facts, entry.servings), {
+      servings: entry.servings,
+      recipeId: entry.ref?.kind === 'recipe' ? entry.ref.recipeId : undefined,
+      isPartial: entry.isPartial,
+    });
   }
 
   // --- Schnell-Loggen (ein Tipp) ---
@@ -740,7 +904,7 @@ export class DiaryPage implements OnDestroy {
       return;
     }
     const base = this.scaleBase;
-    if (base?.unit === 'g' && !isValidAmount(this.form.amountG)) {
+    if (base?.unit === 'g' && !isValidAmount(this.baseAmount)) {
       this.error.set('Die Menge fehlt — gib eine Menge größer als 0 ein.');
       return;
     }
@@ -748,7 +912,7 @@ export class DiaryPage implements OnDestroy {
       this.error.set('Die Portionen fehlen — gib eine Zahl größer als 0 ein.');
       return;
     }
-    if (!base && this.form.amountG != null && !isValidAmount(this.form.amountG)) {
+    if (!base && this.form.amountG != null && !isValidAmount(this.baseAmount)) {
       this.error.set('Die Menge muss größer als 0 sein — oder lass das Feld leer.');
       return;
     }
@@ -767,12 +931,12 @@ export class DiaryPage implements OnDestroy {
       label,
       ref: recipeId ? { kind: 'recipe', recipeId } : undefined,
       servings: isPortion ? (this.form.servings ?? 1) : undefined,
-      amountG: this.form.amountG ?? undefined,
+      amountG: this.baseAmount ?? undefined,
       facts,
       baseFacts: this.baseForSave(base, facts),
       isEstimate: this.isAiEstimate() || undefined,
       isPartial: this.isPartialSource || undefined,
-      unit: this.form.amountG ? this.amountUnit : undefined,
+      unit: this.baseAmount ? this.amountUnit : undefined,
     });
     if (!recipeId && base?.unit !== 'g') this.customFoods.save(label, facts);
 
@@ -783,7 +947,7 @@ export class DiaryPage implements OnDestroy {
   /** Bezugswerte für spätere Mengenänderung; bei manuell angepassten Werten daraus neu abgeleitet. */
   private baseForSave(base: ScaleBase | null, facts: NutritionFacts): NutritionFacts | undefined {
     if (base?.unit !== 'g') return undefined;
-    const amount = this.form.amountG;
+    const amount = this.baseAmount;
     if (!isValidAmount(amount)) return base.facts;
     const scaled = scaleFacts(base.facts, amount / 100);
     return factsDiffer(scaled, facts) ? rebaseTo100(facts, amount) : base.facts;
@@ -792,11 +956,14 @@ export class DiaryPage implements OnDestroy {
   // --- Eintrag bearbeiten / löschen ---
   openEdit(entry: DiaryEntry): void {
     this.editEntry = entry;
-    this.editBaseFacts = entry.baseFacts ?? null;
+    this.clearRawTexts(EDIT_FORM_TEXT_KEYS);
+    this.editUnit = entry.unit ?? 'g';
+    // Manuelle Einträge mit Menge bekommen eine abgeleitete Basis, damit die Menge änderbar ist.
+    this.editBaseFacts = editBaseFor(entry);
     this.editForm = {
       label: entry.label,
       meal: entry.meal,
-      amountG: entry.amountG ?? null,
+      amountG: entry.amountG == null ? null : fromBaseAmount(entry.amountG, this.editUnit),
     };
     this.editError = null;
     this.editOpen.set(true);
@@ -809,7 +976,8 @@ export class DiaryPage implements OnDestroy {
 
   saveEdit(): void {
     if (!this.editEntry) return;
-    if (this.editBaseFacts && !isValidAmount(this.editForm.amountG)) {
+    const editBase = this.editForm.amountG == null ? null : toBaseAmount(this.editForm.amountG, this.editUnit);
+    if (this.editBaseFacts && !isValidAmount(editBase)) {
       this.editError = 'Die Menge fehlt — gib eine Menge größer als 0 ein.';
       return;
     }
@@ -817,8 +985,12 @@ export class DiaryPage implements OnDestroy {
       label: this.editForm.label.trim() || undefined,
       meal: this.editForm.meal,
     };
-    if (this.editBaseFacts && isValidAmount(this.editForm.amountG)) {
-      patch.amountG = this.editForm.amountG;
+    if (this.editBaseFacts && isValidAmount(editBase)) {
+      patch.amountG = editBase;
+      patch.unit = this.editUnit;
+      // Abgeleitete Basis nur bei geänderter Menge übernehmen (sonst keine Rundungsdrift).
+      const isDerivedBase = !this.editEntry.baseFacts;
+      if (isDerivedBase && editBase !== this.editEntry.amountG) patch.baseFacts = this.editBaseFacts;
     }
     this.diary.update(this.editEntry.id, patch);
     this.closeEdit();
@@ -848,6 +1020,57 @@ export class DiaryPage implements OnDestroy {
         unit: entry.unit,
       });
     });
+  }
+
+  // --- Wie gestern / Tag kopieren ---
+  readonly copyFromButtonText = copyFromButtonText;
+
+  /** Übernimmt eine leere Mahlzeit vom letzten Tag, an dem sie Einträge hatte. */
+  copyMeal(group: MealGroup): void {
+    if (!group.copySource) return;
+    const copies = this.diary.copyEntries(group.copySource.entries, this.selectedDate());
+    this.confirmCopy(copies, `${group.label} ${copyFromText(group.copySource.dateISO)}`);
+  }
+
+  /** Fragt den Quelltag ab (letzte 7 Tage) und kopiert ihn nach Bestätigung in den gezeigten Tag. */
+  async copyDay(): Promise<void> {
+    const sources = this.daySources();
+    if (sources.length === 0) return;
+    const sourceDate = await this.askCopyDay(sources);
+    const source = sources.find((s) => s.dateISO === sourceDate);
+    if (!source) return;
+    const copies = this.diary.copyEntries(source.entries, this.selectedDate());
+    this.confirmCopy(copies, `Tag ${copyFromText(source.dateISO)}`);
+  }
+
+  private async askCopyDay(sources: CopySource[]): Promise<string | null> {
+    const hasEntries = this.groups().some((g) => g.entries.length > 0);
+    const keepNote = hasEntries ? ' Vorhandene Einträge bleiben erhalten.' : '';
+    const alert = await this.alertCtrl.create({
+      header: 'Tag kopieren',
+      message: `Alle Einträge des gewählten Tages werden zu „${this.dateLabel()}“ hinzugefügt.${keepNote}`,
+      inputs: sources.map((s, i) => ({
+        type: 'radio' as const,
+        label: copySourceOptionText(s),
+        value: s.dateISO,
+        checked: i === 0,
+      })),
+      buttons: [
+        { text: 'Abbrechen', role: 'cancel' },
+        { text: 'Kopieren', role: 'confirm' },
+      ],
+    });
+    await alert.present();
+    const { role, data } = await alert.onDidDismiss<{ values?: string }>();
+    return role === 'confirm' ? (data?.values ?? null) : null;
+  }
+
+  private confirmCopy(copies: DiaryEntry[], what: string): void {
+    if (copies.length === 0) return;
+    const kcal = formatNum(entriesKcal(copies), 0);
+    void this.showToast(`${what} übernommen · ${entryCountText(copies.length)} · ${kcal} kcal`, () =>
+      this.diary.removeMany(copies.map((c) => c.id)),
+    );
   }
 
   // --- Fastfood-Helfer ---

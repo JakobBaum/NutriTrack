@@ -19,6 +19,8 @@ import {
 
 /** Erkennt "250 g Mehl", "2 EL Öl", "1 Zwiebel" am Zeilenanfang. */
 const INGREDIENT_RE = /^\s*(\d+(?:[.,]\d+)?)\s*([a-zA-ZäöüÄÖÜ.]+)?\s+(.+)$/;
+// Zeitwörter nach einer Zahl („10 Minuten köcheln“) sind Schritte, keine Zutaten.
+const STEP_WORDS = new Set(['minute', 'minuten', 'min', 'sekunden', 'sek', 'stunde', 'stunden', 'std', 'grad', 'schritt', 'personen', 'portionen']);
 const UNITS = new Set([
   'g', 'kg', 'mg', 'ml', 'l', 'el', 'tl', 'stk', 'stück', 'prise', 'prisen',
   'packung', 'dose', 'dosen', 'bund', 'zehe', 'zehen', 'scheibe', 'scheiben', 'tasse', 'tassen',
@@ -134,10 +136,12 @@ export class MockAiProvider implements AiProvider {
     for (const line of body) {
       const m = INGREDIENT_RE.exec(line);
       const hasUnit = m && m[2] && UNITS.has(m[2].toLowerCase().replace('.', ''));
-      if (m && (hasUnit || !m[2])) {
+      const unknownUnitWord = !!m && !!m[2] && !hasUnit && !STEP_WORDS.has(m[2].toLowerCase());
+      if (m && (hasUnit || !m[2] || unknownUnitWord)) {
         const amount = Number(m[1].replace(',', '.'));
         const unit = hasUnit ? m[2]!.toLowerCase().replace('.', '') : 'Stk';
-        const name = m[3].trim();
+        // Unbekanntes Einheitswort (z. B. „Becher“) bleibt Teil des Namens.
+        const name = (unknownUnitWord ? `${m[2]} ${m[3]}` : m[3]).trim();
         ingredients.push({
           name,
           amount: Number.isFinite(amount) ? amount : 0,

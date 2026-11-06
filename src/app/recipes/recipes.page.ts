@@ -10,6 +10,8 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { UNIT_OPTIONS } from '../core/util/units';
+import { formatDecimal, parseDecimal } from '../core/util/number-input';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import type { IScannerControls } from '@zxing/browser';
@@ -130,7 +132,9 @@ export class RecipesPage implements OnDestroy {
   readonly lowerBoundPrefix = lowerBoundPrefix;
   readonly servingsLabel = servingsLabel;
 
-  readonly unitOptions = ['g', 'kg', 'ml', 'l', 'EL', 'TL', 'Stk', 'Prise', 'Bund', 'Dose', 'Pck'];
+  readonly unitOptions = UNIT_OPTIONS;
+  readonly parseDecimal = parseDecimal;
+  readonly formatDecimal = formatDecimal;
 
   readonly isModalOpen = signal(false);
   readonly editId = signal<string | null>(null);
@@ -555,6 +559,12 @@ export class RecipesPage implements OnDestroy {
     }
   }
 
+  setFact(ing: IngredientForm, key: 'kcal' | 'proteinG' | 'carbsG' | 'fatG' | 'fiberG' | 'sugarG', value: unknown): void {
+    if (!ing.facts) return;
+    const parsed = parseDecimal(value);
+    ing.facts = { ...ing.facts, [key]: key === 'fiberG' || key === 'sugarG' ? parsed ?? undefined : parsed ?? 0 };
+  }
+
   private toNum(v: number | null): number {
     return typeof v === 'number' && Number.isFinite(v) ? v : 0;
   }
@@ -566,9 +576,9 @@ export class RecipesPage implements OnDestroy {
       this.error.set('Titel fehlt — bitte einen Namen eintragen.');
       return;
     }
-    const servings = Number(this.form.servings);
-    if (!Number.isFinite(servings) || servings < 1) {
-      this.error.set('Portionen fehlt — bitte mindestens 1 eintragen.');
+    const servings = parseDecimal(this.form.servings);
+    if (servings === null || servings <= 0) {
+      this.error.set('Portionen fehlt — bitte eine Zahl größer 0 eintragen (z. B. 2,5).');
       return;
     }
     const ingredients = this.toIngredients();
@@ -578,7 +588,7 @@ export class RecipesPage implements OnDestroy {
 
     const draft: RecipeDraft = {
       title,
-      servings: Math.floor(servings),
+      servings,
       cookedWeightG: this.form.cookedWeightG != null && Number(this.form.cookedWeightG) > 0
         ? Number(this.form.cookedWeightG)
         : autoWeight > 0 ? autoWeight : undefined,

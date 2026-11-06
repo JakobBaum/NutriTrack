@@ -1,0 +1,200 @@
+/**
+ * Reine Funktionen für Daten-Backups (Export/Import aller `nutritrack:`-Schlüssel).
+ * Keine Abhängigkeit zu Angular oder Browser-APIs, damit alles unit-testbar bleibt.
+ */
+
+/** Kennung im Backup, damit fremde JSON-Dateien sicher erkannt werden. */
+export const BACKUP_FORMAT = 'nutritrack-backup';
+/** Aktuelle Schema-Version des Backups. */
+export const BACKUP_VERSION = 1;
+/** Speicherschlüssel (ohne Präfix) für das Datum des letzten Exports. Wird nicht mitexportiert. */
+export const LAST_BACKUP_KEY = 'lastBackup';
+/** Obergrenze für die Dateigröße beim Import (Schutz vor versehentlich riesigen Dateien). */
+export const MAX_BACKUP_BYTES = 20 * 1024 * 1024;
+
+const KEY_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const ARRAY_KEYS = ['diary', 'recipes', 'savedMeals', 'customFoods'] as const;
+const NULLABLE_OBJECT_KEYS = ['profile', 'shopping'] as const;
+const AI_KEY = 'ai-config';
+
+/** Gespeicherte Daten: Schlüssel (ohne Präfix) → bereits geparster JSON-Wert. */
+export type BackupData = Readonly<Record<string, unknown>>;
+
+/** Aufbau einer Backup-Datei. */
+export interface BackupFile {
+  readonly format: typeof BACKUP_FORMAT;
+  readonly version: number;
+  readonly exportedAt: string;
+  readonly data: BackupData;
+}
+
+/** Ergebnis der Prüfung einer Backup-Datei. */
+export type BackupParseResult =
+  | { readonly ok: true; readonly backup: BackupFile }
+  | { readonly ok: false; readonly error: string };
+
+/** Anzahl der wichtigsten Datensätze für die Vorschau vor dem Import. */
+export interface BackupCounts {
+  readonly diary: number;
+  readonly recipes: number;
+  readonly savedMeals: number;
+  readonly customFoods: number;
+  readonly shoppingItems: number;
+  readonly hasProfile: boolean;
+}
+
+export const BACKUP_ERRORS = {
+  notJson: 'Die Datei konnte nicht gelesen werden: Sie enthält kein gültiges JSON.',
+  foreign: 'Diese Datei ist kein NutriTrack-Backup.',
+  newerVersion: 'Dieses Backup stammt aus einer neueren NutriTrack-Version. Bitte zuerst die App aktualisieren.',
+  badVersion: 'Die Backup-Version wird nicht unterstützt.',
+  badDate: 'Das Backup ist beschädigt: Das Exportdatum fehlt oder ist ungültig.',
+  badData: 'Das Backup ist beschädigt: Der Datenbereich fehlt oder ist ungültig.',
+  tooLarge: 'Die Datei ist zu groß für ein NutriTrack-Backup.',
+  empty: 'Die Datei ist leer.',
+} as const;
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** Dateiname im Format `nutritrack-backup-YYYY-MM-DD.json` (lokales Datum). */
+export function backupFileName(date: Date): string {
+  const y = date.getFullYear();
+  const m = `${date.getMonth() + 1}`.padStart(2, '0');
+  const d = `${date.getDate()}`.padStart(2, '0');
+  return `${BACKUP_FORMAT}-${y}-${m}-${d}.json`;
+}
+
+/** Entfernt den eigenen API-Key, damit er nicht in einer geteilten Datei landet. */
+function withoutSecrets(data: BackupData): BackupData {
+  const ai = data[AI_KEY];
+  if (!isPlainObject(ai) || !('apiKey' in ai)) return data;
+  return { ...data, [AI_KEY]: { ...ai, apiKey: '' } };
+}
+
+/** Erstellt das Backup-Objekt aus den gespeicherten Daten (ohne Meta-Schlüssel und Secrets). */
+export function buildBackup(data: BackupData, now: Date): BackupFile {
+  const entries = Object.entries(data).filter(([key]) => key !== LAST_BACKUP_KEY);
+  return {
+    format: BACKUP_FORMAT,
+    version: BACKUP_VERSION,
+    exportedAt: now.toISOString(),
+    data: withoutSecrets(Object.fromEntries(entries)),
+  };
+}
+
+/** Serialisiert ein Backup lesbar eingerückt. */
+export function serializeBackup(backup: BackupFile): string {
+  return JSON.stringify(backup, null, 2);
+}
+
+function validateVersion(version: unknown): string | null {
+  if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
+    return BACKUP_ERRORS.badVersion;
+  }
+  if (version > BACKUP_VERSION) return BACKUP_ERRORS.newerVersion;
+  return null;
+}
+
+function isValidIsoDate(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(Date.parse(value));
+}
+
+/** Prüft die bekannten Schlüssel auf ihren erwarteten Typ. */
+function validateKnownKeys(data: Record<string, unknown>): boolean {
+  const arraysOk = ARRAY_KEYS.every((k) => !(k in data) || (Array.isArray(data[k]) && (data[k] as unknown[]).every(isPlainObject)));
+  const objectsOk = NULLABLE_OBJECT_KEYS.every((k) => !(k in data) || data[k] === null || isPlainObject(data[k]));
+  const aiOk = !(AI_KEY in data) || isPlainObject(data[AI_KEY]);
+  return arraysOk && objectsOk && aiOk;
+}
+
+function validateData(data: unknown): data is Record<string, unknown> {
+  if (!isPlainObject(data)) return false;
+  const keysOk = Object.keys(data).every((k) => KEY_PATTERN.test(k) && !FORBIDDEN_KEYS.has(k));
+  return keysOk && validateKnownKeys(data);
+}
+
+/** Prüft ein bereits geparstes Objekt streng gegen das Backup-Schema. */
+export function validateBackup(value: unknown): BackupParseResult {
+  if (!isPlainObject(value) || value['format'] !== BACKUP_FORMAT) {
+    return { ok: false, error: BACKUP_ERRORS.foreign };
+  }
+  const versionError = validateVersion(value['version']);
+  if (versionError) return { ok: false, error: versionError };
+  if (!isValidIsoDate(value['exportedAt'])) return { ok: false, error: BACKUP_ERRORS.badDate };
+  const data = value['data'];
+  if (!validateData(data)) return { ok: false, error: BACKUP_ERRORS.badData };
+  const backup: BackupFile = {
+    format: BACKUP_FORMAT,
+    version: value['version'] as number,
+    exportedAt: value['exportedAt'],
+    data: { ...data },
+  };
+  return { ok: true, backup };
+}
+
+/** Parst den Dateiinhalt und validiert ihn. Wirft nie. */
+export function parseBackup(text: string): BackupParseResult {
+  if (text.trim() === '') return { ok: false, error: BACKUP_ERRORS.empty };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { ok: false, error: BACKUP_ERRORS.notJson };
+  }
+  return validateBackup(parsed);
+}
+
+const lengthOf = (v: unknown): number => (Array.isArray(v) ? v.length : 0);
+
+/** Zählt die Datensätze eines Backups für die Vorschau. */
+export function countBackup(data: BackupData): BackupCounts {
+  const shopping = data['shopping'];
+  return {
+    diary: lengthOf(data['diary']),
+    recipes: lengthOf(data['recipes']),
+    savedMeals: lengthOf(data['savedMeals']),
+    customFoods: lengthOf(data['customFoods']),
+    shoppingItems: isPlainObject(shopping) ? lengthOf(shopping['items']) : 0,
+    hasProfile: isPlainObject(data['profile']),
+  };
+}
+
+const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
+
+/** Vorschautext, z. B. "123 Tagebucheinträge, 4 Rezepte, Profil". */
+export function describeCounts(c: BackupCounts): string {
+  const parts = [
+    plural(c.diary, 'Tagebucheintrag', 'Tagebucheinträge'),
+    plural(c.recipes, 'Rezept', 'Rezepte'),
+    plural(c.savedMeals, 'gespeicherte Mahlzeit', 'gespeicherte Mahlzeiten'),
+    plural(c.customFoods, 'eigenes Lebensmittel', 'eigene Lebensmittel'),
+    ...(c.shoppingItems > 0 ? [plural(c.shoppingItems, 'Einkaufsposition', 'Einkaufspositionen')] : []),
+    ...(c.hasProfile ? ['Profil'] : []),
+  ];
+  return parts.join(', ');
+}
+
+/**
+ * Daten, die beim Import geschrieben werden: Backup-Inhalt, aber der lokale API-Key
+ * bleibt erhalten, wenn das Backup (wie beim Export üblich) keinen enthält.
+ */
+export function prepareRestore(backup: BackupData, current: BackupData): BackupData {
+  const restored = Object.fromEntries(Object.entries(backup).filter(([key]) => key !== LAST_BACKUP_KEY));
+  const ai = restored[AI_KEY];
+  const currentAi = current[AI_KEY];
+  if (!isPlainObject(ai) || !isPlainObject(currentAi)) return restored;
+  const hasOwnKey = typeof ai['apiKey'] === 'string' && ai['apiKey'] !== '';
+  const localKey = currentAi['apiKey'];
+  if (hasOwnKey || typeof localKey !== 'string' || localKey === '') return restored;
+  return { ...restored, [AI_KEY]: { ...ai, apiKey: localKey } };
+}
+
+/** Formatiert ein ISO-Datum als "06.11.2026, 14:05" (lokal); `null` bei ungültiger Eingabe. */
+export function formatBackupDate(iso: unknown): string | null {
+  if (!isValidIsoDate(iso)) return null;
+  const d = new Date(iso);
+  const pad = (n: number) => `${n}`.padStart(2, '0');
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}

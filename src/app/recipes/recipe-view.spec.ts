@@ -14,6 +14,11 @@ import {
 const facts: NutritionFacts = { kcal: 100, proteinG: 1, carbsG: 1, fatG: 1, basis: 'per100g' };
 
 describe('recipe-view', () => {
+  it('formats half servings with a decimal comma', () => {
+    expect(servingsLabel(2.5)).toBe('2,5 Portionen');
+    expect(servingsLabel(1)).toBe('1 Portion');
+  });
+
   it('counts only ingredients without facts', () => {
     expect(countMissingFacts([{ facts }, { facts: undefined }, {}])).toBe(2);
   });

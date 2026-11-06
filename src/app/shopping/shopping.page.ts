@@ -1,9 +1,24 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, OnDestroy, computed, inject, signal, viewChild } from '@angular/core';
 import { AlertController } from '@ionic/angular';
+import { formatDecimal, parseDecimal } from '../core/util/number-input';
+import { UNIT_OPTIONS } from '../core/util/units';
 import { AiService } from '../core/ai/ai.service';
-import { MealType, ShoppingItem } from '../core/models';
+import { MealType } from '../core/models';
+import { ProfileStore } from '../core/state/profile.store';
 import { ShoppingStore, sumItems } from '../core/state/shopping.store';
 import { UNDO_TOAST_BUTTONS, UNDO_TOAST_MS, UndoableDelete, settleUndoToast } from '../meals/undoable-delete';
+import {
+  ShoppingRow,
+  adjustIndex,
+  decodeIndexes,
+  defaultPersons,
+  encodeIndexes,
+  formatShareText,
+  groupByCategory,
+  splitRows,
+} from './shopping-list.util';
+
+export type { ShoppingRow } from './shopping-list.util';
 
 /** Eine wählbare Mahlzeit im Generator. */
 export interface MealToggle {
@@ -12,11 +27,8 @@ export interface MealToggle {
   checked: boolean;
 }
 
-/** Eine Position samt Index in der gespeicherten Liste. */
-export interface ShoppingRow {
-  item: ShoppingItem;
-  index: number;
-}
+/** Dauer des Hinweises nach „Liste teilen“ in ms. */
+const SHARE_TOAST_MS = 2500;
 
 /**
  * Einkaufsliste: generiert einen Wocheneinkauf (Personen × Tage × Mahlzeiten ×
@@ -31,23 +43,39 @@ export interface ShoppingRow {
 })
 export class ShoppingPage implements OnDestroy {
   private readonly store = inject(ShoppingStore);
+  private readonly profileStore = inject(ProfileStore);
   private readonly ai = inject(AiService);
   private readonly alertCtrl = inject(AlertController);
 
-  private readonly deletion = new UndoableDelete((id) => this.store.removeItem(Number(id)));
+  /** Eine ID = Komma-Liste von Indizes (Einzel- oder Sammel-Löschen). */
+  private readonly deletion = new UndoableDelete((id) => this.commitRemoval(decodeIndexes(id)));
   readonly undoOpen = signal(false);
+  readonly undoMessage = signal('Position gelöscht');
   readonly undoDuration = UNDO_TOAST_MS;
   readonly undoButtons = UNDO_TOAST_BUTTONS;
 
   readonly list = this.store.list;
 
-  /** Positionen ohne die gerade zum Löschen vorgemerkte (Index = Position in der Liste). */
+  /** Positionen ohne die gerade zum Löschen vorgemerkten (Index = Position in der Liste). */
   readonly rows = computed<ShoppingRow[]>(() => {
-    const pending = this.deletion.pendingId();
+    const pending = new Set(decodeIndexes(this.deletion.pendingId()));
     return (this.list()?.items ?? [])
       .map((item, index) => ({ item, index }))
-      .filter((r) => String(r.index) !== pending);
+      .filter((r) => !pending.has(r.index));
   });
+
+  private readonly split = computed(() => splitRows(this.rows()));
+  /** Offene Positionen, nach Supermarkt-Kategorie gruppiert (falls vorhanden). */
+  readonly openGroups = computed(() => groupByCategory(this.split().open));
+  readonly openCount = computed(() => this.split().open.length);
+  /** Abgehakte Positionen für den Bereich „Erledigt“. */
+  readonly doneRows = computed(() => this.split().done);
+  /** Ob „Erledigt (n)“ aufgeklappt ist. */
+  readonly doneOpen = signal(false);
+
+  readonly shareToastOpen = signal(false);
+  readonly shareToastMessage = signal('');
+  readonly shareToastDuration = SHARE_TOAST_MS;
 
   /** Summe aus den sichtbaren Positionen; `unpriced` = Positionen ohne Schätzpreis. */
   readonly totals = computed(() => {
@@ -72,7 +100,8 @@ export class ShoppingPage implements OnDestroy {
   /** Ohne Liste immer sichtbar; mit Liste nur auf Wunsch (Checkliste bleibt oben). */
   readonly showGenerator = computed(() => this.list() === null || this.formOpen());
 
-  persons = 2;
+  /** Vorbelegung aus dem Profil, sonst aus der letzten generierten Liste. */
+  persons = defaultPersons(this.profileStore.profile(), this.lastGeneratedPersons());
   days = 5;
   budget: number | null = null;
   storeName = '';
@@ -87,7 +116,15 @@ export class ShoppingPage implements OnDestroy {
   readonly stores = ['', 'Spar', 'Billa', 'Hofer', 'Lidl', 'Penny'];
 
   newItemName = '';
-  newItemAmount: number | null = null;
+  newItemAmountText = '';
+  readonly parseDecimal = parseDecimal;
+  readonly formatDecimal = formatDecimal;
+  readonly unitOptions = UNIT_OPTIONS;
+  // read: ElementRef, sonst liefert viewChild die IonInput-Instanz (ohne nativeElement).
+  private readonly addNameInput = viewChild<string, ElementRef<HTMLElement & { setFocus?: () => Promise<void> }>>(
+    'addName',
+    { read: ElementRef },
+  );
   newItemUnit = 'g';
 
   toggleMeal(value: MealType): void {
@@ -106,6 +143,12 @@ export class ShoppingPage implements OnDestroy {
 
   ngOnDestroy(): void {
     this.deletion.flush();
+  }
+
+  /** Personen der letzten generierten Liste (rein manuelle Listen zählen nicht). */
+  private lastGeneratedPersons(): number | undefined {
+    const l = this.store.list();
+    return l && (l.days ?? null) !== null ? l.persons : undefined;
   }
 
   private async confirmRegenerate(): Promise<boolean> {
@@ -170,11 +213,26 @@ export class ShoppingPage implements OnDestroy {
   /** Blendet die Position aus und zeigt „Gelöscht – Rückgängig“. */
   removeItem(index: number): void {
     // Ein offenes früheres Löschen wird endgültig und verschiebt spätere Indizes.
-    const pending = this.deletion.pendingId();
+    const pending = decodeIndexes(this.deletion.pendingId());
     this.deletion.flush();
-    const adjusted = pending !== null && Number(pending) < index ? index - 1 : index;
-    this.deletion.start(String(adjusted));
-    this.undoOpen.set(true);
+    this.startDeletion([adjustIndex(index, pending)], 'Position gelöscht');
+  }
+
+  /** Blendet alle abgehakten Positionen aus („Erledigte entfernen“, mit Rückgängig). */
+  removeChecked(): void {
+    this.deletion.flush();
+    const checked = (this.list()?.items ?? [])
+      .map((item, index) => ({ item, index }))
+      .filter((r) => r.item.checked)
+      .map((r) => r.index);
+    if (checked.length === 0) return;
+    const message =
+      checked.length === 1 ? '1 erledigte Position entfernt' : `${checked.length} erledigte Positionen entfernt`;
+    this.startDeletion(checked, message);
+  }
+
+  toggleDone(): void {
+    this.doneOpen.update((open) => !open);
   }
 
   onUndoDismiss(event: CustomEvent<{ role?: string }>): void {
@@ -182,21 +240,67 @@ export class ShoppingPage implements OnDestroy {
     this.undoOpen.set(false);
   }
 
+  private startDeletion(indexes: readonly number[], message: string): void {
+    this.deletion.start(encodeIndexes(indexes));
+    this.undoMessage.set(message);
+    this.undoOpen.set(true);
+  }
+
+  /** Entfernt endgültig, von hinten nach vorn, damit Indizes gültig bleiben. */
+  private commitRemoval(indexes: readonly number[]): void {
+    [...indexes].sort((a, b) => b - a).forEach((i) => this.store.removeItem(i));
+  }
+
+  /** Teilt die offenen Positionen per Web Share API; sonst Zwischenablage + Hinweis. */
+  async shareList(): Promise<void> {
+    const text = formatShareText(this.rows().map((r) => r.item));
+    const nav = typeof navigator === 'undefined' ? undefined : navigator;
+    if (typeof nav?.share === 'function') {
+      try {
+        await nav.share({ title: 'Einkaufsliste', text });
+        return;
+      } catch (e: unknown) {
+        // Abbruch durch den Nutzer ist kein Fehler; sonst Zwischenablage versuchen.
+        if (e instanceof DOMException && e.name === 'AbortError') return;
+      }
+    }
+    await this.copyToClipboard(text, nav);
+  }
+
+  private async copyToClipboard(text: string, nav: Navigator | undefined): Promise<void> {
+    try {
+      if (typeof nav?.clipboard?.writeText !== 'function') throw new Error('Zwischenablage nicht verfügbar');
+      await nav.clipboard.writeText(text);
+      this.showShareToast('Liste in die Zwischenablage kopiert');
+    } catch (e: unknown) {
+      console.error('Einkaufsliste teilen fehlgeschlagen', e);
+      this.showShareToast('Teilen nicht möglich. Bitte erneut versuchen.');
+    }
+  }
+
+  private showShareToast(message: string): void {
+    this.shareToastMessage.set(message);
+    this.shareToastOpen.set(true);
+  }
+
+  onShareToastDismiss(): void {
+    this.shareToastOpen.set(false);
+  }
+
   addManual(): void {
     const name = this.newItemName.trim();
     if (!name) return;
     this.store.addItem({
       name,
-      amount:
-        typeof this.newItemAmount === 'number' && Number.isFinite(this.newItemAmount)
-          ? this.newItemAmount
-          : 1,
-      unit: this.newItemUnit.trim() || 'Stk',
+      // Leer, ungültig oder ≤ 0 = „ohne Menge“.
+      amount: Math.max(0, parseDecimal(this.newItemAmountText) ?? 0),
+      unit: this.newItemUnit || 'g',
       checked: false,
     });
     this.newItemName = '';
-    this.newItemAmount = null;
+    this.newItemAmountText = '';
     this.newItemUnit = 'g';
+    void this.addNameInput()?.nativeElement.setFocus?.();
   }
 
   overBudget(): boolean {

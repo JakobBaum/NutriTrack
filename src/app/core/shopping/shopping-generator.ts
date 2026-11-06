@@ -1,4 +1,5 @@
 import { Recipe, ShoppingItem } from '../models';
+import { withCategories } from './shopping-category';
 
 /** Rundet eine Menge auf max. 2 Nachkommastellen (hübsche Anzeige). */
 function round2(n: number): number {
@@ -8,6 +9,16 @@ function round2(n: number): number {
 /** Normalisiert einen Zutat-Namen für das Zusammenführen (Merge-Key). */
 function mergeKey(name: string, unit: string): string {
   return `${name.trim().toLowerCase()}|${unit.trim().toLowerCase()}`;
+}
+
+/** Ganze Zahl >= 1; nicht endliche Werte (NaN, Infinity) zählen als 1. */
+function safeCount(n: number): number {
+  return Number.isFinite(n) ? Math.max(1, Math.floor(n)) : 1;
+}
+
+/** Gültige Portionenzahl eines Rezepts (auch 0,5 / 2,5); sonst 1. */
+function safeServings(servings: number): number {
+  return Number.isFinite(servings) && servings > 0 ? servings : 1;
 }
 
 /** Basis-Einkaufsliste pro Person, wenn (noch) keine Rezepte vorhanden sind. */
@@ -35,22 +46,22 @@ export function buildShoppingList(
   dishes: number,
   persons: number,
 ): { items: ShoppingItem[]; suggestedDishes: string[] } {
-  const safeDishes = Math.max(1, Math.floor(dishes));
-  const safePersons = Math.max(1, Math.floor(persons));
+  const safeDishes = safeCount(dishes);
+  const safePersons = safeCount(persons);
 
   if (recipes.length === 0) {
     const items = STAPLES_PER_PERSON.map((i) => ({
       ...i,
       amount: round2(i.amount * safePersons),
     }));
-    return { items, suggestedDishes: [] };
+    return { items: withCategories(items), suggestedDishes: [] };
   }
 
   const chosen = recipes.slice(0, safeDishes);
   const merged = new Map<string, ShoppingItem>();
 
   for (const recipe of chosen) {
-    const factor = safePersons / Math.max(1, recipe.servings);
+    const factor = safePersons / safeServings(recipe.servings);
     for (const ing of recipe.ingredients) {
       const key = mergeKey(ing.name, ing.unit);
       const scaled = round2(ing.amount * factor);
@@ -69,7 +80,7 @@ export function buildShoppingList(
   }
 
   return {
-    items: [...merged.values()],
+    items: withCategories([...merged.values()]),
     suggestedDishes: chosen.map((r) => r.title),
   };
 }
@@ -84,7 +95,7 @@ export function buildWeekPlan(
   days: number,
   mealsPerDay: number,
 ): { items: ShoppingItem[]; suggestedDishes: string[] } {
-  const safePersons = Math.max(1, Math.floor(persons));
+  const safePersons = safeCount(persons);
   const safeDays = Math.max(1, Math.floor(days));
   const slots = safeDays * Math.max(1, Math.floor(mealsPerDay));
 
@@ -94,7 +105,7 @@ export function buildWeekPlan(
       ...i,
       amount: round2(i.amount * safePersons * safeDays),
     }));
-    return { items, suggestedDishes: [] };
+    return { items: withCategories(items), suggestedDishes: [] };
   }
 
   const chosen: Recipe[] = [];
@@ -102,7 +113,7 @@ export function buildWeekPlan(
 
   const merged = new Map<string, ShoppingItem>();
   for (const recipe of chosen) {
-    const factor = safePersons / Math.max(1, recipe.servings);
+    const factor = safePersons / safeServings(recipe.servings);
     for (const ing of recipe.ingredients) {
       const key = mergeKey(ing.name, ing.unit);
       const scaled = round2(ing.amount * factor);
@@ -121,7 +132,7 @@ export function buildWeekPlan(
   }
 
   const titles = [...new Set(chosen.map((r) => r.title))];
-  return { items: [...merged.values()], suggestedDishes: titles };
+  return { items: withCategories([...merged.values()]), suggestedDishes: titles };
 }
 
 /** Markt-Faktoren für Schätzpreise (Diskonter günstiger als Vollsortimenter). */
@@ -166,7 +177,8 @@ export function estimatePrice(item: ShoppingItem, store?: string): number {
       base = item.amount * 0.5;
   }
   const factor = store ? (STORE_FACTOR[store.trim().toLowerCase()] ?? 1) : 1;
-  const price = Math.max(0.1, base * factor);
+  const raw = base * factor;
+  const price = Number.isFinite(raw) ? Math.max(0.1, raw) : 0.1;
   return round2(price);
 }
 

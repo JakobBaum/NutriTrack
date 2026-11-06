@@ -3,6 +3,7 @@ import { MealType, ShoppingItem, ShoppingList } from '../models';
 import { AiService } from '../ai/ai.service';
 import { MockAiProvider } from '../ai/mock-ai-provider';
 import { StorageService } from '../storage/storage.service';
+import { withCategories, withCategory } from '../shopping/shopping-category';
 import { buildShoppingList } from '../shopping/shopping-generator';
 import { makeId } from '../util/id';
 import { RecipeStore } from './recipe.store';
@@ -56,7 +57,8 @@ export function mergeKept(
     const old = byKey.get(key);
     if (!old || used.has(key)) return g;
     used.add(key);
-    return old;
+    // Manuelle Position "ohne Menge" (0) darf die generierte Menge nicht verlieren.
+    return old.amount > 0 ? old : { ...old, amount: g.amount };
   });
   const rest = kept.filter((it) => !used.has(itemKey(it)));
   return [...merged, ...rest];
@@ -129,7 +131,7 @@ export class ShoppingStore {
       }
       return this.mock.generateShoppingList(req);
     });
-    const items = mergeKept(this._list()?.items ?? [], result.items);
+    const items = withCategories(mergeKept(this._list()?.items ?? [], result.items));
     const list: ShoppingListView = {
       id: makeId('shopping'),
       dishes: Math.max(1, Math.floor(opts.days)) * Math.max(1, opts.meals.length),
@@ -174,7 +176,7 @@ export class ShoppingStore {
           suggestedDishes: [],
           generatedAt: new Date().toISOString(),
         };
-      return withTotal({ ...base, items: [...base.items, item] });
+      return withTotal({ ...base, items: [...base.items, withCategory(item)] });
     });
     this.persist();
   }

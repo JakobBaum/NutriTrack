@@ -135,7 +135,7 @@
       <span class="field-label nt-section-header">Name</span>
       <ion-list inset="true">
         <ion-item>
-          <ion-input [(ngModel)]="form.title" aria-label="Name" placeholder="zum Beispiel Linsen-Dal"></ion-input>
+          <ion-input enterkeyhint="next" [(ngModel)]="form.title" aria-label="Name" placeholder="zum Beispiel Linsen-Dal"></ion-input>
         </ion-item>
       </ion-list>
 
@@ -149,6 +149,7 @@
                 <ion-label>
                   <ion-input
                     class="ing-name"
+                    enterkeyhint="next"
                     [(ngModel)]="ing.name"
                     placeholder="Zutat benennen"
                     aria-label="Zutatname"
@@ -164,7 +165,7 @@
                   </button>
                 </ion-label>
                 <div class="ing-qty" slot="end" (click)="$event.stopPropagation()" (touchstart)="$event.stopPropagation()">
-                  <ion-input type="number" inputmode="decimal" [(ngModel)]="ing.amount" aria-label="Menge" placeholder="0"></ion-input>
+                  <ion-input type="text" inputmode="decimal" enterkeyhint="next" [ngModel]="formatDecimal(ing.amount)" (ngModelChange)="ing.amount = parseDecimal($event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Menge" placeholder="0"></ion-input>
                   <ion-select class="ing-qty__unit" [(ngModel)]="ing.unit" aria-label="Einheit" interface="popover" placeholder="g"
                     (click)="$event.stopPropagation()" (ionFocus)="$event.stopPropagation()">
                     @for (u of unitOptions; track u) {
@@ -194,12 +195,12 @@
                     Werte für {{ ing.amount || 0 | ntNum: 2 }} {{ ing.unit }}. Zum Korrigieren die Felder je 100 g unten anpassen.
                   </p>
                   <div class="ing-detail__inputs">
-                    <label>kcal/100g <ion-input type="number" inputmode="decimal" [(ngModel)]="ing.facts.kcal" aria-label="kcal je 100g"></ion-input></label>
-                    <label>Eiweiß <ion-input type="number" inputmode="decimal" [(ngModel)]="ing.facts.proteinG" aria-label="Eiweiß je 100g"></ion-input></label>
-                    <label>Kohlenh. <ion-input type="number" inputmode="decimal" [(ngModel)]="ing.facts.carbsG" aria-label="Kohlenhydrate je 100g"></ion-input></label>
-                    <label>Fett <ion-input type="number" inputmode="decimal" [(ngModel)]="ing.facts.fatG" aria-label="Fett je 100g"></ion-input></label>
-                    <label>Ballast. <ion-input type="number" inputmode="decimal" [(ngModel)]="ing.facts.fiberG" aria-label="Ballaststoffe je 100g"></ion-input></label>
-                    <label>Zucker <ion-input type="number" inputmode="decimal" [(ngModel)]="ing.facts.sugarG" aria-label="Zucker je 100g"></ion-input></label>
+                    <label>kcal/100g <ion-input type="text" inputmode="decimal" enterkeyhint="next" [ngModel]="formatDecimal(ing.facts.kcal)" (ngModelChange)="setFact(ing, 'kcal', $event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="kcal je 100g"></ion-input></label>
+                    <label>Eiweiß <ion-input type="text" inputmode="decimal" enterkeyhint="next" [ngModel]="formatDecimal(ing.facts.proteinG)" (ngModelChange)="setFact(ing, 'proteinG', $event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Eiweiß je 100g"></ion-input></label>
+                    <label>Kohlenh. <ion-input type="text" inputmode="decimal" enterkeyhint="next" [ngModel]="formatDecimal(ing.facts.carbsG)" (ngModelChange)="setFact(ing, 'carbsG', $event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Kohlenhydrate je 100g"></ion-input></label>
+                    <label>Fett <ion-input type="text" inputmode="decimal" enterkeyhint="next" [ngModel]="formatDecimal(ing.facts.fatG)" (ngModelChange)="setFact(ing, 'fatG', $event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Fett je 100g"></ion-input></label>
+                    <label>Ballast. <ion-input type="text" inputmode="decimal" enterkeyhint="next" [ngModel]="formatDecimal(ing.facts.fiberG)" (ngModelChange)="setFact(ing, 'fiberG', $event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Ballaststoffe je 100g"></ion-input></label>
+                    <label>Zucker <ion-input type="text" inputmode="decimal" enterkeyhint="done" [ngModel]="formatDecimal(ing.facts.sugarG)" (ngModelChange)="setFact(ing, 'sugarG', $event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Zucker je 100g"></ion-input></label>
                   </div>
                 } @else {
                   <p class="ing-detail__hint">
@@ -259,7 +260,7 @@
           <span class="field-label nt-section-header">Fertig gekocht</span>
           <ion-list inset="true">
             <ion-item>
-              <ion-input type="number" inputmode="numeric" [(ngModel)]="form.cookedWeightG" aria-label="Fertig gekocht in Gramm"
+              <ion-input type="text" inputmode="decimal" enterkeyhint="next" [ngModel]="formatDecimal(form.cookedWeightG)" (ngModelChange)="form.cookedWeightG = parseDecimal($event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Fertig gekocht in Gramm"
                 [placeholder]="autoWeightG() > 0 ? autoWeightG().toString() : '0'"></ion-input>
               <ion-note slot="end">g</ion-note>
             </ion-item>
@@ -284,7 +285,7 @@
           <span class="field-label nt-section-header">Portionen</span>
           <ion-list inset="true">
             <ion-item>
-              <ion-input type="number" inputmode="numeric" [(ngModel)]="form.servings" aria-label="Portionen" placeholder="4"></ion-input>
+              <ion-input type="text" inputmode="decimal" enterkeyhint="done" [ngModel]="formatDecimal(form.servings)" (ngModelChange)="form.servings = parseDecimal($event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Portionen" placeholder="4"></ion-input>
             </ion-item>
           </ion-list>
         </div>

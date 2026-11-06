@@ -1,0 +1,89 @@
+// Onboarding/Profil, Einkaufsliste (Enter), Dashboard (Summen + Über-Ziel-Zustand).
+import { assert, eventually, go, readStore, settle } from '../lib/harness.mjs';
+import { fillAndBlur, ionInput, topModal } from '../lib/ionic.mjs';
+import { DIARY_NORMAL, DIARY_OVER, SHOPPING, seed } from '../lib/fixtures.mjs';
+
+const sumKcal = (entries) => entries.reduce((s, e) => s + e.facts.kcal, 0);
+/** Zahl aus deutsch formatiertem Text („2.884“ / „2 884“) lesen. */
+const toInt = (text) => Number(String(text).replace(/[^\d]/g, ''));
+
+async function pickSelect(page, modal, label, optionText) {
+  await modal.locator('ion-select').filter({ hasText: label }).click();
+  const option = page.locator('ion-popover ion-item, ion-popover ion-radio', { hasText: optionText }).first();
+  await option.click();
+  await settle(page, 400);
+}
+
+export function register({ test }) {
+  test('onboarding: Profil einrichten setzt Tagesziel', null, async (page) => {
+    await go(page, 'dashboard');
+    await page.locator('h2', { hasText: 'Willkommen bei NutriTrack' }).waitFor();
+    await page.locator('ion-button', { hasText: 'Profil einrichten' }).click();
+    // ?setup=1 öffnet den Bedarfs-Berechner automatisch
+    await page.waitForURL(/settings\?setup=1/);
+    const modal = topModal(page);
+    await modal.locator('ion-title', { hasText: 'Bedarfs-Berechner' }).waitFor();
+    await fillAndBlur(ionInput(modal, 'Gewicht (kg)'), '72,5');
+    await fillAndBlur(ionInput(modal, 'Größe (cm)'), '175');
+    await fillAndBlur(ionInput(modal, 'Alter'), '28');
+    await pickSelect(page, modal, 'Geschlecht', 'Weiblich');
+    await modal.locator('ion-button', { hasText: 'Bedarf berechnen' }).click();
+    await settle(page);
+
+    const profile = await readStore(page, 'profile');
+    assert.ok(profile, 'Profil nicht gespeichert');
+    assert.equal(profile.weightKg, 72.5);
+    assert.equal(profile.heightCm, 175);
+    assert.equal(profile.sex, 'female');
+    const kcal = toInt(await page.locator('.target-card__kcal .num').innerText());
+    assert.ok(kcal > 1200 && kcal < 3500, `unplausibles Tagesziel ${kcal}`);
+
+    await go(page, 'dashboard');
+    await page.locator('.hero').waitFor();
+    assert.equal(toInt(await page.locator('.hero__meta div', { hasText: 'Ziel' }).innerText()), kcal);
+  });
+
+  test('shopping: Artikel mit Enter hinzufügen', seed({ shopping: SHOPPING }), async (page) => {
+    await go(page, 'shopping');
+    const name = page.locator('ion-input.add-name input');
+    await name.fill('Hafermilch');
+    await page.locator('ion-input.add-amount input').fill('1,5');
+    await name.press('Enter');
+    await settle(page);
+    const list = await readStore(page, 'shopping');
+    const item = list.items.find((i) => i.name === 'Hafermilch');
+    assert.ok(item, 'Artikel nicht gespeichert');
+    assert.equal(item.amount, 1.5);
+    await eventually(async () => assert.equal(await page.locator('.check-row__name', { hasText: 'Hafermilch' }).count(), 1));
+    assert.equal(await name.inputValue(), '', 'Eingabefeld sollte geleert werden');
+    // zweites Enter mit leerem Feld darf nichts anlegen
+    await name.press('Enter');
+    await settle(page, 300);
+    assert.equal((await readStore(page, 'shopping')).items.length, SHOPPING.items.length + 1);
+  });
+
+  test('dashboard: Summen gegessen/übrig', seed({ diary: DIARY_NORMAL }), async (page) => {
+    await go(page, 'dashboard');
+    const eaten = toInt(await page.locator('.hero__meta div', { hasText: 'gegessen' }).innerText());
+    const target = toInt(await page.locator('.hero__meta div', { hasText: 'Ziel' }).innerText());
+    assert.equal(eaten, sumKcal(DIARY_NORMAL));
+    assert.match(await page.locator('.hero__unit').innerText(), /kcal übrig/);
+    assert.equal(toInt(await page.locator('.hero__big').innerText()), target - eaten);
+    assert.equal(await page.locator('.hero--over').count(), 0);
+    const lunch = page.locator('.row__btn', { hasText: 'Mittagessen' });
+    assert.equal(toInt(await lunch.locator('.row__note').innerText()), 520);
+  });
+
+  test('dashboard: Über-Ziel-Zustand', seed({ diary: DIARY_OVER }), async (page) => {
+    await go(page, 'dashboard');
+    const eaten = toInt(await page.locator('.hero__meta div', { hasText: 'gegessen' }).innerText());
+    const target = toInt(await page.locator('.hero__meta div', { hasText: 'Ziel' }).innerText());
+    assert.equal(eaten, sumKcal(DIARY_OVER));
+    assert.ok(eaten > target, `Seed muss über Ziel liegen (${eaten} vs ${target})`);
+    await page.locator('section.hero.hero--over').waitFor();
+    assert.match(await page.locator('.hero__unit').innerText(), /kcal über Ziel/);
+    assert.equal(toInt(await page.locator('.hero__big').innerText()), eaten - target);
+    const label = await page.locator('.hero__main').getAttribute('aria-label');
+    assert.match(label ?? '', /über/i, 'aria-label sollte Über-Ziel nennen');
+  });
+}

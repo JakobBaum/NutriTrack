@@ -80,3 +80,25 @@ describe('recipe-nutrition', () => {
     expect(ingredientFacts(ing({ amount: 0.1, unit: 'kg', facts: f })).kcal).toBe(140);
   });
 });
+
+describe('perServingFacts mit halben Portionen', () => {
+  const items = [ing({ amount: 100, facts: per100g(500, 10) })];
+
+  it('teilt durch 2,5 statt abgerundet durch 2', () => {
+    expect(perServingFacts(items, 2.5).kcal).toBe(200);
+    expect(perServingFacts(items, 2.5).proteinG).toBe(4);
+  });
+
+  it('teilt durch 0,5 (Portion verdoppelt) statt auf 1 zu klemmen', () => {
+    expect(perServingFacts(items, 0.5).kcal).toBe(1000);
+  });
+
+  it('fällt bei negativ/NaN auf 1 Portion zurück', () => {
+    expect(perServingFacts(items, -2).kcal).toBe(500);
+    expect(perServingFacts(items, NaN).kcal).toBe(500);
+  });
+
+  it('je Portion × Portionen ergibt wieder das Gesamt (Rezeptkarte "Gesamt")', () => {
+    expect(perServingFacts(items, 2.5).kcal * 2.5).toBe(totalFacts(items).kcal);
+  });
+});

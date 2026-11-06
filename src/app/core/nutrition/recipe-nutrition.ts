@@ -1,5 +1,5 @@
 import { NutritionFacts, RecipeIngredient } from '../models';
-import { UNIT_WEIGHT_G } from '../../recipes/recipe-view';
+import { UNIT_WEIGHT_G } from './units-weight';
 
 /** Einheiten mit exaktem Gewicht (Gramm je Einheit) für die Skalierung. */
 const EXACT_UNIT_G: Readonly<Record<string, number>> = {
@@ -37,7 +37,9 @@ export function ingredientFacts(ing: RecipeIngredient): NutritionFacts {
   const unit = (ing.unit || 'g').trim().toLowerCase();
   let factor: number;
   const exactG = EXACT_UNIT_G[unit];
-  const refGrams = facts.basis === 'per100g' ? 100 : facts.portionG ?? 100;
+  const portionG = facts.portionG;
+  const validPortion = portionG !== undefined && Number.isFinite(portionG) && portionG > 0;
+  const refGrams = facts.basis === 'per100g' ? 100 : validPortion ? portionG : 100;
   if (exactG !== undefined) {
     factor = (amount * exactG) / refGrams;
   } else if (facts.basis === 'per100g') {
@@ -76,12 +78,12 @@ export function totalFacts(ingredients: RecipeIngredient[]): NutritionFacts {
   }, emptyFacts());
 }
 
-/** Nährwerte je Portion = Gesamt / Portionen (mind. 1 Portion). */
+/** Nährwerte je Portion = Gesamt / Portionen (auch halbe Portionen; ungültig → 1). */
 export function perServingFacts(
   ingredients: RecipeIngredient[],
   servings: number,
 ): NutritionFacts {
-  const n = Number.isFinite(servings) && servings >= 1 ? Math.floor(servings) : 1;
+  const n = Number.isFinite(servings) && servings > 0 ? servings : 1;
   const total = totalFacts(ingredients);
   return {
     kcal: Math.round(total.kcal / n),

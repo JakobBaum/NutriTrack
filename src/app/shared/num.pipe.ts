@@ -15,7 +15,9 @@ function formatter(minDigits: number, maxDigits: number): Intl.NumberFormat {
 /** Zahl im österreichischen Format (Dezimalkomma), z. B. `{{ 16.6 | ntNum }}` → „16,6“, `{{ 54.3 | ntNum:2:2 }}` → „54,30“. */
 export function formatNum(value: number | null | undefined, maxDigits = 1, minDigits = 0): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return '–';
-  return formatter(minDigits, maxDigits).format(value);
+  const text = formatter(minDigits, maxDigits).format(value);
+  // Kleine negative Werte runden auf „-0" → als „0" anzeigen.
+  return /^-0(,0*)?$/.test(text) ? text.slice(1) : text;
 }
 
 @Pipe({ name: 'ntNum', standalone: true })

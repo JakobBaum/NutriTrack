@@ -1,16 +1,17 @@
 import { NutritionBasis, NutritionFacts } from '../models';
+import { parseDecimal } from '../util/number-input';
 import { RecipeImportIngredient, RecipeImportResult } from './ai-provider';
 
 // Einheiten, die 1:1 als Gramm/Milliliter gelten (→ Bezug per100g).
-const GRAM_UNITS = new Set(['g', 'gramm', 'gr', 'ml', 'milliliter']);
+const GRAM_UNITS = new Set(['g', 'gramm', 'gr', 'kg', 'kilogramm', 'ml', 'milliliter', 'l', 'liter']);
 const DEFAULT_PORTION_G = 50;
 const DEFAULT_SERVINGS = 2;
 const FALLBACK_TITLE = 'Importiertes Rezept';
 
 function num(v: unknown): number {
-  const n = typeof v === 'number' ? v : Number(v);
+  const n = parseDecimal(v);
   // Nährwerte und Mengen sind nie negativ — defekte Modellwerte abfangen.
-  return Number.isFinite(n) ? Math.max(0, n) : 0;
+  return n === null ? 0 : Math.max(0, n);
 }
 
 /** Parst KI-Nährwerte einer Zutat defensiv; Basis wird aus der Einheit

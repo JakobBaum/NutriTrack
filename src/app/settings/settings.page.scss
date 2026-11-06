@@ -90,6 +90,26 @@ ion-item {
   font-size: var(--nt-fs-body);
 }
 
+// Unterzeile in einer Gruppenzeile (z. B. "Letztes Backup: ...")
+.row-sub {
+  margin: 2px 0 0;
+  font-size: var(--nt-fs-caption);
+  color: var(--nt-secondary);
+}
+
+// Dateiauswahl fuer den Backup-Import: unsichtbar, wird per Zeile ausgeloest
+.backup-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.data-hint {
+  margin-top: var(--nt-space-2);
+}
+
 // Zerstoererische Zeile: roter Text (danger)
 .danger-row {
   --color: var(--nt-danger);

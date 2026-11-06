@@ -107,6 +107,9 @@ export type DiaryRef =
   | { kind: 'recipe'; recipeId: string }
   | { kind: 'manual' };
 
+/** Einheit einer Mengenangabe; gespeichert wird immer in Basiseinheit (g bzw. ml). */
+export type AmountUnit = 'g' | 'kg' | 'ml' | 'l';
+
 /** Ein verzehrter Posten an einem Tag. */
 export interface DiaryEntry {
   id: string;
@@ -130,7 +133,7 @@ export interface DiaryEntry {
   /** Werte sind unvollständig (z.B. Rezept mit Zutaten ohne Nährwerte) – angezeigt als Untergrenze. */
   isPartial?: boolean;
   /** Einheit der Menge amountG; fehlt = 'g'. */
-  unit?: 'g' | 'ml';
+  unit?: AmountUnit;
   createdAt: string;
 }
 
@@ -141,6 +144,8 @@ export interface ShoppingItem {
   checked: boolean;
   /** Geschätzter Preis in EUR (KI-Schätzung; echte Preise folgen später). */
   estPrice?: number;
+  /** Supermarkt-Kategorie (siehe SHOPPING_CATEGORIES); fehlt bei älteren Daten. */
+  category?: string;
 }
 
 export interface ShoppingList {

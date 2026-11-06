@@ -16,6 +16,7 @@ import {
   ShoppingPlanRequest,
   ShoppingPlanResult,
 } from './ai-provider';
+import { SHOPPING_CATEGORIES, categorizeName, normalizeCategory } from '../shopping/shopping-category';
 import { normalizeRecipeImport } from './recipe-import-normalize';
 
 const DEFAULT_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -68,9 +69,10 @@ export class GeminiAiProvider implements AiProvider {
     }));
     const sys =
       'Du erstellst Einkaufslisten. Antworte NUR mit JSON: ' +
-      '{"items":[{"name":string,"amount":number,"unit":string,"estPrice":number}],' +
+      '{"items":[{"name":string,"amount":number,"unit":string,"estPrice":number,"category":string}],' +
       '"suggestedDishes":[string],"estTotal":number,"note":string}. ' +
       'Fasse gleiche Zutaten zusammen. estPrice/estTotal in EUR (Schätzung für den Markt). ' +
+      'category ist genau eine aus: ' + SHOPPING_CATEGORIES.join(' | ') + '. ' +
       'Bleibe möglichst im Budget. Nutze vorhandene Rezepte, ergänze sonst sinnvoll.';
     const user = JSON.stringify({
       persons: req.persons,
@@ -88,6 +90,7 @@ export class GeminiAiProvider implements AiProvider {
           unit: String(i['unit'] ?? 'g'),
           checked: false,
           estPrice: this.num(i['estPrice']),
+          category: normalizeCategory(i['category']) ?? categorizeName(String(i['name'] ?? '')),
         }))
       : [];
     return {

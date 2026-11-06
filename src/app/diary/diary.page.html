@@ -19,6 +19,13 @@
       <ion-icon slot="icon-only" name="chevron-forward-outline"></ion-icon>
     </ion-button>
   </div>
+  @if (daySources().length) {
+    <div class="day-actions">
+      <button type="button" class="nt-pill nt-pill--secondary day-actions__copy" (click)="copyDay()" [attr.aria-label]="'Tag kopieren: einen früheren Tag zu ' + dateLabel() + ' hinzufügen'">
+        <ion-icon name="copy-outline" aria-hidden="true"></ion-icon> Tag kopieren
+      </button>
+    </div>
+  }
 
   <div class="summary nt-card">
     <span class="summary__kcal">{{ totalKcal() | ntNum:0 }}</span>
@@ -58,6 +65,12 @@
           <button type="button" class="meal__empty-add" (click)="openAdd(group.type)">
             <ion-icon name="add" aria-hidden="true"></ion-icon> Zu {{ group.label }} hinzufügen
           </button>
+          @if (group.copySource; as src) {
+            <button type="button" class="meal__empty-add meal__empty-copy" (click)="copyMeal(group)" [attr.aria-label]="group.label + ' ' + copyFromButtonText(src.dateISO).toLowerCase() + ' übernehmen: ' + src.entries.length + ' Einträge'">
+              <ion-icon name="copy-outline" aria-hidden="true"></ion-icon> {{ copyFromButtonText(src.dateISO) }}
+              <span class="meal__empty-count">{{ src.entries.length }} {{ src.entries.length === 1 ? 'Eintrag' : 'Einträge' }}</span>
+            </button>
+          }
         </div>
       } @else {
         <ion-list class="diary-list" lines="none">
@@ -67,7 +80,7 @@
                 <ion-label>
                   <h3>{{ entry.label }}</h3>
                   <p>
-                    @if (entry.amountG) { {{ entry.amountG | ntNum }} {{ entry.unit ?? 'g' }} · }
+                    @if (entry.amountG) { {{ formatAmount(entry.amountG, entry.unit) }} · }
                     E {{ entry.facts.proteinG | ntNum }} g · KH {{ entry.facts.carbsG | ntNum }} g · F {{ entry.facts.fatG | ntNum }} g
                     @if (entry.isEstimate) { · <span class="ai-badge">KI-Schätzung</span> }
                   </p>
@@ -196,7 +209,7 @@
                     <span class="recent__text">
                       <span class="recent__name">{{ entry.label }}</span>
                       <span class="recent__meta">
-                        @if (entry.amountG) { {{ entry.amountG | ntNum }} {{ entry.unit ?? 'g' }} · }{{ entry.isPartial ? 'mind. ' : '' }}{{ entry.facts.kcal | ntNum:0 }} kcal
+                        @if (entry.amountG) { {{ formatAmount(entry.amountG, entry.unit) }} · }{{ entry.isPartial ? 'mind. ' : '' }}{{ entry.facts.kcal | ntNum:0 }} kcal
                       </span>
                     </span>
                     <span class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
@@ -300,22 +313,37 @@
 
           <ion-list class="diary-list" lines="none">
             <ion-item lines="none">
-              <ion-input label="Name" labelPlacement="stacked" [(ngModel)]="form.label" placeholder="z. B. Haferflocken" enterkeyhint="done"></ion-input>
+              <ion-input label="Name" labelPlacement="stacked" [ngModel]="form.label" (ngModelChange)="setLabel($event)" placeholder="z. B. Haferflocken" enterkeyhint="done"></ion-input>
             </ion-item>
             @if (quantityUnit === 'portion') {
               <ion-item lines="none">
-                <ion-input type="number" inputmode="decimal" label="Portionen" labelPlacement="stacked" [ngModel]="form.servings" (ngModelChange)="setServings($event)"></ion-input>
+                <ion-input #amountInput type="text" inputmode="decimal" label="Portionen" labelPlacement="stacked" [ngModel]="numText('servings', form.servings)" (ngModelChange)="setServings($event)" (ionFocus)="selectAllOnFocus($event)"></ion-input>
               </ion-item>
             } @else {
               <ion-item lines="none">
-                <ion-input type="number" inputmode="decimal" [label]="(quantityUnit === 'g' ? 'Menge' : 'Menge (optional)') + ' (' + amountUnit + ')'" labelPlacement="stacked" [ngModel]="form.amountG" (ngModelChange)="setAmount($event)" placeholder="z. B. 150">
+                <ion-input #amountInput type="text" inputmode="decimal" [label]="quantityUnit === 'g' ? 'Menge' : 'Menge (optional)'" labelPlacement="stacked" [ngModel]="numText('amount', form.amountG)" (ngModelChange)="setAmount($event)" (ionFocus)="selectAllOnFocus($event)" placeholder="z. B. 150">
                   <ion-note slot="end">{{ amountUnit }}</ion-note>
                 </ion-input>
               </ion-item>
+              <div class="unit-picker">
+                <ion-segment class="unit-segment" aria-label="Einheit" [value]="amountUnit" (ionChange)="setAmountUnit($event.detail.value)">
+                  @for (u of amountUnits; track u) {
+                    <ion-segment-button [value]="u"><ion-label>{{ u }}</ion-label></ion-segment-button>
+                  }
+                </ion-segment>
+              </div>
+              <div class="quick-amounts" role="group" aria-label="Schnellwahl Menge">
+                @for (q of quickAmountOptions; track q) {
+                  <button type="button" class="nt-pill nt-pill--secondary quick-chip" (click)="pickAmount(q)" [attr.aria-label]="'Menge ' + (q | ntNum:2) + ' ' + amountUnit">{{ q | ntNum:2 }}</button>
+                }
+                @if (lastAmountFor(form.label, amountUnit); as last) {
+                  <button type="button" class="nt-pill nt-pill--secondary quick-chip" (click)="pickAmount(last)" [attr.aria-label]="'Menge wie zuletzt: ' + (last | ntNum:3) + ' ' + amountUnit">wie zuletzt {{ last | ntNum:3 }}</button>
+                }
+              </div>
             }
           </ion-list>
           @if (basisKcal !== null) {
-            <p class="scan-hint">Quelle: {{ basisKcal | ntNum:0 }} kcal pro 100 {{ amountUnit }}</p>
+            <p class="scan-hint">Quelle: {{ basisKcal | ntNum:0 }} kcal pro 100 {{ baseUnit }}</p>
           }
 
           <p class="preview" aria-live="polite">
@@ -338,22 +366,22 @@
                     </ion-select>
                   </ion-item>
                   <ion-item lines="none">
-                    <ion-input type="number" inputmode="numeric" label="Kalorien (kcal)" labelPlacement="stacked" [(ngModel)]="form.kcal" placeholder="0"></ion-input>
+                    <ion-input type="text" inputmode="numeric" label="Kalorien (kcal)" labelPlacement="stacked" [ngModel]="numText('kcal', form.kcal)" (ngModelChange)="setField('kcal', $event)" (ionFocus)="selectAllOnFocus($event)" placeholder="0"></ion-input>
                   </ion-item>
                   <ion-item lines="none">
-                    <ion-input type="number" inputmode="decimal" label="Eiweiß (g)" labelPlacement="stacked" [(ngModel)]="form.proteinG" placeholder="0"></ion-input>
+                    <ion-input type="text" inputmode="decimal" label="Eiweiß (g)" labelPlacement="stacked" [ngModel]="numText('proteinG', form.proteinG)" (ngModelChange)="setField('proteinG', $event)" (ionFocus)="selectAllOnFocus($event)" placeholder="0"></ion-input>
                   </ion-item>
                   <ion-item lines="none">
-                    <ion-input type="number" inputmode="decimal" label="Kohlenhydrate (g)" labelPlacement="stacked" [(ngModel)]="form.carbsG" placeholder="0"></ion-input>
+                    <ion-input type="text" inputmode="decimal" label="Kohlenhydrate (g)" labelPlacement="stacked" [ngModel]="numText('carbsG', form.carbsG)" (ngModelChange)="setField('carbsG', $event)" (ionFocus)="selectAllOnFocus($event)" placeholder="0"></ion-input>
                   </ion-item>
                   <ion-item lines="none">
-                    <ion-input type="number" inputmode="decimal" label="Fett (g)" labelPlacement="stacked" [(ngModel)]="form.fatG" placeholder="0"></ion-input>
+                    <ion-input type="text" inputmode="decimal" label="Fett (g)" labelPlacement="stacked" [ngModel]="numText('fatG', form.fatG)" (ngModelChange)="setField('fatG', $event)" (ionFocus)="selectAllOnFocus($event)" placeholder="0"></ion-input>
                   </ion-item>
                   <ion-item lines="none">
-                    <ion-input type="number" inputmode="decimal" label="Ballaststoffe (g)" labelPlacement="stacked" [(ngModel)]="form.fiberG" placeholder="0"></ion-input>
+                    <ion-input type="text" inputmode="decimal" label="Ballaststoffe (g)" labelPlacement="stacked" [ngModel]="numText('fiberG', form.fiberG)" (ngModelChange)="setField('fiberG', $event)" (ionFocus)="selectAllOnFocus($event)" placeholder="0"></ion-input>
                   </ion-item>
                   <ion-item lines="none">
-                    <ion-input type="number" inputmode="decimal" label="Zucker (g)" labelPlacement="stacked" [(ngModel)]="form.sugarG" placeholder="0"></ion-input>
+                    <ion-input type="text" inputmode="decimal" label="Zucker (g)" labelPlacement="stacked" [ngModel]="numText('sugarG', form.sugarG)" (ngModelChange)="setField('sugarG', $event)" (ionFocus)="selectAllOnFocus($event)" placeholder="0"></ion-input>
                   </ion-item>
                 </ion-list>
               </div>
@@ -398,10 +426,10 @@
           <ion-input label="Restaurant" labelPlacement="stacked" [(ngModel)]="ff.restaurant" placeholder="z. B. McDonald’s"></ion-input>
         </ion-item>
         <ion-item lines="none">
-          <ion-input type="number" inputmode="numeric" label="kcal-Budget" labelPlacement="stacked" [(ngModel)]="ff.kcalBudget" placeholder="z. B. 800"></ion-input>
+          <ion-input type="text" inputmode="numeric" label="kcal-Budget" labelPlacement="stacked" [ngModel]="numText('ff.kcalBudget', ff.kcalBudget)" (ngModelChange)="setFastFoodField('kcalBudget', $event)" (ionFocus)="selectAllOnFocus($event)" placeholder="z. B. 800"></ion-input>
         </ion-item>
         <ion-item lines="none">
-          <ion-input type="number" inputmode="decimal" label="Geld-Budget (€)" labelPlacement="stacked" [(ngModel)]="ff.moneyBudget" placeholder="optional"></ion-input>
+          <ion-input type="text" inputmode="decimal" label="Geld-Budget (€)" labelPlacement="stacked" [ngModel]="numText('ff.moneyBudget', ff.moneyBudget)" (ngModelChange)="setFastFoodField('moneyBudget', $event)" (ionFocus)="selectAllOnFocus($event)" placeholder="optional"></ion-input>
         </ion-item>
         <ion-item lines="none">
           <ion-input label="Priorität" labelPlacement="stacked" [(ngModel)]="ff.preference" placeholder="viel Protein"></ion-input>
@@ -470,10 +498,25 @@
         </ion-item>
         @if (editBaseFacts) {
           <ion-item lines="none">
-            <ion-input type="number" inputmode="decimal" [label]="'Menge (' + (editEntryUnit) + ')'" labelPlacement="stacked" [(ngModel)]="editForm.amountG" min="1">
-              <ion-note slot="end">{{ editEntryUnit }}</ion-note>
+            <ion-input type="text" inputmode="decimal" label="Menge" labelPlacement="stacked" [ngModel]="numText('editAmount', editForm.amountG)" (ngModelChange)="setEditAmount($event)" (ionFocus)="selectAllOnFocus($event)">
+              <ion-note slot="end">{{ editUnit }}</ion-note>
             </ion-input>
           </ion-item>
+          <div class="unit-picker">
+            <ion-segment class="unit-segment" aria-label="Einheit" [value]="editUnit" (ionChange)="setEditUnit($event.detail.value)">
+              @for (u of amountUnits; track u) {
+                <ion-segment-button [value]="u"><ion-label>{{ u }}</ion-label></ion-segment-button>
+              }
+            </ion-segment>
+          </div>
+          <div class="quick-amounts" role="group" aria-label="Schnellwahl Menge">
+            @for (q of editQuickAmountOptions; track q) {
+              <button type="button" class="nt-pill nt-pill--secondary quick-chip" (click)="pickEditAmount(q)" [attr.aria-label]="'Menge ' + (q | ntNum:2) + ' ' + editUnit">{{ q | ntNum:2 }}</button>
+            }
+            @if (lastAmountFor(editForm.label, editUnit, editEntryId); as last) {
+              <button type="button" class="nt-pill nt-pill--secondary quick-chip" (click)="pickEditAmount(last)" [attr.aria-label]="'Menge wie zuletzt: ' + (last | ntNum:3) + ' ' + editUnit">wie zuletzt {{ last | ntNum:3 }}</button>
+            }
+          </div>
         }
       </ion-list>
       <ion-button expand="block" class="sheet-action" (click)="saveEdit()">Speichern</ion-button>

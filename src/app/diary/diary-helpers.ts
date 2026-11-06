@@ -1,4 +1,6 @@
-import { MealType, NutritionFacts } from '../core/models';
+import { formatNum } from '../shared/num.pipe';
+import { AmountUnit, DiaryEntry, MealType, NutritionFacts } from '../core/models';
+import { parseDecimal } from '../core/util/number-input';
 
 export interface MealDef {
   readonly type: MealType;
@@ -106,9 +108,48 @@ export function factsFromFields(fields: EntryFields): NutritionFacts | null {
 
 /** Wandelt Ionic-Eingaben (Zahl, String oder leer) in eine endliche Zahl oder null. */
 export function toNumberOrNull(value: unknown): number | null {
-  if (value === null || value === undefined || value === '') return null;
-  const n = typeof value === 'number' ? value : Number(String(value).replace(',', '.'));
-  return Number.isFinite(n) ? n : null;
+  // Zentrale Zahlen-Logik (Dezimalkomma, Tausenderpunkt, Leerzeichen -> null).
+  return parseDecimal(value);
+}
+
+/**
+ * Nährwerte je Portion aus einem Eintrag, dessen facts bereits für `servings`
+ * Portionen gelten (verhindert doppelte Skalierung beim erneuten Anpassen).
+ */
+export function perServingFacts(facts: NutritionFacts, servings: number | null | undefined): NutritionFacts {
+  return isValidAmount(servings) && servings !== 1 ? scaleFacts(facts, 1 / servings) : facts;
+}
+
+/**
+ * Bezugswerte für den Bearbeiten-Dialog: gespeicherte baseFacts, sonst (manueller
+ * Eintrag mit Menge) aus den Nährwerten auf 100 g/ml zurückgerechnet; ohne Menge null.
+ */
+export function editBaseFor(entry: DiaryEntry): NutritionFacts | null {
+  if (entry.baseFacts) return entry.baseFacts;
+  return isValidAmount(entry.amountG) ? rebaseTo100(entry.facts, entry.amountG) : null;
+}
+
+/**
+ * Letzte Menge (Basiseinheit) für ein Lebensmittel nach Name, neueste zuerst;
+ * Rezepte und der Eintrag `excludeId` (z. B. der gerade bearbeitete) zählen nicht.
+ */
+export function lastAmountForLabel(
+  entries: readonly DiaryEntry[],
+  label: string,
+  excludeId?: string | null,
+): number | null {
+  const key = label.trim().toLowerCase();
+  if (!key) return null;
+  const hit = [...entries]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .find(
+      (e) =>
+        e.id !== excludeId &&
+        e.ref?.kind !== 'recipe' &&
+        isValidAmount(e.amountG) &&
+        e.label.trim().toLowerCase() === key,
+    );
+  return hit?.amountG ?? null;
 }
 
 const LIQUID_PATTERN =
@@ -139,4 +180,74 @@ export function factsDiffer(a: NutritionFacts, b: NutritionFacts): boolean {
     (a.fiberG ?? 0) !== (b.fiberG ?? 0) ||
     (a.sugarG ?? 0) !== (b.sugarG ?? 0)
   );
+}
+
+/** Auswählbare Mengeneinheiten im Tagebuch. */
+export const AMOUNT_UNITS: readonly AmountUnit[] = ['g', 'kg', 'ml', 'l'];
+
+const MAX_AMOUNT_DECIMALS = 3;
+/** Anzeigegenauigkeit von Zahlenfeldern (6 Nachkommastellen). */
+const INPUT_TEXT_PRECISION = 1e6;
+
+/** Faktor von der Einheit in die Basiseinheit (kg/l -> 1000, sonst 1). */
+export function unitFactor(unit: AmountUnit): number {
+  return unit === 'kg' || unit === 'l' ? 1000 : 1;
+}
+
+/** Basiseinheit einer Einheit (g für g/kg, ml für ml/l). */
+export function baseUnitOf(unit: AmountUnit): 'g' | 'ml' {
+  return unit === 'ml' || unit === 'l' ? 'ml' : 'g';
+}
+
+const roundDecimals = (n: number): number => {
+  const f = 10 ** MAX_AMOUNT_DECIMALS;
+  return Math.round(n * f) / f;
+};
+
+/** Eingegebener Wert in `unit` -> Menge in Basiseinheit (g bzw. ml). */
+export function toBaseAmount(value: number, unit: AmountUnit): number {
+  return roundDecimals(value * unitFactor(unit));
+}
+
+/** Menge in Basiseinheit -> Wert in `unit` (max. 3 Nachkommastellen). */
+export function fromBaseAmount(amountG: number, unit: AmountUnit): number {
+  return roundDecimals(amountG / unitFactor(unit));
+}
+
+/**
+ * Rechnet einen Mengenwert ungerundet von einer Einheit in eine andere um
+ * (Einheitenwechsel im Formular; gerundet wird erst bei Anzeige/Speichern).
+ */
+export function convertAmount(value: number, from: AmountUnit, to: AmountUnit): number {
+  return (value * unitFactor(from)) / unitFactor(to);
+}
+
+/** Menge für die Anzeige, z. B. „250 g“, „0,5 l“, „1,2 kg“ (Dezimalkomma). */
+export function formatAmount(amountG: number, unit: AmountUnit = 'g'): string {
+  return `${formatNum(fromBaseAmount(amountG, unit), MAX_AMOUNT_DECIMALS)} ${unit}`;
+}
+
+const QUICK_AMOUNTS_SMALL: readonly number[] = [50, 100, 150, 200];
+const QUICK_AMOUNTS_LARGE: readonly number[] = [0.1, 0.25, 0.5, 1];
+
+/** Schnellwahl-Mengen in der gewählten Einheit (g/ml: 50-200, kg/l: 0,1-1). */
+export function quickAmounts(unit: AmountUnit): readonly number[] {
+  return unitFactor(unit) === 1 ? QUICK_AMOUNTS_SMALL : QUICK_AMOUNTS_LARGE;
+}
+
+/** Zahl als Eingabetext mit Dezimalkomma ('' bei null). */
+export function numberToInputText(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return '';
+  // Nur für die Anzeige runden (Gleitkomma-Reste aus Einheitenwechseln ausblenden).
+  const shown = Math.round(value * INPUT_TEXT_PRECISION) / INPUT_TEXT_PRECISION;
+  return String(shown).replace('.', ',');
+}
+
+/**
+ * Anzeigetext eines Zahlenfelds: der rohe Tipptext bleibt erhalten (z. B. "1,"),
+ * solange er noch zum Zahlenwert passt, sonst die formatierte Zahl.
+ */
+export function inputTextFor(raw: string | undefined, value: number | null): string {
+  if (raw !== undefined && toNumberOrNull(raw) === value) return raw;
+  return numberToInputText(value);
 }

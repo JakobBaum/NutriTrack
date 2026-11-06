@@ -36,6 +36,16 @@ const FIBER_G_PER_1000_KCAL = 14;
 /** Freier Zucker (Obergrenze): WHO-Empfehlung < 10 % der Energie, 4 kcal/g. */
 const SUGAR_ENERGY_RATIO = 0.1;
 
+/** Standard-Bezugsmenge (g), wenn keine gültige Portionsgröße vorliegt. */
+const DEFAULT_PORTION_G = 100;
+
+/** Portionsgröße nur, wenn endlich und > 0 – sonst Standard (verhindert Division durch 0). */
+function validPortionG(portionG: number | undefined): number {
+  return portionG !== undefined && Number.isFinite(portionG) && portionG > 0
+    ? portionG
+    : DEFAULT_PORTION_G;
+}
+
 /**
  * Reine, testbare Ernährungs-Rechenlogik. Dient als deterministischer Fallback,
  * wenn kein KI-Anbieter für die Bedarfsberechnung verfügbar ist, und als
@@ -62,9 +72,13 @@ export class NutritionCalcService {
    * Deckelt das Ergebnis auf eine sichere Untergrenze.
    */
   dailyTarget(p: UserProfile): DailyTarget {
-    const kcal = Math.round(Math.max(this.uncappedKcal(p), this.minKcal(p)));
+    const uncapped = this.uncappedKcal(p);
+    const kcal = Math.round(
+      Number.isFinite(uncapped) ? Math.max(uncapped, this.minKcal(p)) : this.minKcal(p),
+    );
 
-    const proteinG = Math.round(PROTEIN_G_PER_KG[p.goal] * p.weightKg);
+    const weightKg = Number.isFinite(p.weightKg) ? p.weightKg : 0;
+    const proteinG = Math.round(PROTEIN_G_PER_KG[p.goal] * weightKg);
     const fatG = Math.round((kcal * FAT_ENERGY_RATIO) / KCAL_PER_G.fat);
     const proteinKcal = proteinG * KCAL_PER_G.protein;
     const fatKcal = fatG * KCAL_PER_G.fat;
@@ -80,7 +94,8 @@ export class NutritionCalcService {
 
   /** `true`, wenn die Mindestzufuhr das rechnerische Ziel anhebt (Formel liegt darunter). */
   isMinKcalApplied(p: UserProfile): boolean {
-    return this.uncappedKcal(p) < this.minKcal(p);
+    const uncapped = this.uncappedKcal(p);
+    return !Number.isFinite(uncapped) || uncapped < this.minKcal(p);
   }
 
   /** Rechnerisches Kalorienziel vor der Mindestzufuhr. */
@@ -102,7 +117,7 @@ export class NutritionCalcService {
    * `facts` kann pro 100 g oder pro Portion vorliegen.
    */
   scaleToGrams(facts: NutritionFacts, grams: number): NutritionFacts {
-    const refGrams = facts.basis === 'per100g' ? 100 : facts.portionG ?? 100;
+    const refGrams = facts.basis === 'per100g' ? 100 : validPortionG(facts.portionG);
     const f = grams / refGrams;
     return this.scaleBy(facts, f, grams);
   }

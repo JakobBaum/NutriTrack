@@ -1,6 +1,13 @@
 <ion-header class="ion-no-border">
   <ion-toolbar>
     <ion-title role="heading" aria-level="1">Einkaufsliste</ion-title>
+    @if (list() !== null) {
+      <ion-buttons slot="end">
+        <ion-button class="share-btn" (click)="shareList()" [disabled]="openCount() === 0" aria-label="Liste teilen">
+          <ion-icon slot="icon-only" name="share-outline"></ion-icon>
+        </ion-button>
+      </ion-buttons>
+    }
   </ion-toolbar>
 </ion-header>
 
@@ -9,8 +16,8 @@
     <ion-card class="generator">
       <ion-card-content>
         <div class="generator__row">
-          <ion-input type="number" inputmode="numeric" min="1" step="1" label="Personen" labelPlacement="stacked" [(ngModel)]="persons" fill="outline"></ion-input>
-          <ion-input type="number" inputmode="numeric" min="1" step="1" label="Tage" labelPlacement="stacked" [(ngModel)]="days" fill="outline"></ion-input>
+          <ion-input type="text" inputmode="numeric" enterkeyhint="next" label="Personen" labelPlacement="stacked" [ngModel]="formatDecimal(persons)" (ngModelChange)="persons = parseDecimal($event) ?? 0" [ngModelOptions]="{ updateOn: 'blur' }" fill="outline"></ion-input>
+          <ion-input type="text" inputmode="numeric" enterkeyhint="next" label="Tage" labelPlacement="stacked" [ngModel]="formatDecimal(days)" (ngModelChange)="days = parseDecimal($event) ?? 0" [ngModelOptions]="{ updateOn: 'blur' }" fill="outline"></ion-input>
         </div>
 
         <div class="generator__meals" role="group" aria-labelledby="meals-label">
@@ -34,7 +41,7 @@
         </div>
 
         <div class="generator__row">
-          <ion-input type="number" inputmode="decimal" label="Budget (€)" labelPlacement="stacked" [(ngModel)]="budget" placeholder="optional" fill="outline"></ion-input>
+          <ion-input type="text" inputmode="decimal" enterkeyhint="done" label="Budget (€)" labelPlacement="stacked" [ngModel]="formatDecimal(budget)" (ngModelChange)="budget = parseDecimal($event)" [ngModelOptions]="{ updateOn: 'blur' }" placeholder="optional" fill="outline"></ion-input>
           <ion-select label="Markt" labelPlacement="stacked" [(ngModel)]="storeName" interface="popover" fill="outline">
             @for (s of stores; track s) {
               <ion-select-option [value]="s">{{ s || 'egal' }}</ion-select-option>
@@ -100,46 +107,87 @@
       </div>
     }
 
-    <ion-list class="nt-grouped" lines="full">
-      @for (row of rows(); track row.index) {
-        @let item = row.item;
-        <ion-item-sliding>
-          <ion-item class="check-row" detail="false" lines="full">
-            <ion-checkbox
-              class="check-row__box"
-              labelPlacement="end"
-              justify="start"
-              alignment="center"
-              [checked]="item.checked"
-              (ionChange)="setChecked(row.index, $event.detail.checked)"
-            >
-              <span class="check-row__text" [class.checked]="item.checked">
-                <span class="check-row__name">{{ item.name }}</span>
-                <span class="qty">
-                  {{ item.amount | ntNum:2 }} {{ item.unit }}
-                  @if ((item.estPrice ?? null) !== null) { · ≈ {{ item.estPrice! | ntNum:2:2 }} € } @else { · ohne Preis }
-                </span>
+    <!-- Eine Zeile (offen oder erledigt); Index = Position in der gespeicherten Liste. -->
+    <ng-template #rowTpl let-row>
+      @let item = row.item;
+      <ion-item-sliding>
+        <ion-item class="check-row" detail="false" lines="full">
+          <ion-checkbox
+            class="check-row__box"
+            labelPlacement="end"
+            justify="start"
+            alignment="center"
+            [checked]="item.checked"
+            (ionChange)="setChecked(row.index, $event.detail.checked)"
+          >
+            <span class="check-row__text" [class.checked]="item.checked">
+              <span class="check-row__name">{{ item.name }}</span>
+              <span class="qty">
+                @if (item.amount > 0) { {{ item.amount | ntNum:2 }} {{ item.unit }} } @else { ohne Menge }
+                @if ((item.estPrice ?? null) !== null) { · ≈ {{ item.estPrice! | ntNum:2:2 }} € } @else { · ohne Preis }
               </span>
-            </ion-checkbox>
-          </ion-item>
-          <ion-item-options side="end">
-            <ion-item-option color="danger" (click)="removeItem(row.index)" [attr.aria-label]="item.name + ' löschen'">
-              <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
-            </ion-item-option>
-          </ion-item-options>
-        </ion-item-sliding>
+            </span>
+          </ion-checkbox>
+        </ion-item>
+        <ion-item-options side="end">
+          <ion-item-option color="danger" (click)="removeItem(row.index)" [attr.aria-label]="item.name + ' löschen'">
+            <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+          </ion-item-option>
+        </ion-item-options>
+      </ion-item-sliding>
+    </ng-template>
+
+    @for (group of openGroups(); track group.category ?? '') {
+      @if (group.category) {
+        <h2 class="nt-section-header">{{ group.category }}</h2>
       }
-      @if (rows().length === 0) {
-        <ion-item lines="none"><ion-label color="medium">Liste ist leer.</ion-label></ion-item>
+      <ion-list class="nt-grouped" lines="full">
+        @for (row of group.rows; track row.index) {
+          <ng-container *ngTemplateOutlet="rowTpl; context: { $implicit: row }"></ng-container>
+        }
+      </ion-list>
+    }
+    @if (openCount() === 0) {
+      <ion-list class="nt-grouped" lines="none">
+        <ion-item lines="none">
+          <ion-label color="medium">{{ rows().length === 0 ? 'Liste ist leer.' : 'Alles erledigt.' }}</ion-label>
+        </ion-item>
+      </ion-list>
+    }
+
+    @if (doneRows().length > 0) {
+      <div class="done-head">
+        <button
+          type="button"
+          class="done-head__toggle"
+          [attr.aria-expanded]="doneOpen()"
+          aria-controls="done-list"
+          (click)="toggleDone()"
+        >
+          <ion-icon [name]="doneOpen() ? 'chevron-up-outline' : 'chevron-down-outline'" aria-hidden="true"></ion-icon>
+          Erledigt ({{ doneRows().length }})
+        </button>
+        <ion-button fill="clear" class="done-head__clear" (click)="removeChecked()">Erledigte entfernen</ion-button>
+      </div>
+      @if (doneOpen()) {
+        <ion-list id="done-list" class="nt-grouped done-list" lines="full">
+          @for (row of doneRows(); track row.index) {
+            <ng-container *ngTemplateOutlet="rowTpl; context: { $implicit: row }"></ng-container>
+          }
+        </ion-list>
       }
-    </ion-list>
+    }
 
     <h2 class="nt-section-header">Position hinzufügen</h2>
     <div class="add-row">
-      <ion-input class="add-name" [(ngModel)]="newItemName" placeholder="Artikel" aria-label="Artikel" fill="outline"></ion-input>
+      <ion-input #addName class="add-name" enterkeyhint="done" [(ngModel)]="newItemName" (keyup.enter)="addManual()" placeholder="Artikel" aria-label="Artikel" fill="outline"></ion-input>
       <div class="add-row__line">
-        <ion-input class="add-amount" type="number" inputmode="decimal" [(ngModel)]="newItemAmount" placeholder="Menge" aria-label="Menge" fill="outline"></ion-input>
-        <ion-input class="add-unit" [(ngModel)]="newItemUnit" placeholder="g" aria-label="Einheit" fill="outline"></ion-input>
+        <ion-input class="add-amount" type="text" inputmode="decimal" enterkeyhint="done" [(ngModel)]="newItemAmountText" (keyup.enter)="addManual()" placeholder="Menge" aria-label="Menge" fill="outline"></ion-input>
+        <ion-select class="add-unit" [(ngModel)]="newItemUnit" aria-label="Einheit" interface="popover" fill="outline">
+          @for (u of unitOptions; track u) {
+            <ion-select-option [value]="u">{{ u }}</ion-select-option>
+          }
+        </ion-select>
         <ion-button fill="clear" class="add-btn" (click)="addManual()" aria-label="Position hinzufügen">
           <ion-icon slot="icon-only" name="add-circle-outline"></ion-icon>
         </ion-button>
@@ -151,11 +199,18 @@
     </p>
     <ion-toast
       [isOpen]="undoOpen()"
-      message="Position gelöscht"
+      [message]="undoMessage()"
       [duration]="undoDuration"
       [buttons]="undoButtons"
       position="bottom"
       (didDismiss)="onUndoDismiss($any($event))"
+    ></ion-toast>
+    <ion-toast
+      [isOpen]="shareToastOpen()"
+      [message]="shareToastMessage()"
+      [duration]="shareToastDuration"
+      position="bottom"
+      (didDismiss)="onShareToastDismiss()"
     ></ion-toast>
   } @else {
     <div class="empty">

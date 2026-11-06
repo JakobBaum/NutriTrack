@@ -1,11 +1,8 @@
 import { RecipeIngredient, RecipeOrigin } from '../core/models';
+import { UNIT_WEIGHT_G, countMissingFacts } from '../core/nutrition/units-weight';
 
-/** Gramm je Einheit; EL, TL, Stk … sind Näherungswerte. */
-export const UNIT_WEIGHT_G: Readonly<Record<string, number>> = {
-  g: 1, kg: 1000, ml: 1, l: 1000,
-  EL: 15, TL: 5, Prise: 0.5,
-  Stk: 80, Pck: 100, Dose: 400, Bund: 50,
-};
+// Re-Export: Bestandsimporte (z. B. Diary) bleiben unverändert gültig.
+export { UNIT_WEIGHT_G, countMissingFacts };
 
 /** Einheiten mit exaktem Gewicht (kein „≈“ nötig). */
 const EXACT_UNITS = new Set(['g', 'kg', 'ml', 'l']);
@@ -27,11 +24,6 @@ export function hasApproxUnits(ingredients: readonly Pick<RecipeIngredient, 'uni
   return ingredients.some((i) => !EXACT_UNITS.has(i.unit));
 }
 
-/** Anzahl Zutaten ohne hinterlegte Nährwerte (zählen in der Summe als 0). */
-export function countMissingFacts(ingredients: readonly Pick<RecipeIngredient, 'facts'>[]): number {
-  return ingredients.filter((i) => !i.facts).length;
-}
-
 /** „1 Zutat ohne Werte“ / „2 Zutaten ohne Werte“. */
 export function missingFactsLabel(count: number): string {
   return `${count} ${count === 1 ? 'Zutat' : 'Zutaten'} ohne Werte`;
@@ -39,7 +31,8 @@ export function missingFactsLabel(count: number): string {
 
 /** „1 Portion“ / „4 Portionen“. */
 export function servingsLabel(servings: number): string {
-  return `${servings} ${servings === 1 ? 'Portion' : 'Portionen'}`;
+  const text = String(servings).replace('.', ',');
+  return `${text} ${servings === 1 ? 'Portion' : 'Portionen'}`;
 }
 
 /** Präfix „≥ “, wenn die Summe wegen fehlender Zutatenwerte nur eine Untergrenze ist. */

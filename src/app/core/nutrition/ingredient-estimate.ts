@@ -41,12 +41,12 @@ const UNIT_GRAMS: Record<string, number> = {
 };
 const DEFAULT_UNIT_GRAMS = 50;
 
-/** Keyword → Dichte. Erster Treffer (Teilstring, case-insensitive) gewinnt. */
+/** Keyword → Dichte. Längster Treffer am Wortanfang/-ende (case-insensitive) gewinnt. */
 const TABLE: { keywords: string[]; d: Density }[] = [
   { keywords: ['mehl'], d: { kcal: 364, proteinG: 10, carbsG: 76, fatG: 1, fiberG: 2.7, sugarG: 0.3 } },
   { keywords: ['haferflocken', 'hafer'], d: { kcal: 389, proteinG: 13, carbsG: 66, fatG: 7, fiberG: 10, sugarG: 1 } },
   { keywords: ['zucker'], d: { kcal: 400, proteinG: 0, carbsG: 100, fatG: 0, fiberG: 0, sugarG: 100 } },
-  { keywords: ['ei', 'eier'], d: { kcal: 155, proteinG: 13, carbsG: 1.1, fatG: 11, fiberG: 0, sugarG: 1.1 } },
+  { keywords: ['ei', 'eier', 'hühnerei'], d: { kcal: 155, proteinG: 13, carbsG: 1.1, fatG: 11, fiberG: 0, sugarG: 1.1 } },
   { keywords: ['milch'], d: { kcal: 64, proteinG: 3.4, carbsG: 4.8, fatG: 3.6, fiberG: 0, sugarG: 4.8 } },
   { keywords: ['sahne', 'rahm'], d: { kcal: 292, proteinG: 2.4, carbsG: 3.4, fatG: 30, fiberG: 0, sugarG: 3.4 } },
   { keywords: ['joghurt', 'jogurt'], d: { kcal: 61, proteinG: 3.5, carbsG: 4.7, fatG: 3.3, fiberG: 0, sugarG: 4.7 } },
@@ -73,12 +73,28 @@ function round1(v: number): number {
   return Math.round(v * 10) / 10;
 }
 
+/** Wortteile (Buchstaben/Ziffern), damit Keywords nicht mitten im Wort treffen. */
+function tokenize(name: string): string[] {
+  return name.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((t) => t.length > 0);
+}
+
+/** Keyword passt am Wortanfang oder -ende (Komposita wie „Hühnerei", „Olivenöl"), nie mittendrin. */
+function matchesToken(token: string, keyword: string): boolean {
+  return token.startsWith(keyword) || token.endsWith(keyword);
+}
+
+/** Längster passender Keyword gewinnt (spezifisch vor kurz), bei Gleichstand die Tabellenreihenfolge. */
 function findDensity(name: string): Density | undefined {
-  const n = name.toLowerCase();
+  const tokens = tokenize(name);
+  let best: { len: number; d: Density } | undefined;
   for (const row of TABLE) {
-    if (row.keywords.some((k) => n.includes(k))) return row.d;
+    for (const k of row.keywords) {
+      if (k.length > (best?.len ?? 0) && tokens.some((t) => matchesToken(t, k))) {
+        best = { len: k.length, d: row.d };
+      }
+    }
   }
-  return undefined;
+  return best?.d;
 }
 
 /**

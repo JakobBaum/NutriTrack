@@ -56,6 +56,69 @@ export class StorageService {
     }
   }
 
+  /**
+   * Liest alle NutriTrack-Schlüssel (ohne Präfix) als geparste JSON-Werte, z. B. für ein Backup.
+   * Nicht lesbare Einträge werden ausgelassen (sie wären auch für die Stores unbrauchbar).
+   */
+  snapshot(): Record<string, unknown> {
+    return Object.fromEntries(
+      Object.entries(this.rawEntries()).flatMap(([key, raw]) => {
+        try {
+          return [[key, JSON.parse(raw) as unknown]];
+        } catch {
+          return [];
+        }
+      }),
+    );
+  }
+
+  /**
+   * Ersetzt alle NutriTrack-Schlüssel durch `data` (z. B. Backup-Import).
+   * Schlägt das Schreiben fehl (Speicher voll), wird der vorherige Stand wiederhergestellt.
+   * @returns `true` bei Erfolg.
+   */
+  replaceAll(data: Readonly<Record<string, unknown>>): boolean {
+    const b = this.backend();
+    if (!b) return false;
+    const previous = this.rawEntries();
+    try {
+      this.writeRaw(b, previous, {});
+      Object.entries(data).forEach(([key, value]) => b.setItem(this.prefix + key, JSON.stringify(value)));
+      return true;
+    } catch {
+      this.restoreRaw(b, previous);
+      return false;
+    }
+  }
+
+  /** Alle NutriTrack-Einträge als Rohstrings (Schlüssel ohne Präfix). */
+  private rawEntries(): Record<string, string> {
+    const b = this.backend();
+    if (!b) return {};
+    try {
+      const keys = Array.from({ length: b.length }, (_, i) => b.key(i)).filter(
+        (k): k is string => !!k && k.startsWith(this.prefix),
+      );
+      return Object.fromEntries(keys.map((k) => [k.slice(this.prefix.length), b.getItem(k) ?? 'null']));
+    } catch {
+      return {};
+    }
+  }
+
+  /** Entfernt alle Schlüssel aus `remove` und schreibt danach `write` (Rohstrings). */
+  private writeRaw(b: Storage, remove: Record<string, string>, write: Record<string, string>): void {
+    Object.keys(remove).forEach((k) => b.removeItem(this.prefix + k));
+    Object.entries(write).forEach(([k, v]) => b.setItem(this.prefix + k, v));
+  }
+
+  private restoreRaw(b: Storage, previous: Record<string, string>): void {
+    try {
+      this.writeRaw(b, this.rawEntries(), previous);
+    } catch {
+      /* Wiederherstellung fehlgeschlagen — nichts weiter möglich. */
+    }
+  }
+
   private backend(): Storage | null {
     try {
       return typeof localStorage !== 'undefined' ? localStorage : null;

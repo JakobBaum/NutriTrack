@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { AlertController } from '@ionic/angular';
 import { ActivityLevel, AiConfig, Goal, Sex, UserProfile } from '../core/models';
@@ -7,6 +7,7 @@ import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { RecipeStore } from '../core/state/recipe.store';
 import { MealsStore } from '../core/state/meals.store';
+import { formatDecimal, parseDecimal } from '../core/util/number-input';
 import { StorageService } from '../core/storage/storage.service';
 import { NutritionCalcService } from '../core/nutrition/nutrition-calc.service';
 import { CustomFoodStore } from '../core/state/custom-food.store';
@@ -14,6 +15,8 @@ import { SettingsStore } from '../core/state/settings.store';
 import { ShoppingStore } from '../core/state/shopping.store';
 import { DebugLogService } from '../core/debug/debug-log.service';
 import { resolveDebugMode, safeLocalStorage } from './debug-flag';
+import { BackupService } from '../core/backup/backup.service';
+import { BackupFile, countBackup, describeCounts, formatBackupDate } from '../core/backup/backup';
 
 /**
  * Einstellungen: Profil erfassen → Tagesbedarf berechnen (deterministisch),
@@ -39,6 +42,8 @@ export class SettingsPage implements OnInit {
   private readonly shopping = inject(ShoppingStore);
   private readonly savedMeals = inject(MealsStore);
   private readonly storage = inject(StorageService);
+  readonly parseDecimal = parseDecimal;
+  readonly formatDecimal = formatDecimal;
   private readonly calc = inject(NutritionCalcService);
   private readonly alertCtrl = inject(AlertController);
   private readonly win = inject(DOCUMENT).defaultView;
@@ -54,6 +59,13 @@ export class SettingsPage implements OnInit {
   readonly aiOpen = signal(false);
   readonly logOpen = signal(false);
   readonly infoSection = signal<'anleitung' | 'datenschutz' | 'agb' | 'hilfe' | null>(null);
+
+  private readonly backup = inject(BackupService);
+  readonly backupBusy = signal(false);
+  readonly lastBackupLabel = computed(() => {
+    const label = formatBackupDate(this.backup.lastBackup());
+    return label ? `Letztes Backup: ${label}` : 'Noch kein Backup erstellt';
+  });
 
   readonly debugLog = inject(DebugLogService);
   readonly logEntries = this.debugLog.entries;
@@ -208,6 +220,66 @@ export class SettingsPage implements OnInit {
     this.storage.clearAll();
     this.ai = { ...this.settingsStore.ai() };
     this.savedToast.set('Alle Daten wurden zurückgesetzt.');
+  }
+
+  /** Exportiert alle Daten als JSON (Teilen-Menü auf iOS, sonst Download). */
+  async exportBackup(): Promise<void> {
+    this.backupBusy.set(true);
+    try {
+      const result = await this.backup.exportBackup();
+      if (result === 'shared') this.savedToast.set('Backup erstellt.');
+      if (result === 'downloaded') this.savedToast.set('Backup heruntergeladen.');
+    } catch {
+      await this.showBackupError('Das Backup konnte nicht erstellt werden. Bitte erneut versuchen.');
+    } finally {
+      this.backupBusy.set(false);
+    }
+  }
+
+  /** Datei aus der Auswahl lesen, prüfen und Import bestätigen lassen. */
+  async onBackupFileSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = ''; // gleiche Datei erneut wählbar
+    if (!file) return;
+    this.backupBusy.set(true);
+    try {
+      const result = await this.backup.readFile(file);
+      if (!result.ok) {
+        await this.showBackupError(result.error);
+        return;
+      }
+      await this.confirmImport(result.backup);
+    } finally {
+      this.backupBusy.set(false);
+    }
+  }
+
+  private async confirmImport(backup: BackupFile): Promise<void> {
+    const date = formatBackupDate(backup.exportedAt) ?? 'unbekannt';
+    const alert = await this.alertCtrl.create({
+      header: 'Backup importieren?',
+      message: `Backup vom ${date}: ${describeCounts(countBackup(backup.data))}. Alle aktuellen Daten auf diesem Gerät werden dadurch ersetzt.`,
+      buttons: [
+        { text: 'Abbrechen', role: 'cancel' },
+        { text: 'Ersetzen', role: 'destructive', handler: () => this.applyImport(backup) },
+      ],
+    });
+    await alert.present();
+  }
+
+  /** Schreibt das Backup und lädt die App neu, damit alle Stores den neuen Stand lesen. */
+  private applyImport(backup: BackupFile): void {
+    if (!this.backup.restore(backup)) {
+      void this.showBackupError('Der Import ist fehlgeschlagen (Speicher voll oder gesperrt). Deine bisherigen Daten sind unverändert.');
+      return;
+    }
+    this.win?.location.reload();
+  }
+
+  private async showBackupError(message: string): Promise<void> {
+    const alert = await this.alertCtrl.create({ header: 'Backup', message, buttons: ['OK'] });
+    await alert.present();
   }
 
   onToastDismiss(): void {

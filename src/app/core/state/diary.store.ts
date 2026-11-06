@@ -3,14 +3,39 @@ import {
   DailyTarget,
   DiaryEntry,
   DiaryRef,
+  AmountUnit,
   MealType,
   NutritionFacts,
 } from '../models';
 import { NutritionCalcService } from '../nutrition/nutrition-calc.service';
 import { StorageService } from '../storage/storage.service';
+import { addDaysISO } from '../util/date';
 import { makeId } from '../util/id';
 
 const KEY_ENTRIES = 'diary';
+/** Wie viele Tage "Wie gestern" / "Tag kopieren" höchstens zurückschaut. */
+export const COPY_LOOKBACK_DAYS = 7;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Ein früherer Tag mit Einträgen als Kopier-Quelle. */
+export interface CopySource {
+  dateISO: string;
+  entries: DiaryEntry[];
+}
+
+/**
+ * Erzeugt Kopien von Einträgen für einen Zieltag (rein, ohne Seiteneffekte).
+ * Neu: id, dateISO, createdAt. Erhalten: Mahlzeit, Name, ref, Nährwerte,
+ * Menge/Einheit/Portionen und Flags (isEstimate, isPartial).
+ */
+export function copyEntriesTo(
+  entries: readonly DiaryEntry[],
+  dateISO: string,
+  nowISO: string = new Date().toISOString(),
+  newId: () => string = () => makeId('diary'),
+): DiaryEntry[] {
+  return entries.map((e) => ({ ...e, id: newId(), dateISO, createdAt: nowISO }));
+}
 
 /** Eingabe-DTO zum Anlegen eines Tagebuch-Eintrags. */
 export interface NewDiaryEntry {
@@ -25,7 +50,7 @@ export interface NewDiaryEntry {
   baseFacts?: NutritionFacts;
   isEstimate?: boolean;
   isPartial?: boolean;
-  unit?: 'g' | 'ml';
+  unit?: AmountUnit;
 }
 
 /**
@@ -73,26 +98,35 @@ export class DiaryStore {
     meal?: MealType;
     amountG?: number;
     servings?: number;
+    unit?: AmountUnit;
+    /** Neue Bezugswerte pro 100 g/ml (z. B. für manuelle Einträge, die bisher keine hatten). */
+    baseFacts?: NutritionFacts;
   }): void {
     // Leere/0/negative Menge nie übernehmen (würde alte oder negative Werte erzeugen).
-    const { amountG, ...rest } = patch;
+    const { amountG, baseFacts: patchBase, ...rest } = patch;
     const hasValidAmount = typeof amountG === 'number' && Number.isFinite(amountG) && amountG > 0;
-    const safePatch = hasValidAmount ? { ...rest, amountG } : rest;
+    const validBase = patchBase?.basis === 'per100g' ? patchBase : undefined;
+    const safePatch = {
+      ...rest,
+      ...(hasValidAmount ? { amountG } : {}),
+      ...(validBase ? { baseFacts: validBase } : {}),
+    };
     this._entries.update((list) =>
       list.map((e) => {
         if (e.id !== id) return e;
         const next = { ...e, ...safePatch };
+        const base = next.baseFacts;
         // Nährwerte neu skalieren, wenn Basis und neue Menge bekannt.
-        if (e.baseFacts && hasValidAmount && e.baseFacts.basis === 'per100g') {
+        if (base && hasValidAmount && base.basis === 'per100g') {
           const factor = amountG / 100;
           next.facts = {
-            ...e.baseFacts,
-            kcal: Math.round(e.baseFacts.kcal * factor),
-            proteinG: Math.round(e.baseFacts.proteinG * factor * 10) / 10,
-            carbsG: Math.round(e.baseFacts.carbsG * factor * 10) / 10,
-            fatG: Math.round(e.baseFacts.fatG * factor * 10) / 10,
-            fiberG: e.baseFacts.fiberG != null ? Math.round(e.baseFacts.fiberG * factor * 10) / 10 : undefined,
-            sugarG: e.baseFacts.sugarG != null ? Math.round(e.baseFacts.sugarG * factor * 10) / 10 : undefined,
+            ...base,
+            kcal: Math.round(base.kcal * factor),
+            proteinG: Math.round(base.proteinG * factor * 10) / 10,
+            carbsG: Math.round(base.carbsG * factor * 10) / 10,
+            fatG: Math.round(base.fatG * factor * 10) / 10,
+            fiberG: base.fiberG != null ? Math.round(base.fiberG * factor * 10) / 10 : undefined,
+            sugarG: base.sugarG != null ? Math.round(base.sugarG * factor * 10) / 10 : undefined,
             basis: 'perPortion',
           };
         }
@@ -106,6 +140,46 @@ export class DiaryStore {
   remove(id: string): void {
     this._entries.update((list) => list.filter((e) => e.id !== id));
     this.persist();
+  }
+
+  /**
+   * Kopiert Einträge in den Tag `dateISO` (neue ids/createdAt) und persistiert.
+   * Gibt die angelegten Kopien zurück (z. B. für Rückgängig).
+   */
+  copyEntries(entries: readonly DiaryEntry[], dateISO: string): DiaryEntry[] {
+    if (!ISO_DATE_RE.test(dateISO) || entries.length === 0) return [];
+    const copies = copyEntriesTo(entries, dateISO);
+    this._entries.update((list) => [...list, ...copies]);
+    this.persist();
+    return copies;
+  }
+
+  /** Entfernt mehrere Einträge auf einmal (ein Persist). */
+  removeMany(ids: readonly string[]): void {
+    if (ids.length === 0) return;
+    const drop = new Set(ids);
+    this._entries.update((list) => list.filter((e) => !drop.has(e.id)));
+    this.persist();
+  }
+
+  /**
+   * Frühere Tage (neueste zuerst, max. `maxDaysBack` zurück) mit Einträgen,
+   * optional nur für eine Mahlzeit.
+   */
+  copySources(dateISO: string, meal?: MealType, maxDaysBack = COPY_LOOKBACK_DAYS): CopySource[] {
+    if (!ISO_DATE_RE.test(dateISO)) return [];
+    const sources: CopySource[] = [];
+    for (let back = 1; back <= maxDaysBack; back++) {
+      const day = addDaysISO(dateISO, -back);
+      const entries = meal ? this.entriesForMeal(day, meal) : this.entriesForDate(day);
+      if (entries.length > 0) sources.push({ dateISO: day, entries });
+    }
+    return sources;
+  }
+
+  /** Nächstliegender früherer Tag mit Einträgen (für "Wie gestern"), sonst null. */
+  findCopySource(dateISO: string, meal?: MealType, maxDaysBack = COPY_LOOKBACK_DAYS): CopySource | null {
+    return this.copySources(dateISO, meal, maxDaysBack)[0] ?? null;
   }
 
   /** Einträge eines Tages, nach Erstellzeit sortiert. */

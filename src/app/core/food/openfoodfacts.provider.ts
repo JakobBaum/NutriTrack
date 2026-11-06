@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { FoodItem, NutritionFacts } from '../models';
 import { makeId } from '../util/id';
+import { parseDecimal } from '../util/number-input';
 import { FoodProvider } from './food-provider';
 import { toFoodLookupError } from './food-errors';
 import { SettingsStore } from '../state/settings.store';
@@ -20,6 +21,8 @@ const LANGS = 'de,en';
 // Mehr Kandidaten holen, damit nach dem DACH-Ranking genug passende übrig bleiben.
 const CANDIDATE_FACTOR = 2;
 const MAX_PAGE_SIZE = 50;
+/** 1 kcal = 4,184 kJ. */
+const KJ_PER_KCAL = 4.184;
 const DACH_COUNTRIES = new Set(['en:austria', 'en:germany', 'en:switzerland']);
 
 // Bewusst KEIN eigener User-Agent-Header: Chrome verwirft ihn, Safari/Firefox schicken
@@ -141,23 +144,26 @@ export class OpenFoodFactsProvider implements FoodProvider {
   }
 
   private num(v: number | string | undefined): number {
-    const n = typeof v === 'number' ? v : Number(v);
-    return Number.isFinite(n) ? Math.max(0, n) : 0;
+    const n = parseDecimal(v);
+    return n !== null ? Math.max(0, n) : 0;
   }
 
-  /** Fehlender oder nicht numerischer kcal-Wert gilt als "keine Naehrwerte" (nie still 0 kcal). */
-  private hasKcal(v: number | string | undefined): boolean {
-    if (v === undefined || v === null || v === '') return false;
-    return Number.isFinite(typeof v === 'number' ? v : Number(v));
+  /** kcal je 100 g; fehlt der Wert, wird aus kJ umgerechnet. null = keine Naehrwerte (nie still 0 kcal). */
+  private kcalPer100g(n: OffNutriments): number | null {
+    const kcal = parseDecimal(n['energy-kcal_100g']);
+    if (kcal !== null) return Math.max(0, kcal);
+    const kj = parseDecimal(n['energy-kj_100g']);
+    return kj !== null ? Math.max(0, kj / KJ_PER_KCAL) : null;
   }
 
   private toFoodItem(p: OffProduct): FoodItem | null {
     const name = (p.product_name ?? '').trim();
     if (!name) return null;
     const n = p.nutriments ?? {};
-    if (!this.hasKcal(n['energy-kcal_100g'])) return null;
+    const kcal = this.kcalPer100g(n);
+    if (kcal === null) return null;
     const facts: NutritionFacts = {
-      kcal: this.num(n['energy-kcal_100g']),
+      kcal,
       proteinG: this.num(n['proteins_100g']),
       carbsG: this.num(n['carbohydrates_100g']),
       fatG: this.num(n['fat_100g']),

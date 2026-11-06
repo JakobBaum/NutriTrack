@@ -239,6 +239,49 @@ ion-list.nt-grouped {
   }
 }
 
+.share-btn {
+  --color: var(--nt-accent);
+  min-height: var(--nt-touch);
+  min-width: var(--nt-touch);
+}
+
+// Kopf des Bereichs „Erledigt (n)“: Aufklapp-Knopf links, Sammel-Entfernen rechts.
+.done-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nt-space-2);
+  padding: var(--nt-space-3) var(--nt-space-4) 0;
+
+  &__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: var(--nt-touch);
+    padding: 0 var(--nt-space-1);
+    border: 0;
+    background: none;
+    color: var(--nt-secondary);
+    font: inherit;
+    font-size: var(--nt-fs-caption);
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--nt-focus);
+      outline-offset: 2px;
+      border-radius: var(--nt-radius-input);
+    }
+  }
+
+  &__clear {
+    --color: var(--nt-accent);
+    min-height: var(--nt-touch);
+    margin: 0;
+  }
+}
+
 .qty {
   display: block;
   font-size: var(--nt-fs-caption);
@@ -277,7 +320,8 @@ ion-list.nt-grouped {
   gap: var(--nt-space-2);
   margin: 0 var(--nt-space-4);
 
-  ion-input {
+  ion-input,
+  ion-select {
     --border-radius: var(--nt-radius-input);
     --highlight-color-focused: var(--nt-accent);
   }

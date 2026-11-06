@@ -115,3 +115,33 @@ describe('estimatePrice / priceItems', () => {
     expect(estTotal).toBeCloseTo(Math.round(sum * 100) / 100, 2);
   });
 });
+
+describe('Skalierung mit halben Portionen', () => {
+  const half = recipe({
+    servings: 0.5,
+    ingredients: [{ name: 'Reis', amount: 50, unit: 'g' }],
+  });
+
+  it('buildShoppingList skaliert 0,5 Portionen auf 2 Personen (×4)', () => {
+    expect(buildShoppingList([half], 1, 2).items[0].amount).toBe(200);
+  });
+
+  it('buildWeekPlan skaliert 2,5 Portionen korrekt', () => {
+    const r = recipe({ servings: 2.5, ingredients: [{ name: 'Reis', amount: 250, unit: 'g' }] });
+    expect(buildWeekPlan([r], 1, 1, 1).items[0].amount).toBe(100);
+  });
+
+  it('fällt bei ungültigen Portionen auf 1 zurück', () => {
+    const bad = recipe({ servings: 0, ingredients: [{ name: 'Reis', amount: 50, unit: 'g' }] });
+    expect(buildShoppingList([bad], 1, 2).items[0].amount).toBe(100);
+  });
+});
+
+describe('Kategorien in der Generierung', () => {
+  it('versieht die Basis-Liste ohne Rezepte mit Kategorien', async () => {
+    const { buildShoppingList } = await import('./shopping-generator');
+    const { items } = buildShoppingList([], 1, 1);
+    expect(items.every((i) => typeof i.category === 'string')).toBe(true);
+    expect(items.find((i) => i.name === 'Nudeln')?.category).toBe('Trockenware/Nudeln/Reis');
+  });
+});
