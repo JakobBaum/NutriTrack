@@ -26,18 +26,23 @@ import { RecipeStore } from '../core/state/recipe.store';
 import { CustomFood, CustomFoodStore } from '../core/state/custom-food.store';
 import { addDaysISO, dayLabel, toDateISO } from '../core/util/date';
 import { formatNum } from '../shared/num.pipe';
+import { countMissingFacts } from '../recipes/recipe-view';
 import {
   EMPTY_FIELDS,
   EntryFields,
   MEAL_DEFS,
+  factsDiffer,
   factsFromFields,
   fieldsFromFacts,
   isIsoDate,
   isMealType,
+  isValidAmount,
   mealForHour,
   mealLabel,
+  rebaseTo100,
   scaleFacts,
   toNumberOrNull,
+  unitForName,
 } from './diary-helpers';
 
 interface MealGroup {
@@ -69,6 +74,7 @@ interface ApplyOptions {
   servings?: number;
   recipeId?: string;
   isAi?: boolean;
+  isPartial?: boolean;
   hint?: string;
 }
 
@@ -91,6 +97,7 @@ const DEFAULT_AMOUNT_G = 100;
 const MAX_RECENT_FOODS = 8;
 const SEARCH_DEBOUNCE_MS = 400;
 const SEARCH_FOCUS_DELAY_MS = 60;
+const SCROLL_TO_MEAL_DELAY_MS = 150;
 const TOAST_MS = 2500;
 const TOAST_UNDO_MS = 5000;
 
@@ -166,6 +173,8 @@ export class DiaryPage implements OnDestroy {
   /** True, wenn die Werte im Formular aus einer KI-Schätzung stammen. */
   readonly isAiEstimate = signal(false);
   readonly formHint = signal<string | null>(null);
+  /** True, wenn die Rezeptwerte unvollständig sind (Zutaten ohne Nährwerte). */
+  private isPartialSource = false;
   form: EntryForm = { ...EMPTY_FORM };
 
   /** Gewähltes Rezept (für die ref des Eintrags), null bei manuell/Food. */
@@ -180,6 +189,7 @@ export class DiaryPage implements OnDestroy {
     label: '', meal: 'breakfast', amountG: null,
   };
   editBaseFacts: NutritionFacts | null = null;
+  editError: string | null = null;
 
   /** Freitext-Filter für die Rezept-Auswahl im Add-Modal. */
   readonly recipeQuery = signal('');
@@ -246,6 +256,8 @@ export class DiaryPage implements OnDestroy {
   readonly ffOpen = signal(false);
   readonly ffLoading = signal(false);
   readonly ffResults = signal<FastFoodSuggestion[]>([]);
+  /** True, sobald eine Fastfood-Suche gelaufen ist (für den Leerzustand). */
+  readonly ffSearched = signal(false);
   ff: FastFoodForm = { restaurant: 'McDonald’s', kcalBudget: null, moneyBudget: null, preference: 'viel Protein' };
 
   constructor() {
@@ -266,7 +278,8 @@ export class DiaryPage implements OnDestroy {
   private handleQuery(params: ParamMap): void {
     const add = params.get('add');
     const wantsFastfood = params.get('fastfood') === '1';
-    if (!add && !wantsFastfood) return;
+    const meal = params.get('meal');
+    if (!add && !wantsFastfood && !meal) return;
 
     const date = params.get('date');
     if (add) {
@@ -274,13 +287,22 @@ export class DiaryPage implements OnDestroy {
       this.openAdd(isMealType(add) ? add : this.currentMeal());
     }
     if (wantsFastfood) this.openFastfood();
+    if (isMealType(meal)) {
+      if (isIsoDate(date)) this.selectedDate.set(date);
+      setTimeout(() => this.scrollToMeal(meal), SCROLL_TO_MEAL_DELAY_MS);
+    }
 
     void this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { add: null, fastfood: null, date: null },
+      queryParams: { add: null, fastfood: null, date: null, meal: null },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
+  }
+
+  /** Scrollt zur Mahlzeit-Gruppe (Deep-Link ?meal=lunch). */
+  private scrollToMeal(meal: MealType): void {
+    document.getElementById('meal-' + meal)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   prevDay(): void {
@@ -303,6 +325,7 @@ export class DiaryPage implements OnDestroy {
     this.searchHint.set(null);
     this.formHint.set(null);
     this.isAiEstimate.set(false);
+    this.isPartialSource = false;
     this.adjustOpen.set(undefined);
     this.error.set(null);
     this.view.set('search');
@@ -356,6 +379,21 @@ export class DiaryPage implements OnDestroy {
     return this.scaleBase?.unit ?? null;
   }
 
+  /** Einheit der Mengeneingabe (ml für Flüssigkeiten, sonst g). */
+  get amountUnit(): 'g' | 'ml' {
+    return unitForName(this.form.label);
+  }
+
+  /** True, wenn das gewählte Rezept Zutaten ohne Nährwerte hat. */
+  isPartialRecipe(): boolean {
+    return this.isPartialSource;
+  }
+
+  /** Einheit des Eintrags im Bearbeiten-Dialog. */
+  get editEntryUnit(): 'g' | 'ml' {
+    return this.editEntry?.unit ?? 'g';
+  }
+
   /** kcal pro 100 g der gewählten Quelle (Hinweis unter der Mengeneingabe). */
   get basisKcal(): number | null {
     return this.scaleBase?.unit === 'g' ? this.scaleBase.facts.kcal : null;
@@ -368,6 +406,7 @@ export class DiaryPage implements OnDestroy {
     this.form = { ...this.form, ...EMPTY_FIELDS, label: this.searchQuery.trim(), amountG: null, servings: null };
     this.formHint.set(null);
     this.isAiEstimate.set(false);
+    this.isPartialSource = false;
     this.error.set(null);
     this.adjustOpen.set('adjust');
     this.view.set('form');
@@ -415,6 +454,7 @@ export class DiaryPage implements OnDestroy {
     };
     this.formHint.set(opts.hint ?? null);
     this.isAiEstimate.set(opts.isAi ?? false);
+    this.isPartialSource = opts.isPartial ?? false;
     this.error.set(null);
     this.adjustOpen.set(undefined);
     this.view.set('form');
@@ -464,7 +504,10 @@ export class DiaryPage implements OnDestroy {
   /** Übernimmt ein Rezept (Nährwerte je Portion) ins Formular; Menge = Portionen. */
   selectRecipe(recipe: Recipe): void {
     if (!recipe.factsPerServing) return;
-    this.applyFacts(recipe.title, recipe.factsPerServing, { recipeId: recipe.id });
+    this.applyFacts(recipe.title, recipe.factsPerServing, {
+      recipeId: recipe.id,
+      isPartial: countMissingFacts(recipe.ingredients) > 0,
+    });
   }
 
   /** Übernimmt ein gespeichertes eigenes Lebensmittel ins Formular. */
@@ -495,6 +538,9 @@ export class DiaryPage implements OnDestroy {
         servings: entry.servings,
         facts: entry.facts,
         baseFacts: entry.baseFacts,
+        isEstimate: entry.isEstimate,
+        isPartial: entry.isPartial,
+        unit: entry.unit,
       },
     ]);
   }
@@ -510,6 +556,7 @@ export class DiaryPage implements OnDestroy {
         ref: { kind: 'recipe', recipeId: recipe.id },
         servings: 1,
         facts: recipe.factsPerServing,
+        isPartial: countMissingFacts(recipe.ingredients) > 0,
       },
     ]);
   }
@@ -692,6 +739,19 @@ export class DiaryPage implements OnDestroy {
       this.error.set('Der Name fehlt — gib ein, was du gegessen hast.');
       return;
     }
+    const base = this.scaleBase;
+    if (base?.unit === 'g' && !isValidAmount(this.form.amountG)) {
+      this.error.set('Die Menge fehlt — gib eine Menge größer als 0 ein.');
+      return;
+    }
+    if (base?.unit === 'portion' && !isValidAmount(this.form.servings)) {
+      this.error.set('Die Portionen fehlen — gib eine Zahl größer als 0 ein.');
+      return;
+    }
+    if (!base && this.form.amountG != null && !isValidAmount(this.form.amountG)) {
+      this.error.set('Die Menge muss größer als 0 sein — oder lass das Feld leer.');
+      return;
+    }
     const facts = factsFromFields(this.form);
     if (!facts) {
       this.error.set('Die Kalorien fehlen — trage sie unter „Nährwerte anpassen“ ein.');
@@ -699,7 +759,6 @@ export class DiaryPage implements OnDestroy {
       return;
     }
 
-    const base = this.scaleBase;
     const isPortion = base?.unit === 'portion';
     const recipeId = this.pickedRecipeId;
     const entry = this.diary.add({
@@ -710,12 +769,24 @@ export class DiaryPage implements OnDestroy {
       servings: isPortion ? (this.form.servings ?? 1) : undefined,
       amountG: this.form.amountG ?? undefined,
       facts,
-      baseFacts: base?.unit === 'g' ? base.facts : undefined,
+      baseFacts: this.baseForSave(base, facts),
+      isEstimate: this.isAiEstimate() || undefined,
+      isPartial: this.isPartialSource || undefined,
+      unit: this.form.amountG ? this.amountUnit : undefined,
     });
     if (!recipeId && base?.unit !== 'g') this.customFoods.save(label, facts);
 
     this.closeAdd();
     void this.showToast(`Gespeichert · ${formatNum(facts.kcal, 0)} kcal`, () => this.diary.remove(entry.id));
+  }
+
+  /** Bezugswerte für spätere Mengenänderung; bei manuell angepassten Werten daraus neu abgeleitet. */
+  private baseForSave(base: ScaleBase | null, facts: NutritionFacts): NutritionFacts | undefined {
+    if (base?.unit !== 'g') return undefined;
+    const amount = this.form.amountG;
+    if (!isValidAmount(amount)) return base.facts;
+    const scaled = scaleFacts(base.facts, amount / 100);
+    return factsDiffer(scaled, facts) ? rebaseTo100(facts, amount) : base.facts;
   }
 
   // --- Eintrag bearbeiten / löschen ---
@@ -727,6 +798,7 @@ export class DiaryPage implements OnDestroy {
       meal: entry.meal,
       amountG: entry.amountG ?? null,
     };
+    this.editError = null;
     this.editOpen.set(true);
   }
 
@@ -737,11 +809,15 @@ export class DiaryPage implements OnDestroy {
 
   saveEdit(): void {
     if (!this.editEntry) return;
+    if (this.editBaseFacts && !isValidAmount(this.editForm.amountG)) {
+      this.editError = 'Die Menge fehlt — gib eine Menge größer als 0 ein.';
+      return;
+    }
     const patch: Parameters<typeof this.diary.update>[1] = {
       label: this.editForm.label.trim() || undefined,
       meal: this.editForm.meal,
     };
-    if (this.editBaseFacts && this.editForm.amountG != null) {
+    if (this.editBaseFacts && isValidAmount(this.editForm.amountG)) {
       patch.amountG = this.editForm.amountG;
     }
     this.diary.update(this.editEntry.id, patch);
@@ -767,6 +843,9 @@ export class DiaryPage implements OnDestroy {
         servings: entry.servings,
         facts: entry.facts,
         baseFacts: entry.baseFacts,
+        isEstimate: entry.isEstimate,
+        isPartial: entry.isPartial,
+        unit: entry.unit,
       });
     });
   }
@@ -774,8 +853,10 @@ export class DiaryPage implements OnDestroy {
   // --- Fastfood-Helfer ---
   openFastfood(): void {
     this.ffResults.set([]);
+    this.ffSearched.set(false);
     this.error.set(null);
-    if (this.remainingKcal() > 0) {
+    // Auch bei verbrauchtem Budget setzen (0 = nichts mehr übrig).
+    if (this.targetKcal() > 0) {
       this.ff = { ...this.ff, kcalBudget: this.remainingKcal() };
     }
     this.ffOpen.set(true);
@@ -797,6 +878,7 @@ export class DiaryPage implements OnDestroy {
           preference: this.ff.preference,
         }),
       );
+      this.ffSearched.set(true);
     } catch (e: unknown) {
       this.error.set(
         e instanceof Error
@@ -814,6 +896,7 @@ export class DiaryPage implements OnDestroy {
       meal: this.currentMeal(),
       label: `${s.itemName} (${s.restaurant})`,
       facts: s.facts,
+      isEstimate: true,
     });
     this.closeFastfood();
     void this.showToast(`Hinzugefügt · ${formatNum(s.facts.kcal, 0)} kcal`, () => this.diary.remove(entry.id));

@@ -6,6 +6,9 @@ import { ActivityLevel, AiConfig, Goal, Sex, UserProfile } from '../core/models'
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { RecipeStore } from '../core/state/recipe.store';
+import { MealsStore } from '../core/state/meals.store';
+import { StorageService } from '../core/storage/storage.service';
+import { NutritionCalcService } from '../core/nutrition/nutrition-calc.service';
 import { CustomFoodStore } from '../core/state/custom-food.store';
 import { SettingsStore } from '../core/state/settings.store';
 import { ShoppingStore } from '../core/state/shopping.store';
@@ -16,6 +19,9 @@ import { resolveDebugMode, safeLocalStorage } from './debug-flag';
  * Einstellungen: Profil erfassen → Tagesbedarf berechnen (deterministisch),
  * KI-Anbieter konfigurieren (lokal gespeichert) und Daten zurücksetzen.
  */
+/** Ab diesem Tempo (kg/Woche) zeigt das Formular eine Warnung. */
+const RATE_WARN_KG_PER_WEEK = 0.75;
+
 @Component({
   selector: 'app-settings',
   templateUrl: './settings.page.html',
@@ -31,6 +37,9 @@ export class SettingsPage implements OnInit {
   private readonly recipes = inject(RecipeStore);
   private readonly customFoods = inject(CustomFoodStore);
   private readonly shopping = inject(ShoppingStore);
+  private readonly savedMeals = inject(MealsStore);
+  private readonly storage = inject(StorageService);
+  private readonly calc = inject(NutritionCalcService);
   private readonly alertCtrl = inject(AlertController);
   private readonly win = inject(DOCUMENT).defaultView;
 
@@ -56,7 +65,7 @@ export class SettingsPage implements OnInit {
   age: number | null = this.existing?.age ?? 30;
   sex: Sex = this.existing?.sex ?? 'male';
   activityLevel: ActivityLevel = this.existing?.activityLevel ?? 'moderate';
-  goal: Goal = this.existing?.goal ?? 'lose';
+  goal: Goal = this.existing?.goal ?? 'maintain';
   rateKgPerWeek: number | null = this.existing?.rateKgPerWeek ?? 0.5;
 
   // --- KI-Konfiguration (Kopie zum Bearbeiten) ---
@@ -98,6 +107,28 @@ export class SettingsPage implements OnInit {
     if (this.route.snapshot.queryParamMap.get('setup') === '1') {
       this.profileOpen.set(true);
     }
+  }
+
+  /** Aktuelles Profil nutzt die Mindestzufuhr statt der Formel. */
+  get savedMinKcalApplied(): boolean {
+    const p = this.profileStore.profile();
+    return p !== null && this.calc.isMinKcalApplied(p);
+  }
+
+  /** Formular (falls vollstaendig) ergibt ein Ziel unter der Mindestzufuhr. */
+  get formMinKcalApplied(): boolean {
+    const w = Number(this.weightKg), h = Number(this.heightCm), a = Number(this.age);
+    if (![w, h, a].every((n) => Number.isFinite(n) && n > 0)) return false;
+    const rate = this.showRate ? Number(this.rateKgPerWeek) : 0;
+    return this.calc.isMinKcalApplied({
+      weightKg: w, heightCm: h, age: a, sex: this.sex, activityLevel: this.activityLevel,
+      goal: this.goal, rateKgPerWeek: Number.isFinite(rate) ? rate : 0, updatedAt: '',
+    });
+  }
+
+  /** Warnung bei zu schnellem Tempo. */
+  get rateWarning(): boolean {
+    return this.showRate && Number(this.rateKgPerWeek) > RATE_WARN_KG_PER_WEEK;
   }
 
   get showRate(): boolean {
@@ -157,7 +188,7 @@ export class SettingsPage implements OnInit {
     const alert = await this.alertCtrl.create({
       header: 'Alle Daten löschen?',
       message:
-        'Profil, Tagebuch, Rezepte, Einkaufsliste und Einstellungen werden von diesem Gerät gelöscht. Das lässt sich nicht rückgängig machen.',
+        'Profil, Tagebuch, Rezepte, gespeicherte Mahlzeiten, eigene Lebensmittel, Einkaufsliste und Einstellungen werden von diesem Gerät gelöscht. Das lässt sich nicht rückgängig machen.',
       buttons: [
         { text: 'Abbrechen', role: 'cancel' },
         { text: 'Löschen', role: 'destructive', handler: () => this.resetData() },
@@ -171,8 +202,10 @@ export class SettingsPage implements OnInit {
     this.diary.clear();
     this.recipes.clear();
     this.customFoods.clear();
+    this.savedMeals.clear();
     this.shopping.clear();
     this.settingsStore.clear();
+    this.storage.clearAll();
     this.ai = { ...this.settingsStore.ai() };
     this.savedToast.set('Alle Daten wurden zurückgesetzt.');
   }

@@ -93,10 +93,14 @@ export class MockAiProvider implements AiProvider {
         estPrice: 3.5,
       },
     ];
-    const within = base.filter((s) => !req.kcalBudget || s.facts.kcal <= req.kcalBudget);
-    const list = within.length ? within : base;
+    // Beide Budgets strikt einhalten; kein Treffer -> leere Liste (UI zeigt Leerzustand).
+    const within = base.filter(
+      (s) =>
+        (!req.kcalBudget || s.facts.kcal <= req.kcalBudget) &&
+        (!req.moneyBudget || (s.estPrice ?? 0) <= req.moneyBudget),
+    );
     // Nach Protein/kcal-Verhältnis sortieren (proteinreichste zuerst).
-    return list.sort(
+    return within.sort(
       (a, b) => b.facts.proteinG / b.facts.kcal - a.facts.proteinG / a.facts.kcal,
     );
   }

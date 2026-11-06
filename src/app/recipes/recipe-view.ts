@@ -37,6 +37,11 @@ export function missingFactsLabel(count: number): string {
   return `${count} ${count === 1 ? 'Zutat' : 'Zutaten'} ohne Werte`;
 }
 
+/** „1 Portion“ / „4 Portionen“. */
+export function servingsLabel(servings: number): string {
+  return `${servings} ${servings === 1 ? 'Portion' : 'Portionen'}`;
+}
+
 /** Präfix „≥ “, wenn die Summe wegen fehlender Zutatenwerte nur eine Untergrenze ist. */
 export function lowerBoundPrefix(missingCount: number): string {
   return missingCount > 0 ? '≥ ' : '';

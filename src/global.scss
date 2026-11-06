@@ -265,7 +265,16 @@ input[type='number'] {
 
 // Browser-Oberflächen in der App-Farbe statt Browser-Standard.
 ::selection {
-  background: rgba(11, 122, 85, 0.22);
+  background: rgba(15, 122, 107, 0.22);
+}
+
+// Platzhalter klar von eingegebenen Werten unterscheiden: iOS-Platzhaltergrau (#8E8E93).
+// Bewusst heller als Text; jedes Feld hat ein sichtbares Label darueber, der Platzhalter ist nur Beispiel.
+// :root erhoeht die Spezifitaet ueber Ionics Host-Klasse (.sc-ion-input-*-h setzt --placeholder-color: initial).
+:root ion-input,
+ion-textarea {
+  --placeholder-color: #8e8e93;
+  --placeholder-opacity: 1;
 }
 
 input,

@@ -63,4 +63,20 @@ describe('recipe-nutrition', () => {
     expect(hasNutrition([ing({ facts: per100g(100) })])).toBe(true);
     expect(hasNutrition([ing({ facts: undefined })])).toBe(false);
   });
+
+  it('skaliert kg und l mit Faktor 1000', () => {
+    expect(ingredientFacts(ing({ amount: 1, unit: 'kg', facts: per100g(100) })).kcal).toBe(1000);
+    expect(ingredientFacts(ing({ amount: 0.5, unit: 'l', facts: per100g(64) })).kcal).toBe(320);
+  });
+
+  it('rechnet EL/TL/Stk bei per100g über das Näherungsgewicht um', () => {
+    expect(ingredientFacts(ing({ amount: 2, unit: 'EL', facts: per100g(400) })).kcal).toBe(120); // 30 g
+    expect(ingredientFacts(ing({ amount: 3, unit: 'TL', facts: per100g(400) })).kcal).toBe(60); // 15 g
+    expect(ingredientFacts(ing({ amount: 2, unit: 'Stk', facts: per100g(100) })).kcal).toBe(160); // 160 g
+  });
+
+  it('skaliert kg bei perPortion über portionG', () => {
+    const f: NutritionFacts = { kcal: 70, proteinG: 0, carbsG: 0, fatG: 0, basis: 'perPortion', portionG: 50 };
+    expect(ingredientFacts(ing({ amount: 0.1, unit: 'kg', facts: f })).kcal).toBe(140);
+  });
 });

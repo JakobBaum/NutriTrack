@@ -86,3 +86,38 @@ describe('ShoppingPage checking items', () => {
     expect(() => page.setChecked(3, true)).not.toThrow();
   });
 });
+
+describe('ShoppingPage totals and undo delete', () => {
+  it('excludes a pending delete from rows and total, and restores it on undo', () => {
+    const { page, store } = createPage();
+    store.addItem({ name: 'Reis', amount: 1, unit: 'kg', checked: false, estPrice: 2 });
+    store.addItem({ name: 'Brot', amount: 1, unit: 'Stk', checked: false, estPrice: 3 });
+
+    page.removeItem(0);
+    expect(page.rows().map((r) => r.item.name)).toEqual(['Brot']);
+    expect(page.totals().total).toBe(3);
+    expect(page.list()?.items).toHaveLength(2);
+
+    page.onUndoDismiss({ detail: { role: 'undo' } } as CustomEvent<{ role?: string }>);
+    expect(page.rows()).toHaveLength(2);
+    expect(page.totals().total).toBe(5);
+  });
+
+  it('commits the delete when the toast ends without undo', () => {
+    const { page, store } = createPage();
+    store.addItem({ name: 'Reis', amount: 1, unit: 'kg', checked: false });
+
+    page.removeItem(0);
+    page.onUndoDismiss({ detail: { role: 'timeout' } } as CustomEvent<{ role?: string }>);
+
+    expect(page.list()?.items).toHaveLength(0);
+  });
+
+  it('rejects non-integer persons instead of flooring', async () => {
+    const { page } = createPage();
+    page.persons = 1.5;
+    await page.generate();
+    expect(page.error()).toContain('Personen');
+    expect(page.list()).toBeNull();
+  });
+});

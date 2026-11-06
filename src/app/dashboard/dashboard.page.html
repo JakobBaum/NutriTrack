@@ -20,6 +20,7 @@
       <ion-icon name="sparkles-outline" class="empty__icon"></ion-icon>
       <h2>Willkommen bei NutriTrack</h2>
       <p>Richte dein Profil ein, damit wir deinen Tagesbedarf berechnen können.</p>
+      <p class="empty__hint">Deine Daten bleiben lokal auf diesem Gerät. KI-Funktionen sind optional.</p>
       <ion-button expand="block" (click)="openSettings()">Profil einrichten</ion-button>
     </div>
   } @else {
@@ -35,24 +36,21 @@
     </div>
 
     <!-- Hero: kcal übrig (öffnet den Kalorien-Drill), gegessen / Ziel -->
-    <section class="hero" aria-label="Kalorien">
-      <button type="button" class="hero__main" aria-label="Kalorien im Detail anzeigen" (click)="openDrill('kcal')">
-        <span class="hero__big">{{ kcalRemaining() | ntNum:0 }}</span>
-        <span class="hero__unit">kcal übrig</span>
+    <section class="hero" [class.hero--over]="kcalOverBy() > 0" aria-label="Kalorien">
+      <button type="button" class="hero__main" [attr.aria-label]="heroLabel()" (click)="openDrill('kcal')">
+        <span class="hero__big">{{ (kcalOverBy() > 0 ? kcalOverBy() : kcalRemaining()) | ntNum:0 }}</span>
+        <span class="hero__unit">{{ kcalOverBy() > 0 ? 'kcal über Ziel' : 'kcal übrig' }}</span>
       </button>
       <div class="hero__meta">
         <div><strong>{{ kcalEaten() | ntNum:0 }}</strong> gegessen</div>
         <div><strong>{{ kcalTarget() | ntNum:0 }}</strong> Ziel</div>
       </div>
     </section>
-    @if (kcalOverBy() > 0) {
-      <p class="hero__over"><strong class="hero__over-num">{{ kcalOverBy() | ntNum:0 }}</strong> kcal über Ziel</p>
-    }
 
     <!-- Nährwerte: 3 x 2 Ringe; jede Kachel öffnet den Drill -->
     <section class="nt-card macros" aria-label="Nährwerte">
       @for (m of macros(); track m.key) {
-        <button type="button" class="macros__col" [attr.aria-label]="m.label + ' ' + (m.eaten | ntNum) + ' von ' + (m.target | ntNum) + ' ' + m.unit + ', Details anzeigen'" (click)="openDrill(m.key)">
+        <button type="button" class="macros__col" [attr.aria-label]="m.label + ' ' + (m.eaten | ntNum) + ' von ' + (m.target | ntNum) + ' ' + m.unit + (m.eaten > m.target ? ', über Ziel' : '') + ', Details anzeigen'" (click)="openDrill(m.key)">
           <app-progress-ring [value]="m.eaten" [max]="m.target" [color]="m.color" [track]="m.track" [size]="68" [stroke]="6">
             <span class="macros__num">{{ m.eaten | ntNum }}</span>
           </app-progress-ring>
@@ -69,7 +67,7 @@
     <ul class="nt-grouped">
       @for (meal of meals(); track meal.type) {
         <li class="row">
-          <button type="button" class="row__btn" (click)="openDiary()">
+          <button type="button" class="row__btn" (click)="openDiary(meal.type)">
             <ion-icon [name]="meal.icon" class="row__icon" aria-hidden="true"></ion-icon>
             <span class="row__label">{{ meal.label }}</span>
             <span class="row__note">{{ meal.kcal | ntNum:0 }} kcal</span>
@@ -117,11 +115,11 @@
           </ion-buttons>
         </ion-toolbar>
       </ion-header>
-      <ion-content class="ion-padding">
+      <ion-content class="drill-content">
         @if (drill.items.length === 0) {
           <p class="drill-empty">Noch keine Einträge an diesem Tag.</p>
         } @else {
-          <ion-list lines="none">
+          <ion-list lines="none" class="nt-grouped">
             @for (item of drill.items; track item.label) {
               <ion-item class="drill-item">
                 <ion-label>

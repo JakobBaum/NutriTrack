@@ -59,6 +59,24 @@ describe('ProfileStore', () => {
 });
 
 describe('DiaryStore', () => {
+  it('ignoriert leere, 0 und negative Mengen beim Update', () => {
+    const store = TestBed.inject(DiaryStore);
+    const base: NutritionFacts = { kcal: 400, proteinG: 10, carbsG: 50, fatG: 5, basis: 'per100g' };
+    const e = store.add({ dateISO: '2026-10-13', meal: 'lunch', label: 'Reis', amountG: 100, facts: base, baseFacts: base });
+    store.update(e.id, { amountG: -50 });
+    store.update(e.id, { amountG: 0 });
+    expect(store.entries()[0].facts.kcal).toBe(400);
+    expect(store.entries()[0].amountG).toBe(100);
+    store.update(e.id, { amountG: 50 });
+    expect(store.entries()[0].facts.kcal).toBe(200);
+  });
+
+  it('speichert isEstimate, isPartial und unit', () => {
+    const store = TestBed.inject(DiaryStore);
+    const e = store.add({ dateISO: '2026-10-13', meal: 'lunch', label: 'Milch', facts: facts(100), isEstimate: true, isPartial: true, unit: 'ml' });
+    expect(e).toMatchObject({ isEstimate: true, isPartial: true, unit: 'ml' });
+  });
+
   it('fügt Einträge hinzu und summiert pro Tag', () => {
     const store = TestBed.inject(DiaryStore);
     store.add({ dateISO: '2026-10-13', meal: 'breakfast', label: 'Müsli', facts: facts(300, 10) });

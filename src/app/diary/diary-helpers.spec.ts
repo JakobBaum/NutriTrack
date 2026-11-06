@@ -4,7 +4,11 @@ import {
   factsFromFields,
   fieldsFromFacts,
   isIsoDate,
+  factsDiffer,
   isMealType,
+  isValidAmount,
+  rebaseTo100,
+  unitForName,
   mealForHour,
   mealLabel,
   scaleFacts,
@@ -117,5 +121,31 @@ describe('toNumberOrNull', () => {
     expect(toNumberOrNull('')).toBeNull();
     expect(toNumberOrNull(null)).toBeNull();
     expect(toNumberOrNull('abc')).toBeNull();
+  });
+});
+
+describe('amount and unit helpers', () => {
+  it('rejects empty, zero and negative amounts', () => {
+    expect(isValidAmount(null)).toBe(false);
+    expect(isValidAmount(0)).toBe(false);
+    expect(isValidAmount(-5)).toBe(false);
+    expect(isValidAmount(150)).toBe(true);
+  });
+
+  it('detects liquids by name', () => {
+    expect(unitForName('Vollmilch 3,5%')).toBe('ml');
+    expect(unitForName('Haferflocken')).toBe('g');
+  });
+
+  it('rebases adjusted facts to per 100 g', () => {
+    const base = rebaseTo100(scaleFacts(OATS_PER_100G, 2), 200);
+    expect(base.basis).toBe('per100g');
+    expect(base.kcal).toBe(372);
+  });
+
+  it('detects differing facts', () => {
+    const a = scaleFacts(OATS_PER_100G, 1);
+    expect(factsDiffer(a, { ...a })).toBe(false);
+    expect(factsDiffer(a, { ...a, kcal: a.kcal + 1 })).toBe(true);
   });
 });

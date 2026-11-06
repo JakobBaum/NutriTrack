@@ -18,7 +18,7 @@ interface Density {
 }
 
 /** Einheiten, die 1:1 als Gramm/Milliliter gelten (→ Bezug per100g). */
-const GRAM_UNITS = new Set(['g', 'gramm', 'gr', 'ml', 'milliliter']);
+const GRAM_UNITS = new Set(['g', 'gramm', 'gr', 'kg', 'kilogramm', 'ml', 'milliliter', 'l', 'liter']);
 
 /** Ungefähres Gewicht einer Stück-/Löffel-Einheit in Gramm. */
 const UNIT_GRAMS: Record<string, number> = {

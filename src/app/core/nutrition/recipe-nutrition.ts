@@ -1,7 +1,16 @@
 import { NutritionFacts, RecipeIngredient } from '../models';
+import { UNIT_WEIGHT_G } from '../../recipes/recipe-view';
 
-/** Einheiten, die als Gramm/Milliliter (1:1) für die Skalierung gelten. */
-const GRAM_UNITS = new Set(['g', 'gramm', 'gr', 'ml', 'milliliter']);
+/** Einheiten mit exaktem Gewicht (Gramm je Einheit) für die Skalierung. */
+const EXACT_UNIT_G: Readonly<Record<string, number>> = {
+  g: 1, gramm: 1, gr: 1, kg: 1000, kilogramm: 1000,
+  ml: 1, milliliter: 1, l: 1000, liter: 1000,
+};
+
+/** Gramm je Näherungseinheit (EL, TL, Stk …), Schlüssel kleingeschrieben. */
+const APPROX_UNIT_G: Readonly<Record<string, number>> = Object.fromEntries(
+  Object.entries(UNIT_WEIGHT_G).map(([unit, g]) => [unit.toLowerCase(), g]),
+);
 
 function emptyFacts(): NutritionFacts {
   return { kcal: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0, basis: 'perPortion' };
@@ -15,10 +24,10 @@ function round1(v: number): number {
  * Nährwerte einer einzelnen Zutat, skaliert auf ihre Menge.
  *
  * - Hat die Zutat keine hinterlegten Nährwerte, trägt sie 0 bei (manuelle Zutat).
- * - Bei Gramm-/ml-Einheiten wird über die Bezugsmenge skaliert
+ * - Bei g/ml/kg/l wird über die Bezugsmenge skaliert
  *   (per100g → amount/100, perPortion → amount/portionG).
- * - Bei stückbasierten Einheiten (z.B. „Stück", „Portion") zählt `amount`
- *   als Faktor auf die Portions-Nährwerte.
+ * - Bei Stück-/Löffel-Einheiten: per100g über das Näherungsgewicht (EL = 15 g …),
+ *   perPortion zählt `amount` als Faktor auf die Portions-Nährwerte.
  */
 export function ingredientFacts(ing: RecipeIngredient): NutritionFacts {
   const facts = ing.facts;
@@ -27,11 +36,16 @@ export function ingredientFacts(ing: RecipeIngredient): NutritionFacts {
 
   const unit = (ing.unit || 'g').trim().toLowerCase();
   let factor: number;
-  if (GRAM_UNITS.has(unit)) {
-    const refGrams = facts.basis === 'per100g' ? 100 : facts.portionG ?? 100;
-    factor = amount / refGrams;
+  const exactG = EXACT_UNIT_G[unit];
+  const refGrams = facts.basis === 'per100g' ? 100 : facts.portionG ?? 100;
+  if (exactG !== undefined) {
+    factor = (amount * exactG) / refGrams;
+  } else if (facts.basis === 'per100g') {
+    // EL, TL, Stk …: Menge über das Näherungsgewicht in Gramm umrechnen.
+    const approxG = APPROX_UNIT_G[unit === 'stück' ? 'stk' : unit];
+    factor = approxG !== undefined ? (amount * approxG) / refGrams : amount;
   } else {
-    // Stück/Portion: amount ist die Anzahl der Bezugsmengen.
+    // perPortion: amount ist die Anzahl der Bezugsmengen.
     factor = amount;
   }
 

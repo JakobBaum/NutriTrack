@@ -62,16 +62,7 @@ export class NutritionCalcService {
    * Deckelt das Ergebnis auf eine sichere Untergrenze.
    */
   dailyTarget(p: UserProfile): DailyTarget {
-    const tdee = this.totalDailyEnergy(p);
-    const rate = p.goal === 'maintain' ? 0 : Math.abs(p.rateKgPerWeek ?? 0.5);
-    const dailyDelta = (rate * KCAL_PER_KG) / 7;
-
-    let kcal = tdee;
-    if (p.goal === 'lose') kcal = tdee - dailyDelta;
-    else if (p.goal === 'gain') kcal = tdee + dailyDelta;
-
-    kcal = Math.max(kcal, MIN_KCAL[p.sex] ?? 1350);
-    kcal = Math.round(kcal);
+    const kcal = Math.round(Math.max(this.uncappedKcal(p), this.minKcal(p)));
 
     const proteinG = Math.round(PROTEIN_G_PER_KG[p.goal] * p.weightKg);
     const fatG = Math.round((kcal * FAT_ENERGY_RATIO) / KCAL_PER_G.fat);
@@ -85,6 +76,25 @@ export class NutritionCalcService {
     const sugarG = Math.round((kcal * SUGAR_ENERGY_RATIO) / KCAL_PER_G.carbs);
 
     return { kcal, proteinG, carbsG, fatG, fiberG, sugarG };
+  }
+
+  /** `true`, wenn die Mindestzufuhr das rechnerische Ziel anhebt (Formel liegt darunter). */
+  isMinKcalApplied(p: UserProfile): boolean {
+    return this.uncappedKcal(p) < this.minKcal(p);
+  }
+
+  /** Rechnerisches Kalorienziel vor der Mindestzufuhr. */
+  private uncappedKcal(p: UserProfile): number {
+    const tdee = this.totalDailyEnergy(p);
+    const rate = p.goal === 'maintain' ? 0 : Math.abs(p.rateKgPerWeek ?? 0.5);
+    const dailyDelta = (rate * KCAL_PER_KG) / 7;
+    if (p.goal === 'lose') return tdee - dailyDelta;
+    if (p.goal === 'gain') return tdee + dailyDelta;
+    return tdee;
+  }
+
+  private minKcal(p: UserProfile): number {
+    return MIN_KCAL[p.sex] ?? 1350;
   }
 
   /**

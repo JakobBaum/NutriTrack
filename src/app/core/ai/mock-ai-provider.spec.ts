@@ -56,3 +56,16 @@ describe('MockAiProvider — importRecipe (Text-Parser)', () => {
     expect(res.sourceUrl).toBe('https://example.com/rezept');
   });
 });
+
+describe('MockAiProvider — suggestFastfood Budgets', () => {
+  it('filtert nach Geld-Budget', async () => {
+    const res = await provider.suggestFastfood({ restaurant: 'X', kcalBudget: 0, moneyBudget: 4 });
+    expect(res.length).toBeGreaterThan(0);
+    expect(res.every((s) => (s.estPrice ?? 0) <= 4)).toBe(true);
+  });
+
+  it('liefert leere Liste statt Vorschlaegen ueber dem kcal-Budget', async () => {
+    const res = await provider.suggestFastfood({ restaurant: 'X', kcalBudget: 100 });
+    expect(res).toEqual([]);
+  });
+});

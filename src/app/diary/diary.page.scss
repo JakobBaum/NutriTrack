@@ -44,10 +44,12 @@ ion-content {
 .date-nav {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--nt-space-1);
   padding: 0 var(--nt-space-3);
 
   &__label {
+    flex: 1;
     min-width: 96px;
     text-align: center;
     font-size: var(--nt-fs-headline);
@@ -212,6 +214,27 @@ ion-content {
     font-size: var(--nt-fs-body);
     color: var(--nt-secondary);
   }
+
+  &__empty-add {
+    display: flex;
+    align-items: center;
+    gap: var(--nt-space-1);
+    width: 100%;
+    min-height: var(--nt-touch);
+    padding: 0 var(--nt-space-4);
+    background: transparent;
+    border: 0;
+    color: var(--nt-accent);
+    font: inherit;
+    font-size: var(--nt-fs-body);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--nt-focus);
+      outline-offset: -2px;
+    }
+  }
 }
 
 // Fastfood-Helfer als Zeile mit Chevron
@@ -271,11 +294,15 @@ ion-content {
 }
 
 // --- Sheets (Add / Fastfood / Edit) ----------------------------------------
+// Absolut oben mittig: im Fluss landete der Griff unter dem ion-header.
 .sheet-grabber {
-  flex: none;
+  position: absolute;
+  top: var(--nt-space-2);
+  left: 50%;
+  z-index: 20;
+  transform: translateX(-50%);
   width: 36px;
   height: 5px;
-  margin: var(--nt-space-2) auto 0;
   border-radius: 3px;
   background: #c7c7cc;
 }
@@ -338,9 +365,49 @@ ion-searchbar.nt-searchbar {
 // Quellen-Kacheln (Barcode / Etikett / Rezept / Eigene / Mahlzeiten / Manuell)
 .sources {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(76px, 1fr);
   gap: var(--nt-space-2);
   margin: var(--nt-space-4) var(--nt-space-4) var(--nt-space-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar { display: none; }
+}
+
+// Mahlzeit-Wahl im Kopf des Add-Sheets
+.meal-picker {
+  display: flex;
+  gap: var(--nt-space-2);
+  margin: var(--nt-space-1) var(--nt-space-4) var(--nt-space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar { display: none; }
+}
+
+.meal-chip {
+  flex: none;
+  min-height: 36px;
+  padding: 0 var(--nt-space-3);
+  background: var(--nt-card);
+  border: 0;
+  border-radius: var(--nt-radius-pill);
+  color: var(--nt-ink);
+  font: inherit;
+  font-size: var(--nt-fs-caption);
+  font-weight: 600;
+  cursor: pointer;
+
+  &--on {
+    background: var(--nt-accent);
+    color: #fff;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--nt-focus);
+    outline-offset: 2px;
+  }
 }
 
 .source-btn {
@@ -432,6 +499,18 @@ ion-searchbar.nt-searchbar {
 
 .adjust {
   padding-bottom: var(--nt-space-2);
+}
+
+// Manuelles Formular: Akkordeon als eine gerundete Karte
+.adjust-group {
+  overflow: hidden;
+  border-radius: var(--nt-radius-card);
+}
+
+.nt-adjust-card {
+  background: var(--nt-card);
+  border-radius: 0 0 var(--nt-radius-card) var(--nt-radius-card);
+  overflow: hidden;
 }
 
 .add-footer ion-toolbar {

@@ -23,6 +23,9 @@ export interface NewDiaryEntry {
   servings?: number;
   /** Basis-Nährwerte vor Mengenskalierung (per100g) — für spätere Neuskalierung. */
   baseFacts?: NutritionFacts;
+  isEstimate?: boolean;
+  isPartial?: boolean;
+  unit?: 'g' | 'ml';
 }
 
 /**
@@ -54,6 +57,9 @@ export class DiaryStore {
       servings: input.servings,
       facts: input.facts,
       baseFacts: input.baseFacts,
+      isEstimate: input.isEstimate,
+      isPartial: input.isPartial,
+      unit: input.unit,
       createdAt: new Date().toISOString(),
     };
     this._entries.update((list) => [...list, entry]);
@@ -68,13 +74,17 @@ export class DiaryStore {
     amountG?: number;
     servings?: number;
   }): void {
+    // Leere/0/negative Menge nie übernehmen (würde alte oder negative Werte erzeugen).
+    const { amountG, ...rest } = patch;
+    const hasValidAmount = typeof amountG === 'number' && Number.isFinite(amountG) && amountG > 0;
+    const safePatch = hasValidAmount ? { ...rest, amountG } : rest;
     this._entries.update((list) =>
       list.map((e) => {
         if (e.id !== id) return e;
-        const next = { ...e, ...patch };
+        const next = { ...e, ...safePatch };
         // Nährwerte neu skalieren, wenn Basis und neue Menge bekannt.
-        if (e.baseFacts && patch.amountG != null && e.baseFacts.basis === 'per100g') {
-          const factor = patch.amountG / 100;
+        if (e.baseFacts && hasValidAmount && e.baseFacts.basis === 'per100g') {
+          const factor = amountG / 100;
           next.facts = {
             ...e.baseFacts,
             kcal: Math.round(e.baseFacts.kcal * factor),

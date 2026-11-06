@@ -7,6 +7,7 @@ import {
   isAiOrigin,
   lowerBoundPrefix,
   missingFactsLabel,
+  servingsLabel,
   totalWeightG,
 } from './recipe-view';
 
@@ -57,5 +58,10 @@ describe('recipe-view', () => {
     const units = APPROX_UNITS.map((u) => u.unit);
     expect(units).toContain('EL');
     expect(units).not.toContain('g');
+  });
+
+  it('uses singular for one serving', () => {
+    expect(servingsLabel(1)).toBe('1 Portion');
+    expect(servingsLabel(4)).toBe('4 Portionen');
   });
 });

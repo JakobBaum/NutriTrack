@@ -10,14 +10,17 @@
     <ion-card class="target-card">
       <ion-card-content>
         <div class="target-card__kcal">
-          <span class="num">{{ t.kcal }}</span><span class="unit">kcal / Tag</span>
+          <span class="num">{{ t.kcal | ntNum:0 }}</span><span class="unit">kcal / Tag</span>
         </div>
+        @if (savedMinKcalApplied) {
+          <p class="target-card__note">Mindestzufuhr aktiv: Die Formel läge darunter, das Ziel wurde auf den Mindestwert angehoben.</p>
+        }
         <div class="target-card__macros">
-          <span><strong>{{ t.proteinG }}</strong>g Eiweiß</span>
-          <span><strong>{{ t.carbsG }}</strong>g Kohlenh.</span>
-          <span><strong>{{ t.fatG }}</strong>g Fett</span>
-          <span><strong>{{ t.fiberG }}</strong>g Ballast.</span>
-          <span><strong>{{ t.sugarG }}</strong>g Zucker max.</span>
+          <span><strong>{{ t.proteinG | ntNum:0 }}</strong> g Eiweiß</span>
+          <span><strong>{{ t.carbsG | ntNum:0 }}</strong> g Kohlenh.</span>
+          <span><strong>{{ t.fatG | ntNum:0 }}</strong> g Fett</span>
+          <span><strong>{{ t.fiberG | ntNum:0 }}</strong> g Ballast.</span>
+          <span><strong>{{ t.sugarG | ntNum:0 }}</strong> g Zucker max.</span>
         </div>
       </ion-card-content>
     </ion-card>
@@ -28,7 +31,7 @@
     <ion-item button detail="true" (click)="profileOpen.set(true)">
       <ion-icon slot="start" name="body-outline"></ion-icon>
       <ion-label>Bedarfs-Berechner</ion-label>
-      <ion-note slot="end" class="row-note">{{ target() ? target()!.kcal + ' kcal/Tag' : 'Einrichten' }}</ion-note>
+      <ion-note slot="end" class="row-note">{{ target() ? (target()!.kcal | ntNum:0) + ' kcal/Tag' : 'Einrichten' }}</ion-note>
     </ion-item>
     <ion-item button detail="true" (click)="aiOpen.set(true)">
       <ion-icon slot="start" name="sparkles-outline"></ion-icon>
@@ -63,7 +66,7 @@
   <h2 class="nt-section-header">Daten</h2>
   <ion-list class="nt-grouped" lines="none">
     <ion-item button detail="false" class="danger-row" (click)="confirmReset()">
-      <ion-icon slot="start" name="trash-outline"></ion-icon>
+      <ion-icon slot="start" name="trash-outline" color="danger"></ion-icon>
       <ion-label>Alle lokalen Daten zurücksetzen</ion-label>
     </ion-item>
   </ion-list>
@@ -98,8 +101,6 @@
     }
   }
 
-  <div class="content-spacer"></div>
-
   <ion-toast
     [isOpen]="savedToast() !== null"
     [message]="savedToast() ?? ''"
@@ -114,7 +115,7 @@
   <ng-template>
     <ion-header class="ion-no-border">
       <ion-toolbar>
-        <ion-title role="heading" aria-level="1">Bedarfs-Berechner</ion-title>
+        <ion-title role="heading" aria-level="2">Bedarfs-Berechner</ion-title>
         <ion-buttons slot="end">
           <ion-button (click)="profileOpen.set(false)">Schließen</ion-button>
         </ion-buttons>
@@ -169,6 +170,12 @@
           </ion-item>
         }
       </ion-list>
+      @if (rateWarning) {
+        <p class="hint hint--warn" role="status">Mehr als 0,75 kg pro Woche ist ein starkes Defizit bzw. ein starker Überschuss und wird nicht empfohlen.</p>
+      }
+      @if (formMinKcalApplied) {
+        <p class="hint" role="status">Mindestzufuhr aktiv: Die Formel läge darunter, das Ziel wird auf den Mindestwert angehoben.</p>
+      }
       <ion-button expand="block" class="ion-margin-horizontal ion-margin-bottom" (click)="saveProfile()">
         Bedarf berechnen &amp; speichern
       </ion-button>
@@ -181,7 +188,7 @@
   <ng-template>
     <ion-header class="ion-no-border">
       <ion-toolbar>
-        <ion-title role="heading" aria-level="1">KI-Verbindung</ion-title>
+        <ion-title role="heading" aria-level="2">KI-Verbindung</ion-title>
         <ion-buttons slot="end">
           <ion-button (click)="aiOpen.set(false)">Schließen</ion-button>
         </ion-buttons>
@@ -229,7 +236,7 @@
   <ng-template>
     <ion-header class="ion-no-border">
       <ion-toolbar>
-        <ion-title role="heading" aria-level="1">
+        <ion-title role="heading" aria-level="2">
           @switch (infoSection()) {
             @case ('anleitung') { Anleitung }
             @case ('datenschutz') { Datenschutzerklärung }
@@ -255,10 +262,10 @@
         @case ('datenschutz') {
           <h3>Datenschutzerklärung</h3>
           <p><strong>Verantwortlich:</strong> Jakob Baumgartner, baumgartner.jakob12&#64;gmail.com</p>
-          <p><strong>Lokal gespeichert:</strong> Profil (Gewicht, Größe, Alter, Ziel), Tagebuch, Rezepte und Einstellungen liegen <strong>nur auf deinem Gerät</strong> (Browser-Speicher). Wir haben keinen Zugriff darauf. „Daten zurücksetzen“ löscht alles.</p>
-          <p><strong>Lebensmittelsuche:</strong> Dein Suchbegriff geht über unseren Proxy (Cloudflare Worker, Cloudflare Inc. als Auftragsverarbeiter) an Open Food Facts. Dabei werden technisch deine IP-Adresse und der Suchbegriff verarbeitet. Suchergebnisse werden bis zu 1 Stunde zwischengespeichert, ohne Bezug zu deiner Person. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Bereitstellung der Funktion).</p>
+          <p><strong>Lokal gespeichert:</strong> Profil (Gewicht, Größe, Alter, Ziel), Tagebuch, Rezepte und Einstellungen liegen <strong>nur auf deinem Gerät</strong> (Browser-Speicher). Wir haben keinen Zugriff darauf. „Alle lokalen Daten zurücksetzen“ löscht alles auf diesem Gerät, auch gespeicherte Mahlzeiten und eigene Lebensmittel.</p>
+          <p><strong>Lebensmittelsuche:</strong> Dein Suchbegriff geht über unseren Proxy (Cloudflare Worker, Cloudflare Inc. als Auftragsverarbeiter, USA) an Open Food Facts. Dabei werden technisch deine IP-Adresse und der Suchbegriff verarbeitet. Suchergebnisse werden bis zu 1 Stunde zwischengespeichert, ohne Bezug zu deiner Person. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Bereitstellung der Funktion).</p>
           <p><strong>Barcode &amp; Preise:</strong> Barcode-Abfragen gehen direkt an Open Food Facts bzw. Open Prices (openfoodfacts.org, gemeinnützig, Frankreich). Dabei wird deine IP-Adresse übertragen.</p>
-          <p><strong>KI-Funktionen (optional):</strong> Nur wenn du sie nutzt, werden die jeweiligen Inhalte (Rezepttext oder -link, Etikett- oder Rezeptfoto, Einkaufs- und Fastfood-Wünsche) über den Proxy an Google Gemini (Google LLC) gesendet. Gesundheitsdaten wie Gewicht oder Größe werden dabei <strong>nicht</strong> übertragen. KI-Ergebnisse sind automatisch erzeugt und können falsch sein — bitte prüfen.</p>
+          <p><strong>KI-Funktionen (optional):</strong> Nur wenn du sie nutzt, werden die jeweiligen Inhalte (Rezepttext oder -link, Etikett- oder Rezeptfoto, Einkaufs- und Fastfood-Wünsche) über den Proxy an Google Gemini (Google LLC) gesendet; beim Fastfood-Helfer wird zusätzlich das verbleibende Kalorien-Budget übertragen. Nutzt du „Gemini direkt“ mit eigenem Key, gehen diese Inhalte ohne Proxy direkt von deinem Gerät an Google. Google und Cloudflare sitzen in den USA, es kann also eine Übermittlung in ein Drittland stattfinden. Gesundheitsdaten wie Gewicht oder Größe werden dabei <strong>nicht</strong> übertragen. KI-Ergebnisse sind automatisch erzeugt und können falsch sein — bitte prüfen.</p>
           <p><strong>Hosting:</strong> Die Web-App wird über GitHub Pages (GitHub Inc.) ausgeliefert. Dabei fallen Server-Logs mit IP-Adressen an.</p>
           <p><strong>Deine Rechte:</strong> Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch und Datenübertragbarkeit (Art. 15–21 DSGVO). Kontakt per E-Mail. Beschwerden kannst du bei der österreichischen Datenschutzbehörde (dsb.gv.at) einreichen.</p>
         }

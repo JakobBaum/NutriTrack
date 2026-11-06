@@ -11,7 +11,6 @@ ion-content {
   --background: var(--nt-ground);
   --padding-start: var(--nt-space-4);
   --padding-end: var(--nt-space-4);
-  --padding-bottom: var(--nt-space-6);
 }
 
 /* --- Empty state --- */
@@ -36,6 +35,10 @@ ion-content {
   p {
     margin: 0 0 12px;
     color: var(--nt-secondary);
+  }
+
+  &__hint {
+    font-size: var(--nt-fs-caption);
   }
 
   ion-button {
@@ -115,6 +118,10 @@ ion-content {
     letter-spacing: -1.5px;
     font-variant-numeric: tabular-nums;
     color: var(--nt-accent);
+  }
+
+  &--over &__big {
+    color: var(--nt-over);
   }
 
   &__unit {
@@ -276,6 +283,13 @@ ion-content {
   }
 }
 
+.drill-content {
+  --padding-start: var(--nt-space-4);
+  --padding-end: var(--nt-space-4);
+  --padding-top: var(--nt-space-2);
+  --padding-bottom: var(--nt-space-4);
+}
+
 .drill-empty {
   text-align: center;
   color: var(--nt-secondary);
@@ -283,9 +297,7 @@ ion-content {
 }
 
 .drill-item {
-  --padding-start: 0;
-  --inner-padding-end: 0;
-  margin-bottom: 4px;
+  margin-bottom: 0;
 
   &__name {
     font-size: 14px;

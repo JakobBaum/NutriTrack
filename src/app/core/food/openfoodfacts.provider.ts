@@ -145,10 +145,17 @@ export class OpenFoodFactsProvider implements FoodProvider {
     return Number.isFinite(n) ? Math.max(0, n) : 0;
   }
 
+  /** Fehlender oder nicht numerischer kcal-Wert gilt als "keine Naehrwerte" (nie still 0 kcal). */
+  private hasKcal(v: number | string | undefined): boolean {
+    if (v === undefined || v === null || v === '') return false;
+    return Number.isFinite(typeof v === 'number' ? v : Number(v));
+  }
+
   private toFoodItem(p: OffProduct): FoodItem | null {
     const name = (p.product_name ?? '').trim();
     if (!name) return null;
     const n = p.nutriments ?? {};
+    if (!this.hasKcal(n['energy-kcal_100g'])) return null;
     const facts: NutritionFacts = {
       kcal: this.num(n['energy-kcal_100g']),
       proteinG: this.num(n['proteins_100g']),

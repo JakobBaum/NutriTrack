@@ -118,11 +118,12 @@ ion-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--nt-space-3);
+  flex-wrap: wrap;
+  gap: var(--nt-space-2) var(--nt-space-3);
   padding: var(--nt-space-1) var(--nt-space-5) 0;
 
   &__text {
-    flex: 1 1 auto;
+    flex: 1 1 12rem;
     min-width: 0;
     font-size: var(--nt-fs-body);
     color: var(--nt-secondary);
@@ -170,15 +171,23 @@ ion-title {
     }
   }
 
-  &__budget,
-  &__meta {
+  &__budget {
     font-size: var(--nt-fs-caption);
     color: var(--nt-secondary);
     font-variant-numeric: tabular-nums;
   }
 
-  &__meta {
-    margin-left: auto;
+  &__detail,
+  &__note {
+    margin: 0;
+    padding: 0 var(--nt-space-5) var(--nt-space-2);
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__note {
+    color: var(--nt-over);
   }
 }
 
@@ -261,14 +270,29 @@ ion-list.nt-grouped {
   }
 }
 
-.add-name {
-  flex: 1 1 42%;
+// Eigene Eingabezeile: Name volle Breite, darunter Menge, Einheit, Hinzufügen.
+.add-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nt-space-2);
+  margin: 0 var(--nt-space-4);
+
+  ion-input {
+    --border-radius: var(--nt-radius-input);
+    --highlight-color-focused: var(--nt-accent);
+  }
+
+  &__line {
+    display: flex;
+    align-items: center;
+    gap: var(--nt-space-2);
+  }
 }
 .add-amount {
-  flex: 0 0 26%;
+  flex: 1 1 40%;
 }
 .add-unit {
-  flex: 0 0 16%;
+  flex: 1 1 30%;
 }
 
 .empty {

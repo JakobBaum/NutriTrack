@@ -83,6 +83,20 @@ describe('NutritionCalcService', () => {
     expect(scaled.portionG).toBe(250);
   });
 
+  it('meldet die Mindestzufuhr, wenn die Formel darunter liegt', () => {
+    // Arrange: 55 kg / 160 cm / sitzend / Abnehmen 0,5 kg/W -> Formel ca. 937 kcal
+    const small: UserProfile = {
+      weightKg: 55, heightCm: 160, age: 30, sex: 'female',
+      activityLevel: 'sedentary', goal: 'lose', rateKgPerWeek: 0.5,
+      updatedAt: '2026-10-13T00:00:00.000Z',
+    };
+
+    // Act / Assert
+    expect(svc.isMinKcalApplied(small)).toBe(true);
+    expect(svc.dailyTarget(small).kcal).toBe(1200);
+    expect(svc.isMinKcalApplied(male)).toBe(false);
+  });
+
   it('summiert mehrere Nährwert-Sätze', () => {
     const a: NutritionFacts = { kcal: 100, proteinG: 5, carbsG: 10, fatG: 2, fiberG: 1, basis: 'perPortion' };
     const b: NutritionFacts = { kcal: 150, proteinG: 8, carbsG: 12, fatG: 4, fiberG: 2, basis: 'perPortion' };

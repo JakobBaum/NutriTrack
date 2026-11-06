@@ -29,6 +29,12 @@ ion-content {
   --padding-top: var(--nt-space-2);
 }
 
+// Modal-Inhalt: seitlicher Rand (schlägt das globale ion-content-Padding 0)
+ion-modal ion-content {
+  --padding-start: var(--nt-space-4);
+  --padding-end: var(--nt-space-4);
+}
+
 // Modals: Felder als inset gruppierte Karten
 ion-modal ion-list[inset='true'] {
   margin: 0 0 var(--nt-space-2);
@@ -149,6 +155,11 @@ ion-modal ion-item {
 
     &--first {
       margin-inline-start: auto !important;
+    }
+
+    // Löschen mit Abstand zum Bearbeiten (Fehltipp-Schutz)
+    &--delete {
+      margin-inline-start: var(--nt-space-6, 24px) !important;
     }
   }
 }

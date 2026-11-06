@@ -9,8 +9,8 @@ export interface MealDef {
 /** Mahlzeiten in Tagesreihenfolge (Anzeige im Tagebuch, Dashboard, Add-Modal). */
 export const MEAL_DEFS: readonly MealDef[] = [
   { type: 'breakfast', label: 'Frühstück', icon: 'cafe-outline' },
-  { type: 'lunch', label: 'Mittagessen', icon: 'fast-food-outline' },
-  { type: 'dinner', label: 'Abendessen', icon: 'restaurant-outline' },
+  { type: 'lunch', label: 'Mittagessen', icon: 'sunny-outline' },
+  { type: 'dinner', label: 'Abendessen', icon: 'moon-outline' },
   { type: 'snack', label: 'Snacks', icon: 'ice-cream-outline' },
 ];
 
@@ -109,4 +109,34 @@ export function toNumberOrNull(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null;
   const n = typeof value === 'number' ? value : Number(String(value).replace(',', '.'));
   return Number.isFinite(n) ? n : null;
+}
+
+const LIQUID_PATTERN =
+  /(milch|saft|wasser|cola|limo|getränk|getraenk|bier|wein|tee\b|kaffee|drink|juice|milk|water|smoothie|schorle|shake|sprudel|brause|latte|cappuccino|espresso)/i;
+
+/** Heuristik: Flüssigkeiten (nach Name) werden in ml statt g gemessen. */
+export function unitForName(name: string): 'g' | 'ml' {
+  return LIQUID_PATTERN.test(name) ? 'ml' : 'g';
+}
+
+/** True, wenn die Menge eine positive, endliche Zahl ist. */
+export function isValidAmount(value: number | null | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+/** Rechnet angepasste Nährwerte für `amount` zurück auf Werte pro 100 g (Basis für spätere Mengenänderung). */
+export function rebaseTo100(facts: NutritionFacts, amount: number): NutritionFacts {
+  return { ...scaleFacts(facts, 100 / amount), basis: 'per100g' };
+}
+
+/** True, wenn zwei Nährwert-Sätze sich in einem angezeigten Wert unterscheiden. */
+export function factsDiffer(a: NutritionFacts, b: NutritionFacts): boolean {
+  return (
+    a.kcal !== b.kcal ||
+    a.proteinG !== b.proteinG ||
+    a.carbsG !== b.carbsG ||
+    a.fatG !== b.fatG ||
+    (a.fiberG ?? 0) !== (b.fiberG ?? 0) ||
+    (a.sugarG ?? 0) !== (b.sugarG ?? 0)
+  );
 }

@@ -1,6 +1,5 @@
 ion-content {
   --background: var(--nt-ground);
-  --padding-bottom: var(--nt-space-6);
 }
 
 ion-toolbar {
@@ -12,6 +11,12 @@ ion-title {
   font-weight: 700;
   letter-spacing: 0.3px;
   color: var(--nt-ink);
+}
+
+// Modal-Titel: normale Titelgroesse, damit "Bedarfs-Berechner" nicht abgeschnitten wird.
+ion-modal ion-title {
+  font-size: 17px;
+  letter-spacing: 0;
 }
 
 // Tagesziel: weisse Karte, kcal gross in Akzent.
@@ -39,6 +44,12 @@ ion-title {
       font-weight: 600;
       color: var(--nt-secondary);
     }
+  }
+
+  &__note {
+    margin: var(--nt-space-2) 0 0;
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
   }
 
   &__macros {
@@ -84,7 +95,7 @@ ion-item {
   --color: var(--nt-danger);
   --color-activated: var(--nt-danger);
 
-  ion-icon,
+  ion-icon[slot='start'],
   ion-label {
     color: var(--nt-danger);
   }
@@ -96,13 +107,14 @@ ion-item {
   color: var(--nt-secondary);
 }
 
-.form-error {
-  margin: 0 var(--nt-space-5) var(--nt-space-2);
+.hint--warn {
+  color: var(--nt-over);
   font-weight: 600;
 }
 
-.content-spacer {
-  height: 40px;
+.form-error {
+  margin: 0 var(--nt-space-5) var(--nt-space-2);
+  font-weight: 600;
 }
 
 .debug-log {

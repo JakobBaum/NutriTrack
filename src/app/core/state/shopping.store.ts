@@ -16,7 +16,58 @@ export interface ShoppingPlanOptions {
   store?: string;
 }
 
+/** Einkaufsliste inkl. Zusatzfeldern, die das Basismodell nicht kennt. */
+export interface ShoppingListView extends ShoppingList {
+  /** Hinweis des Anbieters (z. B. "über Budget"). */
+  note?: string;
+  /** Woher die Schätzpreise stammen: feste Demo-Formel oder KI. */
+  priceSource?: 'mock' | 'ai';
+}
+
 const KEY_LIST = 'shopping';
+
+/** Summe der Schätzpreise; `unpriced` zählt Positionen ohne Preis. */
+export function sumItems(items: readonly ShoppingItem[]): { total: number; unpriced: number } {
+  let total = 0;
+  let unpriced = 0;
+  for (const it of items) {
+    if (typeof it.estPrice === 'number' && Number.isFinite(it.estPrice)) total += it.estPrice;
+    else unpriced += 1;
+  }
+  return { total: Math.round(total * 100) / 100, unpriced };
+}
+
+const itemKey = (it: ShoppingItem): string =>
+  `${it.name.trim().toLowerCase()}|${it.unit.trim().toLowerCase()}`;
+
+/**
+ * Übernimmt beim Neu-Generieren abgehakte und manuelle Positionen (manuell =
+ * ohne Schätzpreis). Gleicher Name+Einheit ersetzt die neu generierte Position.
+ */
+export function mergeKept(
+  previous: readonly ShoppingItem[],
+  generated: readonly ShoppingItem[],
+): ShoppingItem[] {
+  const kept = previous.filter((it) => it.checked || it.estPrice == null);
+  const byKey = new Map(kept.map((it) => [itemKey(it), it] as const));
+  const used = new Set<string>();
+  const merged = generated.map((g) => {
+    const key = itemKey(g);
+    const old = byKey.get(key);
+    if (!old || used.has(key)) return g;
+    used.add(key);
+    return old;
+  });
+  const rest = kept.filter((it) => !used.has(itemKey(it)));
+  return [...merged, ...rest];
+}
+
+/** Hält estTotal an die Positionen gekoppelt; ein veralteter Demo-Budgethinweis entfällt. */
+function withTotal(l: ShoppingListView): ShoppingListView {
+  const estTotal = sumItems(l.items).total;
+  const stale = l.priceSource === 'mock' && estTotal !== l.estTotal;
+  return { ...l, estTotal, note: stale ? undefined : l.note };
+}
 
 /**
  * Verwaltet die aktuelle Einkaufsliste. Generierung läuft lokal über
@@ -30,8 +81,8 @@ export class ShoppingStore {
   private readonly ai = inject(AiService);
   private readonly mock = inject(MockAiProvider);
 
-  private readonly _list = signal<ShoppingList | null>(
-    this.storage.get<ShoppingList | null>(KEY_LIST, null),
+  private readonly _list = signal<ShoppingListView | null>(
+    this.storage.get<ShoppingListView | null>(KEY_LIST, null),
   );
 
   /** Aktuelle Einkaufsliste (oder null). */
@@ -59,9 +110,10 @@ export class ShoppingStore {
 
   /**
    * Generiert einen Wocheneinkauf über den KI-Anbieter (Mock oder Claude),
-   * inkl. Schätzpreisen. Persistiert das Ergebnis.
+   * inkl. Schätzpreisen. Abgehakte und manuelle Positionen der bisherigen
+   * Liste bleiben erhalten. Persistiert das Ergebnis.
    */
-  async generatePlan(opts: ShoppingPlanOptions): Promise<ShoppingList> {
+  async generatePlan(opts: ShoppingPlanOptions): Promise<ShoppingListView> {
     const req = {
       persons: opts.persons,
       days: opts.days,
@@ -70,14 +122,15 @@ export class ShoppingStore {
       store: opts.store,
       recipes: this.recipes.recipes(),
     };
-    let result = await this.ai.generateShoppingList(req).catch(async (err: unknown) => {
+    const result = await this.ai.generateShoppingList(req).catch(async (err: unknown) => {
       if (this.ai.isLive()) {
         // Proxy/KI-Fehler → Mock-Fallback, Fehler an Aufrufer weitergeben
         throw err;
       }
       return this.mock.generateShoppingList(req);
     });
-    const list: ShoppingList = {
+    const items = mergeKept(this._list()?.items ?? [], result.items);
+    const list: ShoppingListView = {
       id: makeId('shopping'),
       dishes: Math.max(1, Math.floor(opts.days)) * Math.max(1, opts.meals.length),
       persons: Math.max(1, Math.floor(opts.persons)),
@@ -85,9 +138,11 @@ export class ShoppingStore {
       meals: opts.meals,
       budget: opts.budget,
       store: opts.store,
-      items: result.items,
+      items,
       suggestedDishes: result.suggestedDishes,
-      estTotal: result.estTotal,
+      estTotal: sumItems(items).total,
+      note: result.note,
+      priceSource: this.ai.isLive() ? 'ai' : 'mock',
       generatedAt: new Date().toISOString(),
     };
     this._list.set(list);
@@ -102,7 +157,7 @@ export class ShoppingStore {
       const items = l.items.map((it, i) =>
         i === index ? { ...it, checked: !it.checked } : it,
       );
-      return { ...l, items };
+      return withTotal({ ...l, items });
     });
     this.persist();
   }
@@ -110,7 +165,7 @@ export class ShoppingStore {
   /** Fügt eine manuelle Position hinzu. */
   addItem(item: ShoppingItem): void {
     this._list.update((l) => {
-      const base: ShoppingList =
+      const base: ShoppingListView =
         l ?? {
           id: makeId('shopping'),
           dishes: 0,
@@ -119,7 +174,7 @@ export class ShoppingStore {
           suggestedDishes: [],
           generatedAt: new Date().toISOString(),
         };
-      return { ...base, items: [...base.items, item] };
+      return withTotal({ ...base, items: [...base.items, item] });
     });
     this.persist();
   }
@@ -127,7 +182,7 @@ export class ShoppingStore {
   /** Entfernt eine Position. */
   removeItem(index: number): void {
     this._list.update((l) =>
-      l ? { ...l, items: l.items.filter((_, i) => i !== index) } : l,
+      l ? withTotal({ ...l, items: l.items.filter((_, i) => i !== index) }) : l,
     );
     this.persist();
   }

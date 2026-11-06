@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { MealType, NutritionFacts } from '../core/models';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
+import { formatNum } from '../shared/num.pipe';
 import { addDaysISO, dayLabel, toDateISO } from '../core/util/date';
 import { MEAL_DEFS, mealForHour, mealLabel } from '../diary/diary-helpers';
 
@@ -74,6 +75,13 @@ export class DashboardPage {
   );
   /** kcal über dem Tagesziel (0, solange das Ziel nicht überschritten ist). */
   readonly kcalOverBy = computed(() => Math.max(0, this.kcalEaten() - this.kcalTarget()));
+
+  /** Screenreader-Name des Heros inkl. Zahl und Ueberschreitung. */
+  readonly heroLabel = computed(() => {
+    const over = this.kcalOverBy();
+    const n = formatNum(over > 0 ? over : this.kcalRemaining(), 0);
+    return `${n} kcal ${over > 0 ? 'über Ziel' : 'übrig'}, Details anzeigen`;
+  });
 
   readonly macros = computed<MacroView[]>(() => {
     const t = this.target();
@@ -150,8 +158,8 @@ export class DashboardPage {
     void this.router.navigate(['/settings'], { queryParams: { setup: '1' } });
   }
 
-  openDiary(): void {
-    void this.router.navigate(['/diary']);
+  openDiary(meal?: MealType): void {
+    void this.router.navigate(['/diary'], meal ? { queryParams: { meal } } : {});
   }
 
   /** Mahlzeit, die zur aktuellen Uhrzeit passt (Ziel des FAB). */

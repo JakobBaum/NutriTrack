@@ -38,6 +38,7 @@ import {
   isAiOrigin,
   lowerBoundPrefix,
   missingFactsLabel,
+  servingsLabel,
   totalWeightG,
 } from './recipe-view';
 
@@ -127,6 +128,7 @@ export class RecipesPage implements OnDestroy {
   readonly countMissingFacts = countMissingFacts;
   readonly missingFactsLabel = missingFactsLabel;
   readonly lowerBoundPrefix = lowerBoundPrefix;
+  readonly servingsLabel = servingsLabel;
 
   readonly unitOptions = ['g', 'kg', 'ml', 'l', 'EL', 'TL', 'Stk', 'Prise', 'Bund', 'Dose', 'Pck'];
 
@@ -627,6 +629,8 @@ export class RecipesPage implements OnDestroy {
     const facts = recipe.factsPerServing ?? {
       kcal: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0, basis: 'perPortion' as const,
     };
+    const missing = countMissingFacts(recipe.ingredients);
+    const isPartial = missing > 0;
     this.diary.add({
       dateISO: toDateISO(),
       meal,
@@ -634,9 +638,11 @@ export class RecipesPage implements OnDestroy {
       ref: { kind: 'recipe', recipeId: recipe.id },
       servings: 1,
       facts,
+      ...(isPartial ? { isPartial: true } : {}),
     });
     const mealLabel = this.mealOptions.find((m) => m.value === meal)?.label ?? 'Tagebuch';
-    this.toastMessage.set(`„${recipe.title}" als ${mealLabel} gelegt.`);
+    const hint = isPartial ? ` Unvollständig: ${missingFactsLabel(missing)}, Werte sind eine Untergrenze.` : '';
+    this.toastMessage.set(`„${recipe.title}" als ${mealLabel} gelegt.${hint}`);
   }
 
   onToastDismiss(): void {

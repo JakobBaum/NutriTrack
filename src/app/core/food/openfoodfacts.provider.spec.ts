@@ -39,6 +39,35 @@ beforeEach(() => {
 
 afterEach(() => http.verify());
 
+describe('OpenFoodFactsProvider — fehlende Nährwerte', () => {
+  it('verwirft Suchtreffer ohne kcal statt sie als 0 kcal zu speichern', async () => {
+    // Arrange
+    const promise = provider.searchByText('reis');
+    const req = http.expectOne((r) => r.url === SEARCH_URL);
+
+    // Act
+    req.flush({
+      hits: [product('Ohne Werte', { nutriments: {} }), product('Mit Werten'), product('Wasser', { nutriments: { 'energy-kcal_100g': 0 } })],
+    });
+    const items = await promise;
+
+    // Assert
+    expect(items.map((i) => i.name)).toEqual(['Mit Werten', 'Wasser']);
+  });
+
+  it('liefert bei Barcode-Produkt ohne kcal null', async () => {
+    // Arrange
+    const promise = provider.lookupByBarcode('111');
+    const req = http.expectOne((r) => r.url.startsWith(PRODUCT_URL));
+
+    // Act
+    req.flush({ status: 'success', product: product('Ohne Werte', { nutriments: {} }) });
+
+    // Assert
+    expect(await promise).toBeNull();
+  });
+});
+
 describe('OpenFoodFactsProvider — Suche (search-a-licious)', () => {
   it('nutzt /search mit q und mappt hits', async () => {
     // Act

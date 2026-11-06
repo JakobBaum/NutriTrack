@@ -41,4 +41,9 @@ describe('estimateIngredientFacts', () => {
   it('gibt undefined für unbekannte Zutaten zurück', () => {
     expect(estimateIngredientFacts('Spezialpulver XY', 'g')).toBeUndefined();
   });
+
+  it('behandelt kg und l als Gramm-Einheiten (per100g)', () => {
+    expect(estimateIngredientFacts('Mehl', 'kg')!.basis).toBe('per100g');
+    expect(estimateIngredientFacts('Milch', 'l')!.basis).toBe('per100g');
+  });
 });

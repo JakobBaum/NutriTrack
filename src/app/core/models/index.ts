@@ -125,6 +125,12 @@ export interface DiaryEntry {
    * nachträgliches Anpassen der Menge mit korrekter Neuskalierung.
    */
   baseFacts?: NutritionFacts;
+  /** Werte stammen aus einer KI-Schätzung (Fastfood-Helfer, Etikett-/Foto-Erkennung). */
+  isEstimate?: boolean;
+  /** Werte sind unvollständig (z.B. Rezept mit Zutaten ohne Nährwerte) – angezeigt als Untergrenze. */
+  isPartial?: boolean;
+  /** Einheit der Menge amountG; fehlt = 'g'. */
+  unit?: 'g' | 'ml';
   createdAt: string;
 }
 
