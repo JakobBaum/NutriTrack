@@ -91,3 +91,9 @@ ion-modal .nt-grouped {
   text-align: center;
   padding: 8px 0;
 }
+
+// Touch-Ziele >= 44px (Abbrechen/Fertig im Sheet)
+ion-modal ion-buttons ion-button {
+  min-height: 44px;
+  min-width: 44px;
+}

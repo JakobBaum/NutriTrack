@@ -9,7 +9,9 @@ import {
   encodeIndexes,
   formatAmount,
   formatShareText,
+  categoryLabel,
   groupByCategory,
+  sortCategories,
   splitRows,
 } from './shopping-list.util';
 
@@ -110,5 +112,25 @@ describe('defaultPersons', () => {
     expect(defaultPersons({ weightKg: 70 }, 3)).toBe(3);
     expect(defaultPersons(null, undefined)).toBe(DEFAULT_PERSONS);
     expect(defaultPersons({ persons: 1.5 }, 0)).toBe(DEFAULT_PERSONS);
+  });
+});
+
+describe('sortCategories / categoryLabel', () => {
+  it('ordnet bekannte Kategorien im Supermarkt-Fluss, Sonstiges zuletzt', () => {
+    expect(sortCategories(['Sonstiges', 'Getränke', 'Obst & Gemüse', 'Fleisch & Fisch'])).toEqual([
+      'Obst & Gemüse',
+      'Fleisch & Fisch',
+      'Getränke',
+      'Sonstiges',
+    ]);
+  });
+
+  it('hängt unbekannte Kategorien vor Sonstiges an', () => {
+    expect(sortCategories(['Zeug', 'Obst & Gemüse', 'Sonstiges'])).toEqual(['Obst & Gemüse', 'Zeug', 'Sonstiges']);
+  });
+
+  it('ersetzt Schrägstriche durch Kommas', () => {
+    expect(categoryLabel('Trockenware/Nudeln/Reis')).toBe('Trockenware, Nudeln, Reis');
+    expect(categoryLabel('Obst & Gemüse')).toBe('Obst & Gemüse');
   });
 });

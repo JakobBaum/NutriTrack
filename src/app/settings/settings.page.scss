@@ -99,11 +99,7 @@ ion-item {
 
 // Dateiauswahl fuer den Backup-Import: unsichtbar, wird per Zeile ausgeloest
 .backup-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
+  display: none;
 }
 
 .data-hint {
@@ -129,11 +125,6 @@ ion-item {
 
 .hint--warn {
   color: var(--nt-over);
-  font-weight: 600;
-}
-
-.form-error {
-  margin: 0 var(--nt-space-5) var(--nt-space-2);
   font-weight: 600;
 }
 

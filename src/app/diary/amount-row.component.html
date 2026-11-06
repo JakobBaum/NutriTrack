@@ -1,0 +1,32 @@
+<div class="amount">
+  <span class="amount__label" [id]="labelId">{{ label }}</span>
+  <div class="amount__row">
+    <button type="button" class="amount__step" (click)="stepped.emit(-1)" [attr.aria-label]="label + ' verringern'">
+      <ion-icon name="remove-outline" aria-hidden="true"></ion-icon>
+    </button>
+    <div class="amount__field">
+      <ion-input
+        #field
+        type="text"
+        inputmode="decimal"
+        enterkeyhint="done"
+        [attr.aria-labelledby]="labelId"
+        [ngModel]="text"
+        (ngModelChange)="onText($event)"
+        (ionFocus)="selectAll($event)"
+        [placeholder]="placeholder"
+      ></ion-input>
+      @if (unit) {
+        <button type="button" class="amount__unit" (click)="pickUnit()" [attr.aria-label]="'Einheit wählen, aktuell ' + unit">
+          {{ unit }} <ion-icon name="chevron-down-outline" aria-hidden="true"></ion-icon>
+        </button>
+      } @else if (suffix) {
+        <span class="amount__suffix">{{ suffix }}</span>
+      }
+    </div>
+    <button type="button" class="amount__step" (click)="stepped.emit(1)" [attr.aria-label]="label + ' erhöhen'">
+      <ion-icon name="add-outline" aria-hidden="true"></ion-icon>
+    </button>
+  </div>
+  <ng-content></ng-content>
+</div>

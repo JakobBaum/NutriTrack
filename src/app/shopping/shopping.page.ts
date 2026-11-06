@@ -10,6 +10,7 @@ import { UNDO_TOAST_BUTTONS, UNDO_TOAST_MS, UndoableDelete, settleUndoToast } fr
 import {
   ShoppingRow,
   adjustIndex,
+  categoryLabel,
   decodeIndexes,
   defaultPersons,
   encodeIndexes,
@@ -82,8 +83,7 @@ export class ShoppingPage implements OnDestroy {
     const all = this.rows().map((r) => r.item);
     const sum = sumItems(all);
     const open = sumItems(all.filter((i) => !i.checked));
-    const hasChecked = all.some((i) => i.checked);
-    return { total: sum.total, unpriced: sum.unpriced, open: hasChecked ? open.total : null };
+    return { total: sum.total, unpriced: sum.unpriced, open: open.total };
   });
 
   /** Badge-Text je Preisquelle; Altlisten ohne Quelle folgen dem aktiven Anbieter. */
@@ -117,6 +117,7 @@ export class ShoppingPage implements OnDestroy {
 
   newItemName = '';
   newItemAmountText = '';
+  readonly categoryLabel = categoryLabel;
   readonly parseDecimal = parseDecimal;
   readonly formatDecimal = formatDecimal;
   readonly unitOptions = UNIT_OPTIONS;
@@ -253,6 +254,10 @@ export class ShoppingPage implements OnDestroy {
 
   /** Teilt die offenen Positionen per Web Share API; sonst Zwischenablage + Hinweis. */
   async shareList(): Promise<void> {
+    if (this.openCount() === 0) {
+      this.showShareToast('Nichts zu teilen: alle Positionen sind erledigt.');
+      return;
+    }
     const text = formatShareText(this.rows().map((r) => r.item));
     const nav = typeof navigator === 'undefined' ? undefined : navigator;
     if (typeof nav?.share === 'function') {
@@ -285,6 +290,14 @@ export class ShoppingPage implements OnDestroy {
 
   onShareToastDismiss(): void {
     this.shareToastOpen.set(false);
+  }
+
+  /** Header-„+“: Eingabezeile ins Bild holen und fokussieren. */
+  focusAddForm(): void {
+    const el = this.addNameInput()?.nativeElement;
+    if (!el) return;
+    el.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    void el.setFocus?.();
   }
 
   addManual(): void {

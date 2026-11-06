@@ -42,6 +42,7 @@ export interface NewDiaryEntry {
   dateISO: string;
   meal: MealType;
   label: string;
+  brand?: string;
   facts: NutritionFacts;
   ref?: DiaryRef;
   amountG?: number;
@@ -77,6 +78,7 @@ export class DiaryStore {
       dateISO: input.dateISO,
       meal: input.meal,
       label: input.label,
+      brand: input.brand,
       ref: input.ref ?? { kind: 'manual' },
       amountG: input.amountG,
       servings: input.servings,
@@ -99,6 +101,8 @@ export class DiaryStore {
     amountG?: number;
     servings?: number;
     unit?: AmountUnit;
+    /** Neue Gesamt-Nährwerte (z. B. nach Portionsänderung); id, createdAt und Reihenfolge bleiben. */
+    facts?: NutritionFacts;
     /** Neue Bezugswerte pro 100 g/ml (z. B. für manuelle Einträge, die bisher keine hatten). */
     baseFacts?: NutritionFacts;
   }): void {

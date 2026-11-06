@@ -615,3 +615,148 @@ ion-select:focus-within {
 ion-tabs ion-content {
   --padding-bottom: calc(var(--nt-tabbar-height) + 24px + env(safe-area-inset-bottom, 0px));
 }
+
+
+/* =========================================================================
+ * Globale Anpassungen (Haiku-Fixrunde): Toasts, breite Screens, Hover,
+ * Touch-Ziele, grosse Schrift
+ * ========================================================================= */
+
+// Toasts ueber der schwebenden Tab-Bar: Der Toast-Host fuellt den ganzen Bildschirm, der Wrapper
+// klebt unten (bottom: 0). Den Host unten um Tab-Bar + Abstand verkuerzen schiebt den Toast darueber.
+ion-toast {
+  --max-width: min(420px, calc(100% - 32px));
+  --start: 16px;
+  --end: 16px;
+  height: calc(100% - var(--nt-tabbar-height) - 8px - var(--nt-space-3) - env(safe-area-inset-bottom, 0px));
+}
+
+// Aktion ("Rueckgaengig"): auf dem dunklen Material-Toast weiss + fett, auf dem hellen iOS-Toast Akzent.
+ion-toast.md {
+  --button-color: #ffffff;
+}
+
+ion-toast::part(button) {
+  font-weight: 700;
+  min-height: var(--nt-touch);
+}
+
+// Touch-Ziele >= 44 px (Standard-Buttons und Toolbar-Buttons wie "Schliessen").
+ion-button:not([size='small']),
+ion-buttons ion-button {
+  min-height: var(--nt-touch);
+}
+
+ion-buttons ion-button {
+  min-width: var(--nt-touch);
+}
+
+// Grosse Schrift (Root 200 %): Labels umbrechen statt mitten im Wort zu kippen, keine festen Zeilenhoehen.
+ion-label {
+  white-space: normal;
+  min-width: 0;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+ion-item {
+  --min-height: var(--nt-grouped-row-min);
+  height: auto;
+}
+
+// Breite Screens: Inhalt auf 720 px begrenzen und mittig halten (Ionic-Padding-Variablen der Inhaltsflaeche).
+@media (min-width: 768px) {
+  ion-content {
+    --padding-start: max(0px, calc((100% - 720px) / 2));
+    --padding-end: max(0px, calc((100% - 720px) / 2));
+  }
+
+  ion-content.ion-padding {
+    --padding-start: calc(max(0px, calc((100% - 720px) / 2)) + var(--nt-space-4));
+    --padding-end: calc(max(0px, calc((100% - 720px) / 2)) + var(--nt-space-4));
+  }
+}
+
+// Sheets auf Tablet/Desktop: hoeher als Ionics festes 600x600, damit nichts abgeschnitten wird.
+@media (min-width: 768px) and (min-height: 600px) {
+  ion-modal:not(.barcode-fullscreen-modal):not(.cook-fullscreen-modal) {
+    --height: min(90vh, 780px);
+    --max-height: 90vh;
+    --border-radius: var(--nt-radius-sheet);
+  }
+}
+
+// Hover/Cursor nur auf Geraeten mit echtem Hover (Maus/Trackpad).
+@media (hover: hover) {
+  ion-item[button],
+  ion-tab-button,
+  ion-segment-button,
+  ion-chip,
+  .nt-pill {
+    cursor: pointer;
+  }
+
+  ion-item[button] {
+    --background-hover: var(--nt-accent);
+    --background-hover-opacity: 0.06;
+  }
+
+  ion-tab-button:not(.tab-selected):hover {
+    background: rgba(28, 28, 30, 0.06);
+  }
+
+  .nt-pill:hover {
+    opacity: 0.9;
+  }
+
+  .nt-pill--secondary:hover {
+    opacity: 1;
+    filter: brightness(0.96);
+  }
+}
+
+// Loesch-Button in Zeilen (Alternative zum Wischen): auf Hover-Geraeten erst bei Hover/Fokus der
+// Zeile sichtbar, per Tastatur immer erreichbar (opacity statt display, daher fokussierbar).
+// Auf Touch-Geraeten ausgeblendet - dort loescht man per Wischen.
+.nt-hover-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: var(--nt-touch);
+  min-height: var(--nt-touch);
+  padding: 0;
+  border: 0;
+  border-radius: var(--nt-radius-pill);
+  background: transparent;
+  color: var(--nt-danger);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+@media (hover: none) {
+  .nt-hover-delete {
+    display: none;
+  }
+}
+
+@media (hover: hover) {
+  .nt-hover-delete {
+    opacity: 0;
+    transition: opacity 120ms ease;
+  }
+
+  :hover > .nt-hover-delete,
+  :focus-within > .nt-hover-delete,
+  ion-item:hover .nt-hover-delete,
+  ion-item:focus-within .nt-hover-delete,
+  li:hover .nt-hover-delete,
+  li:focus-within .nt-hover-delete,
+  .nt-hover-delete:focus-visible {
+    opacity: 1;
+  }
+
+  .nt-hover-delete:hover {
+    background: rgba(198, 40, 57, 0.1);
+  }
+}

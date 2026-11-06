@@ -47,6 +47,15 @@ describe('ProgressRingComponent', () => {
     expect(ring.strokeColor()).toBe('var(--nt-over)');
   });
 
+  it('warnt erst oberhalb der Schwelle warnAbove', () => {
+    fixture.componentRef.setInput('warnAbove', 0.1);
+    set(105, 100);
+    expect(ring.isOver()).toBe(false);
+    expect(ring.dashOffset()).toBe(0);
+    set(111, 100);
+    expect(ring.isOver()).toBe(true);
+  });
+
   it('nutzt die Eingabefarbe ohne Überschreitung und rendert die Attribute', () => {
     fixture.componentRef.setInput('color', 'red');
     fixture.componentRef.setInput('size', 100);

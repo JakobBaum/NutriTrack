@@ -1,8 +1,10 @@
-// Schwebende Kapsel-Tab-Bar (S1): links/rechts 16, unten Safe-Area + 8, Hoehe 64.
+// Schwebende Kapsel-Tab-Bar (S1): Breite min(440px, 100% - 32px) mittig, unten Safe-Area + 8, Hoehe 64.
 ion-tab-bar {
   position: absolute;
-  left: var(--nt-tabbar-inset);
-  right: var(--nt-tabbar-inset);
+  left: 0;
+  right: 0;
+  width: min(440px, calc(100% - 2 * var(--nt-tabbar-inset)));
+  margin-inline: auto;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
   height: var(--nt-tabbar-height);
   padding: 6px;

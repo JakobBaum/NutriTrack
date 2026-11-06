@@ -1,4 +1,5 @@
 import { ShoppingItem } from '../core/models';
+import { SHOPPING_CATEGORIES } from '../core/shopping/shopping-category';
 
 /** Eine Position samt Index in der gespeicherten Liste. */
 export interface ShoppingRow {
@@ -35,7 +36,23 @@ export function splitRows(rows: readonly ShoppingRow[]): { open: ShoppingRow[]; 
 }
 
 /**
- * Gruppiert nach Kategorie in Reihenfolge des ersten Auftretens; ohne jede
+ * Feste Supermarkt-Reihenfolge (Obst & Gemüse zuerst, Sonstiges zuletzt); unbekannte
+ * Kategorien folgen in Reihenfolge des ersten Auftretens vor „Sonstiges“.
+ */
+export function sortCategories(categories: readonly string[]): string[] {
+  const known = (c: string): number => SHOPPING_CATEGORIES.findIndex((k) => k === c);
+  const fixed = categories.filter((c) => known(c) >= 0 && c !== FALLBACK_CATEGORY).sort((a, b) => known(a) - known(b));
+  const unknown = categories.filter((c) => known(c) < 0);
+  return [...fixed, ...unknown, ...categories.filter((c) => c === FALLBACK_CATEGORY)];
+}
+
+/** Überschrift einer Kategorie: Schrägstriche als Aufzählung („Kühlregal, Milchprodukte“). */
+export function categoryLabel(category: string): string {
+  return category.replace(/\s*\/\s*/g, ', ');
+}
+
+/**
+ * Gruppiert nach Kategorie in fester Supermarkt-Reihenfolge; ohne jede
  * Kategorie bleibt es eine ungruppierte Gruppe in Originalreihenfolge.
  * Positionen ohne Kategorie landen dann am Ende unter „Sonstiges“.
  */
@@ -49,10 +66,7 @@ export function groupByCategory(rows: readonly ShoppingRow[]): ShoppingGroup[] {
     if (!byCategory.has(category)) order.push(category);
     byCategory.set(category, [...(byCategory.get(category) ?? []), row]);
   }
-  const sorted = [
-    ...order.filter((c) => c !== FALLBACK_CATEGORY),
-    ...order.filter((c) => c === FALLBACK_CATEGORY),
-  ];
+  const sorted = sortCategories(order);
   return sorted.map((category) => ({ category, rows: byCategory.get(category) ?? [] }));
 }
 

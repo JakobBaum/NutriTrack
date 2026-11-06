@@ -30,6 +30,8 @@ export class ProgressRingComponent {
   readonly size = input<number>(72);
   /** Strichstärke in px. */
   readonly stroke = input<number>(8);
+  /** Anteil über dem Ziel (0.1 = +10 %), ab dem die Warnfarbe greift. 0 = jede Überschreitung. */
+  readonly warnAbove = input<number>(0);
   /** Farbe des ungefüllten Tracks. */
   readonly track = input<string>('var(--nt-track)');
 
@@ -40,8 +42,10 @@ export class ProgressRingComponent {
     return Math.min(1, Math.max(0, this.value() / max));
   });
 
-  /** True, wenn der Wert das Ziel überschreitet (Warnfarbe). */
-  readonly isOver = computed(() => this.max() > 0 && this.value() > this.max());
+  /** True, wenn der Wert das Ziel um mehr als `warnAbove` überschreitet (Warnfarbe). */
+  readonly isOver = computed(
+    () => this.max() > 0 && this.value() > this.max() * (1 + this.warnAbove()),
+  );
 
   readonly radius = computed(() => (this.size() - this.stroke()) / 2);
   readonly circumference = computed(() => 2 * Math.PI * this.radius());

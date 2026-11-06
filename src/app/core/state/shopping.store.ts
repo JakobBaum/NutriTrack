@@ -4,6 +4,7 @@ import { AiService } from '../ai/ai.service';
 import { MockAiProvider } from '../ai/mock-ai-provider';
 import { StorageService } from '../storage/storage.service';
 import { withCategories, withCategory } from '../shopping/shopping-category';
+import { roundItemsToPackages } from '../shopping/package-size';
 import { buildShoppingList } from '../shopping/shopping-generator';
 import { makeId } from '../util/id';
 import { RecipeStore } from './recipe.store';
@@ -41,6 +42,18 @@ export function sumItems(items: readonly ShoppingItem[]): { total: number; unpri
 const itemKey = (it: ShoppingItem): string =>
   `${it.name.trim().toLowerCase()}|${it.unit.trim().toLowerCase()}`;
 
+/** Führt eine behaltene Position mit der generierten gleichen Name+Einheit zusammen. */
+function mergeOne(old: ShoppingItem, g: ShoppingItem): ShoppingItem {
+  // Manuelle Position "ohne Menge" (0) darf die generierte Menge nicht verlieren.
+  const amount = old.amount > 0 ? old.amount : g.amount;
+  const category = old.category ?? g.category;
+  if (old.estPrice != null) return { ...old, amount, category };
+  // Ohne eigenen Preis den generierten übernehmen, auf die behaltene Menge skaliert.
+  const estPrice =
+    g.estPrice != null && g.amount > 0 ? Math.round((g.estPrice * amount * 100) / g.amount) / 100 : g.estPrice;
+  return { ...old, amount, category, estPrice };
+}
+
 /**
  * Übernimmt beim Neu-Generieren abgehakte und manuelle Positionen (manuell =
  * ohne Schätzpreis). Gleicher Name+Einheit ersetzt die neu generierte Position.
@@ -57,8 +70,7 @@ export function mergeKept(
     const old = byKey.get(key);
     if (!old || used.has(key)) return g;
     used.add(key);
-    // Manuelle Position "ohne Menge" (0) darf die generierte Menge nicht verlieren.
-    return old.amount > 0 ? old : { ...old, amount: g.amount };
+    return mergeOne(old, g);
   });
   const rest = kept.filter((it) => !used.has(itemKey(it)));
   return [...merged, ...rest];
@@ -131,7 +143,7 @@ export class ShoppingStore {
       }
       return this.mock.generateShoppingList(req);
     });
-    const items = withCategories(mergeKept(this._list()?.items ?? [], result.items));
+    const items = withCategories(mergeKept(this._list()?.items ?? [], roundItemsToPackages(result.items)));
     const list: ShoppingListView = {
       id: makeId('shopping'),
       dishes: Math.max(1, Math.floor(opts.days)) * Math.max(1, opts.meals.length),

@@ -69,3 +69,15 @@ describe('MockAiProvider — suggestFastfood Budgets', () => {
     expect(res).toEqual([]);
   });
 });
+
+describe('MockAiProvider — Einheiten bleiben erhalten', () => {
+  it('mappt "2 EL Butter" auf 2 EL und "1 Stk Zwiebel" auf 1 Stk', async () => {
+    // Act
+    const res = await provider.importRecipe({ text: ['Test', '2 EL Butter', '1 Stk Zwiebel', '1 Packung Nudeln'].join('\n') });
+
+    // Assert
+    expect(res.ingredients[0]).toMatchObject({ name: 'Butter', amount: 2, unit: 'EL' });
+    expect(res.ingredients[1]).toMatchObject({ name: 'Zwiebel', amount: 1, unit: 'Stk' });
+    expect(res.ingredients[2]).toMatchObject({ unit: 'Pck' });
+  });
+});

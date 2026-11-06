@@ -69,6 +69,10 @@ export interface FoodItem {
   /** Standard-Portion in g (optional). */
   servingG?: number;
   imageUrl?: string;
+  /** Packungsgröße als Anzeigetext, z.B. "400 g" (nur Anzeige). */
+  quantity?: string;
+  /** Nutri-Score A-E (nur Anzeige). */
+  nutriscore?: 'a' | 'b' | 'c' | 'd' | 'e';
 }
 
 export interface RecipeIngredient {
@@ -116,6 +120,8 @@ export interface DiaryEntry {
   dateISO: string;
   meal: MealType;
   label: string;
+  /** Marke (nur Anzeige), z. B. aus der Food-Suche. */
+  brand?: string;
   ref: DiaryRef;
   /** Menge: Gramm ODER Portionen (je nach Quelle). */
   amountG?: number;

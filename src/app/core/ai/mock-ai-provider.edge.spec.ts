@@ -52,7 +52,7 @@ describe('MockAiProvider — Randfälle', () => {
     const text = ['Brot', '', '1,5 kg Mehl', '2 EL. Öl', '   ', 'Backen.'].join('\n');
     const res = await provider.importRecipe({ text });
     expect(res.ingredients[0]).toMatchObject({ name: 'Mehl', amount: 1.5, unit: 'kg' });
-    expect(res.ingredients[1]).toMatchObject({ name: 'Öl', amount: 2, unit: 'el' });
+    expect(res.ingredients[1]).toMatchObject({ name: 'Öl', amount: 2, unit: 'EL' });
     expect(res.steps).toEqual(['Backen.']);
   });
 

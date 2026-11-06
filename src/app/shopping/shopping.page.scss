@@ -154,16 +154,53 @@ ion-title {
   font-weight: 600;
 }
 
+.page-col {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
 .totals {
-  display: flex;
-  align-items: baseline;
-  gap: var(--nt-space-3);
   padding: var(--nt-space-3) var(--nt-space-5) var(--nt-space-1);
 
+  &__main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--nt-space-1) var(--nt-space-5);
+  }
+
+  &__group {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--nt-space-2);
+    white-space: nowrap;
+  }
+
+  &__label {
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+  }
+
+  &__open {
+    font-size: var(--nt-fs-headline);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--nt-ink);
+  }
+
+  &__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--nt-space-1) var(--nt-space-3);
+    margin-top: var(--nt-space-1);
+  }
+
   &__sum {
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
     color: var(--nt-accent);
 
     &.over {
@@ -175,6 +212,7 @@ ion-title {
     font-size: var(--nt-fs-caption);
     color: var(--nt-secondary);
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   &__detail,
@@ -213,7 +251,9 @@ ion-list.nt-grouped {
   --min-height: 56px;
 
   &__box {
-    width: 100%;
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
     min-height: 56px;
     padding: 6px var(--nt-space-4);
     box-sizing: border-box;
@@ -237,6 +277,20 @@ ion-list.nt-grouped {
   &__name {
     font-size: var(--nt-fs-headline);
   }
+}
+
+// Kategorie-Überschrift im Satzbau statt Großbuchstaben.
+.cat-header {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+
+// Schmale Wisch-Aktion, damit die Checkbox beim Wischen im Bild bleibt.
+ion-item-option {
+  --padding-start: 0;
+  --padding-end: 0;
+  width: 56px;
 }
 
 .share-btn {

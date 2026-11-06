@@ -117,11 +117,19 @@ ion-content {
     line-height: 1;
     letter-spacing: -1.5px;
     font-variant-numeric: tabular-nums;
-    color: var(--nt-accent);
+    color: var(--nt-ink);
   }
 
-  &--over &__big {
+  &__chip {
+    display: inline-block;
+    margin-left: var(--nt-space-2);
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: var(--nt-fs-caption);
+    font-weight: 600;
     color: var(--nt-over);
+    background: color-mix(in srgb, var(--nt-over) 12%, transparent);
+    vertical-align: middle;
   }
 
   &__unit {
@@ -196,10 +204,27 @@ ion-content {
     flex-direction: column;
     align-items: center;
     white-space: nowrap;
-    font-size: 12px;
+    font-size: 13px;
     line-height: 18px;
     color: var(--nt-secondary);
     font-variant-numeric: tabular-nums;
+  }
+
+  &__delta {
+    font-weight: 500;
+    color: var(--nt-secondary);
+  }
+
+  &__hint {
+    grid-column: 1 / -1;
+    margin: 0;
+    text-align: center;
+    font-size: var(--nt-fs-body);
+    color: var(--nt-secondary);
+  }
+
+  &--empty &__col {
+    opacity: 0.45;
   }
 
   &__label {
@@ -242,6 +267,12 @@ ion-content {
   &__label {
     flex: 1;
     min-width: 0;
+  }
+
+  &--empty &__icon,
+  &--empty &__label,
+  &--empty &__note {
+    opacity: 0.5;
   }
 
   &__note {
@@ -303,6 +334,13 @@ ion-content {
     font-size: 14px;
     font-weight: 600;
     margin-bottom: 4px;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
   }
 
   &__bar {
@@ -335,5 +373,43 @@ ion-content {
     font-weight: 400;
     color: var(--nt-secondary);
     display: block;
+  }
+}
+
+.drill-hint {
+  margin: 0 var(--nt-space-4) var(--nt-space-2);
+  font-size: var(--nt-fs-caption);
+  color: var(--nt-secondary);
+}
+
+/* --- Breite Screens: Inhalt begrenzen, im Querformat zwei Spalten (Ringe | Mahlzeiten) --- */
+@media (min-width: 768px) {
+  .page {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+}
+
+@media (min-width: 768px) and (orientation: landscape) {
+  .page {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: var(--nt-space-5);
+    align-items: start;
+
+    > .head,
+    > .hero {
+      grid-column: 1 / -1;
+    }
+
+    > .macros {
+      grid-column: 1;
+      grid-row: 3 / span 10;
+    }
+
+    > .nt-section-header,
+    > .nt-grouped {
+      grid-column: 2;
+    }
   }
 }

@@ -15,6 +15,10 @@ interface MacroView {
   track: string;
   eaten: number;
   target: number;
+  /** Anteil über dem Ziel, ab dem die Warnfarbe greift (kcal: 0, Makros: 10 %). */
+  warnAbove: number;
+  /** Überschreitung in Einheiten (0, solange das Ziel nicht überschritten ist). */
+  overBy: number;
 }
 
 interface DrillItem {
@@ -28,6 +32,8 @@ interface DrillData {
   unit: string;
   total: number;
   color: string;
+  /** True, wenn das Ziel dieses Werts deutlich überschritten ist (Warnfarbe). */
+  over: boolean;
   items: DrillItem[];
 }
 
@@ -36,7 +42,10 @@ interface MealView {
   label: string;
   icon: string;
   kcal: number;
+  count: number;
 }
+
+const MACRO_WARN_ABOVE = 0.1;
 
 /**
  * Tages-Dashboard ("Heute"): Kalorien-Hero + sechs Nährwertringe + Mahlzeiten.
@@ -87,13 +96,20 @@ export class DashboardPage {
     const t = this.target();
     const e = this.totals();
     if (!t) return [];
+    const mk = (
+      key: MacroView['key'], label: string, unit: string, color: string, eaten: number, target: number,
+    ): MacroView => ({
+      key, label, unit, color, track: 'var(--nt-track)', eaten, target,
+      warnAbove: key === 'kcal' ? 0 : MACRO_WARN_ABOVE,
+      overBy: Math.max(0, eaten - target),
+    });
     return [
-      { key: 'kcal', label: 'Kalorien', unit: 'kcal', color: 'var(--nt-kcal)', track: 'var(--nt-track)', eaten: Math.round(e.kcal), target: t.kcal },
-      { key: 'protein', label: 'Eiweiß', unit: 'g', color: 'var(--nt-protein)', track: 'var(--nt-track)', eaten: Math.round(e.proteinG), target: t.proteinG },
-      { key: 'carbs', label: 'Kohlenhydrate', unit: 'g', color: 'var(--nt-carbs)', track: 'var(--nt-track)', eaten: Math.round(e.carbsG), target: t.carbsG },
-      { key: 'fat', label: 'Fett', unit: 'g', color: 'var(--nt-fat)', track: 'var(--nt-track)', eaten: Math.round(e.fatG), target: t.fatG },
-      { key: 'fiber', label: 'Ballaststoffe', unit: 'g', color: 'var(--nt-fiber)', track: 'var(--nt-track)', eaten: Math.round(e.fiberG), target: t.fiberG },
-      { key: 'sugar', label: 'Zucker', unit: 'g', color: 'var(--nt-sugar)', track: 'var(--nt-track)', eaten: Math.round(e.sugarG), target: t.sugarG },
+      mk('kcal', 'Kalorien', 'kcal', 'var(--nt-kcal)', Math.round(e.kcal), t.kcal),
+      mk('protein', 'Eiweiß', 'g', 'var(--nt-protein)', Math.round(e.proteinG), t.proteinG),
+      mk('carbs', 'Kohlenhydrate', 'g', 'var(--nt-carbs)', Math.round(e.carbsG), t.carbsG),
+      mk('fat', 'Fett', 'g', 'var(--nt-fat)', Math.round(e.fatG), t.fatG),
+      mk('fiber', 'Ballaststoffe', 'g', 'var(--nt-fiber)', Math.round(e.fiberG), t.fiberG),
+      mk('sugar', 'Zucker', 'g', 'var(--nt-sugar)', Math.round(e.sugarG), t.sugarG),
     ];
   });
 
@@ -102,8 +118,12 @@ export class DashboardPage {
     return MEAL_DEFS.map((d) => ({
       ...d,
       kcal: Math.round(this.diary.kcalForMeal(date, d.type)),
+      count: this.diary.entriesForMeal(date, d.type).length,
     }));
   });
+
+  /** True, solange am gewählten Tag nichts eingetragen ist. */
+  readonly isEmptyDay = computed(() => this.diary.entriesForDate(this.selectedDate()).length === 0);
 
   readonly drillMacro = signal<string | null>(null);
 
@@ -116,13 +136,15 @@ export class DashboardPage {
       : (this.macros().find(m => m.key === key)?.color ?? 'var(--ion-color-primary)');
     const label = key === 'kcal' ? 'Kalorien' : (this.macros().find(m => m.key === key)?.label ?? key);
     const unit = key === 'kcal' ? 'kcal' : 'g';
+    const macro = this.macros().find(m => m.key === key);
+    const over = !!macro && macro.target > 0 && macro.eaten > macro.target * (1 + macro.warnAbove);
     const items = entries
       .map(e => ({ label: e.label, value: this.factValue(e.facts, key) }))
       .filter(d => d.value > 0)
       .sort((a, b) => b.value - a.value);
     const total = items.reduce((s, i) => s + i.value, 0);
     return {
-      label, unit, color,
+      label, unit, color, over,
       total: Math.round(total * 10) / 10,
       items: items.map(i => ({
         ...i,
@@ -159,7 +181,19 @@ export class DashboardPage {
   }
 
   openDiary(meal?: MealType): void {
-    void this.router.navigate(['/diary'], meal ? { queryParams: { meal } } : {});
+    if (!meal) {
+      void this.router.navigate(['/diary']);
+      return;
+    }
+    const date = this.selectedDate();
+    const queryParams: Record<string, string> = { meal };
+    if (date !== toDateISO()) queryParams['date'] = date;
+    void this.router.navigate(['/diary'], { queryParams });
+  }
+
+  /** Text unter der Mahlzeit, z.B. "2 Einträge". */
+  entryCountLabel(count: number): string {
+    return count === 1 ? '1 Eintrag' : `${count} Einträge`;
   }
 
   /** Mahlzeit, die zur aktuellen Uhrzeit passt (Ziel des FAB). */

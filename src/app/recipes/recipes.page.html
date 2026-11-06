@@ -30,36 +30,36 @@
   @if (recipes().length === 0) {
     <div class="empty">
       <ion-icon name="restaurant-outline" class="empty__icon" aria-hidden="true"></ion-icon>
-      <p>Noch keine Rezepte. Importiere eins per Link oder Text — oder lege es mit <strong>+</strong> selbst an.</p>
+      <p>Noch keine Rezepte. Importiere eins per Link oder Text — oder lege es mit <strong>Neu</strong> selbst an.</p>
     </div>
   } @else {
     @for (recipe of recipes(); track recipe.id) {
       @let missing = countMissingFacts(recipe.ingredients);
-      @let lb = lowerBoundPrefix(missing);
+      @let lbNote = lowerBoundNote(missing);
       <article class="nt-card recipe">
-        <h2 class="recipe__title">{{ recipe.title }}</h2>
+        <h2 class="recipe__title"><button type="button" class="recipe__title-btn" (click)="openDetail(recipe)" [attr.aria-label]="'„' + recipe.title + '“ ansehen'">{{ recipe.title }}</button></h2>
         <div class="recipe__body">
           @if (recipe.factsPerServing; as f) {
             <div class="recipe__macros">
               <div class="recipe__macro">
-                <strong>{{ lb }}{{ f.kcal | ntNum: 0 }}</strong><span>kcal</span>
+                <strong>{{ f.kcal | ntNum: 0 }}</strong><span>kcal</span>
               </div>
               <div class="recipe__macro">
-                <strong>{{ lb }}{{ f.proteinG | ntNum }} g</strong><span>Eiweiß</span>
+                <strong>{{ f.proteinG | ntNum }} g</strong><span>Eiweiß</span>
               </div>
               <div class="recipe__macro">
-                <strong>{{ lb }}{{ f.carbsG | ntNum }} g</strong><span>Kohlenhydrate</span>
+                <strong>{{ f.carbsG | ntNum }} g</strong><span>Kohlenhydrate</span>
               </div>
               <div class="recipe__macro">
-                <strong>{{ lb }}{{ f.fatG | ntNum }} g</strong><span>Fett</span>
+                <strong>{{ f.fatG | ntNum }} g</strong><span>Fett</span>
               </div>
             </div>
             <p class="recipe__meta">
-              Ballaststoffe {{ f.fiberG !== undefined ? lb + (f.fiberG | ntNum) + ' g' : 'keine Angabe' }}
-              · Zucker {{ f.sugarG !== undefined ? lb + (f.sugarG | ntNum) + ' g' : 'keine Angabe' }}
-              @if (f.saltG !== undefined) { · Salz {{ lb }}{{ f.saltG | ntNum }} g }
+              Ballaststoffe {{ optionalGramsLabel(f.fiberG, missing) }}
+              · Zucker {{ optionalGramsLabel(f.sugarG, missing) }}
+              @if (f.saltG !== undefined) { · Salz {{ f.saltG | ntNum }} g }
             </p>
-            <p class="recipe__meta">je Portion · Gesamt {{ lb }}{{ f.kcal * recipe.servings | ntNum: 0 }} kcal</p>
+            <p class="recipe__meta">je Portion · Gesamt {{ f.kcal * recipe.servings | ntNum: 0 }} kcal</p>
           }
           <p class="recipe__meta">
             {{ servingsLabel(recipe.servings) }} · {{ recipe.ingredients.length }} Zutaten
@@ -68,7 +68,7 @@
           @if (missing > 0) {
             <p class="recipe__missing">
               <ion-icon name="information-circle-outline" aria-hidden="true"></ion-icon>
-              {{ missingFactsLabel(missing) }}
+              {{ lbNote }}
             </p>
           }
           <div class="recipe__actions">
@@ -82,11 +82,8 @@
                 Kochen
               </ion-button>
             }
-            <ion-button fill="clear" class="recipe__icon-btn recipe__icon-btn--first" [attr.aria-label]="'„' + recipe.title + '“ bearbeiten'" (click)="openEdit(recipe)">
-              <ion-icon slot="icon-only" name="create-outline" aria-hidden="true"></ion-icon>
-            </ion-button>
-            <ion-button fill="clear" color="danger" class="recipe__icon-btn recipe__icon-btn--delete" [attr.aria-label]="'„' + recipe.title + '“ löschen'" (click)="remove(recipe.id)">
-              <ion-icon slot="icon-only" name="trash-outline" aria-hidden="true"></ion-icon>
+            <ion-button fill="clear" class="recipe__icon-btn recipe__icon-btn--first" [attr.aria-label]="'Weitere Aktionen für „' + recipe.title + '“'" (click)="openCardMenu(recipe)">
+              <ion-icon slot="icon-only" name="ellipsis-horizontal" aria-hidden="true"></ion-icon>
             </ion-button>
           </div>
         </div>
@@ -159,20 +156,31 @@
                     @if (ing.facts) {
                       <span>{{ kcalOf(ing) | ntNum: 0 }} kcal</span>
                     } @else {
-                      <span class="ing-facts-toggle--missing">Nährwerte fehlen</span>
+                      <span class="ing-facts-toggle--missing">Nährwerte fehlen – kcal eintragen</span>
                     }
                     <ion-icon [name]="isExpanded($index) ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
                   </button>
+                  <div class="unit-chips" role="group" aria-label="Häufige Einheiten">
+                    @for (u of quickUnits; track u) {
+                      <button type="button" class="unit-chip" [class.unit-chip--on]="ing.unit === u" [attr.aria-pressed]="ing.unit === u" (click)="setUnit(ing, u)">{{ u }}</button>
+                    }
+                  </div>
+                  @if (isUnknownUnit(ing.unit)) {
+                    <p class="unit-warn" role="alert"><ion-icon name="alert-circle-outline" aria-hidden="true"></ion-icon> Einheit „{{ ing.unit }}“ unbekannt – bitte wählen.</p>
+                  }
                 </ion-label>
                 <div class="ing-qty" slot="end" (click)="$event.stopPropagation()" (touchstart)="$event.stopPropagation()">
                   <ion-input type="text" inputmode="decimal" enterkeyhint="next" [ngModel]="formatDecimal(ing.amount)" (ngModelChange)="ing.amount = parseDecimal($event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Menge" placeholder="0"></ion-input>
-                  <ion-select class="ing-qty__unit" [(ngModel)]="ing.unit" aria-label="Einheit" interface="popover" placeholder="g"
+                  <ion-select class="ing-qty__unit" [(ngModel)]="ing.unit" [attr.aria-label]="'Einheit für ' + (ing.name || 'Zutat')" interface="popover" placeholder="g"
                     (click)="$event.stopPropagation()" (ionFocus)="$event.stopPropagation()">
                     @for (u of unitOptions; track u) {
                       <ion-select-option [value]="u">{{ u }}</ion-select-option>
                     }
                   </ion-select>
                 </div>
+                <ion-button slot="end" fill="clear" color="danger" class="nt-hover-delete" [attr.aria-label]="'Zutat „' + (ing.name || 'ohne Namen') + '“ löschen'" (click)="removeIngredient($index)">
+                  <ion-icon slot="icon-only" name="trash-outline" aria-hidden="true"></ion-icon>
+                </ion-button>
               </ion-item>
               <ion-item-options side="end">
                 <ion-item-option color="danger" aria-label="Zutat löschen" (click)="removeIngredient($index)">
@@ -205,12 +213,11 @@
                 } @else {
                   <p class="ing-detail__hint">
                     <ion-icon name="information-circle-outline"></ion-icon>
-                    Für diese Zutat sind keine Nährwerte hinterlegt. Bitte je 100 g eintragen,
-                    damit sie in die Rezept-Summe einfließt.
+                    Keine Nährwerte hinterlegt. Trage die kcal je 100 g ein, damit die Zutat in die Summe einfließt.
                   </p>
-                  <ion-button size="small" fill="outline" (click)="enableManualFacts(ing)">
-                    <ion-icon slot="start" name="create-outline"></ion-icon> Nährwerte eintragen
-                  </ion-button>
+                  <div class="ing-detail__inputs">
+                    <label>kcal/100g <ion-input type="text" inputmode="decimal" enterkeyhint="done" [ngModel]="''" (ngModelChange)="startFactsWithKcal(ing, $event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="kcal je 100g" placeholder="0"></ion-input></label>
+                  </div>
                 }
               </div>
             }
@@ -229,25 +236,25 @@
         <div class="nutri-card">
           <div class="nutri-card__head">
             <h2>Nährwerte je Portion</h2>
-            <span class="nutri-card__total">Gesamt {{ lowerBoundPrefix(missingCount()) }}{{ total().kcal | ntNum: 0 }} kcal</span>
+            <span class="nutri-card__total">Gesamt {{ total().kcal | ntNum: 0 }} kcal</span>
           </div>
           <div class="nutri-grid">
             <div class="nutri-grid__cell">
-              <strong>{{ lowerBoundPrefix(missingCount()) }}{{ perServing().kcal | ntNum: 0 }}</strong><span>kcal</span>
+              <strong>{{ perServing().kcal | ntNum: 0 }}</strong><span>kcal</span>
             </div>
             <div class="nutri-grid__cell">
-              <strong>{{ lowerBoundPrefix(missingCount()) }}{{ perServing().proteinG | ntNum }} g</strong><span>Eiweiß</span>
+              <strong>{{ perServing().proteinG | ntNum }} g</strong><span>Eiweiß</span>
             </div>
             <div class="nutri-grid__cell">
-              <strong>{{ lowerBoundPrefix(missingCount()) }}{{ perServing().carbsG | ntNum }} g</strong><span>Kohlenh.</span>
+              <strong>{{ perServing().carbsG | ntNum }} g</strong><span>Kohlenh.</span>
             </div>
             <div class="nutri-grid__cell">
-              <strong>{{ lowerBoundPrefix(missingCount()) }}{{ perServing().fatG | ntNum }} g</strong><span>Fett</span>
+              <strong>{{ perServing().fatG | ntNum }} g</strong><span>Fett</span>
             </div>
           </div>
           @if (missingCount() > 0 || formIsAi()) {
             <p class="nutri-card__note">
-              @if (missingCount() > 0) { {{ missingFactsLabel(missingCount()) }} }
+              @if (missingCount() > 0) { {{ lowerBoundNote(missingCount()) }} }
               @if (formIsAi()) { <span class="ai-badge">KI-Schätzung</span> }
             </p>
           }
@@ -282,12 +289,14 @@
           }
         </div>
         <div>
-          <span class="field-label nt-section-header">Portionen</span>
+          <span class="field-label nt-section-header">Ergibt … Portionen</span>
           <ion-list inset="true">
             <ion-item>
-              <ion-input type="text" inputmode="decimal" enterkeyhint="done" [ngModel]="formatDecimal(form.servings)" (ngModelChange)="form.servings = parseDecimal($event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Portionen" placeholder="4"></ion-input>
+              <ion-input type="text" inputmode="decimal" enterkeyhint="done" [ngModel]="formatDecimal(form.servings)" (ngModelChange)="form.servings = parseDecimal($event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Ergibt Portionen" placeholder="4"></ion-input>
+              <ion-note slot="end">Portionen</ion-note>
             </ion-item>
           </ion-list>
+          <p class="auto-weight-hint">Mindestens 1, ganz oder halb (z. B. 2 oder 2,5).</p>
         </div>
       </div>
 
@@ -311,12 +320,70 @@
       <button class="dashed-add" (click)="addStep()">
         <ion-icon name="add-outline"></ion-icon> Schritt hinzufügen
       </button>
-
-      @if (error()) {
-        <ion-text color="danger"><p class="form-error save-error" role="alert">{{ error() }}</p></ion-text>
-      }
-      <ion-button expand="block" class="ion-margin-top save-btn" (click)="save()">Rezept sichern</ion-button>
     </ion-content>
+    <ion-footer class="ion-no-border save-footer">
+      <ion-toolbar>
+        @if (error()) {
+          <ion-text color="danger"><p class="form-error save-error" role="alert">{{ error() }}</p></ion-text>
+        }
+        <ion-button expand="block" class="save-btn" (click)="save()">Rezept sichern</ion-button>
+      </ion-toolbar>
+    </ion-footer>
+  </ng-template>
+</ion-modal>
+
+<!-- Nur-Lesen-Detail -->
+<ion-modal [isOpen]="detailRecipe() !== null" (didDismiss)="closeDetail()">
+  <ng-template>
+    @if (detailRecipe(); as r) {
+      @let dMissing = countMissingFacts(r.ingredients);
+      <ion-header class="ion-no-border">
+        <ion-toolbar>
+          <ion-title role="heading" aria-level="2">{{ r.title }}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="closeDetail()">Schließen</ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <p class="recipe__meta">{{ servingsLabel(r.servings) }} · {{ r.ingredients.length }} Zutaten
+          @if (isAiOrigin(r.origin)) { <span class="ai-badge">KI-Schätzung</span> }</p>
+        @if (r.factsPerServing; as f) {
+          <h2 class="field-label nt-section-header">Nährwerte je Portion</h2>
+          <div class="recipe__macros">
+            <div class="recipe__macro"><strong>{{ f.kcal | ntNum: 0 }}</strong><span>kcal</span></div>
+            <div class="recipe__macro"><strong>{{ f.proteinG | ntNum }} g</strong><span>Eiweiß</span></div>
+            <div class="recipe__macro"><strong>{{ f.carbsG | ntNum }} g</strong><span>Kohlenhydrate</span></div>
+            <div class="recipe__macro"><strong>{{ f.fatG | ntNum }} g</strong><span>Fett</span></div>
+          </div>
+          <p class="recipe__meta">Ballaststoffe {{ optionalGramsLabel(f.fiberG, dMissing) }} · Zucker {{ optionalGramsLabel(f.sugarG, dMissing) }}</p>
+          @if (dMissing > 0) { <p class="recipe__missing">{{ lowerBoundNote(dMissing) }}</p> }
+        }
+        <h2 class="field-label nt-section-header">Zutaten</h2>
+        <ul class="detail-list">
+          @for (i of r.ingredients; track $index) {
+            <li><span>{{ i.name }}</span><span>{{ i.amount | ntNum: 2 }} {{ i.unit }}</span></li>
+          }
+        </ul>
+        @if (r.steps.length > 0) {
+          <h2 class="field-label nt-section-header">Zubereitung</h2>
+          <ol class="detail-steps">
+            @for (st of r.steps; track $index) { <li>{{ st }}</li> }
+          </ol>
+        }
+      </ion-content>
+      <ion-footer class="ion-no-border save-footer">
+        <ion-toolbar>
+          <div class="recipe__actions">
+            <ion-button class="recipe__btn" fill="solid" (click)="detailThen(diaryAction)">Tagebuch</ion-button>
+            @if (r.steps.length > 0) {
+              <ion-button class="recipe__btn recipe__btn--tint" fill="solid" (click)="detailThen(cookAction)">Kochen</ion-button>
+            }
+            <ion-button fill="clear" (click)="detailThen(editAction)">Bearbeiten</ion-button>
+          </div>
+        </ion-toolbar>
+      </ion-footer>
+    }
   </ng-template>
 </ion-modal>
 

@@ -19,6 +19,9 @@
           <ion-button slot="end" fill="clear" class="icon-btn" [attr.aria-label]="'„' + meal.name + '“ ins Tagebuch eintragen'" (click)="useMeal(meal)">
             <ion-icon slot="icon-only" name="add-circle-outline" aria-hidden="true"></ion-icon>
           </ion-button>
+          <ion-button slot="end" fill="clear" color="danger" class="icon-btn nt-hover-delete" [attr.aria-label]="'„' + meal.name + '“ löschen'" (click)="removeMeal(meal.id)">
+            <ion-icon slot="icon-only" name="trash-outline" aria-hidden="true"></ion-icon>
+          </ion-button>
         </ion-item>
         <ion-item-options side="end">
           <ion-item-option color="danger" [attr.aria-label]="'„' + meal.name + '“ löschen'" (click)="removeMeal(meal.id)">

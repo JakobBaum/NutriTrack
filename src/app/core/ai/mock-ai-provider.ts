@@ -26,6 +26,18 @@ const UNITS = new Set([
   'packung', 'dose', 'dosen', 'bund', 'zehe', 'zehen', 'scheibe', 'scheiben', 'tasse', 'tassen',
 ]);
 
+/** Schreibweisen aus Rezepttexten -> Einheit aus der App-Auswahl (UNIT_OPTIONS). */
+const UNIT_ALIASES: Readonly<Record<string, string>> = {
+  g: 'g', kg: 'kg', ml: 'ml', l: 'l', el: 'EL', tl: 'TL', stk: 'Stk', stück: 'Stk',
+  prise: 'Prise', prisen: 'Prise', packung: 'Pck', dose: 'Dose', dosen: 'Dose', bund: 'Bund',
+};
+
+/** Behält die erkannte Einheit bei (z. B. „EL“); Unbekanntes bleibt klein und wird im Import-Review markiert. */
+export function canonicalUnit(raw: string): string {
+  const key = raw.toLowerCase().replace('.', '');
+  return UNIT_ALIASES[key] ?? key;
+}
+
 /**
  * Deterministischer KI-Anbieter für Entwicklung/Tests — **ohne Netzwerk, ohne Kosten**.
  * Liefert plausible, nachvollziehbare Ergebnisse, damit alle KI-Flows ohne echten
@@ -139,7 +151,7 @@ export class MockAiProvider implements AiProvider {
       const unknownUnitWord = !!m && !!m[2] && !hasUnit && !STEP_WORDS.has(m[2].toLowerCase());
       if (m && (hasUnit || !m[2] || unknownUnitWord)) {
         const amount = Number(m[1].replace(',', '.'));
-        const unit = hasUnit ? m[2]!.toLowerCase().replace('.', '') : 'Stk';
+        const unit = hasUnit ? canonicalUnit(m[2]!) : 'Stk';
         // Unbekanntes Einheitswort (z. B. „Becher“) bleibt Teil des Namens.
         const name = (unknownUnitWord ? `${m[2]} ${m[3]}` : m[3]).trim();
         ingredients.push({

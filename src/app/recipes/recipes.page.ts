@@ -16,6 +16,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import type { IScannerControls } from '@zxing/browser';
 import { ActionSheetController } from '@ionic/angular';
+import { QUICK_UNITS } from './recipe-view';
 import { FoodItem, MealType, NutritionFacts, Recipe, RecipeIngredient } from '../core/models';
 import { AiService } from '../core/ai/ai.service';
 import { FOOD_PROVIDER } from '../core/food/food-provider';
@@ -35,6 +36,12 @@ import { MealsListComponent } from '../meals/meals-list.component';
 import { UNDO_TOAST_BUTTONS, UNDO_TOAST_MS, UndoableDelete, settleUndoToast } from '../meals/undoable-delete';
 import {
   APPROX_UNITS,
+  EAT_PORTION_OPTIONS,
+  isUnknownUnit,
+  isValidYield,
+  lowerBoundNote,
+  optionalGramsLabel,
+  scaleFacts,
   countMissingFacts,
   hasApproxUnits,
   isAiOrigin,
@@ -130,9 +137,21 @@ export class RecipesPage implements OnDestroy {
   readonly countMissingFacts = countMissingFacts;
   readonly missingFactsLabel = missingFactsLabel;
   readonly lowerBoundPrefix = lowerBoundPrefix;
+  readonly lowerBoundNote = lowerBoundNote;
+  readonly optionalGramsLabel = optionalGramsLabel;
+  readonly quickUnits = QUICK_UNITS;
   readonly servingsLabel = servingsLabel;
 
   readonly unitOptions = UNIT_OPTIONS;
+
+  /** True, wenn die Einheit (z. B. aus dem Import) nicht in der Auswahl steht. */
+  isUnknownUnit(unit: string): boolean {
+    return isUnknownUnit(unit, this.unitOptions);
+  }
+
+  setUnit(ing: IngredientForm, unit: string): void {
+    ing.unit = unit;
+  }
   readonly parseDecimal = parseDecimal;
   readonly formatDecimal = formatDecimal;
 
@@ -435,6 +454,14 @@ export class RecipesPage implements OnDestroy {
     ing.facts = { kcal: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0, basis: 'per100g' };
   }
 
+  /** Inline-Eingabe: erster kcal-Wert legt die Nährwerte (je 100 g) an. */
+  startFactsWithKcal(ing: IngredientForm, value: unknown): void {
+    const kcal = parseDecimal(value);
+    if (kcal === null) return;
+    this.enableManualFacts(ing);
+    this.setFact(ing, 'kcal', kcal);
+  }
+
   /** True, wenn die Zutat (noch) keine Nährwerte hat → Hinweis zum Eintragen. */
   needsManualFacts(ing: IngredientForm): boolean {
     return !ing.facts;
@@ -577,8 +604,8 @@ export class RecipesPage implements OnDestroy {
       return;
     }
     const servings = parseDecimal(this.form.servings);
-    if (servings === null || servings <= 0) {
-      this.error.set('Portionen fehlt — bitte eine Zahl größer 0 eintragen (z. B. 2,5).');
+    if (!isValidYield(servings)) {
+      this.error.set('„Ergibt“ braucht mindestens 1 Portion, ganz oder halb (z. B. 2 oder 2,5).');
       return;
     }
     const ingredients = this.toIngredients();
@@ -632,13 +659,31 @@ export class RecipesPage implements OnDestroy {
     await sheet.present();
     const { data, role } = await sheet.onDidDismiss<MealType>();
     if (role === 'cancel' || !data) return;
-    this.logMeal(recipe, data);
+    const portions = await this.askPortions();
+    if (portions === null) return;
+    this.logMeal(recipe, data, portions);
   }
 
-  private logMeal(recipe: Recipe, meal: MealType): void {
-    const facts = recipe.factsPerServing ?? {
+  /** Fragt, wie viele Portionen gegessen wurden (0,5 / 1 / 1,5 / 2); null bei Abbruch. */
+  private async askPortions(): Promise<number | null> {
+    const sheet = await this.actionSheets.create({
+      header: 'Wie viel davon hast du gegessen?',
+      buttons: [
+        ...EAT_PORTION_OPTIONS.map((p) => ({ text: servingsLabel(p), data: p })),
+        { text: 'Abbrechen', role: 'cancel' },
+      ],
+    });
+    await sheet.present();
+    const { data, role } = await sheet.onDidDismiss<number>();
+    return role === 'cancel' || typeof data !== 'number' ? null : data;
+  }
+
+  private logMeal(recipe: Recipe, meal: MealType, portions: number): void {
+    const perPortion = recipe.factsPerServing ?? {
       kcal: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0, basis: 'perPortion' as const,
     };
+    // Eintrag speichert die tatsächlich gegessene Summe; servings = gegessene Portionen (Tagebuch rechnet daraus je Portion zurück).
+    const facts = scaleFacts(perPortion, portions);
     const missing = countMissingFacts(recipe.ingredients);
     const isPartial = missing > 0;
     this.diary.add({
@@ -646,24 +691,65 @@ export class RecipesPage implements OnDestroy {
       meal,
       label: recipe.title,
       ref: { kind: 'recipe', recipeId: recipe.id },
-      servings: 1,
+      servings: portions,
       facts,
       ...(isPartial ? { isPartial: true } : {}),
     });
     const mealLabel = this.mealOptions.find((m) => m.value === meal)?.label ?? 'Tagebuch';
     const hint = isPartial ? ` Unvollständig: ${missingFactsLabel(missing)}, Werte sind eine Untergrenze.` : '';
-    this.toastMessage.set(`„${recipe.title}" als ${mealLabel} gelegt.${hint}`);
+    this.toastMessage.set(`${servingsLabel(portions)} „${recipe.title}" als ${mealLabel} gelegt.${hint}`);
   }
 
   onToastDismiss(): void {
     this.toastMessage.set(null);
   }
 
+  // --- Karten-Menü (Bearbeiten/Löschen) ---
+  async openCardMenu(recipe: Recipe): Promise<void> {
+    const sheet = await this.actionSheets.create({
+      header: recipe.title,
+      buttons: [
+        { text: 'Bearbeiten', icon: 'create-outline', data: 'edit' },
+        { text: 'Löschen', icon: 'trash-outline', role: 'destructive', data: 'delete' },
+        { text: 'Abbrechen', role: 'cancel' },
+      ],
+    });
+    await sheet.present();
+    const { data } = await sheet.onDidDismiss<string>();
+    if (data === 'edit') this.openEdit(recipe);
+    if (data === 'delete') this.remove(recipe.id);
+  }
+
+  // --- Nur-Lesen-Detail ---
+  readonly detailRecipe = signal<Recipe | null>(null);
+
+  openDetail(recipe: Recipe): void {
+    this.detailRecipe.set(recipe);
+  }
+
+  closeDetail(): void {
+    this.detailRecipe.set(null);
+  }
+
+  /** Schließt das Detail und führt dann die Aktion aus. */
+  detailThen(action: (r: Recipe) => void): void {
+    const r = this.detailRecipe();
+    this.closeDetail();
+    if (r) action(r);
+  }
+
+  readonly editAction = (r: Recipe): void => this.openEdit(r);
+  readonly diaryAction = (r: Recipe): void => void this.logToDiary(r);
+  readonly cookAction = (r: Recipe): void => this.startCook(r);
+
   // --- Kochmodus ---
   readonly cookRecipe = signal<Recipe | null>(null);
   readonly cookStep = signal(0);
 
   startCook(recipe: Recipe): void {
+    // Offene Hinweise würden „Weiter“ verdecken.
+    this.toastMessage.set(null);
+    this.detailRecipe.set(null);
     this.cookRecipe.set(recipe);
     this.cookStep.set(0);
   }

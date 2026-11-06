@@ -18,16 +18,17 @@
   @if (!hasProfile()) {
     <div class="empty">
       <ion-icon name="sparkles-outline" class="empty__icon"></ion-icon>
-      <h2>Willkommen bei NutriTrack</h2>
+      <h1>Willkommen bei NutriTrack</h1>
       <p>Richte dein Profil ein, damit wir deinen Tagesbedarf berechnen können.</p>
       <p class="empty__hint">Deine Daten bleiben lokal auf diesem Gerät. KI-Funktionen sind optional.</p>
       <ion-button expand="block" (click)="openSettings()">Profil einrichten</ion-button>
     </div>
   } @else {
+   <div class="page">
     <!-- Kopf: Grosstitel + Datum, primaere Eintragen-Pille (ersetzt den FAB, gleiche Aktion) -->
     <div class="head">
       <div class="head__text">
-        <h1 class="nt-large-title">{{ dateLabel() }}</h1>
+        <h1 class="nt-large-title">{{ isToday() ? 'Heute' : 'Rückblick' }}</h1>
       </div>
       <button type="button" class="nt-pill head__add" (click)="openAddForNow()" [attr.aria-label]="'Zu ' + currentMealLabel() + ' hinzufügen'">
         <ion-icon name="add" aria-hidden="true"></ion-icon>
@@ -39,7 +40,12 @@
     <section class="hero" [class.hero--over]="kcalOverBy() > 0" aria-label="Kalorien">
       <button type="button" class="hero__main" [attr.aria-label]="heroLabel()" (click)="openDrill('kcal')">
         <span class="hero__big">{{ (kcalOverBy() > 0 ? kcalOverBy() : kcalRemaining()) | ntNum:0 }}</span>
-        <span class="hero__unit">{{ kcalOverBy() > 0 ? 'kcal über Ziel' : 'kcal übrig' }}</span>
+        <span class="hero__unit">
+          kcal{{ kcalOverBy() > 0 ? '' : ' übrig' }}
+          @if (kcalOverBy() > 0) {
+            <span class="hero__chip">über Ziel</span>
+          }
+        </span>
       </button>
       <div class="hero__meta">
         <div><strong>{{ kcalEaten() | ntNum:0 }}</strong> gegessen</div>
@@ -48,17 +54,23 @@
     </section>
 
     <!-- Nährwerte: 3 x 2 Ringe; jede Kachel öffnet den Drill -->
-    <section class="nt-card macros" aria-label="Nährwerte">
+    <section class="nt-card macros" [class.macros--empty]="isEmptyDay()" aria-label="Nährwerte">
       @for (m of macros(); track m.key) {
-        <button type="button" class="macros__col" [attr.aria-label]="m.label + ' ' + (m.eaten | ntNum) + ' von ' + (m.target | ntNum) + ' ' + m.unit + (m.eaten > m.target ? ', über Ziel' : '') + ', Details anzeigen'" (click)="openDrill(m.key)">
-          <app-progress-ring [value]="m.eaten" [max]="m.target" [color]="m.color" [track]="m.track" [size]="68" [stroke]="6">
+        <button type="button" class="macros__col" [attr.aria-label]="m.label + ' ' + (m.eaten | ntNum) + ' von ' + (m.target | ntNum) + ' ' + m.unit + (m.overBy > 0 ? ', ' + (m.overBy | ntNum) + ' ' + m.unit + ' über Ziel' : '') + ', Details anzeigen'" (click)="openDrill(m.key)">
+          <app-progress-ring [value]="m.eaten" [max]="m.target" [color]="m.color" [warnAbove]="m.warnAbove" [track]="m.track" [size]="68" [stroke]="6">
             <span class="macros__num">{{ m.eaten | ntNum }}</span>
           </app-progress-ring>
           <span class="macros__text">
             <span class="macros__label">{{ m.label }}</span>
-            <span class="macros__val">{{ m.eaten | ntNum }} / {{ m.target | ntNum }} {{ m.unit }}</span>
+            <span class="macros__val">von {{ m.target | ntNum }} {{ m.unit }}</span>
+            @if (m.overBy > 0 && m.key !== 'kcal') {
+              <span class="macros__delta">+{{ m.overBy | ntNum }} {{ m.unit }}</span>
+            }
           </span>
         </button>
+      }
+      @if (isEmptyDay()) {
+        <p class="macros__hint">Noch nichts eingetragen</p>
       }
     </section>
 
@@ -66,10 +78,15 @@
     <h2 class="nt-section-header">Mahlzeiten</h2>
     <ul class="nt-grouped">
       @for (meal of meals(); track meal.type) {
-        <li class="row">
+        <li class="row" [class.row--empty]="meal.count === 0">
           <button type="button" class="row__btn" (click)="openDiary(meal.type)">
             <ion-icon [name]="meal.icon" class="row__icon" aria-hidden="true"></ion-icon>
-            <span class="row__label">{{ meal.label }}</span>
+            <span class="row__stack">
+              <span class="row__label">{{ meal.label }}</span>
+              @if (meal.count > 0) {
+                <span class="row__sub">{{ entryCountLabel(meal.count) }}</span>
+              }
+            </span>
             <span class="row__note">{{ meal.kcal | ntNum:0 }} kcal</span>
             <ion-icon name="chevron-forward-outline" class="nt-grouped__chevron" aria-hidden="true"></ion-icon>
           </button>
@@ -85,12 +102,15 @@
           <ion-icon name="fast-food-outline" class="row__icon" aria-hidden="true"></ion-icon>
           <span class="row__stack">
             <span class="row__label">Fastfood-Helfer</span>
-            <span class="row__sub">{{ kcalRemaining() | ntNum:0 }} kcal übrig — was passt?</span>
+            <span class="row__sub">
+              @if (kcalOverBy() > 0) { Ziel erreicht } @else { {{ kcalRemaining() | ntNum:0 }} kcal übrig — was passt? }
+            </span>
           </span>
           <ion-icon name="chevron-forward-outline" class="nt-grouped__chevron" aria-hidden="true"></ion-icon>
         </button>
       </li>
     </ul>
+   </div>
   }
 </ion-content>
 
@@ -119,13 +139,14 @@
         @if (drill.items.length === 0) {
           <p class="drill-empty">Noch keine Einträge an diesem Tag.</p>
         } @else {
+          <p class="drill-hint">Anteil am Tag</p>
           <ion-list lines="none" class="nt-grouped">
             @for (item of drill.items; track item.label) {
               <ion-item class="drill-item">
                 <ion-label>
                   <div class="drill-item__name">{{ item.label }}</div>
                   <div class="drill-item__bar">
-                    <div class="drill-item__fill" [style.width.%]="item.percent" [style.background]="drill.color"></div>
+                    <div class="drill-item__fill" [style.width.%]="item.percent" [style.background]="drill.over ? 'var(--nt-over)' : drill.color"></div>
                   </div>
                 </ion-label>
                 <ion-note slot="end" class="drill-item__val">

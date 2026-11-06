@@ -38,3 +38,18 @@ export async function pickActionSheet(page, text) {
   await btn.click();
   await settle(page, 400);
 }
+
+/** Natives <input> einer Mengenzeile (app-amount-row) anhand ihres Labels. */
+export function amountInput(scope, label) {
+  const exact = new RegExp(`^\\s*${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i');
+  return scope.locator('app-amount-row').filter({ has: scope.page().locator('.amount__label', { hasText: exact }) }).locator('input');
+}
+
+/** Wählt die Einheit über den Einheiten-Button der Mengenzeile (Action-Sheet). */
+export async function pickUnit(page, scope, unit) {
+  await scope.locator('.amount__unit').click();
+  const btn = page.locator('ion-action-sheet button', { hasText: new RegExp('^\s*' + unit + '\s*$') }).first();
+  await btn.waitFor();
+  await btn.click();
+  await settle(page, 400);
+}

@@ -16,6 +16,7 @@ import { ShoppingStore } from '../core/state/shopping.store';
 import { DebugLogService } from '../core/debug/debug-log.service';
 import { resolveDebugMode, safeLocalStorage } from './debug-flag';
 import { BackupService } from '../core/backup/backup.service';
+import { PROFILE_FIELD_ORDER, ProfileField, ProfileFieldErrors, validateProfileForm } from './profile-form';
 import { BackupFile, countBackup, describeCounts, formatBackupDate } from '../core/backup/backup';
 
 /**
@@ -52,7 +53,6 @@ export class SettingsPage implements OnInit {
   readonly debugMode = resolveDebugMode(this.win?.location.search ?? '', safeLocalStorage(this.win));
 
   readonly target = this.profileStore.target;
-  readonly error = signal<string | null>(null);
   readonly savedToast = signal<string | null>(null);
 
   readonly profileOpen = signal(false);
@@ -72,9 +72,10 @@ export class SettingsPage implements OnInit {
 
   // --- Profil-Formular (mit Werten aus gespeichertem Profil, sonst Defaults) ---
   private readonly existing = this.profileStore.profile();
-  weightKg: number | null = this.existing?.weightKg ?? 80;
-  heightCm: number | null = this.existing?.heightCm ?? 180;
-  age: number | null = this.existing?.age ?? 30;
+  // Körperwerte starten leer (Platzhalter sind nur Beispiele), damit nichts Vorbelegtes als echte Eingabe gespeichert wird.
+  weightKg: number | null = this.existing?.weightKg ?? null;
+  heightCm: number | null = this.existing?.heightCm ?? null;
+  age: number | null = this.existing?.age ?? null;
   sex: Sex = this.existing?.sex ?? 'male';
   activityLevel: ActivityLevel = this.existing?.activityLevel ?? 'moderate';
   goal: Goal = this.existing?.goal ?? 'maintain';
@@ -108,12 +109,8 @@ export class SettingsPage implements OnInit {
     { value: 'gemini', label: 'Gemini direkt (eigener Key)' },
   ];
 
-  private readonly ranges = {
-    weightKg: { min: 30, max: 300, label: 'Gewicht' },
-    heightCm: { min: 100, max: 250, label: 'Größe' },
-    age: { min: 14, max: 100, label: 'Alter' },
-    rateKgPerWeek: { min: 0.1, max: 1.5, label: 'Tempo' },
-  } as const;
+  /** Felder, die der Nutzer schon verlassen hat (Fehler erst danach zeigen). */
+  touched: Partial<Record<ProfileField, boolean>> = {};
 
   ngOnInit(): void {
     if (this.route.snapshot.queryParamMap.get('setup') === '1') {
@@ -147,32 +144,44 @@ export class SettingsPage implements OnInit {
     return this.goal !== 'maintain';
   }
 
-  private validate(value: number | null, key: keyof typeof this.ranges, errs: string[]): number | null {
-    const r = this.ranges[key];
-    const n = typeof value === 'number' ? value : Number(value);
-    if (value === null || !Number.isFinite(n)) {
-      errs.push(`${r.label}: bitte eine Zahl eingeben.`);
-      return null;
-    }
-    if (n < r.min || n > r.max) {
-      errs.push(`${r.label}: muss zwischen ${r.min} und ${r.max} liegen.`);
-      return null;
-    }
-    return n;
+  /** Alle aktuellen Feldfehler (leer = Formular gültig). */
+  get fieldErrors(): ProfileFieldErrors {
+    return validateProfileForm(
+      { weightKg: this.weightKg, heightCm: this.heightCm, age: this.age, rateKgPerWeek: this.rateKgPerWeek },
+      this.showRate,
+    );
+  }
+
+  get isFormValid(): boolean {
+    return Object.keys(this.fieldErrors).length === 0;
+  }
+
+  /** Fehlertext nur für Felder, die schon besucht wurden. */
+  visibleError(field: ProfileField): string | null {
+    return this.touched[field] ? (this.fieldErrors[field] ?? null) : null;
+  }
+
+  markTouched(field: ProfileField): void {
+    this.touched = { ...this.touched, [field]: true };
+  }
+
+  /** Fokussiert das erste fehlerhafte Feld (Reihenfolge wie im Formular). */
+  private focusFirstInvalid(errors: ProfileFieldErrors): void {
+    const first = PROFILE_FIELD_ORDER.find((f) => errors[f]);
+    if (!first) return;
+    const el = this.win?.document.querySelector<HTMLIonInputElement>(`ion-input[data-field="${first}"]`);
+    void el?.setFocus();
   }
 
   saveProfile(): void {
-    const errs: string[] = [];
-    const weightKg = this.validate(this.weightKg, 'weightKg', errs);
-    const heightCm = this.validate(this.heightCm, 'heightCm', errs);
-    const age = this.validate(this.age, 'age', errs);
-    const rate = this.showRate ? this.validate(this.rateKgPerWeek, 'rateKgPerWeek', errs) : 0;
-
-    if (weightKg === null || heightCm === null || age === null || rate === null) {
-      this.error.set(errs[0] ?? 'Bitte Eingaben prüfen.');
+    const errors = this.fieldErrors;
+    const { weightKg, heightCm, age, rateKgPerWeek } = this;
+    if (Object.keys(errors).length > 0 || weightKg === null || heightCm === null || age === null) {
+      this.touched = { weightKg: true, heightCm: true, age: true, rateKgPerWeek: true };
+      this.focusFirstInvalid(errors);
       return;
     }
-    this.error.set(null);
+    const rate = this.showRate ? (rateKgPerWeek ?? 0) : 0;
 
     const profile: UserProfile = {
       weightKg,
@@ -230,7 +239,7 @@ export class SettingsPage implements OnInit {
       if (result === 'shared') this.savedToast.set('Backup erstellt.');
       if (result === 'downloaded') this.savedToast.set('Backup heruntergeladen.');
     } catch {
-      await this.showBackupError('Das Backup konnte nicht erstellt werden. Bitte erneut versuchen.');
+      await this.showBackupError('Backup nicht erstellt', 'Das Backup konnte nicht erstellt werden. Bitte erneut versuchen.');
     } finally {
       this.backupBusy.set(false);
     }
@@ -246,7 +255,7 @@ export class SettingsPage implements OnInit {
     try {
       const result = await this.backup.readFile(file);
       if (!result.ok) {
-        await this.showBackupError(result.error);
+        await this.showBackupError('Backup kann nicht gelesen werden', result.error);
         return;
       }
       await this.confirmImport(result.backup);
@@ -271,14 +280,14 @@ export class SettingsPage implements OnInit {
   /** Schreibt das Backup und lädt die App neu, damit alle Stores den neuen Stand lesen. */
   private applyImport(backup: BackupFile): void {
     if (!this.backup.restore(backup)) {
-      void this.showBackupError('Der Import ist fehlgeschlagen (Speicher voll oder gesperrt). Deine bisherigen Daten sind unverändert.');
+      void this.showBackupError('Import fehlgeschlagen', 'Der Import ist fehlgeschlagen (Speicher voll oder gesperrt). Deine bisherigen Daten sind unverändert.');
       return;
     }
     this.win?.location.reload();
   }
 
-  private async showBackupError(message: string): Promise<void> {
-    const alert = await this.alertCtrl.create({ header: 'Backup', message, buttons: ['OK'] });
+  private async showBackupError(header: string, message: string): Promise<void> {
+    const alert = await this.alertCtrl.create({ header, message, buttons: ['OK'] });
     await alert.present();
   }
 

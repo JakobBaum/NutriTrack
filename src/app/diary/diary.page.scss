@@ -33,11 +33,30 @@ ion-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--nt-space-3);
+  gap: var(--nt-space-2);
   padding: var(--nt-space-2) var(--nt-space-5) 0;
 
-  &__add ion-icon {
-    font-size: 20px;
+  .nt-large-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  // Pill darf bei 320 px nicht überlaufen.
+  &__add {
+    flex: none;
+    white-space: nowrap;
+    padding-inline: var(--nt-space-3);
+
+    ion-icon {
+      font-size: 20px;
+    }
+  }
+}
+
+@media (max-width: 340px) {
+  .page-head {
+    padding-inline: var(--nt-space-4);
   }
 }
 
@@ -151,6 +170,39 @@ ion-content {
   &--flat {
     margin: 0;
     border-radius: 0;
+  }
+}
+
+// Eintragszeile: sichtbarer Papierkorb neben dem Wischen (Maus/Tastatur)
+// Papierkorb steht neben der Zeile (nicht darueber); Sichtbarkeit steuert global .nt-hover-delete
+// (auf Touch-Geraeten ausgeblendet, dort bleibt Wischen).
+.entry-row {
+  display: flex;
+  align-items: center;
+
+  > ion-item-sliding {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__delete {
+    width: var(--nt-touch);
+    height: var(--nt-touch);
+    padding: 0;
+    border: 0;
+    border-radius: var(--nt-radius-pill);
+    background: var(--nt-card);
+    color: var(--nt-danger);
+    cursor: pointer;
+
+    ion-icon {
+      font-size: 20px;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--nt-focus);
+      outline-offset: 2px;
+    }
   }
 }
 
@@ -408,21 +460,20 @@ ion-searchbar.nt-searchbar {
   &::-webkit-scrollbar { display: none; }
 }
 
-// Mahlzeit-Wahl im Kopf des Add-Sheets
+// Mahlzeit-Wahl im Kopf des Add-Sheets: 4 gleich breite Spalten (passt bei 320 px)
 .meal-picker {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--nt-space-2);
   margin: var(--nt-space-1) var(--nt-space-4) var(--nt-space-2);
-  overflow-x: auto;
-  scrollbar-width: none;
-
-  &::-webkit-scrollbar { display: none; }
 }
 
 .meal-chip {
-  flex: none;
-  min-height: 36px;
-  padding: 0 var(--nt-space-3);
+  min-height: var(--nt-touch);
+  padding: 0 var(--nt-space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   background: var(--nt-card);
   border: 0;
   border-radius: var(--nt-radius-pill);
@@ -512,6 +563,13 @@ ion-searchbar.nt-searchbar {
     font-weight: 600;
   }
 
+  &__edit {
+    --color: var(--nt-accent);
+    font-size: var(--nt-fs-caption);
+    font-weight: 600;
+    text-transform: none;
+  }
+
   &__meta {
     font-size: var(--nt-fs-caption);
     color: var(--nt-secondary);
@@ -564,6 +622,44 @@ ion-searchbar.nt-searchbar {
   margin: var(--nt-space-2) var(--nt-space-5) 0;
   font-size: var(--nt-fs-caption);
   color: var(--nt-secondary);
+
+  &--empty {
+    margin-top: var(--nt-space-6);
+    text-align: center;
+    font-size: var(--nt-fs-body);
+  }
+}
+
+// Inline-Aktion unter einem Hinweis (z. B. "Manuell eintragen")
+.inline-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nt-space-1);
+  min-height: var(--nt-touch);
+  margin: 0 var(--nt-space-4);
+  padding: 0 var(--nt-space-1);
+  background: transparent;
+  border: 0;
+  color: var(--nt-accent);
+  font: inherit;
+  font-size: var(--nt-fs-body);
+  font-weight: 600;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--nt-focus);
+    outline-offset: 2px;
+  }
+}
+
+// Alte Treffer abdunkeln, solange eine neue Suche läuft
+.results {
+  transition: opacity 150ms ease-out;
+
+  &--stale {
+    opacity: 0.4;
+    pointer-events: none;
+  }
 }
 
 .ff-remaining {
@@ -618,21 +714,64 @@ ion-searchbar.nt-searchbar {
   }
 }
 
-// Einheiten-Auswahl (g / kg / ml / l) unter der Mengeneingabe
-.unit-picker {
-  padding: var(--nt-space-2) var(--nt-space-5) 0;
-}
-
-// Schnellwahl-Chips unter der Mengeneingabe
+// Schnellwahl-Chips in der Mengenzeile: eine Zeile, gleich breit
 .quick-amounts {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: var(--nt-space-2);
-  padding: var(--nt-space-2) var(--nt-space-5) 0;
+  margin-top: var(--nt-space-3);
 }
 
 .quick-chip {
-  min-height: 44px;
-  min-width: 44px;
-  padding-inline: var(--nt-space-4);
+  min-height: var(--nt-touch);
+  min-width: 0;
+  padding-inline: var(--nt-space-1);
+  flex-direction: column;
+  line-height: 1.1;
+
+  small {
+    display: block;
+    font-size: 11px;
+    font-weight: 400;
+  }
+}
+
+// Bearbeiten-Sheet: Sichern rechts im Kopf, Löschen als ruhiger Text-Button mit Abstand
+.sheet-header__save {
+  font-weight: 600;
+}
+
+.edit-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nt-space-1);
+  min-height: var(--nt-touch);
+  margin: 32px auto 0;
+  padding: 0 var(--nt-space-4);
+  background: transparent;
+  border: 0;
+  color: var(--nt-danger);
+  font: inherit;
+  font-size: var(--nt-fs-headline);
+  font-weight: 600;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--nt-focus);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .results {
+    transition: none;
+  }
+}
+
+.entry-brand {
+  font-weight: 400;
+  font-size: 0.8em;
+  color: var(--ion-color-medium);
 }

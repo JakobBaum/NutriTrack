@@ -10,9 +10,14 @@ import { AppRoutingModule } from './app-routing.module';
 import { FOOD_PROVIDER } from './core/food/food-provider';
 import { OpenFoodFactsProvider } from './core/food/openfoodfacts.provider';
 
+/** Systemwunsch "Bewegung reduzieren": Ionic-Animationen (Modals, Seitenwechsel, Toasts) ausschalten. */
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+}
+
 @NgModule({
   declarations: [AppComponent],
-  imports: [BrowserModule, IonicModule.forRoot(), AppRoutingModule],
+  imports: [BrowserModule, IonicModule.forRoot({ animated: !prefersReducedMotion() }), AppRoutingModule],
   providers: [
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
     { provide: FOOD_PROVIDER, useExisting: OpenFoodFactsProvider },

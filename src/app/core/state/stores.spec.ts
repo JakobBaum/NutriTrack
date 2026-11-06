@@ -145,3 +145,24 @@ describe('ShoppingStore', () => {
     expect(shopping.list()!.items.at(-1)).toMatchObject({ name: 'Milch', unit: 'L' });
   });
 });
+
+describe('DiaryStore.update (Portionen, Marke)', () => {
+  it('übernimmt servings und facts, behält id, createdAt und Reihenfolge', () => {
+    const store = TestBed.inject(DiaryStore);
+    const first = store.add({ dateISO: '2026-10-13', meal: 'lunch', label: 'Curry', servings: 1, facts: facts(500) });
+    store.add({ dateISO: '2026-10-13', meal: 'lunch', label: 'Reis', facts: facts(200) });
+    store.update(first.id, { servings: 2, facts: facts(1000) });
+    const updated = store.entries().find((e) => e.id === first.id)!;
+    expect(updated).toMatchObject({ id: first.id, createdAt: first.createdAt, servings: 2 });
+    expect(updated.facts.kcal).toBe(1000);
+    expect(store.entriesForMeal('2026-10-13', 'lunch')[0].id).toBe(first.id);
+  });
+
+  it('speichert die Marke und lässt alte Einträge ohne Marke unverändert', () => {
+    const store = TestBed.inject(DiaryStore);
+    const a = store.add({ dateISO: '2026-10-13', meal: 'lunch', label: 'Haferflocken', brand: 'Crownfield', facts: facts(370) });
+    const b = store.add({ dateISO: '2026-10-13', meal: 'lunch', label: 'Apfel', facts: facts(80) });
+    expect(a.brand).toBe('Crownfield');
+    expect(b.brand).toBeUndefined();
+  });
+});

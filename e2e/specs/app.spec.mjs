@@ -17,7 +17,7 @@ async function pickSelect(page, modal, label, optionText) {
 export function register({ test }) {
   test('onboarding: Profil einrichten setzt Tagesziel', null, async (page) => {
     await go(page, 'dashboard');
-    await page.locator('h2', { hasText: 'Willkommen bei NutriTrack' }).waitFor();
+    await page.locator('h1', { hasText: 'Willkommen bei NutriTrack' }).waitFor();
     await page.locator('ion-button', { hasText: 'Profil einrichten' }).click();
     // ?setup=1 öffnet den Bedarfs-Berechner automatisch
     await page.waitForURL(/settings\?setup=1/);

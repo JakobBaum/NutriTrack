@@ -1,0 +1,99 @@
+// Mengenzeile: [−] [Zahl + Einheit] [+], alle Ziele 44 px.
+.amount {
+  padding: var(--nt-space-3) var(--nt-space-4) var(--nt-space-3);
+
+  &__label {
+    display: block;
+    margin-bottom: var(--nt-space-1);
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: var(--nt-space-2);
+  }
+
+  &__step {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--nt-touch);
+    height: var(--nt-touch);
+    padding: 0;
+    border: 0;
+    border-radius: var(--nt-radius-pill);
+    background: var(--nt-accent-tint);
+    color: var(--nt-accent);
+    cursor: pointer;
+
+    ion-icon {
+      font-size: 22px;
+    }
+
+    &:active {
+      opacity: 0.7;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--nt-focus);
+      outline-offset: 2px;
+    }
+  }
+
+  &__field {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    min-width: 0;
+    height: var(--nt-touch);
+    padding-left: var(--nt-space-3);
+    background: var(--nt-ground);
+    border-radius: var(--nt-radius-tile);
+  }
+
+  ion-input {
+    flex: 1;
+    min-width: 0;
+    min-height: var(--nt-touch);
+    --padding-start: 0;
+    --padding-end: 0;
+    font-size: var(--nt-fs-headline);
+    font-weight: 600;
+    color: var(--nt-ink);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  &__unit,
+  &__suffix {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    height: var(--nt-touch);
+    padding: 0 var(--nt-space-3) 0 var(--nt-space-2);
+    border: 0;
+    background: transparent;
+    color: var(--nt-secondary);
+    font: inherit;
+    font-size: var(--nt-fs-body);
+    font-weight: 600;
+  }
+
+  &__unit {
+    color: var(--nt-accent);
+    cursor: pointer;
+
+    ion-icon {
+      font-size: 14px;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--nt-focus);
+      outline-offset: -2px;
+    }
+  }
+}

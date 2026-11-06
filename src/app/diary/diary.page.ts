@@ -27,6 +27,11 @@ import { CustomFood, CustomFoodStore } from '../core/state/custom-food.store';
 import { addDaysISO, dayLabel, toDateISO } from '../core/util/date';
 import { formatNum } from '../shared/num.pipe';
 import { countMissingFacts } from '../recipes/recipe-view';
+import { DiarySearch } from './diary-search';
+import { AmountRowComponent } from './amount-row.component';
+import {
+  AmountChip, EditMode, StepDirection, amountChips, editModeFor, entryToInput, mealShortLabel, stepAmount, stepServings, withServings,
+} from './diary-edit';
 import { copyFromButtonText, copyFromText, copySourceOptionText, entriesKcal, entryCountText } from './diary-copy';
 import {
   EMPTY_FIELDS,
@@ -43,7 +48,6 @@ import {
   rebaseTo100,
   scaleFacts,
   toNumberOrNull,
-  quickAmounts,
   inputTextFor,
   unitForName,
   AMOUNT_UNITS,
@@ -91,6 +95,7 @@ interface ApplyOptions {
   isAi?: boolean;
   isPartial?: boolean;
   hint?: string;
+  brand?: string;
 }
 
 interface FastFoodForm {
@@ -110,7 +115,6 @@ const EMPTY_FORM: EntryForm = {
 
 const DEFAULT_AMOUNT_G = 100;
 const MAX_RECENT_FOODS = 8;
-const SEARCH_DEBOUNCE_MS = 400;
 const SEARCH_FOCUS_DELAY_MS = 60;
 const AMOUNT_FOCUS_DELAY_MS = 150;
 const SCROLL_TO_MEAL_DELAY_MS = 150;
@@ -118,7 +122,7 @@ const TOAST_MS = 2500;
 const TOAST_UNDO_MS = 5000;
 /** rawTexts-Schlüssel des Add-Formulars (Menge, Portionen, Nährwerte). */
 const ADD_FORM_TEXT_KEYS: readonly string[] = ['amount', 'servings', ...Object.keys(EMPTY_FIELDS)];
-const EDIT_FORM_TEXT_KEYS: readonly string[] = ['editAmount'];
+const EDIT_FORM_TEXT_KEYS: readonly string[] = ['editAmount', 'editServings'];
 
 /**
  * Tagebuch: Einträge je Mahlzeit. Hinzufügen läuft über ein Modal, das sofort
@@ -150,10 +154,7 @@ export class DiaryPage implements OnDestroy {
 
   @ViewChild('barcodeVideo') barcodeVideo?: ElementRef<HTMLVideoElement>;
   @ViewChild('searchbar') searchbar?: { setFocus(): Promise<void> };
-  @ViewChild('amountInput') amountInput?: {
-    setFocus(): Promise<void>;
-    getInputElement(): Promise<HTMLInputElement>;
-  };
+  @ViewChild(AmountRowComponent) amountRow?: AmountRowComponent;
 
   /** Roher Tipptext je Zahlenfeld (erhält z. B. "1," beim Tippen mit Komma). */
   private readonly rawTexts: Record<string, string> = {};
@@ -190,9 +191,10 @@ export class DiaryPage implements OnDestroy {
   /** Frühere Tage (max. 7 zurück) mit Einträgen, für „Tag kopieren“. */
   readonly daySources = computed(() => this.diary.copySources(this.selectedDate()));
 
-  readonly mealOptions: { value: MealType; label: string }[] = MEAL_DEFS.map((m) => ({
+  readonly mealOptions: { value: MealType; label: string; short: string }[] = MEAL_DEFS.map((m) => ({
     value: m.type,
     label: m.label,
+    short: mealShortLabel(m.type),
   }));
 
   /** Mahlzeit, die zur aktuellen Uhrzeit passt (für Schnellzugriff per FAB). */
@@ -215,6 +217,8 @@ export class DiaryPage implements OnDestroy {
 
   /** Gewähltes Rezept (für die ref des Eintrags), null bei manuell/Food. */
   private pickedRecipeId: string | null = null;
+  /** Marke des gewählten Suchtreffers (nur Anzeige), sonst undefined. */
+  private pickedBrand: string | undefined;
   /** Bezugswerte für die Mengenskalierung; null bei manueller Eingabe. */
   scaleBase: ScaleBase | null = null;
   /** Gewählte Einheit der Mengeneingabe; form.amountG zeigt den Wert in dieser Einheit. */
@@ -234,6 +238,9 @@ export class DiaryPage implements OnDestroy {
   editUnit: AmountUnit = 'g';
   editBaseFacts: NutritionFacts | null = null;
   editError: string | null = null;
+  /** Welche Mengenzeile der Bearbeiten-Dialog zeigt (Menge, Portionen, optionale Menge). */
+  editMode: EditMode = 'amount';
+  editServings: number | null = null;
 
   /** Freitext-Filter für die Rezept-Auswahl im Add-Modal. */
   readonly recipeQuery = signal('');
@@ -265,13 +272,8 @@ export class DiaryPage implements OnDestroy {
   readonly hasSavedMeals = computed(() => this.mealsStore.meals().length > 0);
 
   // --- Food search ---
-  searchQuery = '';
-  readonly searchResults = signal<FoodItem[]>([]);
-  readonly searching = signal(false);
+  readonly search = new DiarySearch(this.food, (message) => this.error.set(message));
   readonly scanning = signal(false);
-  readonly searchHint = signal<string | null>(null);
-  readonly searchDebounceMs = SEARCH_DEBOUNCE_MS;
-  private searchSeq = 0;
 
   /** Native Kamera nur auf dem Gerät; im Web → Datei-Upload-Fallback. */
   readonly nativeCamera = this.camera.isNativeCameraAvailable();
@@ -293,6 +295,8 @@ export class DiaryPage implements OnDestroy {
   readonly bcError = signal<string | null>(null);
   readonly bcLooking = signal(false);
   readonly bcManualOpen = signal(false);
+  /** True, wenn keine Kamera nutzbar ist (Rahmen/Anleitung weg, Code-Eingabe offen). */
+  readonly bcNoCamera = signal(false);
   manualBarcode = '';
   private scanControls?: IScannerControls;
 
@@ -323,16 +327,16 @@ export class DiaryPage implements OnDestroy {
     const add = params.get('add');
     const wantsFastfood = params.get('fastfood') === '1';
     const meal = params.get('meal');
-    if (!add && !wantsFastfood && !meal) return;
-
     const date = params.get('date');
+    if (isIsoDate(date)) this.selectedDate.set(date);
+    if (!add && !wantsFastfood && !meal && !date) return;
+
     if (add) {
-      this.selectedDate.set(isIsoDate(date) ? date : toDateISO());
+      if (!isIsoDate(date)) this.selectedDate.set(toDateISO());
       this.openAdd(isMealType(add) ? add : this.currentMeal());
     }
     if (wantsFastfood) this.openFastfood();
     if (isMealType(meal)) {
-      if (isIsoDate(date)) this.selectedDate.set(date);
       setTimeout(() => this.scrollToMeal(meal), SCROLL_TO_MEAL_DELAY_MS);
     }
 
@@ -364,12 +368,11 @@ export class DiaryPage implements OnDestroy {
     this.amountUnit = 'g';
     this.unitTouched = false;
     this.pickedRecipeId = null;
+    this.pickedBrand = undefined;
     this.scaleBase = null;
     this.recipeQuery.set('');
     this.customQuery.set('');
-    this.searchQuery = '';
-    this.searchResults.set([]);
-    this.searchHint.set(null);
+    this.search.reset();
     this.formHint.set(null);
     this.isAiEstimate.set(false);
     this.isPartialSource = false;
@@ -483,7 +486,8 @@ export class DiaryPage implements OnDestroy {
   openManualEntry(): void {
     this.scaleBase = null;
     this.pickedRecipeId = null;
-    const label = this.searchQuery.trim();
+    this.pickedBrand = undefined;
+    const label = this.search.query.trim();
     this.form = { ...this.form, ...EMPTY_FIELDS, label, amountG: null, servings: null };
     this.clearRawTexts(ADD_FORM_TEXT_KEYS);
     this.amountUnit = unitForName(label);
@@ -523,13 +527,42 @@ export class DiaryPage implements OnDestroy {
     this.editForm = { ...this.editForm, amountG: toNumberOrNull(value) };
   }
 
-  /** Schnellwahl-Mengen in der aktuellen Einheit des Formulars. */
-  get quickAmountOptions(): readonly number[] {
-    return quickAmounts(this.amountUnit);
+  /** Chips der Mengenzeile (Vorgaben, „zuletzt“ nur wenn abweichend). */
+  get addChips(): AmountChip[] {
+    return amountChips(this.amountUnit, this.lastAmountFor(this.form.label, this.amountUnit));
   }
 
-  get editQuickAmountOptions(): readonly number[] {
-    return quickAmounts(this.editUnit);
+  get editChips(): AmountChip[] {
+    return amountChips(this.editUnit, this.lastAmountFor(this.editForm.label, this.editUnit, this.editEntryId));
+  }
+
+  /** Chip-Klick-Handler (als Funktion fürs Template-Outlet). */
+  readonly pickAmountFn = (value: number): void => this.pickAmount(value);
+  readonly pickEditAmountFn = (value: number): void => this.pickEditAmount(value);
+
+  stepAddAmount(direction: StepDirection): void {
+    delete this.rawTexts['amount'];
+    this.setAmount(stepAmount(this.form.amountG, this.amountUnit, direction));
+  }
+
+  stepAddServings(direction: StepDirection): void {
+    delete this.rawTexts['servings'];
+    this.setServings(stepServings(this.form.servings, direction));
+  }
+
+  stepEditAmount(direction: StepDirection): void {
+    delete this.rawTexts['editAmount'];
+    this.setEditAmount(stepAmount(this.editForm.amountG, this.editUnit, direction));
+  }
+
+  stepEditServings(direction: StepDirection): void {
+    delete this.rawTexts['editServings'];
+    this.setEditServings(stepServings(this.editServings, direction));
+  }
+
+  setEditServings(value: unknown): void {
+    if (typeof value === 'string') this.rawTexts['editServings'] = value;
+    this.editServings = toNumberOrNull(value);
   }
 
   /**
@@ -596,6 +629,7 @@ export class DiaryPage implements OnDestroy {
     this.amountUnit = shownUnit;
     this.unitTouched = false;
     this.pickedRecipeId = opts.recipeId ?? null;
+    this.pickedBrand = opts.brand;
     this.form = {
       ...this.form,
       ...fieldsFromFacts(scaleFacts(facts, factor)),
@@ -614,50 +648,13 @@ export class DiaryPage implements OnDestroy {
 
   /** Fokussiert das Mengenfeld und markiert den Inhalt, damit Tippen ihn ersetzt. */
   private focusAmount(): void {
-    const input = this.amountInput;
-    if (!input) return;
-    void input.setFocus().then(() => input.getInputElement()).then((el) => el.select());
-  }
-
-  // --- Suche ---
-  onSearchInput(value: unknown): void {
-    this.searchQuery = typeof value === 'string' ? value : '';
-    if (this.searchQuery.trim().length === 0) {
-      this.searchSeq += 1;
-      this.searchResults.set([]);
-      this.searchHint.set(null);
-      this.searching.set(false);
-      return;
-    }
-    void this.searchFood();
-  }
-
-  async searchFood(): Promise<void> {
-    const q = this.searchQuery.trim();
-    if (!q) return;
-    const seq = ++this.searchSeq;
-    this.error.set(null);
-    this.searchHint.set(null);
-    this.searching.set(true);
-    try {
-      const results = await this.food.searchByText(q);
-      if (seq !== this.searchSeq) return;
-      this.searchResults.set(results);
-      if (results.length === 0) {
-        this.searchHint.set(`Keine Treffer für „${q}“ — prüfe die Schreibweise oder trage es manuell ein.`);
-      }
-    } catch (e: unknown) {
-      if (seq === this.searchSeq) this.error.set(foodErrorMessage(e));
-    } finally {
-      if (seq === this.searchSeq) this.searching.set(false);
-    }
+    this.amountRow?.focus();
   }
 
   /** Übernimmt einen Suchtreffer (Nährwerte pro 100 g) ins Formular. */
   selectFood(item: FoodItem): void {
-    this.applyFacts(item.name, item.facts);
-    this.searchResults.set([]);
-    this.searchQuery = '';
+    this.applyFacts(item.name, item.facts, { brand: item.brand });
+    this.search.clearAfterPick();
   }
 
   /** Übernimmt ein Rezept (Nährwerte je Portion) ins Formular; Menge = Portionen. */
@@ -678,12 +675,13 @@ export class DiaryPage implements OnDestroy {
   editRecent(entry: DiaryEntry): void {
     const base = entry.baseFacts?.basis === 'per100g' ? entry.baseFacts : null;
     if (base) {
-      this.applyFacts(entry.label, base, { amountG: entry.amountG ?? DEFAULT_AMOUNT_G, unit: entry.unit });
+      this.applyFacts(entry.label, base, { amountG: entry.amountG ?? DEFAULT_AMOUNT_G, unit: entry.unit, brand: entry.brand });
       return;
     }
     // entry.facts gelten für alle Portionen -> auf eine Portion zurückrechnen.
     this.applyFacts(entry.label, perServingFacts(entry.facts, entry.servings), {
       servings: entry.servings,
+      brand: entry.brand,
       recipeId: entry.ref?.kind === 'recipe' ? entry.ref.recipeId : undefined,
       isPartial: entry.isPartial,
     });
@@ -697,6 +695,7 @@ export class DiaryPage implements OnDestroy {
         dateISO: this.selectedDate(),
         meal: this.form.meal,
         label: entry.label,
+        brand: entry.brand,
         ref: entry.ref,
         amountG: entry.amountG,
         servings: entry.servings,
@@ -815,6 +814,7 @@ export class DiaryPage implements OnDestroy {
     this.bcError.set(null);
     this.bcLooking.set(false);
     this.bcManualOpen.set(false);
+    this.bcNoCamera.set(false);
     this.bcOpen.set(true);
   }
 
@@ -831,16 +831,26 @@ export class DiaryPage implements OnDestroy {
     const video =
       this.barcodeVideo?.nativeElement ??
       (document.querySelector('video#barcodeVideo') as HTMLVideoElement | null);
-    if (!video || !this.barcode.isSupported()) return;
+    if (!video || !this.barcode.isSupported()) {
+      this.showBarcodeWithoutCamera();
+      return;
+    }
     try {
       this.scanControls = await this.barcode.start(
         video,
         (code) => this.lookupBarcode(code),
-        () => this.bcError.set('Kamerazugriff fehlgeschlagen — gib den Code manuell ein.'),
+        () => this.showBarcodeWithoutCamera('Kamerazugriff fehlgeschlagen — gib den Code manuell ein.'),
       );
     } catch {
-      this.bcError.set('Kamera nicht verfügbar — gib den Code manuell ein.');
+      this.showBarcodeWithoutCamera('Kamera nicht verfügbar — gib den Code manuell ein.');
     }
+  }
+
+  /** Ohne Kamera: Rahmen und Anleitung ausblenden, Code-Eingabe offen zeigen. */
+  private showBarcodeWithoutCamera(message?: string): void {
+    this.bcNoCamera.set(true);
+    this.bcManualOpen.set(true);
+    if (message) this.bcError.set(message);
   }
 
   /** ion-modal didDismiss → Kamera/Scanner freigeben. */
@@ -929,6 +939,7 @@ export class DiaryPage implements OnDestroy {
       dateISO: this.selectedDate(),
       meal: this.form.meal,
       label,
+      brand: this.pickedBrand,
       ref: recipeId ? { kind: 'recipe', recipeId } : undefined,
       servings: isPortion ? (this.form.servings ?? 1) : undefined,
       amountG: this.baseAmount ?? undefined,
@@ -960,6 +971,8 @@ export class DiaryPage implements OnDestroy {
     this.editUnit = entry.unit ?? 'g';
     // Manuelle Einträge mit Menge bekommen eine abgeleitete Basis, damit die Menge änderbar ist.
     this.editBaseFacts = editBaseFor(entry);
+    this.editMode = editModeFor(entry, this.editBaseFacts);
+    this.editServings = this.editMode === 'portion' ? (entry.servings ?? 1) : null;
     this.editForm = {
       label: entry.label,
       meal: entry.meal,
@@ -976,9 +989,17 @@ export class DiaryPage implements OnDestroy {
 
   saveEdit(): void {
     if (!this.editEntry) return;
+    if (this.editMode === 'portion') {
+      this.savePortionEdit(this.editEntry);
+      return;
+    }
     const editBase = this.editForm.amountG == null ? null : toBaseAmount(this.editForm.amountG, this.editUnit);
     if (this.editBaseFacts && !isValidAmount(editBase)) {
       this.editError = 'Die Menge fehlt — gib eine Menge größer als 0 ein.';
+      return;
+    }
+    if (this.editMode === 'optional' && editBase != null && !isValidAmount(editBase)) {
+      this.editError = 'Die Menge muss größer als 0 sein — oder lass das Feld leer.';
       return;
     }
     const patch: Parameters<typeof this.diary.update>[1] = {
@@ -992,7 +1013,28 @@ export class DiaryPage implements OnDestroy {
       const isDerivedBase = !this.editEntry.baseFacts;
       if (isDerivedBase && editBase !== this.editEntry.amountG) patch.baseFacts = this.editBaseFacts;
     }
+    if (this.editMode === 'optional' && isValidAmount(editBase)) {
+      // Nur Anzeige-Menge: ohne Bezugswerte bleiben die Nährwerte unverändert.
+      patch.amountG = editBase;
+      patch.unit = this.editUnit;
+    }
     this.diary.update(this.editEntry.id, patch);
+    this.closeEdit();
+  }
+
+  /** Portionen ändern: Nährwerte neu skaliert, Eintrag bleibt (id, createdAt, Reihenfolge). */
+  private savePortionEdit(entry: DiaryEntry): void {
+    if (!isValidAmount(this.editServings)) {
+      this.editError = 'Die Portionen fehlen — gib eine Zahl größer als 0 ein.';
+      return;
+    }
+    const next = withServings(entry, this.editServings);
+    this.diary.update(entry.id, {
+      label: this.editForm.label.trim() || entry.label,
+      meal: this.editForm.meal,
+      servings: next.servings,
+      facts: next.facts,
+    });
     this.closeEdit();
   }
 
@@ -1006,19 +1048,7 @@ export class DiaryPage implements OnDestroy {
   remove(entry: DiaryEntry): void {
     this.diary.remove(entry.id);
     void this.showToast(`„${entry.label}“ gelöscht`, () => {
-      this.diary.add({
-        dateISO: entry.dateISO,
-        meal: entry.meal,
-        label: entry.label,
-        ref: entry.ref,
-        amountG: entry.amountG,
-        servings: entry.servings,
-        facts: entry.facts,
-        baseFacts: entry.baseFacts,
-        isEstimate: entry.isEstimate,
-        isPartial: entry.isPartial,
-        unit: entry.unit,
-      });
+      this.diary.add(entryToInput(entry));
     });
   }
 

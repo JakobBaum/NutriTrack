@@ -67,3 +67,31 @@ describe('mergeKept mit manueller Position ohne Menge', () => {
     expect(mergeKept(prev, generated)[0].amount).toBe(500);
   });
 });
+
+describe('mergeKept übernimmt Preis und Kategorie der generierten Position', () => {
+  it('füllt estPrice und category, wenn die behaltene manuelle Position keine hat', () => {
+    const prev: ShoppingItem[] = [{ name: 'Reis', amount: 0, unit: 'g', checked: false }];
+    const generated: ShoppingItem[] = [
+      { name: 'Reis', amount: 300, unit: 'g', checked: false, estPrice: 1.2, category: 'Trockenware/Nudeln/Reis' },
+    ];
+
+    const [merged] = mergeKept(prev, generated);
+
+    expect(merged.estPrice).toBe(1.2);
+    expect(merged.category).toBe('Trockenware/Nudeln/Reis');
+  });
+
+  it('skaliert den Preis auf die behaltene Menge', () => {
+    const prev: ShoppingItem[] = [{ name: 'Reis', amount: 600, unit: 'g', checked: false }];
+    const generated: ShoppingItem[] = [{ name: 'Reis', amount: 300, unit: 'g', checked: false, estPrice: 1.2 }];
+
+    expect(mergeKept(prev, generated)[0].estPrice).toBe(2.4);
+  });
+
+  it('behält eigene Kategorie und eigenen Preis einer abgehakten Position', () => {
+    const prev: ShoppingItem[] = [{ name: 'Reis', amount: 500, unit: 'g', checked: true, estPrice: 9, category: 'Sonstiges' }];
+    const generated: ShoppingItem[] = [{ name: 'Reis', amount: 300, unit: 'g', checked: false, estPrice: 1.2, category: 'Obst & Gemüse' }];
+
+    expect(mergeKept(prev, generated)[0]).toMatchObject({ estPrice: 9, category: 'Sonstiges' });
+  });
+});

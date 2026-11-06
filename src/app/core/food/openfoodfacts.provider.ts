@@ -9,13 +9,16 @@ import { toFoodLookupError } from './food-errors';
 import { SettingsStore } from '../state/settings.store';
 import { environment } from '../../../environments/environment';
 import { DebugLogService } from '../debug/debug-log.service';
+import {
+  RankEntry, dedupe, normalizeBrand, normalizeQuantity, rank, removeBrandFromName, stripSize,
+} from './food-search-clean';
 
 // Freitextsuche: dev → Angular-Dev-Proxy; prod → NutriTrack-Worker (search.openfoodfacts.org
 // sendet keine CORS-Header). Eine eigene proxyUrl in den Einstellungen hat Vorrang.
 const SEARCH_URL_DEFAULT = environment.offSearchUrl;
 // Barcode exakt über Product Opener v3 (hat CORS *).
 const PRODUCT_V3_URL = 'https://world.openfoodfacts.org/api/v3/product';
-const FIELDS = 'code,product_name,brands,image_url,image_small_url,nutriments,serving_quantity';
+const FIELDS = 'code,product_name,brands,image_url,image_small_url,nutriments,serving_quantity,quantity,nutriscore_grade,categories_tags';
 const SEARCH_FIELDS = `${FIELDS},lang,countries_tags`;
 const LANGS = 'de,en';
 // Mehr Kandidaten holen, damit nach dem DACH-Ranking genug passende übrig bleiben.
@@ -39,6 +42,9 @@ interface OffProduct {
   image_url?: string;
   image_small_url?: string;
   serving_quantity?: number | string;
+  quantity?: string;
+  nutriscore_grade?: string;
+  categories_tags?: string[];
   nutriments?: OffNutriments;
   lang?: string;
   countries_tags?: string[];
@@ -61,14 +67,6 @@ function isNotFound(e: unknown): boolean {
 function localeScore(p: OffProduct): number {
   const soldInDach = (p.countries_tags ?? []).some((c) => DACH_COUNTRIES.has(c));
   return (soldInDach ? 2 : 0) + (p.lang === 'de' ? 1 : 0);
-}
-
-/** Stabile Sortierung nach {@link localeScore}; Originalreihenfolge bleibt bei Gleichstand. */
-function rankForDach(products: readonly OffProduct[]): OffProduct[] {
-  return products
-    .map((p, i) => ({ p, i, s: localeScore(p) }))
-    .sort((a, b) => b.s - a.s || a.i - b.i)
-    .map(({ p }) => p);
 }
 
 /**
@@ -104,10 +102,11 @@ export class OpenFoodFactsProvider implements FoodProvider {
           },
         }),
       );
-      const items = rankForDach(res.hits ?? [])
-        .map((p) => this.toFoodItem(p))
-        .filter((f): f is FoodItem => f !== null)
-        .slice(0, limit);
+      const entries = (res.hits ?? []).flatMap((p): RankEntry[] => {
+        const item = this.toFoodItem(p);
+        return item ? [{ item, locale: localeScore(p), categories: p.categories_tags }] : [];
+      });
+      const items = dedupe(rank(entries, q).map((e) => e.item)).slice(0, limit);
       this.log.success(`✓ ${items.length} Treffer für "${q}"`);
       return items;
     } catch (e: unknown) {
@@ -157,8 +156,14 @@ export class OpenFoodFactsProvider implements FoodProvider {
   }
 
   private toFoodItem(p: OffProduct): FoodItem | null {
-    const name = (p.product_name ?? '').trim();
-    if (!name) return null;
+    const rawName = (p.product_name ?? '').trim();
+    if (!rawName) return null;
+    const stripped = stripSize(rawName);
+    const brand = normalizeBrand(p.brands, stripped.name);
+    const name = removeBrandFromName(stripped.name, brand);
+    const quantity = normalizeQuantity(p.quantity) ?? stripped.quantity;
+    const grade = (p.nutriscore_grade ?? '').toLowerCase();
+    const nutriscore = /^[a-e]$/.test(grade) ? (grade as FoodItem['nutriscore']) : undefined;
     const n = p.nutriments ?? {};
     const kcal = this.kcalPer100g(n);
     if (kcal === null) return null;
@@ -176,11 +181,13 @@ export class OpenFoodFactsProvider implements FoodProvider {
       id: makeId('off'),
       source: 'openfoodfacts',
       name,
-      brand: Array.isArray(p.brands) ? p.brands[0] : p.brands?.split(',')[0]?.trim(),
+      brand,
       barcode: p.code,
       facts,
       servingG: p.serving_quantity ? this.num(p.serving_quantity) : undefined,
       imageUrl: p.image_small_url || p.image_url,
+      quantity,
+      nutriscore,
     };
   }
 }
