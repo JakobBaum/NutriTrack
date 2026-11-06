@@ -6,6 +6,8 @@ import {
   categoryOf,
   decodeIndexes,
   defaultPersons,
+  defaultPersonsInRange,
+  scaleRecipeIngredients,
   encodeIndexes,
   formatAmount,
   formatShareText,
@@ -132,5 +134,27 @@ describe('sortCategories / categoryLabel', () => {
   it('ersetzt Schrägstriche durch Kommas', () => {
     expect(categoryLabel('Trockenware/Nudeln/Reis')).toBe('Trockenware, Nudeln, Reis');
     expect(categoryLabel('Obst & Gemüse')).toBe('Obst & Gemüse');
+  });
+});
+
+describe('scaleRecipeIngredients', () => {
+  it('skaliert auf die Personenzahl und markiert als eigene Position', () => {
+    const items = scaleRecipeIngredients(
+      { servings: 2, ingredients: [{ name: ' Mehl ', amount: 200, unit: 'g' }, { name: '', amount: 1, unit: 'g' }] },
+      3,
+    );
+    expect(items).toEqual([{ name: 'Mehl', amount: 300, unit: 'g', checked: false, manual: true }]);
+  });
+
+  it('behandelt ungültige Portionen wie 1', () => {
+    const items = scaleRecipeIngredients({ servings: 0, ingredients: [{ name: 'Reis', amount: 100, unit: 'g' }] }, 2);
+    expect(items[0].amount).toBe(200);
+  });
+});
+
+describe('defaultPersonsInRange', () => {
+  it('begrenzt die Vorbelegung auf den Stepper-Bereich', () => {
+    expect(defaultPersonsInRange({ householdSize: 12 })).toBe(8);
+    expect(defaultPersonsInRange(null, 3)).toBe(3);
   });
 });

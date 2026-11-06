@@ -1,0 +1,49 @@
+:host {
+  display: inline-block;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--nt-space-2);
+
+  &__btn {
+    width: var(--nt-touch, 44px);
+    height: var(--nt-touch, 44px);
+    border: none;
+    border-radius: var(--nt-radius-pill);
+    background: var(--nt-accent-tint);
+    color: var(--nt-accent);
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+    &:focus-visible {
+      outline: 2px solid var(--nt-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  &__value {
+    min-width: 72px;
+    text-align: center;
+    font-size: var(--nt-fs-headline);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--nt-ink);
+
+    &--empty {
+      color: var(--nt-secondary);
+    }
+  }
+
+  &__unit {
+    font-size: var(--nt-fs-body);
+    font-weight: 500;
+    color: var(--nt-secondary);
+  }
+}

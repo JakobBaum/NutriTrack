@@ -4,7 +4,7 @@ import { MealType, NutritionFacts } from '../core/models';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { formatNum } from '../shared/num.pipe';
-import { addDaysISO, dayLabel, toDateISO } from '../core/util/date';
+import { dayLabel, toDateISO } from '../core/util/date';
 import { MEAL_DEFS, mealForHour, mealLabel } from '../diary/diary-helpers';
 
 interface MacroView {
@@ -66,12 +66,6 @@ export class DashboardPage {
   readonly selectedDate = signal(toDateISO());
   readonly dateLabel = computed(() => dayLabel(this.selectedDate()));
   readonly isToday = computed(() => this.selectedDate() === toDateISO());
-  /** Ausgeschriebenes Datum fuer die Navigationsleiste, z.B. "Donnerstag, 5. November". */
-  readonly fullDate = computed(() =>
-    new Intl.DateTimeFormat('de-AT', { weekday: 'long', day: 'numeric', month: 'long' }).format(
-      new Date(`${this.selectedDate()}T12:00:00`),
-    ),
-  );
 
   readonly hasProfile = this.profileStore.hasProfile;
   readonly target = this.profileStore.target;
@@ -168,12 +162,8 @@ export class DashboardPage {
   openDrill(key: string): void { this.drillMacro.set(key); }
   closeDrill(): void { this.drillMacro.set(null); }
 
-  prevDay(): void {
-    this.selectedDate.update((d) => addDaysISO(d, -1));
-  }
-
-  nextDay(): void {
-    this.selectedDate.update((d) => addDaysISO(d, 1));
+  setDate(dateISO: string): void {
+    this.selectedDate.set(dateISO);
   }
 
   openSettings(): void {

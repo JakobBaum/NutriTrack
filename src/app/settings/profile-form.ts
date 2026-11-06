@@ -14,7 +14,7 @@ const RANGES: Record<ProfileField, { min: number; max: number }> = {
   weightKg: { min: 30, max: 300 },
   heightCm: { min: 100, max: 250 },
   age: { min: 14, max: 100 },
-  rateKgPerWeek: { min: 0.1, max: 1.5 },
+  rateKgPerWeek: { min: 0.1, max: 0.75 },
 };
 
 /** Reihenfolge der Felder im Formular (für den Fokus auf das erste fehlerhafte Feld). */

@@ -20,6 +20,8 @@ export class DiarySearch {
   /** True, wenn die letzte Suche keinen Treffer hatte (zeigt „Manuell eintragen“). */
   readonly noResults = signal(false);
   readonly debounceMs = SEARCH_DEBOUNCE_MS;
+  /** Suchbegriff, zu dem die aktuellen Treffer gehören. */
+  private resultsQuery = '';
   private seq = 0;
 
   constructor(
@@ -32,6 +34,7 @@ export class DiarySearch {
   reset(): void {
     this.query = '';
     this.results.set([]);
+    this.resultsQuery = '';
     this.hint.set(null);
     this.noResults.set(false);
   }
@@ -56,6 +59,14 @@ export class DiarySearch {
     void this.run();
   }
 
+  /** Enter im Suchfeld: erster Treffer zum aktuellen Begriff (sucht bei Bedarf zuerst); null ohne Treffer. */
+  async pickFirst(): Promise<FoodItem | null> {
+    const q = this.query.trim();
+    if (this.searching() || this.resultsQuery !== q) await this.run();
+    if (this.resultsQuery !== q) return null;
+    return this.results()[0] ?? null;
+  }
+
   async run(): Promise<void> {
     const q = this.query.trim();
     if (q.length < MIN_SEARCH_CHARS) return;
@@ -68,6 +79,7 @@ export class DiarySearch {
       const results = await this.food.searchByText(q);
       if (seq !== this.seq) return;
       this.results.set(results);
+      this.resultsQuery = q;
       if (results.length === 0) {
         this.hint.set(`Keine Treffer für „${q}“ — prüfe die Schreibweise.`);
         this.noResults.set(true);

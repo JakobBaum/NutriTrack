@@ -1,6 +1,6 @@
 // Rezepte: anlegen mit 1,5 Portionen Ergiebigkeit, ins Tagebuch loggen (Rezeptseite und halbe Portion im Tagebuch).
 import { assert, eventually, go, readStore, settle } from '../lib/harness.mjs';
-import { amountInput, fillAndBlur, pickActionSheet, topModal } from '../lib/ionic.mjs';
+import { amountInput, fillAndBlur, pickActionSheet, stepTo, topModal } from '../lib/ionic.mjs';
 import { seed } from '../lib/fixtures.mjs';
 
 const TITLE = 'E2E Linsentopf';
@@ -19,7 +19,7 @@ async function createRecipe(page) {
   await modal.locator('.ing-facts-toggle').first().click();
   await fillAndBlur(byAria(modal, 'kcal je 100g'), '100');
   await fillAndBlur(byAria(modal, 'Eiweiß je 100g'), '24,5');
-  await fillAndBlur(byAria(modal, 'Ergibt Portionen'), '1,5');
+  await stepTo(modal, 'Ergibt Portionen', { start: 2, step: 0.5, target: 1.5 });
   await modal.locator('.save-btn').click();
   await settle(page);
 }
@@ -35,7 +35,7 @@ export function register({ test }) {
 
     const card = page.locator('article.recipe', { hasText: TITLE });
     await assert.match(await card.innerText(), /1,5 Portionen/);
-    await card.locator('ion-button', { hasText: 'Tagebuch' }).click();
+    await card.locator('ion-button', { hasText: 'Eintragen' }).click();
     await pickActionSheet(page, 'Mittagessen');
     await pickActionSheet(page, '0,5 Portionen');
     const logged = await eventually(async () => {

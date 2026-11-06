@@ -1,4 +1,5 @@
 import { ShoppingItem } from '../models';
+import { ONION_PIECE_G, UNIT_WEIGHT_G } from '../nutrition/units-weight';
 
 /** Eine Rundungsregel auf einkaufbare Packungsgrößen. */
 interface PackRule {
@@ -18,7 +19,7 @@ const RULES: readonly PackRule[] = [
   { keywords: ['passierte', 'passata', 'gehackte tomaten'], kind: 'pack', packs: [500, 700] },
   { keywords: ['reis'], kind: 'pack', packs: [500] },
   { keywords: ['mehl', 'zucker'], kind: 'pack', packs: [1000] },
-  { keywords: ['zwiebel'], kind: 'piece', gramsPerPiece: 100 },
+  { keywords: ['zwiebel'], kind: 'piece', gramsPerPiece: ONION_PIECE_G },
   { keywords: ['milch'], exclude: ['kokos', 'schoko'], kind: 'liter' },
 ];
 
@@ -50,8 +51,8 @@ function roundByRule(rule: PackRule, amount: number, unit: string): Rounded | nu
     return { amount: next, unit: 'l', factor: next / liters };
   }
   if (rule.kind === 'piece' && unit === 'g') {
-    const pieces = Math.ceil(amount / (rule.gramsPerPiece ?? 100) - 1e-9);
-    return { amount: pieces, unit: 'Stk', factor: (pieces * (rule.gramsPerPiece ?? 100)) / amount };
+    const pieces = Math.ceil(amount / (rule.gramsPerPiece ?? UNIT_WEIGHT_G['Stk']) - 1e-9);
+    return { amount: pieces, unit: 'Stk', factor: (pieces * (rule.gramsPerPiece ?? UNIT_WEIGHT_G['Stk'])) / amount };
   }
   return null;
 }

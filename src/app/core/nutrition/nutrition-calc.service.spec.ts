@@ -97,6 +97,27 @@ describe('NutritionCalcService', () => {
     expect(svc.isMinKcalApplied(male)).toBe(false);
   });
 
+  it('rechnet Tempo in tägliches Defizit um und deckelt bei 0,75 kg/Woche', () => {
+    expect(svc.dailyDeltaKcal(0.5)).toBe(550);
+    expect(svc.dailyDeltaKcal(0.25)).toBe(275);
+    expect(svc.dailyDeltaKcal(2)).toBe(svc.dailyDeltaKcal(0.75));
+    expect(svc.dailyTarget({ ...male, goal: 'lose', rateKgPerWeek: 2 }).kcal)
+      .toBe(svc.dailyTarget({ ...male, goal: 'lose', rateKgPerWeek: 0.75 }).kcal);
+  });
+
+  it('liefert das erreichte Tempo, wenn die Mindestzufuhr greift', () => {
+    const small: UserProfile = {
+      weightKg: 55, heightCm: 160, age: 30, sex: 'female',
+      activityLevel: 'sedentary', goal: 'lose', rateKgPerWeek: 0.5,
+      updatedAt: '2026-10-13T00:00:00.000Z',
+    };
+    const achieved = svc.achievedRateKgPerWeek(small);
+    expect(achieved).toBeLessThan(0.5);
+    expect(achieved).toBeGreaterThanOrEqual(0);
+    expect(svc.achievedRateKgPerWeek({ ...male, goal: 'lose', rateKgPerWeek: 0.5 })).toBeCloseTo(0.5, 2);
+    expect(svc.achievedRateKgPerWeek(male)).toBe(0);
+  });
+
   it('summiert mehrere Nährwert-Sätze', () => {
     const a: NutritionFacts = { kcal: 100, proteinG: 5, carbsG: 10, fatG: 2, fiberG: 1, basis: 'perPortion' };
     const b: NutritionFacts = { kcal: 150, proteinG: 8, carbsG: 12, fatG: 4, fiberG: 2, basis: 'perPortion' };

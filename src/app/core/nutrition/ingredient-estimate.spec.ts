@@ -19,15 +19,15 @@ describe('estimateIngredientFacts', () => {
   });
 
   it('rechnet Stück-Einheiten auf eine Einheit um (basis perPortion)', () => {
-    // Act — 1 Ei ~ 50 g
+    // Act — 1 Ei ~ 60 g
     const facts = estimateIngredientFacts('Eier', 'Stk');
 
     // Assert
     expect(facts).toBeDefined();
     expect(facts!.basis).toBe('perPortion');
-    expect(facts!.portionG).toBe(50);
-    // 155 kcal/100 g * 0.5 = ~78 kcal je Ei
-    expect(facts!.kcal).toBe(78);
+    expect(facts!.portionG).toBe(60);
+    // 155 kcal/100 g * 0.6 = ~93 kcal je Ei
+    expect(facts!.kcal).toBe(93);
   });
 
   it('nutzt Einheitsgewichte für EL/TL', () => {

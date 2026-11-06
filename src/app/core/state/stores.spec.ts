@@ -131,7 +131,8 @@ describe('ShoppingStore', () => {
 
   it('hakt Positionen ab und entfernt sie', () => {
     const shopping = TestBed.inject(ShoppingStore);
-    shopping.generate(1, 1); // Basis-Liste
+    shopping.addItem({ name: 'Reis', amount: 100, unit: 'g', checked: false });
+    shopping.addItem({ name: 'Brot', amount: 1, unit: 'Stk', checked: false });
     const count = shopping.list()!.items.length;
     shopping.toggleItem(0);
     expect(shopping.list()!.items[0].checked).toBe(true);

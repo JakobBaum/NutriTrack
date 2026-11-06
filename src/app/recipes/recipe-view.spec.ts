@@ -6,7 +6,11 @@ import {
   hasApproxUnits,
   isAiOrigin,
   isUnknownUnit,
+  importBlockReason,
+  importErrorMessage,
   isValidYield,
+  moreUnits,
+  unitChips,
   lowerBoundNote,
   optionalGramsLabel,
   scaleFacts,
@@ -109,5 +113,27 @@ describe('recipe-view — Ergibt/Essen/Hinweise', () => {
     expect(isUnknownUnit('EL', ['g', 'EL'])).toBe(false);
     expect(isUnknownUnit('zehe', ['g', 'EL'])).toBe(true);
     expect(isUnknownUnit('', ['g'])).toBe(false);
+  });
+});
+
+describe('Einheiten-Chips und Import-Texte', () => {
+  it('moreUnits liefert nur Einheiten ohne Chip', () => {
+    expect(moreUnits(['g', 'EL', 'Dose', 'Pck'], ['g', 'EL'])).toEqual(['Dose', 'Pck']);
+  });
+  it('unitChips hängt eine nicht-gängige aktuelle Einheit an', () => {
+    expect(unitChips('Dose', ['g', 'EL'])).toEqual(['g', 'EL', 'Dose']);
+    expect(unitChips('g', ['g', 'EL'])).toEqual(['g', 'EL']);
+  });
+  it('importBlockReason ist bei leerer Eingabe gesetzt', () => {
+    expect(importBlockReason(' ', '')).not.toBe('');
+    expect(importBlockReason('', 'https://x.test')).toBe('');
+  });
+  it('importErrorMessage nennt den echten Grund', () => {
+    expect(importErrorMessage(new Error('Gemini ist gerade überlastet (503)'))).toMatch(/503/);
+    expect(importErrorMessage(new Error('KI-Proxy 429: quota'))).toMatch(/429/);
+    expect(importErrorMessage(new Error('KI-Proxy nicht erreichbar (x)'))).toMatch(/Keine Verbindung/);
+    expect(importErrorMessage(new Error('x'), true)).toMatch(/Keine Verbindung/);
+    expect(importErrorMessage(new Error('Keine Zutaten erkannt.'))).toContain('Keine Zutaten erkannt.');
+    expect(importErrorMessage(null)).toMatch(/unbekannt/);
   });
 });

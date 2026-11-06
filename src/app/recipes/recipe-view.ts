@@ -90,3 +90,30 @@ export function isUnknownUnit(unit: string, options: readonly string[]): boolean
 
 /** Häufige Einheiten als 1-Tipp-Chips neben der Auswahl. */
 export const QUICK_UNITS: readonly string[] = ['g', 'ml', 'EL', 'TL', 'Stk'];
+
+/** Einheiten für „weitere“ im Action-Sheet: alles aus der Auswahl, was nicht schon als Chip sichtbar ist. */
+export function moreUnits(options: readonly string[], quick: readonly string[]): string[] {
+  return options.filter((u) => !quick.includes(u));
+}
+
+/** Chips je Zutat: die Schnell-Einheiten plus die aktuelle Einheit, falls sie nicht dazugehört (z. B. „Dose“). */
+export function unitChips(current: string, quick: readonly string[]): string[] {
+  const unit = (current ?? '').trim();
+  return unit && !quick.includes(unit) ? [...quick, unit] : [...quick];
+}
+
+/** Warum „Importieren“ noch nicht geht (leer = es geht). */
+export function importBlockReason(text: string, url: string): string {
+  return text.trim() || url.trim() ? '' : 'Füge einen Rezept-Text ein.';
+}
+
+/** Konkreter Grund eines fehlgeschlagenen Imports (503 / 429 / Netzwerk) statt einer Sammelmeldung. */
+export function importErrorMessage(e: unknown, isOffline = false): string {
+  const raw = e instanceof Error ? e.message : '';
+  if (isOffline || /failed to fetch|networkerror|load failed|nicht erreichbar/i.test(raw)) {
+    return 'Keine Verbindung zur KI — Internet und KI-Verbindung prüfen.';
+  }
+  if (/\b503\b|überlastet/i.test(raw)) return 'Die KI ist gerade überlastet (503) — bitte in ein paar Sekunden erneut versuchen.';
+  if (/\b429\b|zu viele|rate/i.test(raw)) return 'Zu viele KI-Anfragen (429) — bitte kurz warten und erneut versuchen.';
+  return raw ? `Import fehlgeschlagen: ${raw}` : 'Import fehlgeschlagen, Grund unbekannt.';
+}

@@ -1,16 +1,6 @@
 <ion-header class="ion-no-border">
   <ion-toolbar>
-    <ion-buttons slot="start">
-      <ion-button class="touch-btn" (click)="prevDay()" aria-label="Vorheriger Tag">
-        <ion-icon slot="icon-only" name="chevron-back-outline"></ion-icon>
-      </ion-button>
-    </ion-buttons>
-    <ion-title class="nav-date">{{ fullDate() }}</ion-title>
-    <ion-buttons slot="end">
-      <ion-button class="touch-btn" (click)="nextDay()" [disabled]="isToday()" aria-label="Nächster Tag">
-        <ion-icon slot="icon-only" name="chevron-forward-outline"></ion-icon>
-      </ion-button>
-    </ion-buttons>
+    <nt-date-nav [date]="selectedDate()" [full]="true" (dateChange)="setDate($event)"></nt-date-nav>
   </ion-toolbar>
 </ion-header>
 

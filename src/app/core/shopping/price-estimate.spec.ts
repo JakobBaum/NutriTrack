@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildShoppingList, buildWeekPlan, estimatePrice, priceItems } from './shopping-generator';
-import { Recipe, ShoppingItem } from '../models';
-
-const item = (amount: number, unit: string): ShoppingItem => ({ name: 'X', amount, unit, checked: false });
+import { buildShoppingList, buildWeekPlan } from './shopping-generator';
+import { Recipe } from '../models';
 
 function recipe(partial: Partial<Recipe>): Recipe {
   return {
@@ -11,54 +9,6 @@ function recipe(partial: Partial<Recipe>): Recipe {
     ...partial,
   };
 }
-
-// Randfälle der lokalen Preis-Schätzung.
-describe('estimatePrice — Randfälle', () => {
-  it('rechnet je Einheit', () => {
-    expect(estimatePrice(item(250, 'g'))).toBe(1);
-    expect(estimatePrice(item(2, 'kg'))).toBe(8);
-    expect(estimatePrice(item(500, 'ml'))).toBe(1.5);
-    expect(estimatePrice(item(1.5, 'l'))).toBe(3.75);
-    expect(estimatePrice(item(3, ' Stück '))).toBe(1.8);
-    expect(estimatePrice(item(2, 'Zehe'))).toBe(0.2);
-    expect(estimatePrice(item(1, 'Bund'))).toBe(0.5);
-  });
-
-  it('setzt einen Mindestpreis von 0,10 € bei 0 oder negativen Mengen', () => {
-    expect(estimatePrice(item(0, 'g'))).toBe(0.1);
-    expect(estimatePrice(item(-5, 'kg'))).toBe(0.1);
-  });
-
-  it('wendet den Marktfaktor unabhängig von Groß-/Leerzeichen an', () => {
-    expect(estimatePrice(item(250, 'g'), ' LIDL ')).toBe(0.9);
-    expect(estimatePrice(item(250, 'g'), 'Spar')).toBe(1.08);
-    expect(estimatePrice(item(250, 'g'), 'Unbekannt')).toBe(1);
-    expect(estimatePrice(item(250, 'g'), '')).toBe(1);
-  });
-
-  it('bleibt bei großen Mengen endlich', () => {
-    expect(estimatePrice(item(1e9, 'g'))).toBe(4e6);
-  });
-
-  // BUG: Math.max(0.1, NaN) = NaN → Position bekommt NaN-Preis.
-  // shopping-generator.ts:171 — Eingabe: amount NaN; erwartet: 0,1 €, tatsächlich: NaN.
-  it('liefert bei NaN-Menge den Mindestpreis', () => {
-    expect(estimatePrice(item(Number.NaN, 'g'))).toBe(0.1);
-  });
-});
-
-describe('priceItems — Randfälle', () => {
-  it('liefert 0 € für eine leere Liste', () => {
-    expect(priceItems([])).toEqual({ items: [], estTotal: 0 });
-  });
-
-  it('verändert die Eingabe nicht', () => {
-    const input = [item(250, 'g')];
-    const { items } = priceItems(input, 'Hofer');
-    expect(input[0].estPrice).toBeUndefined();
-    expect(items[0].estPrice).toBe(0.9);
-  });
-});
 
 describe('buildShoppingList / buildWeekPlan — Randfälle', () => {
   it('rundet die Gerichteanzahl ab', () => {

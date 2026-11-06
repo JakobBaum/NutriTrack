@@ -7,9 +7,10 @@ import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { RecipeStore } from '../core/state/recipe.store';
 import { MealsStore } from '../core/state/meals.store';
-import { formatDecimal, parseDecimal } from '../core/util/number-input';
+import { formatDecimal } from '../core/util/number-input';
 import { StorageService } from '../core/storage/storage.service';
-import { NutritionCalcService } from '../core/nutrition/nutrition-calc.service';
+import { MAX_RATE_KG_PER_WEEK, NutritionCalcService } from '../core/nutrition/nutrition-calc.service';
+import { aiConnection, aiStatusLabel, modelOptions } from './ai-status';
 import { CustomFoodStore } from '../core/state/custom-food.store';
 import { SettingsStore } from '../core/state/settings.store';
 import { ShoppingStore } from '../core/state/shopping.store';
@@ -23,8 +24,17 @@ import { BackupFile, countBackup, describeCounts, formatBackupDate } from '../co
  * Einstellungen: Profil erfassen → Tagesbedarf berechnen (deterministisch),
  * KI-Anbieter konfigurieren (lokal gespeichert) und Daten zurücksetzen.
  */
-/** Ab diesem Tempo (kg/Woche) zeigt das Formular eine Warnung. */
-const RATE_WARN_KG_PER_WEEK = 0.75;
+/** Wählbare Tempi (kg/Woche); das größte entspricht dem Deckel der Berechnung. */
+const RATE_CHOICES: readonly number[] = [0.25, 0.5, MAX_RATE_KG_PER_WEEK];
+const DEFAULT_RATE = 0.5;
+/** Kleinste Schrittweite beim Angebot „niedrigeres Tempo“. */
+const RATE_OFFER_STEP = 0.05;
+const MIN_RATE = 0.1;
+
+function nearestRate(value: number | null | undefined): number {
+  if (value === null || value === undefined || !Number.isFinite(value)) return DEFAULT_RATE;
+  return RATE_CHOICES.reduce((best, r) => (Math.abs(r - value) < Math.abs(best - value) ? r : best), DEFAULT_RATE);
+}
 
 @Component({
   selector: 'app-settings',
@@ -43,7 +53,6 @@ export class SettingsPage implements OnInit {
   private readonly shopping = inject(ShoppingStore);
   private readonly savedMeals = inject(MealsStore);
   private readonly storage = inject(StorageService);
-  readonly parseDecimal = parseDecimal;
   readonly formatDecimal = formatDecimal;
   private readonly calc = inject(NutritionCalcService);
   private readonly alertCtrl = inject(AlertController);
@@ -79,7 +88,17 @@ export class SettingsPage implements OnInit {
   sex: Sex = this.existing?.sex ?? 'male';
   activityLevel: ActivityLevel = this.existing?.activityLevel ?? 'moderate';
   goal: Goal = this.existing?.goal ?? 'maintain';
-  rateKgPerWeek: number | null = this.existing?.rateKgPerWeek ?? 0.5;
+  rateKgPerWeek: number | null = this.existing?.goal && this.existing.goal !== 'maintain'
+    ? (this.existing.rateKgPerWeek !== undefined && this.existing.rateKgPerWeek <= MAX_RATE_KG_PER_WEEK && this.existing.rateKgPerWeek >= MIN_RATE
+        ? this.existing.rateKgPerWeek
+        : nearestRate(this.existing.rateKgPerWeek))
+    : DEFAULT_RATE;
+  readonly rateChoices = RATE_CHOICES;
+  readonly modelChoices = modelOptions(this.settingsStore.ai().model);
+
+  /** Aktive KI-Verbindung (gespeicherter Stand) und ihre Beschriftung für die Zeile. */
+  readonly aiState = computed(() => aiConnection(this.settingsStore.ai()));
+  readonly aiStatus = computed(() => aiStatusLabel(this.aiState()));
 
   // --- KI-Konfiguration (Kopie zum Bearbeiten) ---
   ai: AiConfig = { ...this.settingsStore.ai() };
@@ -104,10 +123,6 @@ export class SettingsPage implements OnInit {
     { value: 'gain', label: 'Zunehmen' },
   ];
 
-  readonly providers = [
-    { value: 'mock', label: 'Demo (ohne KI)' },
-    { value: 'gemini', label: 'Gemini direkt (eigener Key)' },
-  ];
 
   /** Felder, die der Nutzer schon verlassen hat (Fehler erst danach zeigen). */
   touched: Partial<Record<ProfileField, boolean>> = {};
@@ -124,22 +139,58 @@ export class SettingsPage implements OnInit {
     return p !== null && this.calc.isMinKcalApplied(p);
   }
 
-  /** Formular (falls vollstaendig) ergibt ein Ziel unter der Mindestzufuhr. */
-  get formMinKcalApplied(): boolean {
+  /** Profil aus dem Formular, sofern Gewicht, Größe und Alter gesetzt sind. */
+  private formProfile(): UserProfile | null {
     const w = Number(this.weightKg), h = Number(this.heightCm), a = Number(this.age);
-    if (![w, h, a].every((n) => Number.isFinite(n) && n > 0)) return false;
+    if (this.weightKg === null || this.heightCm === null || this.age === null) return null;
+    if (![w, h, a].every((n) => Number.isFinite(n) && n > 0)) return null;
     const rate = this.showRate ? Number(this.rateKgPerWeek) : 0;
-    return this.calc.isMinKcalApplied({
+    return {
       weightKg: w, heightCm: h, age: a, sex: this.sex, activityLevel: this.activityLevel,
       goal: this.goal, rateKgPerWeek: Number.isFinite(rate) ? rate : 0, updatedAt: '',
-    });
+    };
   }
 
-  /** Warnung bei zu schnellem Tempo. */
-  get rateWarning(): boolean {
-    return this.showRate && Number(this.rateKgPerWeek) > RATE_WARN_KG_PER_WEEK;
+  /** Formular (falls vollständig) ergibt ein Ziel unter der Mindestzufuhr. */
+  get formMinKcalApplied(): boolean {
+    const p = this.formProfile();
+    return p !== null && this.calc.isMinKcalApplied(p);
   }
 
+  /** Tägliches Defizit/Überschuss zum gewählten Tempo, z. B. „≈ −550 kcal/Tag“. */
+  get rateDeltaLabel(): string {
+    const kcal = this.calc.dailyDeltaKcal(Number(this.rateKgPerWeek) || 0);
+    return `≈ ${this.goal === 'lose' ? '−' : '+'}${kcal} kcal/Tag`;
+  }
+
+  /** Erreichtes Tempo bei aktiver Mindestzufuhr, z. B. „0,3“ (kg/Woche). */
+  get achievedRateText(): string {
+    const p = this.formProfile();
+    return p ? formatDecimal(Math.round(this.calc.achievedRateKgPerWeek(p) * 10) / 10) || '0' : '';
+  }
+
+  /** Niedrigeres Tempo, das ohne Mindestzufuhr funktioniert (null = keines möglich). */
+  get lowerRateOffer(): number | null {
+    const p = this.formProfile();
+    if (!p) return null;
+    const achieved = this.calc.achievedRateKgPerWeek(p);
+    const offer = Math.floor(achieved / RATE_OFFER_STEP) * RATE_OFFER_STEP;
+    return offer >= MIN_RATE ? Math.round(offer * 100) / 100 : null;
+  }
+
+  /** Aus der Anleitung direkt zur KI-Verbindung wechseln. */
+  openAiFromGuide(): void {
+    this.infoSection.set(null);
+    this.aiOpen.set(true);
+  }
+
+  setRate(rate: number): void {
+    this.rateKgPerWeek = rate;
+  }
+
+  setGoal(goal: Goal): void {
+    this.goal = goal;
+  }
   get showRate(): boolean {
     return this.goal !== 'maintain';
   }
@@ -165,12 +216,17 @@ export class SettingsPage implements OnInit {
     this.touched = { ...this.touched, [field]: true };
   }
 
+  /** Stepper-Wert übernehmen. */
+  setField(field: 'weightKg' | 'heightCm' | 'age', value: number): void {
+    this[field] = value;
+    this.markTouched(field);
+  }
+
   /** Fokussiert das erste fehlerhafte Feld (Reihenfolge wie im Formular). */
   private focusFirstInvalid(errors: ProfileFieldErrors): void {
     const first = PROFILE_FIELD_ORDER.find((f) => errors[f]);
     if (!first) return;
-    const el = this.win?.document.querySelector<HTMLIonInputElement>(`ion-input[data-field="${first}"]`);
-    void el?.setFocus();
+    this.win?.document.querySelector<HTMLElement>(`[data-field="${first}"] button`)?.focus();
   }
 
   saveProfile(): void {
@@ -199,7 +255,14 @@ export class SettingsPage implements OnInit {
   }
 
   saveAi(): void {
-    this.settingsStore.setAi({ ...this.ai });
+    const apiKey = this.ai.apiKey?.trim() ?? '';
+    // Anbieter ergibt sich aus der Eingabe: eigener Schlüssel -> Gemini, sonst keiner.
+    this.settingsStore.setAi({
+      ...this.ai,
+      proxyUrl: this.ai.proxyUrl?.trim() ?? '',
+      apiKey,
+      provider: apiKey ? 'gemini' : 'none',
+    });
     this.aiOpen.set(false);
     this.savedToast.set('KI-Einstellungen gespeichert.');
   }

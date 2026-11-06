@@ -1,0 +1,29 @@
+<div class="date-nav">
+  <button type="button" class="date-nav__step" (click)="shift(-1)" aria-label="Vorheriger Tag">
+    <ion-icon name="chevron-back-outline" aria-hidden="true"></ion-icon>
+  </button>
+  <button type="button" class="date-nav__label" (click)="pickerOpen.set(true)" [attr.aria-label]="'Datum wählen, aktuell ' + label()" aria-haspopup="dialog">
+    <span aria-live="polite">{{ label() }}</span>
+    <ion-icon name="calendar-outline" aria-hidden="true"></ion-icon>
+  </button>
+  <button type="button" class="date-nav__step" (click)="shift(1)" [disabled]="isToday()" aria-label="Nächster Tag">
+    <ion-icon name="chevron-forward-outline" aria-hidden="true"></ion-icon>
+  </button>
+</div>
+
+<ion-modal class="nt-date-modal" [isOpen]="pickerOpen()" [breakpoints]="[0, 1]" [initialBreakpoint]="1" (didDismiss)="pickerOpen.set(false)">
+  <ng-template>
+    <ion-datetime
+      presentation="date"
+      locale="de-AT"
+      [firstDayOfWeek]="1"
+      [value]="date()"
+      [max]="maxDate"
+      [showDefaultButtons]="true"
+      doneText="Übernehmen"
+      cancelText="Abbrechen"
+      (ionChange)="onPick($event.detail.value)"
+      (ionCancel)="pickerOpen.set(false)"
+    ></ion-datetime>
+  </ng-template>
+</ion-modal>

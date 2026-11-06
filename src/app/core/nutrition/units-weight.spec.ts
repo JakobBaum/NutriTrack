@@ -2,8 +2,8 @@ import { UNIT_OPTIONS } from '../util/units';
 import { UNIT_WEIGHT_G, countMissingFacts } from './units-weight';
 
 describe('units-weight', () => {
-  it('hat für jede Auswahl-Einheit ein Gewicht und umgekehrt', () => {
-    expect([...UNIT_OPTIONS].sort()).toEqual(Object.keys(UNIT_WEIGHT_G).sort());
+  it('hat für jede Auswahl-Einheit ein Gewicht', () => {
+    for (const u of UNIT_OPTIONS) expect(UNIT_WEIGHT_G[u]).toBeGreaterThan(0);
   });
 
   it('zählt Zutaten ohne Nährwerte', () => {

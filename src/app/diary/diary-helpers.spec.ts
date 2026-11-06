@@ -1,6 +1,7 @@
 import { DiaryEntry, NutritionFacts } from '../core/models';
 import {
   EMPTY_FIELDS,
+  formatChipAmount,
   factsFromFields,
   fieldsFromFacts,
   isIsoDate,
@@ -307,5 +308,27 @@ describe('number input text', () => {
   it('falls back to formatted value when raw is stale', () => {
     expect(inputTextFor('1,5', 2)).toBe('2');
     expect(inputTextFor(undefined, 0.25)).toBe('0,25');
+  });
+});
+
+describe('formatChipAmount', () => {
+  it('shows g and ml without decimals', () => {
+    expect(formatChipAmount(150, 'g')).toBe('150');
+    expect(formatChipAmount(200, 'ml')).toBe('200');
+  });
+
+  it('shows kg and l with up to two decimals', () => {
+    expect(formatChipAmount(0.25, 'kg')).toBe('0,25');
+    expect(formatChipAmount(1, 'l')).toBe('1');
+    expect(formatChipAmount(0.1, 'kg')).toBe('0,1');
+  });
+});
+
+describe('salt in fields', () => {
+  it('carries salt through facts, fields and scaling', () => {
+    const facts = factsFromFields({ ...EMPTY_FIELDS, kcal: 100, saltG: 1.5 });
+    expect(facts?.saltG).toBe(1.5);
+    expect(fieldsFromFacts(facts!).saltG).toBe(1.5);
+    expect(scaleFacts({ ...facts!, basis: 'per100g' }, 0.5).saltG).toBe(0.75);
   });
 });

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
+import { RecipeStore } from '../core/state/recipe.store';
 import { ShoppingStore } from '../core/state/shopping.store';
 import { ShoppingPage } from './shopping.page';
 
@@ -84,6 +85,7 @@ describe('ShoppingPage generator visibility', () => {
   });
 
   it('collapses the generator after a successful generation', async () => {
+    TestBed.inject(RecipeStore).add({ title: 'Reis', servings: 1, steps: [], origin: 'own', ingredients: [{ name: 'Reis', amount: 100, unit: 'g' }] });
     const { page } = createPage();
     await page.generate();
     expect(page.list()).not.toBeNull();
@@ -256,5 +258,23 @@ describe('ShoppingPage manual add sanity', () => {
     page.newItemName = '   ';
     page.addManual();
     expect(store.list()).toBeNull();
+  });
+});
+
+describe('ShoppingPage ohne KI und Rezepte', () => {
+  it('blockiert die Generierung und blendet Budget/Summe aus', () => {
+    const { page } = createPage();
+    expect(page.live()).toBe(false);
+    expect(page.noRecipesBlock()).toBe(true);
+    expect(page.showTotals()).toBe(false);
+  });
+
+  it('zeigt Summen nur aus eingetragenen Preisen', () => {
+    const { page, store } = createPage();
+    store.addItem({ name: 'Brot', amount: 1, unit: 'Stk', checked: false });
+    store.addItem({ name: 'Milch', amount: 1, unit: 'l', checked: false });
+    store.setItemPrice(0, 2.5);
+    expect(page.showTotals()).toBe(true);
+    expect(page.totals()).toMatchObject({ total: 2.5, unpriced: 1, priced: 1 });
   });
 });

@@ -17,9 +17,9 @@
         }
         <div class="target-card__macros">
           <span><strong>{{ t.proteinG | ntNum:0 }}</strong> g Eiweiß</span>
-          <span><strong>{{ t.carbsG | ntNum:0 }}</strong> g Kohlenh.</span>
+          <span><strong>{{ t.carbsG | ntNum:0 }}</strong> g Kohlenhydrate</span>
           <span><strong>{{ t.fatG | ntNum:0 }}</strong> g Fett</span>
-          <span><strong>{{ t.fiberG | ntNum:0 }}</strong> g Ballast.</span>
+          <span><strong>{{ t.fiberG | ntNum:0 }}</strong> g Ballaststoffe</span>
           <span><strong>{{ t.sugarG | ntNum:0 }}</strong> g Zucker max.</span>
         </div>
       </ion-card-content>
@@ -30,12 +30,13 @@
   <ion-list class="nt-grouped" lines="full">
     <ion-item button detail="true" (click)="profileOpen.set(true)">
       <ion-icon slot="start" name="body-outline"></ion-icon>
-      <ion-label>Bedarfs-Berechner</ion-label>
+      <ion-label>Mein Profil (Gewicht, Ziel)</ion-label>
       <ion-note slot="end" class="row-note">{{ target() ? (target()!.kcal | ntNum:0) + ' kcal/Tag' : 'Einrichten' }}</ion-note>
     </ion-item>
     <ion-item button detail="true" (click)="aiOpen.set(true)">
       <ion-icon slot="start" name="sparkles-outline"></ion-icon>
       <ion-label>KI-Verbindung</ion-label>
+      <ion-note slot="end" class="row-note" [class.row-note--on]="aiState() !== 'none'">{{ aiStatus() }}</ion-note>
     </ion-item>
   </ion-list>
 
@@ -131,12 +132,12 @@
   ></ion-toast>
 </ion-content>
 
-<!-- Bedarfs-Berechner Modal -->
+<!-- Mein Profil Modal -->
 <ion-modal [isOpen]="profileOpen()" (ionModalDidDismiss)="profileOpen.set(false)">
   <ng-template>
     <ion-header class="ion-no-border">
       <ion-toolbar>
-        <ion-title role="heading" aria-level="2">Bedarfs-Berechner</ion-title>
+        <ion-title role="heading" aria-level="2">Mein Profil</ion-title>
         <ion-buttons slot="end">
           <ion-button (click)="profileOpen.set(false)">Schließen</ion-button>
         </ion-buttons>
@@ -145,16 +146,31 @@
     <ion-content>
       <ion-list class="nt-grouped">
         <ion-item>
-          <ion-input type="text" inputmode="decimal" enterkeyhint="next" label="Gewicht (kg)" labelPlacement="stacked" placeholder="z. B. 75" data-field="weightKg" [ngModel]="formatDecimal(weightKg)" (ngModelChange)="weightKg = parseDecimal($event)" [ngModelOptions]="{ updateOn: 'blur' }" (ionBlur)="markTouched('weightKg')" [errorText]="visibleError('weightKg') ?? ''" [class.ion-invalid]="!!visibleError('weightKg')" [class.ion-touched]="!!visibleError('weightKg')" [attr.aria-invalid]="visibleError('weightKg') ? 'true' : null"></ion-input>
+          <ion-label>
+            Gewicht
+            @if (weightKg === null) { <p class="row-sub">z. B. 75 kg</p> }
+            @if (visibleError('weightKg'); as err) { <p class="row-error" role="alert">{{ err }}</p> }
+          </ion-label>
+          <nt-stepper slot="end" data-field="weightKg" label="Gewicht" unit="kg" [value]="weightKg" [min]="30" [max]="300" [step]="0.5" [decimals]="1" [start]="75" (valueChange)="setField('weightKg', $event)"></nt-stepper>
         </ion-item>
         <ion-item>
-          <ion-input type="text" inputmode="numeric" enterkeyhint="next" label="Größe (cm)" labelPlacement="stacked" placeholder="z. B. 175" data-field="heightCm" [ngModel]="formatDecimal(heightCm)" (ngModelChange)="heightCm = parseDecimal($event)" [ngModelOptions]="{ updateOn: 'blur' }" (ionBlur)="markTouched('heightCm')" [errorText]="visibleError('heightCm') ?? ''" [class.ion-invalid]="!!visibleError('heightCm')" [class.ion-touched]="!!visibleError('heightCm')" [attr.aria-invalid]="visibleError('heightCm') ? 'true' : null"></ion-input>
+          <ion-label>
+            Größe
+            @if (heightCm === null) { <p class="row-sub">z. B. 175 cm</p> }
+            @if (visibleError('heightCm'); as err) { <p class="row-error" role="alert">{{ err }}</p> }
+          </ion-label>
+          <nt-stepper slot="end" data-field="heightCm" label="Größe" unit="cm" [value]="heightCm" [min]="100" [max]="250" [step]="1" [start]="175" (valueChange)="setField('heightCm', $event)"></nt-stepper>
         </ion-item>
         <ion-item>
-          <ion-input type="text" inputmode="numeric" enterkeyhint="next" label="Alter" labelPlacement="stacked" placeholder="z. B. 30" data-field="age" [ngModel]="formatDecimal(age)" (ngModelChange)="age = parseDecimal($event)" [ngModelOptions]="{ updateOn: 'blur' }" (ionBlur)="markTouched('age')" [errorText]="visibleError('age') ?? ''" [class.ion-invalid]="!!visibleError('age')" [class.ion-touched]="!!visibleError('age')" [attr.aria-invalid]="visibleError('age') ? 'true' : null"></ion-input>
+          <ion-label>
+            Alter
+            @if (age === null) { <p class="row-sub">z. B. 30 Jahre</p> }
+            @if (visibleError('age'); as err) { <p class="row-error" role="alert">{{ err }}</p> }
+          </ion-label>
+          <nt-stepper slot="end" data-field="age" label="Alter" unit="Jahre" [value]="age" [min]="14" [max]="100" [step]="1" [start]="30" (valueChange)="setField('age', $event)"></nt-stepper>
         </ion-item>
         <ion-item>
-          <ion-select label="Geschlecht" labelPlacement="stacked" [(ngModel)]="sex" interface="popover">
+          <ion-select label="Geschlecht" [(ngModel)]="sex" interface="action-sheet" cancelText="Abbrechen">
             @for (s of sexes; track s.value) {
               <ion-select-option [value]="s.value">{{ s.label }}</ion-select-option>
             }
@@ -164,38 +180,50 @@
           <ion-item lines="none">
             <ion-icon slot="start" name="information-circle-outline" color="warning"></ion-icon>
             <ion-label class="ion-text-wrap" style="font-size:12px;color:var(--ion-color-warning)">
-              Hinweis: Für "Divers" verwenden wir den Durchschnittswert aus männlichen und weiblichen Referenzwerten. Das Ergebnis ist eine Näherung — individuelle Abweichungen sind möglich.
+              Hinweis: Für „Divers“ verwenden wir den Durchschnittswert aus männlichen und weiblichen Referenzwerten. Das Ergebnis ist eine Näherung – individuelle Abweichungen sind möglich.
             </ion-label>
           </ion-item>
         }
         <ion-item>
-          <ion-select label="Aktivität" labelPlacement="stacked" [(ngModel)]="activityLevel" interface="popover">
+          <ion-select label="Aktivität" [(ngModel)]="activityLevel" interface="action-sheet" cancelText="Abbrechen">
             @for (a of activities; track a.value) {
               <ion-select-option [value]="a.value">{{ a.label }}</ion-select-option>
             }
           </ion-select>
         </ion-item>
-        <ion-item>
-          <ion-select label="Ziel" labelPlacement="stacked" [(ngModel)]="goal" interface="popover">
+        <ion-item lines="none">
+          <ion-segment [value]="goal" aria-label="Ziel" (ionChange)="setGoal($any($event).detail.value)">
             @for (g of goals; track g.value) {
-              <ion-select-option [value]="g.value">{{ g.label }}</ion-select-option>
+              <ion-segment-button [value]="g.value"><ion-label>{{ g.label }}</ion-label></ion-segment-button>
             }
-          </ion-select>
+          </ion-segment>
         </ion-item>
-        @if (showRate) {
-          <ion-item>
-            <ion-input type="text" inputmode="decimal" enterkeyhint="done" label="Tempo (kg/Woche)" labelPlacement="stacked" placeholder="z. B. 0,5" data-field="rateKgPerWeek" [ngModel]="formatDecimal(rateKgPerWeek)" (ngModelChange)="rateKgPerWeek = parseDecimal($event)" [ngModelOptions]="{ updateOn: 'blur' }" (ionBlur)="markTouched('rateKgPerWeek')" [errorText]="visibleError('rateKgPerWeek') ?? ''" [class.ion-invalid]="!!visibleError('rateKgPerWeek')" [class.ion-touched]="!!visibleError('rateKgPerWeek')" [attr.aria-invalid]="visibleError('rateKgPerWeek') ? 'true' : null"></ion-input>
-          </ion-item>
-        }
       </ion-list>
-      @if (rateWarning) {
-        <p class="hint hint--warn" role="status">Mehr als 0,75 kg pro Woche ist ein starkes Defizit bzw. ein starker Überschuss und wird nicht empfohlen.</p>
+
+      @if (showRate) {
+        <h2 class="nt-section-header">Tempo (kg pro Woche)</h2>
+        <div class="rate-chips" role="group" aria-label="Tempo in Kilogramm pro Woche">
+          @for (r of rateChoices; track r) {
+            <button type="button" class="rate-chip" [class.rate-chip--on]="rateKgPerWeek === r" [attr.aria-pressed]="rateKgPerWeek === r" (click)="setRate(r)">{{ r | ntNum:2 }}</button>
+          }
+        </div>
+        <p class="hint" role="status">{{ rateDeltaLabel }} · höchstens 0,75 kg pro Woche, mehr wird nicht empfohlen.</p>
       }
       @if (formMinKcalApplied) {
-        <p class="hint" role="status">Mindestzufuhr aktiv: Die Formel läge darunter, das Ziel wird auf den Mindestwert angehoben.</p>
+        <p class="hint hint--warn" role="status">
+          Mindestzufuhr aktiv: Die Formel läge darunter, das Ziel wird auf den Mindestwert angehoben – tatsächlich ca. {{ achievedRateText }} kg/Woche.
+        </p>
+        @if (lowerRateOffer !== null) {
+          <ion-button fill="clear" size="small" class="ion-margin-horizontal" (click)="setRate(lowerRateOffer)">
+            Tempo auf {{ lowerRateOffer | ntNum:2 }} kg/Woche senken
+          </ion-button>
+        }
+      }
+      @if (!isFormValid) {
+        <p class="hint" role="status">Bitte Gewicht, Größe und Alter angeben.</p>
       }
       <ion-button expand="block" class="ion-margin-horizontal ion-margin-bottom" [disabled]="!isFormValid" (click)="saveProfile()">
-        Bedarf berechnen &amp; speichern
+        Speichern
       </ion-button>
     </ion-content>
   </ng-template>
@@ -214,36 +242,42 @@
     </ion-header>
     <ion-content class="ion-padding">
       <p class="hint">
-        Die KI läuft über Google Gemini. Empfohlen: die Adresse des <strong>NutriTrack-KI-Servers</strong>
-        eintragen, dann ist kein eigener Key nötig. Alternativ nutzt du „Gemini direkt“ mit deinem eigenen Key (nur lokal gespeichert).
+        Die KI läuft über Google Gemini. Ohne Verbindung sind KI-Funktionen (Etikett-Scan, Rezept-Import per Link oder Foto, KI-Einkaufsliste) nicht verfügbar.
+        Aktuell: <strong>{{ aiStatus() }}</strong>.
       </p>
+      <h2 class="nt-section-header">Option 1: KI-Server</h2>
+      <p class="hint">Empfohlen. Mit der Adresse des NutriTrack-KI-Servers ist kein eigener Schlüssel nötig.</p>
       <ion-list class="nt-grouped">
         <ion-item>
-          <ion-input label="NutriTrack-KI-Server (URL)" labelPlacement="stacked" [(ngModel)]="ai.proxyUrl" inputmode="url" placeholder="https://nutritrack-ai.<account>.workers.dev"></ion-input>
+          <ion-input label="Adresse des KI-Servers" labelPlacement="stacked" [(ngModel)]="ai.proxyUrl" inputmode="url" placeholder="https://…"></ion-input>
         </ion-item>
       </ion-list>
-      <h2 class="nt-section-header">Eigener Key (optional)</h2>
-      <p class="hint">Nur nötig ohne KI-Server. Wird ausschließlich lokal auf diesem Gerät gespeichert.</p>
+      <h2 class="nt-section-header">Option 2: Eigener Gemini-Schlüssel</h2>
+      @if (ai.proxyUrl?.trim()) {
+        <p class="hint hint--warn" role="status">Inaktiv, solange eine Adresse des KI-Servers eingetragen ist. Entferne die Adresse oben, um den eigenen Schlüssel zu nutzen.</p>
+      } @else {
+        <p class="hint">Wird nur lokal auf diesem Gerät gespeichert.</p>
+      }
+      <ion-list class="nt-grouped" [class.is-inactive]="!!ai.proxyUrl?.trim()">
+        <ion-item [disabled]="!!ai.proxyUrl?.trim()">
+          <ion-input type="password" label="Gemini-Schlüssel (API-Key)" labelPlacement="stacked" [(ngModel)]="ai.apiKey" [clearOnEdit]="false" autocomplete="off" placeholder="Schlüssel einfügen"></ion-input>
+        </ion-item>
+      </ion-list>
+      <h2 class="nt-section-header">Erweitert</h2>
       <ion-list class="nt-grouped">
         <ion-item>
-          <ion-select label="Anbieter" labelPlacement="stacked" [(ngModel)]="ai.provider" interface="popover">
-            @for (p of providers; track p.value) {
-              <ion-select-option [value]="p.value">{{ p.label }}</ion-select-option>
+          <ion-select label="Modell" [(ngModel)]="ai.model" interface="action-sheet" cancelText="Abbrechen">
+            @for (m of modelChoices; track m.value) {
+              <ion-select-option [value]="m.value">{{ m.label }}</ion-select-option>
             }
           </ion-select>
         </ion-item>
         <ion-item>
-          <ion-input label="Endpoint (optional)" labelPlacement="stacked" [(ngModel)]="ai.endpoint" placeholder="https://..."></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-input label="Modell" labelPlacement="stacked" [(ngModel)]="ai.model" placeholder="automatisch (gemini-3.8-flash)"></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-input type="password" label="API-Key" labelPlacement="stacked" [(ngModel)]="ai.apiKey" [clearOnEdit]="false" autocomplete="off" placeholder="Gemini-API-Key"></ion-input>
+          <ion-input label="Eigene Adresse der Gemini-Schnittstelle (optional)" labelPlacement="stacked" [(ngModel)]="ai.endpoint" placeholder="https://…"></ion-input>
         </ion-item>
       </ion-list>
       <ion-button expand="block" class="ion-margin-horizontal" (click)="saveAi()">
-        KI-Einstellungen speichern
+        Speichern
       </ion-button>
     </ion-content>
   </ng-template>
@@ -271,10 +305,10 @@
       @switch (infoSection()) {
         @case ('anleitung') {
           <h3>So funktioniert NutriTrack</h3>
-          <p>1. <strong>Profil einrichten</strong> — trage Gewicht, Größe, Alter und Ziel ein, um deinen persönlichen Tagesbedarf zu berechnen.</p>
-          <p>2. <strong>Tagebuch führen</strong> — füge täglich gegessene Lebensmittel und Mahlzeiten über die Suche, den Barcode-Scanner oder das Etikett-Scan per Kamera hinzu.</p>
-          <p>3. <strong>Rezepte anlegen</strong> — importiere Rezepte per Link, Text oder Foto, oder erfasse sie manuell. Koche direkt aus der App mit dem Kochmodus.</p>
-          <p>4. <strong>Einkauf planen</strong> — lass die KI auf Basis deiner Rezepte eine Einkaufsliste erstellen.</p>
+          <p>1. <strong>Mein Profil einrichten</strong> — trage Gewicht, Größe, Alter und Ziel ein, um deinen persönlichen Tagesbedarf zu berechnen.</p>
+          <p>2. <strong>Tagebuch führen</strong> — trage täglich gegessene Lebensmittel und Mahlzeiten über die Suche oder den Barcode-Scanner ein. Das Etikett per Kamera lesen geht nur <button type="button" class="link-btn" (click)="openAiFromGuide()">(mit KI-Verbindung)</button>.</p>
+          <p>3. <strong>Rezepte anlegen</strong> — füge Rezepte als Text ein oder erfasse sie manuell. Import per Link oder Foto geht nur <button type="button" class="link-btn" (click)="openAiFromGuide()">(mit KI-Verbindung)</button>. Koche direkt aus der App mit dem Kochmodus.</p>
+          <p>4. <strong>Einkauf planen</strong> — eine Einkaufsliste auf Basis deiner Rezepte erstellt die KI <button type="button" class="link-btn" (click)="openAiFromGuide()">(mit KI-Verbindung)</button>.</p>
           <p>5. <strong>Fortschritt beobachten</strong> — das Dashboard zeigt täglich, wie viel Energie und Makros du noch zur Verfügung hast.</p>
         }
         @case ('datenschutz') {
@@ -302,7 +336,7 @@
           <h4>Häufige Fragen</h4>
           <p><strong>Barcode wird nicht erkannt?</strong> Stelle sicher, dass genügend Licht vorhanden ist. Alternativ kannst du den Barcode manuell eingeben.</p>
           <p><strong>KI funktioniert nicht?</strong> Prüfe unter „KI-Verbindung“, ob die Adresse des KI-Servers oder ein gültiger eigener Key eingetragen ist.</p>
-          <p><strong>Daten verloren?</strong> Alle Daten werden lokal gespeichert. Wenn du die App deinstallierst, werden sie gelöscht. Sichere sie regelmäßig über „Backup exportieren“ und stelle sie mit „Backup importieren“ wieder her.</p>
+          <p><strong>Daten verloren?</strong> Alle Daten werden lokal gespeichert. Wenn du die App deinstallierst, werden sie gelöscht. Speichere regelmäßig ein Backup über „Backup exportieren“ und stelle es mit „Backup importieren“ wieder her.</p>
         }
       }
     </ion-content>

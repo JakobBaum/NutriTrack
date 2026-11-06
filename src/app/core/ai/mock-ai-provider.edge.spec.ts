@@ -33,17 +33,23 @@ describe('MockAiProvider — Randfälle', () => {
     expect(portion.facts.portionG).toBe(40);
   });
 
-  it('setzt einen Budget-Hinweis nur bei Überschreitung', async () => {
-    const base = { persons: 1, days: 1, meals: ['dinner' as const], recipes: [] };
-    const over = await provider.generateShoppingList({ ...base, budget: 0.5 });
-    expect(over.note).toContain('0.50 €');
-    const within = await provider.generateShoppingList({ ...base, budget: 1000 });
-    expect(within.note).toBeUndefined();
-    expect(within.estTotal).toBeGreaterThan(0);
+  it('liefert ohne KI nur Mengen: keine Preise, keine Summe, kein Budget-Hinweis', async () => {
+    const recipes = [
+      {
+        id: 'r', title: 'Reis', servings: 1, steps: [], origin: 'own' as const,
+        createdAt: '2026-10-13T00:00:00.000Z', updatedAt: '2026-10-13T00:00:00.000Z',
+        ingredients: [{ name: 'Reis', amount: 100, unit: 'g' }],
+      },
+    ];
+    const res = await provider.generateShoppingList({ persons: 1, days: 1, meals: ['dinner'], recipes, budget: 0.5 });
+    expect(res.items).toHaveLength(1);
+    expect(res.items.every((i) => i.estPrice === undefined)).toBe(true);
+    expect(res.estTotal).toBe(0);
+    expect(res.note).toBeUndefined();
   });
 
   it('sortiert Fastfood nach Protein/kcal und nutzt „Fastfood" als Standard', async () => {
-    const res = await provider.suggestFastfood({ restaurant: '', kcalBudget: 0 });
+    const res = await provider.suggestFastfood({ restaurant: '', kcalBudget: 5000 });
     expect(res[0].itemName).toBe('Grilled Chicken (ohne Mayo)');
     expect(res.every((s) => s.restaurant === 'Fastfood')).toBe(true);
   });
@@ -56,17 +62,12 @@ describe('MockAiProvider — Randfälle', () => {
     expect(res.steps).toEqual(['Backen.']);
   });
 
-  it('nutzt die erste Zeile als Titel auch ohne Zutaten', async () => {
-    const res = await provider.importRecipe({ text: 'Nur Titel' });
-    expect(res.title).toBe('Nur Titel');
-    expect(res.ingredients).toEqual([]);
-    expect(res.steps).toEqual([]);
+  it('wirft bei Text ohne erkannte Zutaten statt ein leeres Rezept zu liefern', async () => {
+    await expect(provider.importRecipe({ text: 'Nur Titel' })).rejects.toThrow(/Keine Zutaten/);
   });
 
-  it('liefert ohne Text und URL einen leeren Platzhalter', async () => {
-    const res = await provider.importRecipe({ text: '   ' });
-    expect(res.steps).toEqual([]);
-    expect(res.sourceUrl).toBeUndefined();
+  it('wirft ohne Text und URL', async () => {
+    await expect(provider.importRecipe({ text: '   ' })).rejects.toThrow(/Kein Rezept-Text/);
   });
 
   // BUG: Zeilen mit unbekannter Einheit („3 Becher Joghurt") landen als Schritt statt als Zutat.

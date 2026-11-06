@@ -13,10 +13,12 @@ import {
 import { UNIT_OPTIONS } from '../core/util/units';
 import { formatDecimal, parseDecimal } from '../core/util/number-input';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import type { IScannerControls } from '@zxing/browser';
-import { ActionSheetController } from '@ionic/angular';
-import { QUICK_UNITS } from './recipe-view';
+import { ActionSheetController, AlertController } from '@ionic/angular';
+import { hasIncompleteFacts } from '../core/nutrition/units-weight';
+import { QUICK_UNITS, importBlockReason, importErrorMessage, moreUnits, unitChips } from './recipe-view';
+import { confirmDiscard } from '../meals/confirm-discard';
 import { FoodItem, MealType, NutritionFacts, Recipe, RecipeIngredient } from '../core/models';
 import { AiService } from '../core/ai/ai.service';
 import { FOOD_PROVIDER } from '../core/food/food-provider';
@@ -101,6 +103,8 @@ export class RecipesPage implements OnDestroy {
   private readonly actionSheets = inject(ActionSheetController);
   private readonly ai = inject(AiService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly alerts = inject(AlertController);
 
   /** Segment „Rezepte | Mahlzeiten“; per `?view=meals` vorwählbar (alte Route /meals). */
   readonly view = signal<RecipesView>('recipes');
@@ -128,6 +132,17 @@ export class RecipesPage implements OnDestroy {
     return this.ai.isLive();
   }
 
+  /** Grund, warum „Importieren“ gerade gesperrt ist (leer = bereit). */
+  importBlocked(): string {
+    return importBlockReason(this.importText, this.isLive() ? this.importUrl : '');
+  }
+
+  /** Verlässt den Import Richtung Profil › KI-Verbindung. */
+  openAiSettings(): void {
+    this.importOpen.set(false);
+    void this.router.navigate(['/settings']);
+  }
+
   @ViewChild('ingBarcodeVideo') barcodeVideo?: ElementRef<HTMLVideoElement>;
 
   /** Rezepte ohne das gerade zum Löschen vorgemerkte. */
@@ -152,6 +167,26 @@ export class RecipesPage implements OnDestroy {
   setUnit(ing: IngredientForm, unit: string): void {
     ing.unit = unit;
   }
+
+  /** Chips einer Zutat: Schnell-Einheiten plus ihre aktuelle Einheit. */
+  chipsFor(ing: IngredientForm): string[] {
+    return unitChips(ing.unit, this.quickUnits);
+  }
+
+  /** „weitere“: restliche Einheiten im Action-Sheet (eine Einheiten-Steuerung je Zutat). */
+  async pickMoreUnit(ing: IngredientForm): Promise<void> {
+    const sheet = await this.actionSheets.create({
+      header: 'Einheit wählen',
+      buttons: [
+        ...moreUnits(this.unitOptions, this.quickUnits).map((u) => ({ text: u, data: u })),
+        { text: 'Abbrechen', role: 'cancel' },
+      ],
+    });
+    await sheet.present();
+    const { data, role } = await sheet.onDidDismiss<string>();
+    if (role === 'cancel' || !data) return;
+    this.setUnit(ing, data);
+  }
   readonly parseDecimal = parseDecimal;
   readonly formatDecimal = formatDecimal;
 
@@ -161,6 +196,20 @@ export class RecipesPage implements OnDestroy {
   readonly toastMessage = signal<string | null>(null);
 
   form: RecipeForm = emptyForm();
+
+  /** Zustand beim Öffnen; ein Import startet mit leerem Stand und gilt damit als geändert. */
+  private baseline = JSON.stringify(emptyForm());
+  private allowClose = false;
+
+  isDirty(): boolean {
+    return JSON.stringify(this.form) !== this.baseline;
+  }
+
+  /** canDismiss des Rezept-Sheets: bei ungespeicherten Änderungen „Verwerfen?“. */
+  readonly canDismissRecipe = async (): Promise<boolean> => {
+    if (this.allowClose || !this.isDirty()) return true;
+    return confirmDiscard(this.alerts);
+  };
 
   // --- Zutaten-Picker (Suche + Barcode) ---
   readonly pickerOpen = signal(false);
@@ -177,7 +226,7 @@ export class RecipesPage implements OnDestroy {
       const base64 = await this.camera.takePhotoBase64();
       await this.runImportFromBase64(base64);
     } catch (e: unknown) {
-      this.importError.set(e instanceof Error ? e.message : 'Kamera nicht verfügbar.');
+      this.importError.set(importErrorMessage(e, this.isOffline()));
     } finally {
       this.importPhotoScanning.set(false);
     }
@@ -194,7 +243,7 @@ export class RecipesPage implements OnDestroy {
       const base64 = await this.fileToBase64(file);
       await this.runImportFromBase64(base64);
     } catch (e: unknown) {
-      this.importError.set(e instanceof Error ? e.message : 'Foto-Import fehlgeschlagen.');
+      this.importError.set(importErrorMessage(e, this.isOffline()));
     } finally {
       this.importPhotoScanning.set(false);
       input.value = '';
@@ -202,7 +251,9 @@ export class RecipesPage implements OnDestroy {
   }
 
   private async runImportFromBase64(base64: string): Promise<void> {
+    if (!this.isLive()) throw new Error('Foto-Import braucht eine KI-Verbindung.');
     const res = await this.ai.importRecipe({ imageBase64: base64 });
+    if (res.ingredients.length === 0) throw new Error('Auf dem Foto wurden keine Zutaten erkannt.');
     this.form = {
       title: res.title,
       servings: res.servings || 2,
@@ -216,6 +267,7 @@ export class RecipesPage implements OnDestroy {
       steps: res.steps.length ? [...res.steps] : [''],
     };
     this._importOrigin = 'photo';
+    this.baseline = '';
     this.editId.set(null);
     this.error.set(null);
     this.importOpen.set(false);
@@ -292,6 +344,25 @@ export class RecipesPage implements OnDestroy {
     return hasApproxUnits(this.toIngredients());
   }
 
+  /** Wert im Feld „Fertig gekocht“: eigene Eingabe, sonst das berechnete Gewicht. */
+  cookedWeightValue(): number | null {
+    if (this.form.cookedWeightG != null && this.form.cookedWeightG > 0) return this.form.cookedWeightG;
+    const auto = this.autoWeightG();
+    return auto > 0 ? auto : null;
+  }
+
+  /** True, solange das Gewicht nur geschätzt (aus den Zutaten berechnet) ist. */
+  cookedWeightIsEstimate(): boolean {
+    return !(this.form.cookedWeightG != null && this.form.cookedWeightG > 0) && this.autoWeightG() > 0;
+  }
+
+  setCookedWeight(value: unknown): void {
+    const parsed = parseDecimal(value);
+    const auto = this.autoWeightG();
+    // Leer, 0 oder unverändert: wieder die Schätzung verwenden.
+    this.form.cookedWeightG = parsed !== null && parsed > 0 && parsed !== auto ? parsed : null;
+  }
+
   total(): NutritionFacts {
     return totalFacts(this.toIngredients());
   }
@@ -314,10 +385,17 @@ export class RecipesPage implements OnDestroy {
     return isAiOrigin(this._importOrigin);
   }
 
+  /** True, wenn die Zutat nur kcal hat (Eiweiß/KH/Fett fehlen): „Nährwerte unvollständig“. */
+  isIncomplete(ing: IngredientForm): boolean {
+    return hasIncompleteFacts(ing.facts);
+  }
+
   // --- Modal öffnen/schließen ---
   openAdd(): void {
     this._importOrigin = 'own';
     this.form = emptyForm();
+    this.baseline = JSON.stringify(this.form);
+    this.allowClose = false;
     this.editId.set(null);
     this.error.set(null);
     this.isModalOpen.set(true);
@@ -338,12 +416,15 @@ export class RecipesPage implements OnDestroy {
       steps: recipe.steps.length ? [...recipe.steps] : [''],
     };
     this._importOrigin = recipe.origin ?? 'own';
+    this.baseline = JSON.stringify(this.form);
+    this.allowClose = false;
     this.editId.set(recipe.id);
     this.error.set(null);
     this.isModalOpen.set(true);
   }
 
   closeModal(): void {
+    this.allowClose = false;
     this.isModalOpen.set(false);
   }
 
@@ -367,9 +448,9 @@ export class RecipesPage implements OnDestroy {
   /** Parst Text/URL via KI zu einem Rezept und öffnet das Formular vorbefüllt. */
   async runImport(): Promise<void> {
     const text = this.importText.trim();
-    const url = this.importUrl.trim();
+    const url = this.isLive() ? this.importUrl.trim() : '';
     if (!text && !url) {
-      this.importError.set('Bitte Text einfügen oder eine URL angeben.');
+      this.importError.set(importBlockReason(text, url));
       return;
     }
     if (url && this.isTikTokUrl(url) && !this.isLive()) {
@@ -383,6 +464,7 @@ export class RecipesPage implements OnDestroy {
     const isTikTok = url && this.isTikTokUrl(url);
     try {
       const res = await this.ai.importRecipe({ text: text || undefined, url: url || undefined });
+      if (res.ingredients.length === 0) throw new Error('Keine Zutaten erkannt.');
       this.form = {
         title: res.title,
         servings: res.servings || 2,
@@ -396,6 +478,7 @@ export class RecipesPage implements OnDestroy {
         steps: res.steps.length ? [...res.steps] : [''],
       };
       this._importOrigin = isTikTok ? 'tiktok' : (url ? 'url' : 'text');
+      this.baseline = '';
       this.editId.set(null);
       this.error.set(null);
       this.importOpen.set(false);
@@ -405,11 +488,15 @@ export class RecipesPage implements OnDestroy {
           ? `Rezept${isTikTok ? ' aus TikTok' : ''} importiert — bitte prüfen und speichern.`
           : 'Rezept aus Text erkannt — Nährwerte je Zutat prüfen oder ergänzen.',
       );
-    } catch {
-      this.importError.set('Import fehlgeschlagen — bitte Text einfügen oder erneut versuchen.');
+    } catch (e: unknown) {
+      this.importError.set(importErrorMessage(e, this.isOffline()));
     } finally {
       this.importBusy.set(false);
     }
+  }
+
+  private isOffline(): boolean {
+    return typeof navigator !== 'undefined' && navigator.onLine === false;
   }
 
   private _importOrigin: 'own' | 'url' | 'tiktok' | 'photo' | 'text' = 'own';
@@ -629,7 +716,8 @@ export class RecipesPage implements OnDestroy {
     const id = this.editId();
     if (id) this.store.update(id, draft);
     else this.store.add(draft);
-    this.closeModal();
+    this.allowClose = true;
+    this.isModalOpen.set(false);
     this.toastMessage.set(id ? 'Rezept aktualisiert.' : 'Rezept gespeichert.');
   }
 
@@ -650,7 +738,7 @@ export class RecipesPage implements OnDestroy {
    */
   async logToDiary(recipe: Recipe): Promise<void> {
     const sheet = await this.actionSheets.create({
-      header: 'Als welche Mahlzeit loggen?',
+      header: 'Als welche Mahlzeit eintragen?',
       buttons: [
         ...this.mealOptions.map((m) => ({ text: m.label, data: m.value })),
         { text: 'Abbrechen', role: 'cancel' },
@@ -697,7 +785,7 @@ export class RecipesPage implements OnDestroy {
     });
     const mealLabel = this.mealOptions.find((m) => m.value === meal)?.label ?? 'Tagebuch';
     const hint = isPartial ? ` Unvollständig: ${missingFactsLabel(missing)}, Werte sind eine Untergrenze.` : '';
-    this.toastMessage.set(`${servingsLabel(portions)} „${recipe.title}" als ${mealLabel} gelegt.${hint}`);
+    this.toastMessage.set(`${servingsLabel(portions)} „${recipe.title}" als ${mealLabel} eingetragen.${hint}`);
   }
 
   onToastDismiss(): void {

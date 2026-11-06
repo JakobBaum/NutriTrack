@@ -335,6 +335,28 @@ ion-modal ion-item {
   }
 }
 
+.unit-chip--more {
+  background: transparent;
+  border: 1px dashed var(--nt-accent);
+}
+
+.ai-needed {
+  margin: 8px 0 12px;
+  font-size: 13px;
+  color: var(--ion-color-medium);
+
+  p { margin: 0 0 4px; }
+}
+
+.block-reason {
+  text-align: center;
+}
+
+.servings-stepper {
+  display: block;
+  margin: 4px 16px 0;
+}
+
 .two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;

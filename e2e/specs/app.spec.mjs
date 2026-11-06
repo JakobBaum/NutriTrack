@@ -1,6 +1,6 @@
 // Onboarding/Profil, Einkaufsliste (Enter), Dashboard (Summen + Über-Ziel-Zustand).
 import { assert, eventually, go, readStore, settle } from '../lib/harness.mjs';
-import { fillAndBlur, ionInput, topModal } from '../lib/ionic.mjs';
+import { pickActionSheet, stepTo, topModal } from '../lib/ionic.mjs';
 import { DIARY_NORMAL, DIARY_OVER, SHOPPING, seed } from '../lib/fixtures.mjs';
 
 const sumKcal = (entries) => entries.reduce((s, e) => s + e.facts.kcal, 0);
@@ -9,9 +9,7 @@ const toInt = (text) => Number(String(text).replace(/[^\d]/g, ''));
 
 async function pickSelect(page, modal, label, optionText) {
   await modal.locator('ion-select').filter({ hasText: label }).click();
-  const option = page.locator('ion-popover ion-item, ion-popover ion-radio', { hasText: optionText }).first();
-  await option.click();
-  await settle(page, 400);
+  await pickActionSheet(page, optionText);
 }
 
 export function register({ test }) {
@@ -22,12 +20,12 @@ export function register({ test }) {
     // ?setup=1 öffnet den Bedarfs-Berechner automatisch
     await page.waitForURL(/settings\?setup=1/);
     const modal = topModal(page);
-    await modal.locator('ion-title', { hasText: 'Bedarfs-Berechner' }).waitFor();
-    await fillAndBlur(ionInput(modal, 'Gewicht (kg)'), '72,5');
-    await fillAndBlur(ionInput(modal, 'Größe (cm)'), '175');
-    await fillAndBlur(ionInput(modal, 'Alter'), '28');
+    await modal.locator('ion-title', { hasText: 'Mein Profil' }).waitFor();
+    await stepTo(modal, 'Gewicht', { start: 75, step: 0.5, target: 72.5 });
+    await stepTo(modal, 'Größe', { start: 175, step: 1, target: 175 });
+    await stepTo(modal, 'Alter', { start: 30, step: 1, target: 28 });
     await pickSelect(page, modal, 'Geschlecht', 'Weiblich');
-    await modal.locator('ion-button', { hasText: 'Bedarf berechnen' }).click();
+    await modal.locator('ion-button', { hasText: 'Speichern' }).click();
     await settle(page);
 
     const profile = await readStore(page, 'profile');

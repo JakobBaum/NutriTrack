@@ -74,7 +74,7 @@
           <div class="recipe__actions">
             <ion-button class="recipe__btn" fill="solid" (click)="logToDiary(recipe)">
               <ion-icon slot="start" name="add-circle-outline" aria-hidden="true"></ion-icon>
-              Tagebuch
+              Eintragen
             </ion-button>
             @if (recipe.steps.length > 0) {
               <ion-button class="recipe__btn recipe__btn--tint" fill="solid" (click)="startCook(recipe)">
@@ -114,7 +114,7 @@
 </ion-content>
 
 <!-- Add/Edit recipe modal -->
-<ion-modal [isOpen]="isModalOpen()" (didDismiss)="closeModal()">
+<ion-modal [isOpen]="isModalOpen()" [canDismiss]="canDismissRecipe" (didDismiss)="closeModal()">
   <ng-template>
     <ion-header class="ion-no-border">
       <ion-toolbar>
@@ -153,7 +153,9 @@
                   ></ion-input>
                   <button class="ing-facts-toggle" type="button" (click)="toggleIngredient($index)"
                           [attr.aria-expanded]="isExpanded($index)">
-                    @if (ing.facts) {
+                    @if (ing.facts && isIncomplete(ing)) {
+                      <span class="ing-facts-toggle--missing">Nährwerte unvollständig – {{ kcalOf(ing) | ntNum: 0 }} kcal, Eiweiß/KH/Fett ergänzen</span>
+                    } @else if (ing.facts) {
                       <span>{{ kcalOf(ing) | ntNum: 0 }} kcal</span>
                     } @else {
                       <span class="ing-facts-toggle--missing">Nährwerte fehlen – kcal eintragen</span>
@@ -161,9 +163,10 @@
                     <ion-icon [name]="isExpanded($index) ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
                   </button>
                   <div class="unit-chips" role="group" aria-label="Häufige Einheiten">
-                    @for (u of quickUnits; track u) {
+                    @for (u of chipsFor(ing); track u) {
                       <button type="button" class="unit-chip" [class.unit-chip--on]="ing.unit === u" [attr.aria-pressed]="ing.unit === u" (click)="setUnit(ing, u)">{{ u }}</button>
                     }
+                    <button type="button" class="unit-chip unit-chip--more" [attr.aria-label]="'Weitere Einheiten für ' + (ing.name || 'Zutat')" (click)="pickMoreUnit(ing)">weitere</button>
                   </div>
                   @if (isUnknownUnit(ing.unit)) {
                     <p class="unit-warn" role="alert"><ion-icon name="alert-circle-outline" aria-hidden="true"></ion-icon> Einheit „{{ ing.unit }}“ unbekannt – bitte wählen.</p>
@@ -171,12 +174,6 @@
                 </ion-label>
                 <div class="ing-qty" slot="end" (click)="$event.stopPropagation()" (touchstart)="$event.stopPropagation()">
                   <ion-input type="text" inputmode="decimal" enterkeyhint="next" [ngModel]="formatDecimal(ing.amount)" (ngModelChange)="ing.amount = parseDecimal($event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Menge" placeholder="0"></ion-input>
-                  <ion-select class="ing-qty__unit" [(ngModel)]="ing.unit" [attr.aria-label]="'Einheit für ' + (ing.name || 'Zutat')" interface="popover" placeholder="g"
-                    (click)="$event.stopPropagation()" (ionFocus)="$event.stopPropagation()">
-                    @for (u of unitOptions; track u) {
-                      <ion-select-option [value]="u">{{ u }}</ion-select-option>
-                    }
-                  </ion-select>
                 </div>
                 <ion-button slot="end" fill="clear" color="danger" class="nt-hover-delete" [attr.aria-label]="'Zutat „' + (ing.name || 'ohne Namen') + '“ löschen'" (click)="removeIngredient($index)">
                   <ion-icon slot="icon-only" name="trash-outline" aria-hidden="true"></ion-icon>
@@ -267,15 +264,12 @@
           <span class="field-label nt-section-header">Fertig gekocht</span>
           <ion-list inset="true">
             <ion-item>
-              <ion-input type="text" inputmode="decimal" enterkeyhint="next" [ngModel]="formatDecimal(form.cookedWeightG)" (ngModelChange)="form.cookedWeightG = parseDecimal($event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Fertig gekocht in Gramm"
-                [placeholder]="autoWeightG() > 0 ? autoWeightG().toString() : '0'"></ion-input>
+              <ion-input type="text" inputmode="decimal" enterkeyhint="next" [ngModel]="formatDecimal(cookedWeightValue())" (ngModelChange)="setCookedWeight($event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Fertig gekocht in Gramm" placeholder="0"></ion-input>
               <ion-note slot="end">g</ion-note>
             </ion-item>
           </ion-list>
-          @if (autoWeightG() > 0 && !form.cookedWeightG) {
-            <p class="auto-weight-hint">
-              Ohne Eingabe rechnen wir mit {{ autoWeightIsApprox() ? '≈ ' : '' }}{{ autoWeightG() | ntNum: 0 }} g aus den Zutaten.
-            </p>
+          @if (cookedWeightIsEstimate()) {
+            <p class="auto-weight-hint"><span class="ai-badge">geschätzt</span> aus den Zutaten{{ autoWeightIsApprox() ? ' (EL, TL und Stück nur ungefähr)' : '' }}. Zum Überschreiben eintippen.</p>
             @if (autoWeightIsApprox()) {
               <details class="weight-detail">
                 <summary>So schätzen wir EL, TL &amp; Co.</summary>
@@ -290,12 +284,7 @@
         </div>
         <div>
           <span class="field-label nt-section-header">Ergibt … Portionen</span>
-          <ion-list inset="true">
-            <ion-item>
-              <ion-input type="text" inputmode="decimal" enterkeyhint="done" [ngModel]="formatDecimal(form.servings)" (ngModelChange)="form.servings = parseDecimal($event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Ergibt Portionen" placeholder="4"></ion-input>
-              <ion-note slot="end">Portionen</ion-note>
-            </ion-item>
-          </ion-list>
+          <nt-stepper class="servings-stepper" label="Ergibt Portionen" unit="Portionen" [value]="form.servings" [min]="1" [max]="99" [step]="0.5" [decimals]="1" [start]="2" (valueChange)="form.servings = $event"></nt-stepper>
           <p class="auto-weight-hint">Mindestens 1, ganz oder halb (z. B. 2 oder 2,5).</p>
         </div>
       </div>
@@ -326,7 +315,7 @@
         @if (error()) {
           <ion-text color="danger"><p class="form-error save-error" role="alert">{{ error() }}</p></ion-text>
         }
-        <ion-button expand="block" class="save-btn" (click)="save()">Rezept sichern</ion-button>
+        <ion-button expand="block" class="save-btn" (click)="save()">Speichern</ion-button>
       </ion-toolbar>
     </ion-footer>
   </ng-template>
@@ -375,7 +364,7 @@
       <ion-footer class="ion-no-border save-footer">
         <ion-toolbar>
           <div class="recipe__actions">
-            <ion-button class="recipe__btn" fill="solid" (click)="detailThen(diaryAction)">Tagebuch</ion-button>
+            <ion-button class="recipe__btn" fill="solid" (click)="detailThen(diaryAction)">Eintragen</ion-button>
             @if (r.steps.length > 0) {
               <ion-button class="recipe__btn recipe__btn--tint" fill="solid" (click)="detailThen(cookAction)">Kochen</ion-button>
             }
@@ -401,9 +390,16 @@
     <ion-content class="ion-padding">
       <p class="scan-hint">
         Füge einen Rezept-Text ein oder gib einen Link an. Die Nährwerte sind
-        <span class="ai-badge">KI-Schätzung</span> — prüfe sie vor dem Sichern.
-        @if (!isLive()) { Ohne KI-Verbindung wird nur eingefügter Text erkannt; Links gehen dann nicht. }
+        <span class="ai-badge">KI-Schätzung</span> — prüfe sie vor dem Speichern.
       </p>
+      @if (!isLive()) {
+        <div class="ai-needed" role="note">
+          <p>Ohne KI-Verbindung geht nur eingefügter Text. Link und Foto brauchen eine KI-Verbindung.</p>
+          <ion-button size="small" fill="clear" (click)="openAiSettings()">
+            <ion-icon slot="start" name="sparkles-outline" aria-hidden="true"></ion-icon> Profil › KI-Verbindung
+          </ion-button>
+        </div>
+      }
       @if (importError()) {
         <ion-text color="danger"><p class="form-error" role="alert">{{ importError() }}</p></ion-text>
       }
@@ -421,12 +417,13 @@
         </ion-item>
       </ion-list>
 
-      <span class="field-label nt-section-header">oder Link (inkl. TikTok)</span>
+      <span class="field-label nt-section-header">oder Link (inkl. TikTok)@if (!isLive()) { · braucht KI-Verbindung }</span>
       <ion-list inset="true">
         <ion-item>
           <ion-input
             [(ngModel)]="importUrl"
             aria-label="Rezept-Link"
+            [disabled]="!isLive()"
             inputmode="url"
             placeholder="https://tiktok.com/… oder anderer Link"
           ></ion-input>
@@ -445,16 +442,16 @@
         </p>
       }
 
-      <span class="field-label nt-section-header">oder Foto</span>
+      <span class="field-label nt-section-header">oder Foto@if (!isLive()) { · braucht KI-Verbindung }</span>
       <div class="scan-row">
         @if (nativeCamera) {
-          <ion-button size="small" fill="outline" (click)="importFromCamera()" [disabled]="importBusy() || importPhotoScanning()">
+          <ion-button size="small" fill="outline" (click)="importFromCamera()" [disabled]="!isLive() || importBusy() || importPhotoScanning()">
             @if (importPhotoScanning()) { <ion-spinner name="dots"></ion-spinner> } @else {
               <ion-icon slot="start" name="camera-outline"></ion-icon> Kamera
             }
           </ion-button>
         }
-        <ion-button size="small" fill="outline" (click)="importPhotoInput.click()" [disabled]="importBusy() || importPhotoScanning()">
+        <ion-button size="small" fill="outline" (click)="importPhotoInput.click()" [disabled]="!isLive() || importBusy() || importPhotoScanning()">
           @if (importPhotoScanning()) { <ion-spinner name="dots"></ion-spinner> } @else {
             <ion-icon slot="start" name="image-outline"></ion-icon> Foto auswählen
           }
@@ -462,13 +459,16 @@
         <input #importPhotoInput type="file" accept="image/*" capture="environment" hidden (change)="onImportPhotoFile($event)" />
       </div>
 
-      <ion-button expand="block" class="ion-margin-top" (click)="runImport()" [disabled]="importBusy() || importPhotoScanning()">
+      <ion-button expand="block" class="ion-margin-top" (click)="runImport()" [disabled]="importBusy() || importPhotoScanning() || importBlocked() !== ''">
         @if (importBusy()) {
           <ion-spinner name="dots" slot="start"></ion-spinner> Importiere…
         } @else {
           <ion-icon slot="start" name="sparkles-outline"></ion-icon> Importieren
         }
       </ion-button>
+      @if (importBlocked() && !importBusy()) {
+        <p class="auto-weight-hint block-reason" role="note">{{ importBlocked() }}</p>
+      }
     </ion-content>
   </ng-template>
 </ion-modal>

@@ -1,0 +1,19 @@
+<div class="stepper" role="group" [attr.aria-label]="label()">
+  <button
+    type="button"
+    class="stepper__btn"
+    [disabled]="!canDecrease()"
+    [attr.aria-label]="label() + ' verringern'"
+    (click)="change(-1)"
+  >&minus;</button>
+  <span class="stepper__value" [class.stepper__value--empty]="isEmpty()" role="status" aria-live="polite">
+    {{ display() }}@if (unit() && !isEmpty()) {<span class="stepper__unit">&nbsp;{{ unit() }}</span>}
+  </span>
+  <button
+    type="button"
+    class="stepper__btn"
+    [disabled]="!canIncrease()"
+    [attr.aria-label]="label() + ' erhöhen'"
+    (click)="change(1)"
+  >+</button>
+</div>

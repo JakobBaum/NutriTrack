@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildShoppingList,
   buildWeekPlan,
-  estimatePrice,
-  priceItems,
 } from './shopping-generator';
-import { Recipe, ShoppingItem } from '../models';
+import { Recipe } from '../models';
 
 function recipe(partial: Partial<Recipe>): Recipe {
   return {
@@ -22,14 +20,8 @@ function recipe(partial: Partial<Recipe>): Recipe {
 }
 
 describe('buildShoppingList', () => {
-  it('erzeugt eine Basis-Liste (pro Person skaliert), wenn keine Rezepte da sind', () => {
-    const { items, suggestedDishes } = buildShoppingList([], 3, 2);
-    expect(suggestedDishes).toEqual([]);
-    expect(items.length).toBeGreaterThan(0);
-    const nudeln = items.find((i) => i.name === 'Nudeln');
-    // 125 g pro Person × 2 Personen = 250 g
-    expect(nudeln?.amount).toBe(250);
-    expect(items.every((i) => i.checked === false)).toBe(true);
+  it('liefert ohne Rezepte eine leere Liste (keine erfundene Standardliste)', () => {
+    expect(buildShoppingList([], 3, 2)).toEqual({ items: [], suggestedDishes: [] });
   });
 
   it('skaliert Zutaten auf die Personenzahl (persons / servings)', () => {
@@ -63,9 +55,9 @@ describe('buildShoppingList', () => {
   });
 
   it('erzwingt Mindestwerte von 1 für Gerichte und Personen', () => {
-    const { items } = buildShoppingList([], 0, 0);
-    const nudeln = items.find((i) => i.name === 'Nudeln');
-    expect(nudeln?.amount).toBe(125); // 1 Person
+    const r = recipe({ servings: 1, ingredients: [{ name: 'Reis', amount: 100, unit: 'g' }] });
+    const { items } = buildShoppingList([r, r], 0, 0);
+    expect(items[0].amount).toBe(100); // 1 Gericht, 1 Person
   });
 });
 
@@ -82,37 +74,8 @@ describe('buildWeekPlan', () => {
     expect(suggestedDishes).toEqual(['Test']);
   });
 
-  it('skaliert die Basis-Liste auf Personen × Tage, wenn keine Rezepte da sind', () => {
-    const { items } = buildWeekPlan([], 2, 5, 1);
-    const nudeln = items.find((i) => i.name === 'Nudeln');
-    expect(nudeln?.amount).toBe(125 * 2 * 5);
-  });
-});
-
-describe('estimatePrice / priceItems', () => {
-  const item = (o: Partial<ShoppingItem>): ShoppingItem => ({
-    name: 'X',
-    amount: 100,
-    unit: 'g',
-    checked: false,
-    ...o,
-  });
-
-  it('schätzt Preise je Einheit und berücksichtigt den Markt', () => {
-    const spar = estimatePrice(item({ amount: 100, unit: 'g' }), 'Spar');
-    const hofer = estimatePrice(item({ amount: 100, unit: 'g' }), 'Hofer');
-    expect(spar).toBeGreaterThan(hofer); // Diskonter günstiger
-    expect(estimatePrice(item({ amount: 1, unit: 'Stk' }))).toBeGreaterThanOrEqual(0.1);
-  });
-
-  it('summiert Schätzpreise zu estTotal', () => {
-    const { items, estTotal } = priceItems([
-      item({ amount: 200, unit: 'g' }),
-      item({ amount: 1, unit: 'Stk' }),
-    ]);
-    expect(items.every((i) => i.estPrice != null)).toBe(true);
-    const sum = items.reduce((s, i) => s + (i.estPrice ?? 0), 0);
-    expect(estTotal).toBeCloseTo(Math.round(sum * 100) / 100, 2);
+  it('liefert ohne Rezepte keinen Wochenplan', () => {
+    expect(buildWeekPlan([], 2, 5, 1)).toEqual({ items: [], suggestedDishes: [] });
   });
 });
 
@@ -134,14 +97,5 @@ describe('Skalierung mit halben Portionen', () => {
   it('fällt bei ungültigen Portionen auf 1 zurück', () => {
     const bad = recipe({ servings: 0, ingredients: [{ name: 'Reis', amount: 50, unit: 'g' }] });
     expect(buildShoppingList([bad], 1, 2).items[0].amount).toBe(100);
-  });
-});
-
-describe('Kategorien in der Generierung', () => {
-  it('versieht die Basis-Liste ohne Rezepte mit Kategorien', async () => {
-    const { buildShoppingList } = await import('./shopping-generator');
-    const { items } = buildShoppingList([], 1, 1);
-    expect(items.every((i) => typeof i.category === 'string')).toBe(true);
-    expect(items.find((i) => i.name === 'Nudeln')?.category).toBe('Trockenware/Nudeln/Reis');
   });
 });

@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { ShoppingItem } from '../models';
 import { AiService } from '../ai/ai.service';
+import { RecipeStore } from './recipe.store';
 import { ShoppingStore, mergeKept, sumItems } from './shopping.store';
 
 const item = (name: string, estPrice?: number, checked = false): ShoppingItem => ({
@@ -43,6 +44,12 @@ describe('sumItems / mergeKept — Randfälle', () => {
 
 describe('ShoppingStore — Verhalten', () => {
   let store: ShoppingStore;
+  const addRecipe = (): void => {
+    TestBed.inject(RecipeStore).add({
+      title: 'Reis', servings: 1, steps: [], origin: 'own',
+      ingredients: [{ name: 'Reis', amount: 100, unit: 'g' }],
+    });
+  };
 
   beforeEach(() => {
     store = setup();
@@ -76,26 +83,42 @@ describe('ShoppingStore — Verhalten', () => {
     expect(localStorage.getItem('nutritrack:shopping')).toBeNull();
   });
 
-  it('generiert per Mock mit Budget-Hinweis und behält abgehakte Positionen', async () => {
-    store.addItem(item('Eigenes', 1, true));
+  it('generiert ohne KI nur Mengen, ignoriert Budget/Markt und behält abgehakte Positionen', async () => {
+    addRecipe();
+    store.addItem(item('Eigenes', undefined, true));
     const list = await store.generatePlan({ persons: 2, days: 7, meals: ['dinner'], budget: 1, store: 'Lidl' });
     expect(list.priceSource).toBe('mock');
-    expect(list.note).toMatch(/über dem Budget/);
+    expect(list.budget).toBeUndefined();
+    expect(list.store).toBeUndefined();
+    expect(list.note).toBeUndefined();
     expect(list.items.some((i) => i.name === 'Eigenes' && i.checked)).toBe(true);
+    expect(list.items.filter((i) => !i.checked).every((i) => i.estPrice === undefined)).toBe(true);
     expect(list.dishes).toBe(7);
-    expect(list.estTotal).toBe(sumItems(list.items).total);
+    expect(list.estTotal).toBe(0);
+  });
+
+  it('verweigert die Generierung ohne KI und ohne Rezepte', async () => {
+    await expect(store.generatePlan({ persons: 2, days: 3, meals: ['dinner'] })).rejects.toThrow('Rezepte');
+    expect(store.list()).toBeNull();
+  });
+
+  it('behält eigene Positionen mit selbst eingetragenem Preis beim Neu-Generieren', async () => {
+    addRecipe();
+    store.addItem({ name: 'Kaffee', amount: 1, unit: 'Pck', checked: false, estPrice: 5.5, manual: true });
+    const list = await store.generatePlan({ persons: 1, days: 1, meals: ['dinner'] });
+    expect(list.items.find((i) => i.name === 'Kaffee')?.estPrice).toBe(5.5);
   });
 
   it('erzwingt Mindestwerte für Personen/Tage/Mahlzeiten', async () => {
+    addRecipe();
     const list = await store.generatePlan({ persons: 0, days: 0.5, meals: [] });
     expect(list.persons).toBe(1);
     expect(list.days).toBe(1);
     expect(list.dishes).toBe(1);
   });
 
-  it('entfernt einen veralteten Demo-Budgethinweis nach Änderung', async () => {
-    await store.generatePlan({ persons: 2, days: 7, meals: ['dinner'], budget: 1 });
-    expect(store.list()?.note).toBeDefined();
+  it('entfernt einen Hinweis zur alten Summe, sobald sich die Positionen ändern', () => {
+    store.addItem(item('a', 2));
     store.removeItem(0);
     expect(store.list()?.note).toBeUndefined();
   });
@@ -106,6 +129,9 @@ describe('ShoppingStore — KI-Fehler', () => {
     const store = setup({
       isLive: () => false,
       generateShoppingList: () => Promise.reject(new Error('kaputt')),
+    });
+    TestBed.inject(RecipeStore).add({
+      title: 'Reis', servings: 1, steps: [], origin: 'own', ingredients: [{ name: 'Reis', amount: 100, unit: 'g' }],
     });
     const list = await store.generatePlan({ persons: 1, days: 1, meals: ['lunch'] });
     expect(list.items.length).toBeGreaterThan(0);
@@ -131,5 +157,19 @@ describe('ShoppingStore — KI-Fehler', () => {
     expect(list.priceSource).toBe('ai');
     expect(list.estTotal).toBe(2.5);
     expect(list.suggestedDishes).toEqual(['Curry']);
+  });
+
+  it('ergänzt mit KI fehlende Preise über die Kategorie-Tabelle', async () => {
+    const store = setup({
+      isLive: () => true,
+      generateShoppingList: () =>
+        Promise.resolve({
+          items: [{ name: 'Hähnchenbrust', amount: 500, unit: 'g', checked: false, category: 'Fleisch & Fisch' }],
+          suggestedDishes: [],
+          estTotal: 0,
+        }),
+    });
+    const list = await store.generatePlan({ persons: 1, days: 1, meals: ['lunch'] });
+    expect(list.items[0].estPrice).toBeGreaterThan(0);
   });
 });

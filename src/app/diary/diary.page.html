@@ -10,15 +10,7 @@
     </button>
   </div>
 
-  <div class="date-nav">
-    <ion-button fill="clear" class="touch-btn" (click)="prevDay()" aria-label="Vorheriger Tag">
-      <ion-icon slot="icon-only" name="chevron-back-outline"></ion-icon>
-    </ion-button>
-    <span class="date-nav__label" aria-live="polite">{{ dateLabel() }}</span>
-    <ion-button fill="clear" class="touch-btn" (click)="nextDay()" [disabled]="isToday()" aria-label="Nächster Tag">
-      <ion-icon slot="icon-only" name="chevron-forward-outline"></ion-icon>
-    </ion-button>
-  </div>
+  <nt-date-nav [date]="selectedDate()" (dateChange)="setDate($event)"></nt-date-nav>
   @if (daySources().length) {
     <div class="day-actions">
       <button type="button" class="nt-pill nt-pill--secondary day-actions__copy" (click)="copyDay()" [attr.aria-label]="'Tag kopieren: einen früheren Tag zu ' + dateLabel() + ' hinzufügen'">
@@ -76,19 +68,22 @@
         <ion-list class="diary-list" lines="none">
           @for (entry of group.entries; track entry.id) {
             <div class="entry-row">
-            <ion-item-sliding>
+            <ion-item-sliding #sliding>
               <ion-item button detail="false" lines="none" (click)="openEdit(entry)">
                 <ion-label>
                   <h3>{{ entry.label }}@if (entry.brand) { <span class="entry-brand"> · {{ entry.brand }}</span> }</h3>
                   <p>
                     @if (entry.amountG) { {{ formatAmount(entry.amountG, entry.unit) }} · }
                     E {{ entry.facts.proteinG | ntNum }} g · KH {{ entry.facts.carbsG | ntNum }} g · F {{ entry.facts.fatG | ntNum }} g
-                    @if (entry.isEstimate) { · <span class="ai-badge">KI-Schätzung</span> }
+                    @if (entry.isEstimate) { · @if (ffLive()) { <span class="ai-badge">KI-Schätzung</span> } }
                   </p>
                 </ion-label>
                 <ion-note slot="end" class="kcal-note">{{ entry.isPartial ? 'mind. ' : '' }}{{ entry.facts.kcal | ntNum:0 }} kcal</ion-note>
               </ion-item>
               <ion-item-options side="end">
+                <ion-item-option color="medium" (click)="duplicate(entry); sliding.close()" [attr.aria-label]="'Doppelt eintragen: ' + entry.label">
+                  <ion-icon slot="top" name="copy-outline"></ion-icon> Doppelt
+                </ion-item-option>
                 <ion-item-option color="primary" (click)="openEdit(entry)" aria-label="Eintrag bearbeiten">
                   <ion-icon slot="icon-only" name="create-outline"></ion-icon>
                 </ion-item-option>
@@ -107,11 +102,13 @@
     </section>
   }
 
+  <p class="macro-legend">E = Eiweiß · KH = Kohlenhydrate · F = Fett</p>
+
   <div class="content-spacer"></div>
 </ion-content>
 
 <!-- Add-entry modal: Suchen → Menge → Speichern -->
-<ion-modal [isOpen]="isModalOpen()" (didPresent)="focusSearch()" (didDismiss)="closeAdd()">
+<ion-modal [isOpen]="isModalOpen()" [canDismiss]="canDismissAdd" (didPresent)="focusSearch()" (didDismiss)="closeAdd()">
   <ng-template>
     <div class="sheet-grabber" aria-hidden="true"></div>
     <ion-header class="ion-no-border sheet-header">
@@ -125,7 +122,7 @@
         }
         <ion-title role="heading" aria-level="2">{{ modalTitle() }}</ion-title>
         <ion-buttons slot="end">
-          <ion-button (click)="closeAdd()">Abbrechen</ion-button>
+          <ion-button (click)="requestCloseAdd()">Abbrechen</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
@@ -148,7 +145,7 @@
             class="nt-searchbar"
             [ngModel]="search.query"
             (ngModelChange)="search.onInput($event)"
-            (keyup.enter)="search.run()"
+            (keyup.enter)="pickFirstResult()"
             [debounce]="search.debounceMs"
             placeholder="Lebensmittel suchen…"
             aria-label="Lebensmittel suchen"
@@ -212,7 +209,7 @@
             <ion-list class="diary-list" lines="none">
               @for (entry of recentFoods(); track entry.id) {
                 <ion-item class="recent" lines="none">
-                  <button type="button" class="recent__main" (click)="quickAddRecent(entry)" [attr.aria-label]="entry.label + ' direkt hinzufügen'">
+                  <button type="button" class="recent__main" (click)="quickAddRecent(entry)" [attr.aria-label]="entry.label + ' direkt eintragen'">
                     <span class="recent__text">
                       <span class="recent__name">{{ entry.label }}@if (entry.brand) { <span class="entry-brand"> · {{ entry.brand }}</span> }</span>
                       <span class="recent__meta">
@@ -221,23 +218,23 @@
                     </span>
                     <span class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
                   </button>
-                  <ion-button slot="end" fill="clear" class="touch-btn touch-btn--text recent__edit" (click)="editRecent(entry)" [attr.aria-label]="entry.label + ' vor dem Speichern anpassen'">Anpassen</ion-button>
+                  <ion-button slot="end" fill="clear" class="touch-btn touch-btn--text recent__edit" (click)="editRecent(entry)" [attr.aria-label]="entry.label + ' vor dem Eintragen anpassen'">Anpassen</ion-button>
                 </ion-item>
               }
               @for (recipe of recentRecipes(); track recipe.id) {
                 <ion-item class="recent" lines="none">
-                  <button type="button" class="recent__main" (click)="quickAddRecipe(recipe)" [attr.aria-label]="recipe.title + ' direkt hinzufügen'">
+                  <button type="button" class="recent__main" (click)="quickAddRecipe(recipe)" [attr.aria-label]="recipe.title + ' direkt eintragen'">
                     <span class="recent__text">
                       <span class="recent__name">{{ recipe.title }}</span>
                       <span class="recent__meta">1 Portion · {{ recipe.factsPerServing?.kcal | ntNum:0 }} kcal</span>
                     </span>
                     <span class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
                   </button>
-                  <ion-button slot="end" fill="clear" class="touch-btn touch-btn--text recent__edit" (click)="selectRecipe(recipe)" [attr.aria-label]="recipe.title + ' vor dem Speichern anpassen'">Anpassen</ion-button>
+                  <ion-button slot="end" fill="clear" class="touch-btn touch-btn--text recent__edit" (click)="selectRecipe(recipe)" [attr.aria-label]="recipe.title + ' vor dem Eintragen anpassen'">Anpassen</ion-button>
                 </ion-item>
               }
             </ion-list>
-            <p class="scan-hint">Tippe auf einen Eintrag, um ihn mit der letzten Menge zu speichern.</p>
+            <p class="scan-hint">Tippe auf einen Eintrag, um ihn mit der letzten Menge einzutragen.</p>
           } @else {
             <p class="scan-hint scan-hint--empty">Suche oder scanne ein Lebensmittel.</p>
           }
@@ -294,7 +291,7 @@
         }
 
         @case ('meals') {
-          <p class="scan-hint">Tippe auf eine Mahlzeit, um alle Einträge direkt zu „{{ selectedMealLabel() }}“ hinzuzufügen.</p>
+          <p class="scan-hint">Tippe auf eine Mahlzeit, um alle Einträge direkt in „{{ selectedMealLabel() }}“ einzutragen.</p>
           <ion-list class="diary-list" lines="none">
             @for (meal of savedMeals(); track meal.id) {
               <ion-item button detail="false" lines="none" (click)="quickAddSavedMeal(meal)">
@@ -309,7 +306,7 @@
 
         @case ('form') {
           @if (isAiEstimate()) {
-            <p class="form-note"><span class="ai-badge">KI-Schätzung</span> Prüfe die Werte, bevor du speicherst.</p>
+            <p class="form-note"><span class="ai-badge">KI-Schätzung</span> Prüfe die Werte, bevor du einträgst.</p>
           }
           @if (isPartialRecipe()) {
             <p class="form-note"><span class="ai-badge">mind.</span> Einige Zutaten haben keine Nährwerte — die Summe ist eine Untergrenze.</p>
@@ -321,7 +318,7 @@
               <ion-input label="Name" labelPlacement="stacked" [ngModel]="form.label" (ngModelChange)="setLabel($event)" placeholder="z. B. Haferflocken" enterkeyhint="done"></ion-input>
             </ion-item>
             @if (quantityUnit === 'portion') {
-              <app-amount-row label="Portionen" suffix="Port." [text]="numText('servings', form.servings)" (textChange)="setServings($event)" (stepped)="stepAddServings($event)"></app-amount-row>
+              <app-amount-row label="Portionen" suffix="Portionen" [text]="numText('servings', form.servings)" (textChange)="setServings($event)" (stepped)="stepAddServings($event)"></app-amount-row>
             } @else {
               <app-amount-row [label]="quantityUnit === 'g' ? 'Menge' : 'Menge (optional)'" placeholder="z. B. 150" [unit]="amountUnit" [text]="numText('amount', form.amountG)" (textChange)="setAmount($event)" (unitChange)="setAmountUnit($event)" (stepped)="stepAddAmount($event)">
                 <ng-container *ngTemplateOutlet="chipRow; context: { chips: addChips, unit: amountUnit, pick: pickAmountFn }"></ng-container>
@@ -334,7 +331,7 @@
 
           <p class="preview" aria-live="polite">
             <strong>{{ form.kcal | ntNum:0 }}</strong> kcal ·
-            E {{ form.proteinG | ntNum }} g · KH {{ form.carbsG | ntNum }} g · F {{ form.fatG | ntNum }} g
+            Eiweiß {{ form.proteinG | ntNum }} g · Kohlenhydrate {{ form.carbsG | ntNum }} g · Fett {{ form.fatG | ntNum }} g
           </p>
 
           <ion-accordion-group class="diary-list diary-list--spaced adjust-group" [value]="adjustOpen()" (ionChange)="setAdjustOpen($event.detail.value)">
@@ -344,15 +341,14 @@
               </ion-item>
               <div slot="content" class="adjust nt-adjust-card">
                 <ion-list class="diary-list diary-list--flat" lines="none">
+                  <p class="adjust__hint">Gesamt für diese Menge</p>
                   <ion-item lines="none">
-                    <ion-select label="Mahlzeit" labelPlacement="stacked" [(ngModel)]="form.meal" interface="popover">
-                      @for (opt of mealOptions; track opt.value) {
-                        <ion-select-option [value]="opt.value">{{ opt.label }}</ion-select-option>
-                      }
-                    </ion-select>
+                    <ion-input type="text" inputmode="numeric" label="Kalorien (kcal)" labelPlacement="stacked" [ngModel]="numText('kcal', form.kcal)" (ngModelChange)="setField('kcal', $event)" (ionFocus)="selectAllOnFocus($event)" placeholder="0">
+                      @if (kcalDerived) { <span slot="end" class="adjust__badge">berechnet</span> }
+                    </ion-input>
                   </ion-item>
                   <ion-item lines="none">
-                    <ion-input type="text" inputmode="numeric" label="Kalorien (kcal)" labelPlacement="stacked" [ngModel]="numText('kcal', form.kcal)" (ngModelChange)="setField('kcal', $event)" (ionFocus)="selectAllOnFocus($event)" placeholder="0"></ion-input>
+                    <ion-toggle [checked]="kcalManual" (ionChange)="setKcalManual($event.detail.checked)" justify="space-between">kcal selbst eingeben</ion-toggle>
                   </ion-item>
                   <ion-item lines="none">
                     <ion-input type="text" inputmode="decimal" label="Eiweiß (g)" labelPlacement="stacked" [ngModel]="numText('proteinG', form.proteinG)" (ngModelChange)="setField('proteinG', $event)" (ionFocus)="selectAllOnFocus($event)" placeholder="0"></ion-input>
@@ -369,6 +365,9 @@
                   <ion-item lines="none">
                     <ion-input type="text" inputmode="decimal" label="Zucker (g)" labelPlacement="stacked" [ngModel]="numText('sugarG', form.sugarG)" (ngModelChange)="setField('sugarG', $event)" (ionFocus)="selectAllOnFocus($event)" placeholder="0"></ion-input>
                   </ion-item>
+                  <ion-item lines="none">
+                    <ion-input type="text" inputmode="decimal" label="Salz (g)" labelPlacement="stacked" [ngModel]="numText('saltG', form.saltG)" (ngModelChange)="setField('saltG', $event)" (ionFocus)="selectAllOnFocus($event)" placeholder="0"></ion-input>
+                  </ion-item>
                 </ion-list>
               </div>
             </ion-accordion>
@@ -380,7 +379,7 @@
     @if (view() === 'form') {
       <ion-footer class="ion-no-border add-footer">
         <ion-toolbar>
-          <ion-button expand="block" class="add-footer__save" (click)="save()">Speichern</ion-button>
+          <ion-button expand="block" class="add-footer__save" (click)="save()">Eintragen</ion-button>
         </ion-toolbar>
       </ion-footer>
     }
@@ -407,21 +406,8 @@
       @if (error()) {
         <p class="form-error" role="alert">{{ error() }}</p>
       }
-      <ion-list class="diary-list" lines="none">
-        <ion-item lines="none">
-          <ion-input label="Restaurant" labelPlacement="stacked" [(ngModel)]="ff.restaurant" placeholder="z. B. McDonald’s"></ion-input>
-        </ion-item>
-        <ion-item lines="none">
-          <ion-input type="text" inputmode="numeric" label="kcal-Budget" labelPlacement="stacked" [ngModel]="numText('ff.kcalBudget', ff.kcalBudget)" (ngModelChange)="setFastFoodField('kcalBudget', $event)" (ionFocus)="selectAllOnFocus($event)" placeholder="z. B. 800"></ion-input>
-        </ion-item>
-        <ion-item lines="none">
-          <ion-input type="text" inputmode="decimal" label="Geld-Budget (€)" labelPlacement="stacked" [ngModel]="numText('ff.moneyBudget', ff.moneyBudget)" (ngModelChange)="setFastFoodField('moneyBudget', $event)" (ionFocus)="selectAllOnFocus($event)" placeholder="optional"></ion-input>
-        </ion-item>
-        <ion-item lines="none">
-          <ion-input label="Priorität" labelPlacement="stacked" [(ngModel)]="ff.preference" placeholder="viel Protein"></ion-input>
-        </ion-item>
-      </ion-list>
-      <ion-button expand="block" class="sheet-action" (click)="runFastfood()" [disabled]="ffLoading()">
+      <app-fastfood-form [form]="ff" [live]="ffLive()" [remainingKcal]="targetKcal() > 0 ? remainingKcal() : null" (formChange)="ff = $event" (connectAi)="closeFastfood()"></app-fastfood-form>
+      <ion-button expand="block" class="sheet-action" (click)="runFastfood()" [disabled]="ffLoading() || !ffLive()">
         @if (ffLoading()) {
           <ion-spinner name="dots" slot="start"></ion-spinner> Suche…
         } @else {
@@ -446,7 +432,7 @@
           <ion-card-content>
             <p>{{ s.rationale }}</p>
             <ion-button size="small" fill="clear" class="touch-btn touch-btn--text" (click)="logFastfood(s)">
-              <ion-icon slot="start" name="add-circle-outline"></ion-icon> Zum Tagebuch hinzufügen
+              <ion-icon slot="start" name="add-circle-outline"></ion-icon> Eintragen
             </ion-button>
           </ion-card-content>
         </ion-card>
@@ -456,17 +442,17 @@
 </ion-modal>
 
 <!-- Edit-Eintrag modal -->
-<ion-modal [isOpen]="editOpen()" (didDismiss)="closeEdit()">
+<ion-modal [isOpen]="editOpen()" [canDismiss]="canDismissEdit" (didDismiss)="closeEdit()">
   <ng-template>
     <div class="sheet-grabber" aria-hidden="true"></div>
     <ion-header class="ion-no-border sheet-header">
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-button (click)="closeEdit()">Abbrechen</ion-button>
+          <ion-button (click)="requestCloseEdit()">Abbrechen</ion-button>
         </ion-buttons>
         <ion-title role="heading" aria-level="2">Eintrag bearbeiten</ion-title>
         <ion-buttons slot="end">
-          <ion-button class="sheet-header__save" (click)="saveEdit()">Sichern</ion-button>
+          <ion-button class="sheet-header__save" (click)="saveEdit()">Speichern</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
@@ -479,18 +465,15 @@
           <ion-input label="Name" labelPlacement="stacked" [(ngModel)]="editForm.label" enterkeyhint="done"></ion-input>
         </ion-item>
         @if (editMode === 'portion') {
-          <app-amount-row label="Portionen" suffix="Port." [text]="numText('editServings', editServings)" (textChange)="setEditServings($event)" (stepped)="stepEditServings($event)"></app-amount-row>
+          <app-amount-row label="Portionen" suffix="Portionen" [text]="numText('editServings', editServings)" (textChange)="setEditServings($event)" (stepped)="stepEditServings($event)"></app-amount-row>
         } @else {
           <app-amount-row [label]="editMode === 'optional' ? 'Menge (optional)' : 'Menge'" [unit]="editUnit" [text]="numText('editAmount', editForm.amountG)" (textChange)="setEditAmount($event)" (unitChange)="setEditUnit($event)" (stepped)="stepEditAmount($event)">
             <ng-container *ngTemplateOutlet="chipRow; context: { chips: editChips, unit: editUnit, pick: pickEditAmountFn }"></ng-container>
           </app-amount-row>
         }
-        <ion-item lines="none">
-          <ion-select label="Mahlzeit" labelPlacement="stacked" [(ngModel)]="editForm.meal" interface="popover">
-            @for (opt of mealOptions; track opt.value) {
-              <ion-select-option [value]="opt.value">{{ opt.label }}</ion-select-option>
-            }
-          </ion-select>
+        <ion-item button detail="true" lines="none" (click)="pickEditMeal()" [attr.aria-label]="'Mahlzeit wählen, aktuell ' + mealLabelOf(editForm.meal)">
+          <ion-label>Mahlzeit</ion-label>
+          <ion-note slot="end">{{ mealLabelOf(editForm.meal) }}</ion-note>
         </ion-item>
       </ion-list>
       <button type="button" class="edit-delete" (click)="deleteFromEdit()">
@@ -504,8 +487,8 @@
 <ng-template #chipRow let-chips="chips" let-unit="unit" let-pick="pick">
   <div class="quick-amounts" role="group" aria-label="Schnellwahl Menge">
     @for (chip of chips; track chip.value) {
-      <button type="button" class="nt-pill nt-pill--secondary quick-chip" [class.quick-chip--last]="chip.isLast" (click)="pick(chip.value)" [attr.aria-label]="(chip.isLast ? 'Menge wie zuletzt: ' : 'Menge ') + (chip.value | ntNum:3) + ' ' + unit">
-        {{ chip.value | ntNum:3 }}
+      <button type="button" class="nt-pill nt-pill--secondary quick-chip" [class.quick-chip--last]="chip.isLast" (click)="pick(chip.value)" [attr.aria-label]="(chip.isLast ? 'Menge wie zuletzt: ' : 'Menge ') + chipText(chip.value, unit) + ' ' + unit">
+        {{ chipText(chip.value, unit) }}
         @if (chip.isLast) { <small>zuletzt</small> }
       </button>
     }

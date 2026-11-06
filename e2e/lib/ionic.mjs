@@ -53,3 +53,23 @@ export async function pickUnit(page, scope, unit) {
   await btn.click();
   await settle(page, 400);
 }
+
+/** Setzt einen nt-stepper per −/+. Leer: erstes Tippen springt auf `start`; sonst Schritte ab aktuellem Wert. */
+export async function stepTo(scope, label, { start, step, target }) {
+  const page = scope.page();
+  const stepper = scope.locator(`nt-stepper[label="${label}"]`);
+  const btn = (dir) => stepper.locator(`button[aria-label="${label} ${dir}"]`);
+  const shown = (await stepper.locator('.stepper__value').innerText()).trim();
+  let current = start;
+  if (shown.startsWith('–')) {
+    await btn('erhöhen').click();
+    await settle(page, 150);
+  } else {
+    current = parseFloat(shown.replace(',', '.'));
+  }
+  const diff = Math.round((target - current) / step);
+  for (let n = 0; n < Math.abs(diff); n++) {
+    await btn(diff > 0 ? 'erhöhen' : 'verringern').click();
+    await settle(page, 150);
+  }
+}

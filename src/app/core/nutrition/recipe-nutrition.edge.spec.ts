@@ -37,8 +37,8 @@ describe('recipe-nutrition — Randfälle', () => {
     expect(ingredientFacts(ing({ amount: 1, unit: 'Stück', facts: per100g(100) })).kcal).toBe(80);
   });
 
-  it('rechnet Prise (0,5 g) über das Näherungsgewicht', () => {
-    expect(ingredientFacts(ing({ amount: 2, unit: 'Prise', facts: per100g(400) })).kcal).toBe(4);
+  it('rechnet Prise (1 g) über das Näherungsgewicht', () => {
+    expect(ingredientFacts(ing({ amount: 2, unit: 'Prise', facts: per100g(400) })).kcal).toBe(8);
   });
 
   it('zählt eine unbekannte Einheit bei per100g als Faktor (aktuelles Verhalten)', () => {

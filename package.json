@@ -28,10 +28,13 @@
     "@capacitor/keyboard": "8.0.6",
     "@capacitor/status-bar": "8.0.4",
     "@ionic/angular": "^9.0.0",
+    "@tesseract.js-data/deu": "^1.0.0",
+    "@tesseract.js-data/eng": "^1.0.0",
     "@zxing/browser": "^0.2.1",
     "@zxing/library": "^0.23.0",
     "ionicons": "^8.1.0",
     "rxjs": "~7.8.0",
+    "tesseract.js": "^7.0.0",
     "tslib": "^2.3.0"
   },
   "devDependencies": {

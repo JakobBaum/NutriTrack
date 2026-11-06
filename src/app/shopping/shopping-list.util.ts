@@ -131,3 +131,40 @@ export function defaultPersons(profile: object | null, lastListPersons?: number)
     DEFAULT_PERSONS
   );
 }
+
+/** Gängige Wochen-Budgets (EUR) als Schnellwahl; null = „egal“ steht separat daneben. */
+export const BUDGET_PRESETS: readonly number[] = [50, 75, 100, 150];
+
+/** Schnellwahl für die Tage; andere Werte (1–14) über den Stepper. */
+export const DAY_PRESETS: readonly number[] = [1, 3, 5, 7];
+
+export const PERSONS_MIN = 1;
+export const PERSONS_MAX = 8;
+export const DAYS_MIN = 1;
+export const DAYS_MAX = 14;
+
+/** Personenzahl-Vorbelegung innerhalb des Steppers (1–8). */
+export function defaultPersonsInRange(profile: object | null, lastListPersons?: number): number {
+  return Math.min(PERSONS_MAX, Math.max(PERSONS_MIN, defaultPersons(profile, lastListPersons)));
+}
+
+/**
+ * Zutaten eines Rezepts als Einkaufspositionen, auf `persons` skaliert
+ * (`persons / servings`). Selbst hinzugefügt (`manual`), ohne Preis.
+ */
+export function scaleRecipeIngredients(
+  recipe: { servings: number; ingredients: readonly { name: string; amount: number; unit: string }[] },
+  persons: number,
+): ShoppingItem[] {
+  const servings = Number.isFinite(recipe.servings) && recipe.servings > 0 ? recipe.servings : 1;
+  const factor = persons / servings;
+  return recipe.ingredients
+    .filter((ing) => ing.name.trim() !== '')
+    .map((ing) => ({
+      name: ing.name.trim(),
+      amount: Math.round(ing.amount * factor * 100) / 100,
+      unit: ing.unit.trim() || 'g',
+      checked: false,
+      manual: true,
+    }));
+}

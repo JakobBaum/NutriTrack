@@ -5,17 +5,25 @@ import { UNIT_OPTIONS } from '../core/util/units';
 import { AiService } from '../core/ai/ai.service';
 import { MealType } from '../core/models';
 import { ProfileStore } from '../core/state/profile.store';
+import { RecipeStore } from '../core/state/recipe.store';
 import { ShoppingStore, sumItems } from '../core/state/shopping.store';
 import { UNDO_TOAST_BUTTONS, UNDO_TOAST_MS, UndoableDelete, settleUndoToast } from '../meals/undoable-delete';
 import {
+  BUDGET_PRESETS,
+  DAYS_MAX,
+  DAYS_MIN,
+  DAY_PRESETS,
+  PERSONS_MAX,
+  PERSONS_MIN,
   ShoppingRow,
   adjustIndex,
   categoryLabel,
   decodeIndexes,
-  defaultPersons,
+  defaultPersonsInRange,
   encodeIndexes,
   formatShareText,
   groupByCategory,
+  scaleRecipeIngredients,
   splitRows,
 } from './shopping-list.util';
 
@@ -46,6 +54,7 @@ export class ShoppingPage implements OnDestroy {
   private readonly store = inject(ShoppingStore);
   private readonly profileStore = inject(ProfileStore);
   private readonly ai = inject(AiService);
+  private readonly recipeStore = inject(RecipeStore);
   private readonly alertCtrl = inject(AlertController);
 
   /** Eine ID = Komma-Liste von Indizes (Einzel- oder Sammel-Löschen). */
@@ -78,20 +87,29 @@ export class ShoppingPage implements OnDestroy {
   readonly shareToastMessage = signal('');
   readonly shareToastDuration = SHARE_TOAST_MS;
 
-  /** Summe aus den sichtbaren Positionen; `unpriced` = Positionen ohne Schätzpreis. */
+  /** Summe aus den sichtbaren Positionen; nur echte bzw. eingetragene Preise zählen. */
   readonly totals = computed(() => {
     const all = this.rows().map((r) => r.item);
     const sum = sumItems(all);
     const open = sumItems(all.filter((i) => !i.checked));
-    return { total: sum.total, unpriced: sum.unpriced, open: open.total };
+    return { total: sum.total, unpriced: sum.unpriced, open: open.total, priced: all.length - sum.unpriced };
   });
 
-  /** Badge-Text je Preisquelle; Altlisten ohne Quelle folgen dem aktiven Anbieter. */
-  readonly priceLabel = computed(() => {
-    const source = this.list()?.priceSource ?? (this.ai.isLive() ? 'ai' : 'mock');
-    return source === 'mock' ? 'Grobe Schätzung (Demo-Formel)' : 'KI-Schätzung';
-  });
-  readonly isMockPrice = computed(() => this.priceLabel() !== 'KI-Schätzung');
+  /** Echte KI-Verbindung aktiv (nur dann gibt es geschätzte Preise, Budget und Markt). */
+  readonly live = computed(() => this.ai.isLive());
+  /** Ohne KI keine Rezepte = nichts zu generieren. */
+  readonly hasRecipes = computed(() => this.recipeStore.recipes().length > 0);
+  readonly noRecipesBlock = computed(() => !this.live() && !this.hasRecipes());
+  /** Summen zeigen, wenn die Liste KI-Preise hat oder mindestens ein Preis eingetragen ist. */
+  readonly showTotals = computed(() => this.totals().priced > 0);
+  readonly isMockPrice = computed(() => (this.list()?.priceSource ?? (this.live() ? 'ai' : 'mock')) === 'mock');
+
+  readonly personsMin = PERSONS_MIN;
+  readonly personsMax = PERSONS_MAX;
+  readonly daysMin = DAYS_MIN;
+  readonly daysMax = DAYS_MAX;
+  readonly dayPresets = DAY_PRESETS;
+  readonly budgetPresets = BUDGET_PRESETS;
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
 
@@ -101,7 +119,7 @@ export class ShoppingPage implements OnDestroy {
   readonly showGenerator = computed(() => this.list() === null || this.formOpen());
 
   /** Vorbelegung aus dem Profil, sonst aus der letzten generierten Liste. */
-  persons = defaultPersons(this.profileStore.profile(), this.lastGeneratedPersons());
+  persons = defaultPersonsInRange(this.profileStore.profile(), this.lastGeneratedPersons());
   days = 5;
   budget: number | null = null;
   storeName = '';
@@ -292,12 +310,56 @@ export class ShoppingPage implements OnDestroy {
     this.shareToastOpen.set(false);
   }
 
-  /** Header-„+“: Eingabezeile ins Bild holen und fokussieren. */
-  focusAddForm(): void {
-    const el = this.addNameInput()?.nativeElement;
-    if (!el) return;
-    el.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
-    void el.setFocus?.();
+  /** Tippen auf ein Gericht: seine Zutaten (auf die Personenzahl skaliert) landen in der Liste. */
+  addDish(title: string): void {
+    const recipe = this.recipeStore.recipes().find((r) => r.title === title);
+    const items = recipe ? scaleRecipeIngredients(recipe, this.list()?.persons ?? this.persons) : [];
+    if (items.length === 0) {
+      this.showShareToast(`${title}: keine Zutaten hinterlegt`);
+      return;
+    }
+    items.forEach((it) => this.store.addItem(it));
+    this.showShareToast(`${items.length} Zutaten von ${title} hinzugefügt`);
+  }
+
+  setBudget(value: number | null): void {
+    this.budget = value;
+  }
+
+  setDays(value: number): void {
+    this.days = value;
+  }
+
+  setPersons(value: number): void {
+    this.persons = value;
+  }
+
+  /** Eigenen Preis einer Position eintragen oder löschen (leer lassen). */
+  async editPrice(index: number): Promise<void> {
+    const item = this.list()?.items[index];
+    if (!item) return;
+    const alert = await this.alertCtrl.create({
+      header: 'Preis eintragen',
+      subHeader: item.name,
+      inputs: [
+        {
+          name: 'price',
+          type: 'text',
+          placeholder: 'Preis in €',
+          value: item.estPrice != null ? formatDecimal(item.estPrice) : '',
+          attributes: { inputmode: 'decimal' },
+        },
+      ],
+      buttons: [
+        { text: 'Abbrechen', role: 'cancel' },
+        { text: 'Speichern', role: 'confirm' },
+      ],
+    });
+    await alert.present();
+    const { role, data } = await alert.onDidDismiss<{ values?: { price?: string } }>();
+    if (role !== 'confirm') return;
+    const raw = String(data?.values?.price ?? '').trim();
+    this.store.setItemPrice(index, raw === '' ? null : parseDecimal(raw));
   }
 
   addManual(): void {

@@ -1,0 +1,99 @@
+<div class="nt-grouped ff-group">
+  <ion-item lines="none">
+    <ion-select
+      label="Restaurant"
+      labelPlacement="stacked"
+      interface="action-sheet"
+      cancelText="Abbrechen"
+      [interfaceOptions]="{ header: 'Restaurant wählen' }"
+      [value]="choice"
+      (ionChange)="onChoice($event.detail.value)"
+    >
+      @for (c of chains; track c) {
+        <ion-select-option [value]="c">{{ c }}</ion-select-option>
+      }
+      <ion-select-option [value]="other">Anderes …</ion-select-option>
+    </ion-select>
+  </ion-item>
+  @if (choice === other) {
+    <ion-item lines="none">
+      <ion-input
+        label="Name des Restaurants"
+        labelPlacement="stacked"
+        placeholder="z. B. Dönerladen um die Ecke"
+        [ngModel]="customRestaurant"
+        (ngModelChange)="onCustom($event)"
+      ></ion-input>
+    </ion-item>
+  }
+
+  <div class="ff-range">
+    <div class="ff-range__head">
+      <span class="ff-range__label" [id]="ids.kcal">kcal-Budget</span>
+      <output class="ff-range__value" [attr.aria-labelledby]="ids.kcal">{{ kcal }} kcal</output>
+    </div>
+    @if (budgetUsedUp) {
+      <p class="ff-range__note" role="status">Kein Kalorienbudget mehr übrig</p>
+    }
+    <ion-range
+      [attr.aria-labelledby]="ids.kcal"
+      [min]="kcalRange.min" [max]="kcalRange.max" [step]="kcalRange.step"
+      [ticks]="true" [snaps]="true" [pin]="true" [pinFormatter]="formatPin"
+      [value]="kcal"
+      (ionInput)="onKcal($event.detail.value)"
+    >
+      <span slot="start" class="ff-range__bound">{{ kcalRange.min }}</span>
+      <span slot="end" class="ff-range__bound">{{ kcalRange.max }}</span>
+    </ion-range>
+  </div>
+
+  <div class="ff-range">
+    <div class="ff-range__head">
+      <span class="ff-range__label" [id]="ids.money">Geld-Budget</span>
+      <output class="ff-range__value" [attr.aria-labelledby]="ids.money">{{ moneyText }}</output>
+    </div>
+    <ion-range
+      [attr.aria-labelledby]="ids.money"
+      [min]="moneyRange.min" [max]="moneyRange.max" [step]="moneyRange.step"
+      [ticks]="false" [snaps]="false" [pin]="true" [pinFormatter]="formatPin"
+      [disabled]="noMoneyLimit"
+      [value]="money"
+      (ionInput)="onMoney($event.detail.value)"
+    >
+      <span slot="start" class="ff-range__bound">{{ moneyRange.min }} €</span>
+      <span slot="end" class="ff-range__bound">{{ moneyRange.max }} €</span>
+    </ion-range>
+    <ion-toggle
+      class="ff-range__toggle"
+      labelPlacement="start"
+      justify="space-between"
+      [checked]="noMoneyLimit"
+      (ionChange)="onNoLimit($event.detail.checked)"
+    >Kein Limit</ion-toggle>
+  </div>
+
+  <ion-item lines="none">
+    <ion-select
+      label="Priorität"
+      labelPlacement="stacked"
+      interface="action-sheet"
+      cancelText="Abbrechen"
+      [interfaceOptions]="{ header: 'Priorität wählen' }"
+      [value]="preference"
+      (ionChange)="onPreference($event.detail.value)"
+    >
+      @for (p of preferences; track p.value) {
+        <ion-select-option [value]="p.value">{{ p.label }}</ion-select-option>
+      }
+    </ion-select>
+  </ion-item>
+</div>
+
+@if (!live) {
+  <div class="ff-connect" role="note">
+    <p>Für Vorschläge KI verbinden.</p>
+    <ion-button size="small" fill="clear" (click)="openAiSettings()">
+      <ion-icon slot="start" name="sparkles-outline"></ion-icon> Profil › KI-Verbindung
+    </ion-button>
+  </div>
+}

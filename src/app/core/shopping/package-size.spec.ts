@@ -33,7 +33,7 @@ describe('roundToPackage', () => {
 
   it('rechnet Zwiebeln in Gramm in ganze Stück um', () => {
     const r = roundToPackage(item('Zwiebel', 250, 'g'));
-    expect(r).toMatchObject({ amount: 3, unit: 'Stk' });
+    expect(r).toMatchObject({ amount: 4, unit: 'Stk' });
   });
 
   it('rundet Zählware auf ganze Stück', () => {

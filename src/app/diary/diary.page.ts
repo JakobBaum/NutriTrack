@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, ParamMap, Router } from '@angular/router';
-import { AlertController, ToastController } from '@ionic/angular';
+import { ActionSheetController, AlertController, ToastController } from '@ionic/angular';
 import type { IScannerControls } from '@zxing/browser';
 import { AmountUnit, DiaryEntry, FastFoodSuggestion, FoodItem, MealType, NutritionFacts, Recipe, SavedMeal } from '../core/models';
 import { AiService } from '../core/ai/ai.service';
@@ -24,10 +24,16 @@ import { MealsStore } from '../core/state/meals.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { RecipeStore } from '../core/state/recipe.store';
 import { CustomFood, CustomFoodStore } from '../core/state/custom-food.store';
-import { addDaysISO, dayLabel, toDateISO } from '../core/util/date';
+import { dayLabel, toDateISO } from '../core/util/date';
+import { LabelOcrService } from '../core/scan/label-ocr.service';
+import { blankFieldsFor, readLabelOffline } from './label-scan';
+import { FASTFOOD_CHAINS, FastFoodForm, defaultKcalBudget } from './fastfood-options';
 import { formatNum } from '../shared/num.pipe';
 import { countMissingFacts } from '../recipes/recipe-view';
 import { DiarySearch } from './diary-search';
+import { confirmDiscardSheet, pickMealSheet } from './diary-sheets';
+import { lightHaptic } from './haptics';
+import { hasMacros, withDerivedKcal } from './nutrient-fields';
 import { AmountRowComponent } from './amount-row.component';
 import {
   AmountChip, EditMode, StepDirection, amountChips, editModeFor, entryToInput, mealShortLabel, stepAmount, stepServings, withServings,
@@ -52,6 +58,7 @@ import {
   unitForName,
   AMOUNT_UNITS,
   formatAmount,
+  formatChipAmount,
   baseUnitOf,
   fromBaseAmount,
   toBaseAmount,
@@ -98,13 +105,6 @@ interface ApplyOptions {
   brand?: string;
 }
 
-interface FastFoodForm {
-  restaurant: string;
-  kcalBudget: number | null;
-  moneyBudget: number | null;
-  preference: string;
-}
-
 const EMPTY_FORM: EntryForm = {
   ...EMPTY_FIELDS,
   label: '',
@@ -145,12 +145,14 @@ export class DiaryPage implements OnDestroy {
   private readonly food = inject(FOOD_PROVIDER);
   private readonly ai = inject(AiService);
   private readonly camera = inject(CameraService);
+  private readonly labelOcr = inject(LabelOcrService);
   private readonly barcode = inject(BarcodeScannerService);
   private readonly prices = inject(OpenPricesProvider);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly toastCtrl = inject(ToastController);
   private readonly alertCtrl = inject(AlertController);
+  private readonly sheetCtrl = inject(ActionSheetController);
 
   @ViewChild('barcodeVideo') barcodeVideo?: ElementRef<HTMLVideoElement>;
   @ViewChild('searchbar') searchbar?: { setFocus(): Promise<void> };
@@ -214,6 +216,10 @@ export class DiaryPage implements OnDestroy {
   /** True, wenn die Rezeptwerte unvollständig sind (Zutaten ohne Nährwerte). */
   private isPartialSource = false;
   form: EntryForm = { ...EMPTY_FORM };
+  /** True, sobald im Add-Sheet etwas getippt wurde (dann fragt das Schließen „Verwerfen?“). */
+  private addDirty = false;
+  /** kcal selbst eingegeben (true) oder aus den Makros berechnet (false). */
+  kcalManual = false;
 
   /** Gewähltes Rezept (für die ref des Eintrags), null bei manuell/Food. */
   private pickedRecipeId: string | null = null;
@@ -241,6 +247,8 @@ export class DiaryPage implements OnDestroy {
   /** Welche Mengenzeile der Bearbeiten-Dialog zeigt (Menge, Portionen, optionale Menge). */
   editMode: EditMode = 'amount';
   editServings: number | null = null;
+  /** Stand der Felder beim Öffnen; Abweichung = „Verwerfen?“ beim Schließen. */
+  private editInitial = '';
 
   /** Freitext-Filter für die Rezept-Auswahl im Add-Modal. */
   readonly recipeQuery = signal('');
@@ -304,9 +312,9 @@ export class DiaryPage implements OnDestroy {
   readonly ffOpen = signal(false);
   readonly ffLoading = signal(false);
   readonly ffResults = signal<FastFoodSuggestion[]>([]);
-  /** True, sobald eine Fastfood-Suche gelaufen ist (für den Leerzustand). */
-  readonly ffSearched = signal(false);
-  ff: FastFoodForm = { restaurant: 'McDonald’s', kcalBudget: null, moneyBudget: null, preference: 'viel Protein' };
+  readonly ffSearched = signal(false); // true nach der ersten Suche (Leerzustand)
+  ff: FastFoodForm = { restaurant: FASTFOOD_CHAINS[0], kcalBudget: null, moneyBudget: null, preference: 'viel Protein' };
+  ffLive = (): boolean => this.ai.isLive();
 
   constructor() {
     this.route.queryParamMap
@@ -353,16 +361,14 @@ export class DiaryPage implements OnDestroy {
     document.getElementById('meal-' + meal)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  prevDay(): void {
-    this.selectedDate.update((d) => addDaysISO(d, -1));
-  }
-
-  nextDay(): void {
-    this.selectedDate.update((d) => addDaysISO(d, 1));
+  setDate(dateISO: string): void {
+    this.selectedDate.set(dateISO);
   }
 
   // --- Add modal: öffnen / schließen / navigieren ---
   openAdd(meal: MealType = this.currentMeal()): void {
+    this.addDirty = false;
+    this.kcalManual = false;
     this.form = { ...EMPTY_FORM, meal };
     this.clearRawTexts(ADD_FORM_TEXT_KEYS);
     this.amountUnit = 'g';
@@ -389,7 +395,20 @@ export class DiaryPage implements OnDestroy {
   }
 
   closeAdd(): void {
+    this.addDirty = false;
     this.isModalOpen.set(false);
+  }
+
+  /** canDismiss des Add-Sheets (Wischen/Hintergrund): nur mit Rückfrage, wenn Eingaben offen sind. */
+  readonly canDismissAdd = (): Promise<boolean> => this.confirmAddClose();
+
+  /** Abbrechen-Button: schließt, ggf. nach Rückfrage. */
+  async requestCloseAdd(): Promise<void> {
+    if (await this.confirmAddClose()) this.closeAdd();
+  }
+
+  private async confirmAddClose(): Promise<boolean> {
+    return !this.addDirty || confirmDiscardSheet(this.sheetCtrl);
   }
 
   /** ion-modal didPresent → Suchfeld fokussieren, damit sofort getippt werden kann. */
@@ -454,6 +473,7 @@ export class DiaryPage implements OnDestroy {
   /** Name geändert: bei manueller Eingabe die Einheit vorschlagen, solange nicht manuell gewählt. */
   setLabel(value: unknown): void {
     const label = typeof value === 'string' ? value : '';
+    this.addDirty = true;
     this.form = { ...this.form, label };
     if (!this.scaleBase && !this.unitTouched) this.amountUnit = unitForName(label);
   }
@@ -488,6 +508,8 @@ export class DiaryPage implements OnDestroy {
     this.pickedRecipeId = null;
     this.pickedBrand = undefined;
     const label = this.search.query.trim();
+    this.addDirty = false;
+    this.kcalManual = false;
     this.form = { ...this.form, ...EMPTY_FIELDS, label, amountG: null, servings: null };
     this.clearRawTexts(ADD_FORM_TEXT_KEYS);
     this.amountUnit = unitForName(label);
@@ -514,12 +536,22 @@ export class DiaryPage implements OnDestroy {
   /** Nährwert-Feld (kcal/Eiweiß/...) aus Texteingabe setzen. */
   setField(key: keyof EntryFields, value: unknown): void {
     this.rawTexts[key] = String(value ?? '');
-    this.form = { ...this.form, [key]: toNumberOrNull(value) };
+    this.addDirty = true;
+    if (key === 'kcal') this.kcalManual = true;
+    const next = { ...this.form, [key]: toNumberOrNull(value) };
+    const isMacro = key === 'proteinG' || key === 'carbsG' || key === 'fatG';
+    this.form = isMacro && !this.kcalManual ? { ...next, ...withDerivedKcal(next) } : next;
   }
 
-  setFastFoodField(key: 'kcalBudget' | 'moneyBudget', value: unknown): void {
-    this.rawTexts['ff.' + key] = String(value ?? '');
-    this.ff = { ...this.ff, [key]: toNumberOrNull(value) };
+  /** Schalter „kcal selbst eingeben“; aus = kcal wieder aus den Makros berechnen. */
+  setKcalManual(on: boolean): void {
+    this.kcalManual = on;
+    if (!on) this.form = { ...this.form, ...withDerivedKcal(this.form) };
+  }
+
+  /** True, wenn die kcal gerade aus den Makros berechnet angezeigt werden. */
+  get kcalDerived(): boolean {
+    return !this.kcalManual && hasMacros(this.form);
   }
 
   setEditAmount(value: unknown): void {
@@ -534,6 +566,16 @@ export class DiaryPage implements OnDestroy {
 
   get editChips(): AmountChip[] {
     return amountChips(this.editUnit, this.lastAmountFor(this.editForm.label, this.editUnit, this.editEntryId));
+  }
+
+  /** Beschriftung der Schnellwahl-Chips (g/ml ohne, kg/l mit bis zu 2 Nachkommastellen). */
+  readonly chipText = formatChipAmount;
+  readonly mealLabelOf = mealLabel;
+
+  /** Enter im Suchfeld wählt den ersten Treffer. */
+  async pickFirstResult(): Promise<void> {
+    const first = await this.search.pickFirst();
+    if (first) this.selectFood(first);
   }
 
   /** Chip-Klick-Handler (als Funktion fürs Template-Outlet). */
@@ -590,12 +632,14 @@ export class DiaryPage implements OnDestroy {
   }
 
   setAmount(value: unknown): void {
+    this.addDirty = true;
     if (typeof value === 'string') this.rawTexts['amount'] = value;
     this.form = { ...this.form, amountG: toNumberOrNull(value) };
     this.rescale();
   }
 
   setServings(value: unknown): void {
+    this.addDirty = true;
     if (typeof value === 'string') this.rawTexts['servings'] = value;
     this.form = { ...this.form, servings: toNumberOrNull(value) };
     this.rescale();
@@ -625,6 +669,8 @@ export class DiaryPage implements OnDestroy {
     const factor = unit === 'g' ? (baseAmount ?? 0) / 100 : (servings ?? 0);
 
     this.scaleBase = { facts, unit };
+    this.addDirty = false;
+    this.kcalManual = true;
     this.clearRawTexts(ADD_FORM_TEXT_KEYS);
     this.amountUnit = shownUnit;
     this.unitTouched = false;
@@ -743,7 +789,8 @@ export class DiaryPage implements OnDestroy {
     return this.mealsStore.totalKcal(meal);
   }
 
-  private addAndConfirm(inputs: NewDiaryEntry[], verb = 'Hinzugefügt'): void {
+  private addAndConfirm(inputs: NewDiaryEntry[], verb = 'Eingetragen'): void {
+    lightHaptic();
     const added = inputs.map((input) => this.diary.add(input));
     this.closeAdd();
     const kcal = added.reduce((sum, e) => sum + (e.facts.kcal || 0), 0);
@@ -752,8 +799,7 @@ export class DiaryPage implements OnDestroy {
     );
   }
 
-  // --- Etikett-Scan (KI) ---
-  /** Native Kamera, sonst Datei-Dialog. */
+  // --- Etikett-Scan (KI/OCR); Native Kamera, sonst Datei-Dialog ---
   startLabelScan(fileInput: HTMLInputElement): void {
     if (this.nativeCamera) {
       void this.takeLabelPhoto();
@@ -799,13 +845,21 @@ export class DiaryPage implements OnDestroy {
     this.error.set(message);
   }
 
-  /** Ruft die KI-Etiketterkennung und schreibt das Ergebnis ins Formular. */
+  /** Etikett lesen: mit KI per Vision, sonst On-Device-OCR (bei Misserfolg manuelles Formular). */
   private async recognizeLabel(base64: string): Promise<void> {
-    const res = await this.ai.recognizeLabel(base64, 'per100g');
-    this.applyFacts(res.name, res.facts, {
-      isAi: true,
-      hint: 'Werte pro 100 g erkannt — bitte mit dem Etikett vergleichen.',
-    });
+    if (this.ai.isLive()) {
+      const res = await this.ai.recognizeLabel(base64, 'per100g');
+      this.applyFacts(res.name, res.facts, { isAi: true, hint: 'Werte pro 100 g erkannt — bitte mit dem Etikett vergleichen.' });
+      return;
+    }
+    const out = await readLabelOffline(this.labelOcr, base64);
+    if (!out.ok) {
+      this.ensureAddOpen();
+      this.openManualEntry();
+      return this.error.set(out.message);
+    }
+    this.applyFacts('', out.facts, { hint: out.hint });
+    this.form = { ...this.form, ...blankFieldsFor(out.missing) };
   }
 
   // --- Barcode scanner ---
@@ -951,8 +1005,9 @@ export class DiaryPage implements OnDestroy {
     });
     if (!recipeId && base?.unit !== 'g') this.customFoods.save(label, facts);
 
+    lightHaptic();
     this.closeAdd();
-    void this.showToast(`Gespeichert · ${formatNum(facts.kcal, 0)} kcal`, () => this.diary.remove(entry.id));
+    void this.showToast(`Eingetragen · ${formatNum(facts.kcal, 0)} kcal`, () => this.diary.remove(entry.id));
   }
 
   /** Bezugswerte für spätere Mengenänderung; bei manuell angepassten Werten daraus neu abgeleitet. */
@@ -979,12 +1034,36 @@ export class DiaryPage implements OnDestroy {
       amountG: entry.amountG == null ? null : fromBaseAmount(entry.amountG, this.editUnit),
     };
     this.editError = null;
+    this.editInitial = this.editSnapshot();
     this.editOpen.set(true);
   }
 
   closeEdit(): void {
-    this.editOpen.set(false);
     this.editEntry = null;
+    this.editOpen.set(false);
+  }
+
+  private editSnapshot(): string {
+    const f = this.editForm;
+    return JSON.stringify([f.label, f.meal, f.amountG, this.editUnit, this.editServings]);
+  }
+
+  /** canDismiss des Bearbeiten-Sheets: Rückfrage nur bei geänderten Feldern. */
+  readonly canDismissEdit = (): Promise<boolean> => this.confirmEditClose();
+
+  async requestCloseEdit(): Promise<void> {
+    if (await this.confirmEditClose()) this.closeEdit();
+  }
+
+  private async confirmEditClose(): Promise<boolean> {
+    const isDirty = !!this.editEntry && this.editSnapshot() !== this.editInitial;
+    return !isDirty || confirmDiscardSheet(this.sheetCtrl);
+  }
+
+  /** Mahlzeit im Bearbeiten-Sheet per Action-Sheet wählen. */
+  async pickEditMeal(): Promise<void> {
+    const meal = await pickMealSheet(this.sheetCtrl, this.editForm.meal);
+    if (meal) this.editForm = { ...this.editForm, meal };
   }
 
   saveEdit(): void {
@@ -1019,6 +1098,7 @@ export class DiaryPage implements OnDestroy {
       patch.unit = this.editUnit;
     }
     this.diary.update(this.editEntry.id, patch);
+    lightHaptic();
     this.closeEdit();
   }
 
@@ -1035,6 +1115,7 @@ export class DiaryPage implements OnDestroy {
       servings: next.servings,
       facts: next.facts,
     });
+    lightHaptic();
     this.closeEdit();
   }
 
@@ -1046,10 +1127,18 @@ export class DiaryPage implements OnDestroy {
 
   /** Löscht einen Eintrag; „Rückgängig“ legt ihn (am Ende der Mahlzeit) neu an. */
   remove(entry: DiaryEntry): void {
+    lightHaptic();
     this.diary.remove(entry.id);
     void this.showToast(`„${entry.label}“ gelöscht`, () => {
       this.diary.add(entryToInput(entry));
     });
+  }
+
+  /** Doppelt eintragen (Wisch-Aktion): Kopie am Ende der Mahlzeit, mit „Rückgängig“. */
+  duplicate(entry: DiaryEntry): void {
+    const copy = this.diary.add(entryToInput(entry));
+    lightHaptic();
+    void this.showToast(`„${entry.label}“ doppelt eingetragen`, () => this.diary.remove(copy.id));
   }
 
   // --- Wie gestern / Tag kopieren ---
@@ -1110,7 +1199,7 @@ export class DiaryPage implements OnDestroy {
     this.error.set(null);
     // Auch bei verbrauchtem Budget setzen (0 = nichts mehr übrig).
     if (this.targetKcal() > 0) {
-      this.ff = { ...this.ff, kcalBudget: this.remainingKcal() };
+      this.ff = { ...this.ff, kcalBudget: defaultKcalBudget(this.remainingKcal()) };
     }
     this.ffOpen.set(true);
   }
@@ -1120,13 +1209,14 @@ export class DiaryPage implements OnDestroy {
   }
 
   async runFastfood(): Promise<void> {
+    if (!this.ffLive()) return;
     this.error.set(null);
     this.ffLoading.set(true);
     try {
       this.ffResults.set(
         await this.ai.suggestFastfood({
           restaurant: this.ff.restaurant.trim() || 'Fastfood',
-          kcalBudget: this.ff.kcalBudget ?? 0,
+          kcalBudget: this.ff.kcalBudget ?? defaultKcalBudget(this.remainingKcal()),
           moneyBudget: this.ff.moneyBudget ?? undefined,
           preference: this.ff.preference,
         }),
@@ -1151,8 +1241,9 @@ export class DiaryPage implements OnDestroy {
       facts: s.facts,
       isEstimate: true,
     });
+    lightHaptic();
     this.closeFastfood();
-    void this.showToast(`Hinzugefügt · ${formatNum(s.facts.kcal, 0)} kcal`, () => this.diary.remove(entry.id));
+    void this.showToast(`Eingetragen · ${formatNum(s.facts.kcal, 0)} kcal`, () => this.diary.remove(entry.id));
   }
 
   // --- Feedback ---

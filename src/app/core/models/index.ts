@@ -152,6 +152,8 @@ export interface ShoppingItem {
   estPrice?: number;
   /** Supermarkt-Kategorie (siehe SHOPPING_CATEGORIES); fehlt bei älteren Daten. */
   category?: string;
+  /** Vom Nutzer selbst angelegt (bleibt beim Neu-Generieren erhalten, auch mit eigenem Preis). */
+  manual?: boolean;
 }
 
 export interface ShoppingList {

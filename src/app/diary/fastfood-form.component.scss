@@ -1,0 +1,67 @@
+:host {
+  display: block;
+}
+
+.ff-group ion-item {
+  --background: transparent;
+  --color: var(--nt-ink);
+}
+
+.ff-range {
+  display: block;
+  padding: var(--nt-space-3) var(--nt-space-4);
+
+  &__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  &__label {
+    font-size: var(--nt-fs-body);
+    color: var(--nt-secondary);
+  }
+
+  &__value {
+    font-size: var(--nt-fs-headline);
+    font-weight: 600;
+    color: var(--nt-ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__note {
+    margin: var(--nt-space-1) 0 0;
+    font-size: var(--nt-fs-body);
+    color: var(--nt-secondary);
+  }
+
+  &__bound {
+    font-size: 13px;
+    color: var(--nt-secondary);
+  }
+
+  &__toggle {
+    width: 100%;
+    margin-top: var(--nt-space-1);
+  }
+}
+
+ion-range {
+  --bar-background: var(--nt-track);
+  --bar-background-active: var(--nt-accent);
+  --knob-background: var(--nt-accent);
+  padding-inline: 0;
+}
+
+.ff-connect {
+  margin: var(--nt-space-4) var(--nt-space-4) 0;
+  padding: var(--nt-space-3) var(--nt-space-4);
+  background: var(--nt-card);
+  border-radius: var(--nt-radius-card);
+
+  p {
+    margin: 0;
+    color: var(--nt-ink);
+    font-size: var(--nt-fs-body);
+  }
+}

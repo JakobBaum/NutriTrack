@@ -415,3 +415,49 @@ ion-item-option {
 .content-spacer {
   height: 72px;
 }
+
+.add-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: var(--nt-space-2) 0;
+  background: var(--ion-background-color);
+}
+
+.generator__mode {
+  margin: 0 0 var(--nt-space-3);
+  font-size: var(--nt-fs-caption);
+  color: var(--nt-secondary);
+
+  a {
+    color: var(--nt-accent);
+  }
+}
+
+.generator__empty {
+  margin-bottom: var(--nt-space-3);
+
+  p {
+    margin: 0 0 var(--nt-space-2);
+  }
+}
+
+.generator__field {
+  margin-bottom: var(--nt-space-4);
+}
+
+.generator__custom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--nt-space-2);
+}
+
+.generator__hint {
+  font-size: var(--nt-fs-caption);
+  color: var(--nt-secondary);
+}
+
+.price-btn {
+  font-size: var(--nt-fs-caption);
+}

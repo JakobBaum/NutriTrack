@@ -1,4 +1,5 @@
 import { NutritionFacts } from '../models';
+import { canonicalUnitKey, unitGrams } from './units-weight';
 
 /**
  * Deterministische Nährwert-Schätzung für gängige Zutaten (offline, ohne KI).
@@ -20,38 +21,17 @@ interface Density {
 /** Einheiten, die 1:1 als Gramm/Milliliter gelten (→ Bezug per100g). */
 const GRAM_UNITS = new Set(['g', 'gramm', 'gr', 'kg', 'kilogramm', 'ml', 'milliliter', 'l', 'liter']);
 
-/** Ungefähres Gewicht einer Stück-/Löffel-Einheit in Gramm. */
-const UNIT_GRAMS: Record<string, number> = {
-  el: 15,
-  tl: 5,
-  stk: 50,
-  stück: 50,
-  prise: 1,
-  prisen: 1,
-  zehe: 5,
-  zehen: 5,
-  scheibe: 25,
-  scheiben: 25,
-  bund: 30,
-  dose: 400,
-  dosen: 400,
-  packung: 100,
-  tasse: 240,
-  tassen: 240,
-};
-const DEFAULT_UNIT_GRAMS = 50;
-
 /** Keyword → Dichte. Längster Treffer am Wortanfang/-ende (case-insensitive) gewinnt. */
-const TABLE: { keywords: string[]; d: Density }[] = [
+const TABLE: { keywords: string[]; exclude?: string[]; d: Density }[] = [
   { keywords: ['mehl'], d: { kcal: 364, proteinG: 10, carbsG: 76, fatG: 1, fiberG: 2.7, sugarG: 0.3 } },
   { keywords: ['haferflocken', 'hafer'], d: { kcal: 389, proteinG: 13, carbsG: 66, fatG: 7, fiberG: 10, sugarG: 1 } },
   { keywords: ['zucker'], d: { kcal: 400, proteinG: 0, carbsG: 100, fatG: 0, fiberG: 0, sugarG: 100 } },
-  { keywords: ['ei', 'eier', 'hühnerei'], d: { kcal: 155, proteinG: 13, carbsG: 1.1, fatG: 11, fiberG: 0, sugarG: 1.1 } },
-  { keywords: ['milch'], d: { kcal: 64, proteinG: 3.4, carbsG: 4.8, fatG: 3.6, fiberG: 0, sugarG: 4.8 } },
+  { keywords: ['ei', 'eier', 'hühnerei'], exclude: ['eiswürfel', 'eisbergsalat', 'eiweißpulver'], d: { kcal: 155, proteinG: 13, carbsG: 1.1, fatG: 11, fiberG: 0, sugarG: 1.1 } },
+  { keywords: ['milch'], exclude: ['kokos', 'mandel', 'soja', 'hafermilch', 'reismilch'], d: { kcal: 64, proteinG: 3.4, carbsG: 4.8, fatG: 3.6, fiberG: 0, sugarG: 4.8 } },
   { keywords: ['sahne', 'rahm'], d: { kcal: 292, proteinG: 2.4, carbsG: 3.4, fatG: 30, fiberG: 0, sugarG: 3.4 } },
   { keywords: ['joghurt', 'jogurt'], d: { kcal: 61, proteinG: 3.5, carbsG: 4.7, fatG: 3.3, fiberG: 0, sugarG: 4.7 } },
-  { keywords: ['butter'], d: { kcal: 717, proteinG: 0.9, carbsG: 0.1, fatG: 81, fiberG: 0, sugarG: 0.1 } },
-  { keywords: ['öl', 'ol', 'olivenöl'], d: { kcal: 884, proteinG: 0, carbsG: 0, fatG: 100, fiberG: 0, sugarG: 0 } },
+  { keywords: ['butter'], exclude: ['erdnuss', 'mandel', 'nuss', 'buttermilch'], d: { kcal: 717, proteinG: 0.9, carbsG: 0.1, fatG: 81, fiberG: 0, sugarG: 0.1 } },
+  { keywords: ['öl', 'ol', 'olivenöl', 'olivenol'], d: { kcal: 884, proteinG: 0, carbsG: 0, fatG: 100, fiberG: 0, sugarG: 0 } },
   { keywords: ['käse', 'kase', 'gouda', 'parmesan'], d: { kcal: 402, proteinG: 25, carbsG: 1.3, fatG: 33, fiberG: 0, sugarG: 0.5 } },
   { keywords: ['reis'], d: { kcal: 360, proteinG: 7, carbsG: 78, fatG: 1, fiberG: 1.3, sugarG: 0.1 } },
   { keywords: ['nudel', 'pasta', 'spaghetti', 'penne'], d: { kcal: 371, proteinG: 13, carbsG: 75, fatG: 1.5, fiberG: 3, sugarG: 3 } },
@@ -78,23 +58,32 @@ function tokenize(name: string): string[] {
   return name.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((t) => t.length > 0);
 }
 
-/** Keyword passt am Wortanfang oder -ende (Komposita wie „Hühnerei", „Olivenöl"), nie mittendrin. */
+/** Kürzeste Keywords, die auch als Wortteil (Anfang/Ende) treffen dürfen. */
+const MIN_AFFIX_LENGTH = 4;
+
+/** Kurze Keywords („ei“, „öl“) nur als ganzes Wort; ab 4 Zeichen auch am Wortanfang/-ende (Komposita), nie mittendrin. */
 function matchesToken(token: string, keyword: string): boolean {
-  return token.startsWith(keyword) || token.endsWith(keyword);
+  if (token === keyword) return true;
+  return keyword.length >= MIN_AFFIX_LENGTH && (token.startsWith(keyword) || token.endsWith(keyword));
 }
 
-/** Längster passender Keyword gewinnt (spezifisch vor kurz), bei Gleichstand die Tabellenreihenfolge. */
-function findDensity(name: string): Density | undefined {
-  const tokens = tokenize(name);
-  let best: { len: number; d: Density } | undefined;
-  for (const row of TABLE) {
+/** Beste Tabellenzeile je Wort (längstes Keyword, ohne Ausschlüsse). */
+function rowForToken(token: string): { d: Density; row: number } | undefined {
+  let best: { len: number; d: Density; row: number } | undefined;
+  TABLE.forEach((row, index) => {
+    if ((row.exclude ?? []).some((e) => token.includes(e))) return;
     for (const k of row.keywords) {
-      if (k.length > (best?.len ?? 0) && tokens.some((t) => matchesToken(t, k))) {
-        best = { len: k.length, d: row.d };
-      }
+      if (k.length > (best?.len ?? 0) && matchesToken(token, k)) best = { len: k.length, d: row.d, row: index };
     }
-  }
-  return best?.d;
+  });
+  return best;
+}
+
+/** Dichte, wenn genau eine Zutat erkannt wird; mehrdeutig (verschiedene Treffer) oder unbekannt → undefined. */
+function findDensity(name: string): Density | undefined {
+  const hits = tokenize(name).map(rowForToken).filter((h): h is { d: Density; row: number } => !!h);
+  const rows = new Set(hits.map((h) => h.row));
+  return rows.size === 1 ? hits[0].d : undefined;
 }
 
 /**
@@ -126,7 +115,8 @@ export function estimateIngredientFacts(
     };
   }
 
-  const grams = UNIT_GRAMS[u] ?? DEFAULT_UNIT_GRAMS;
+  const grams = canonicalUnitKey(unit) ? unitGrams(unit, name) : undefined;
+  if (grams === undefined) return undefined;
   const factor = grams / 100;
   return {
     kcal: Math.round(density.kcal * factor),

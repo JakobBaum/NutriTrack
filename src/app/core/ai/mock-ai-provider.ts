@@ -7,7 +7,7 @@ import {
 } from '../models';
 import { NutritionCalcService } from '../nutrition/nutrition-calc.service';
 import { estimateIngredientFacts } from '../nutrition/ingredient-estimate';
-import { buildWeekPlan, priceItems } from '../shopping/shopping-generator';
+import { buildWeekPlan } from '../shopping/shopping-generator';
 import {
   AiProvider,
   LabelResult,
@@ -54,12 +54,8 @@ export class MockAiProvider implements AiProvider {
 
   async generateShoppingList(req: ShoppingPlanRequest): Promise<ShoppingPlanResult> {
     const plan = buildWeekPlan(req.recipes, req.persons, req.days, req.meals.length);
-    const { items, estTotal } = priceItems(plan.items, req.store);
-    const note =
-      req.budget && estTotal > req.budget
-        ? `Schätzung ${estTotal.toFixed(2)} € liegt über dem Budget von ${req.budget.toFixed(2)} €.`
-        : undefined;
-    return { items, suggestedDishes: plan.suggestedDishes, estTotal, note };
+    // Ehrlich ohne KI: nur Mengen, keine erfundenen Preise.
+    return { items: plan.items, suggestedDishes: plan.suggestedDishes, estTotal: 0 };
   }
 
   async recognizeLabel(
@@ -110,7 +106,7 @@ export class MockAiProvider implements AiProvider {
     // Beide Budgets strikt einhalten; kein Treffer -> leere Liste (UI zeigt Leerzustand).
     const within = base.filter(
       (s) =>
-        (!req.kcalBudget || s.facts.kcal <= req.kcalBudget) &&
+        (req.kcalBudget == null || s.facts.kcal <= req.kcalBudget) &&
         (!req.moneyBudget || (s.estPrice ?? 0) <= req.moneyBudget),
     );
     // Nach Protein/kcal-Verhältnis sortieren (proteinreichste zuerst).
@@ -122,18 +118,14 @@ export class MockAiProvider implements AiProvider {
   /**
    * Parst eingefügten Rezept-Text deterministisch (ohne Netzwerk). Zutaten-Zeilen
    * werden per Muster erkannt, der Rest wird als Zubereitungsschritte behandelt.
-   * Für eine reine URL gibt es einen Platzhalter — echter Abruf erfolgt via Proxy.
+   * URL/Foto ohne Text und Texte ohne Zutaten werfen einen Fehler (nie ein leeres Rezept).
    */
   async importRecipe(input: RecipeImportInput): Promise<RecipeImportResult> {
+    // Ehrlich: Der Mock kann weder Seiten abrufen noch Bilder lesen und erfindet nichts.
+    if (input.imageBase64) throw new Error('Foto-Import braucht eine KI-Verbindung.');
     const text = (input.text ?? '').trim();
     if (!text) {
-      return {
-        title: 'Importiertes Rezept',
-        servings: 2,
-        ingredients: [],
-        steps: input.url ? [`Quelle: ${input.url} (Text manuell einfügen).`] : [],
-        sourceUrl: input.url,
-      };
+      throw new Error(input.url ? 'Link-Import braucht eine KI-Verbindung. Füge den Rezept-Text ein.' : 'Kein Rezept-Text angegeben.');
     }
 
     const lines = text
@@ -165,6 +157,8 @@ export class MockAiProvider implements AiProvider {
         steps.push(line);
       }
     }
+
+    if (ingredients.length === 0) throw new Error('Keine Zutaten erkannt. Zutaten brauchen eine Menge, z. B. „250 g Mehl“.');
 
     return {
       title,

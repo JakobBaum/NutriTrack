@@ -1,16 +1,11 @@
 import { NutritionFacts, RecipeIngredient } from '../models';
-import { UNIT_WEIGHT_G } from './units-weight';
+import { unitGrams } from './units-weight';
 
 /** Einheiten mit exaktem Gewicht (Gramm je Einheit) für die Skalierung. */
 const EXACT_UNIT_G: Readonly<Record<string, number>> = {
   g: 1, gramm: 1, gr: 1, kg: 1000, kilogramm: 1000,
   ml: 1, milliliter: 1, l: 1000, liter: 1000,
 };
-
-/** Gramm je Näherungseinheit (EL, TL, Stk …), Schlüssel kleingeschrieben. */
-const APPROX_UNIT_G: Readonly<Record<string, number>> = Object.fromEntries(
-  Object.entries(UNIT_WEIGHT_G).map(([unit, g]) => [unit.toLowerCase(), g]),
-);
 
 function emptyFacts(): NutritionFacts {
   return { kcal: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0, basis: 'perPortion' };
@@ -44,7 +39,7 @@ export function ingredientFacts(ing: RecipeIngredient): NutritionFacts {
     factor = (amount * exactG) / refGrams;
   } else if (facts.basis === 'per100g') {
     // EL, TL, Stk …: Menge über das Näherungsgewicht in Gramm umrechnen.
-    const approxG = APPROX_UNIT_G[unit === 'stück' ? 'stk' : unit];
+    const approxG = unitGrams(unit, ing.name);
     factor = approxG !== undefined ? (amount * approxG) / refGrams : amount;
   } else {
     // perPortion: amount ist die Anzahl der Bezugsmengen.

@@ -1,0 +1,56 @@
+:host {
+  display: block;
+}
+
+.date-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nt-space-1);
+  padding: 0 var(--nt-space-3);
+
+  &__step,
+  &__label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--nt-touch, 44px);
+    border: 0;
+    background: transparent;
+    color: var(--nt-accent);
+    font: inherit;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--nt-accent);
+      outline-offset: 2px;
+    }
+    &:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+  }
+
+  &__step {
+    min-width: var(--nt-touch, 44px);
+    font-size: 22px;
+  }
+
+  &__label {
+    flex: 1;
+    gap: var(--nt-space-1);
+    min-width: 96px;
+    font-size: var(--nt-fs-headline);
+    font-weight: 600;
+    color: var(--nt-ink);
+
+    ion-icon {
+      font-size: 18px;
+      color: var(--nt-accent);
+    }
+  }
+}
+
+.nt-date-modal {
+  --height: auto;
+}

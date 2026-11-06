@@ -32,6 +32,26 @@
                 "glob": "**/*.svg",
                 "input": "node_modules/ionicons/dist/ionicons/svg",
                 "output": "./svg"
+              },
+              {
+                "glob": "worker.min.js",
+                "input": "node_modules/tesseract.js/dist",
+                "output": "assets/tesseract"
+              },
+              {
+                "glob": "tesseract-core*-lstm.wasm.js",
+                "input": "node_modules/tesseract.js-core",
+                "output": "assets/tesseract/core"
+              },
+              {
+                "glob": "deu.traineddata.gz",
+                "input": "node_modules/@tesseract.js-data/deu/4.0.0_best_int",
+                "output": "assets/tesseract/lang"
+              },
+              {
+                "glob": "eng.traineddata.gz",
+                "input": "node_modules/@tesseract.js-data/eng/4.0.0_best_int",
+                "output": "assets/tesseract/lang"
               }
             ],
             "styles": ["src/global.scss", "src/theme/variables.scss"],

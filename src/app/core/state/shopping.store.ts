@@ -4,6 +4,7 @@ import { AiService } from '../ai/ai.service';
 import { MockAiProvider } from '../ai/mock-ai-provider';
 import { StorageService } from '../storage/storage.service';
 import { withCategories, withCategory } from '../shopping/shopping-category';
+import { fillMissingPrices } from '../shopping/price-table';
 import { roundItemsToPackages } from '../shopping/package-size';
 import { buildShoppingList } from '../shopping/shopping-generator';
 import { makeId } from '../util/id';
@@ -22,7 +23,7 @@ export interface ShoppingPlanOptions {
 export interface ShoppingListView extends ShoppingList {
   /** Hinweis des Anbieters (z. B. "über Budget"). */
   note?: string;
-  /** Woher die Schätzpreise stammen: feste Demo-Formel oder KI. */
+  /** Modus bei der Generierung: 'ai' = mit KI-Verbindung (Preise), 'mock' = ohne KI (nur Mengen). */
   priceSource?: 'mock' | 'ai';
 }
 
@@ -56,13 +57,13 @@ function mergeOne(old: ShoppingItem, g: ShoppingItem): ShoppingItem {
 
 /**
  * Übernimmt beim Neu-Generieren abgehakte und manuelle Positionen (manuell =
- * ohne Schätzpreis). Gleicher Name+Einheit ersetzt die neu generierte Position.
+ * Markierung `manual` oder ohne Schätzpreis). Gleicher Name+Einheit ersetzt die neu generierte Position.
  */
 export function mergeKept(
   previous: readonly ShoppingItem[],
   generated: readonly ShoppingItem[],
 ): ShoppingItem[] {
-  const kept = previous.filter((it) => it.checked || it.estPrice == null);
+  const kept = previous.filter((it) => it.checked || it.manual || it.estPrice == null);
   const byKey = new Map(kept.map((it) => [itemKey(it), it] as const));
   const used = new Set<string>();
   const merged = generated.map((g) => {
@@ -76,10 +77,10 @@ export function mergeKept(
   return [...merged, ...rest];
 }
 
-/** Hält estTotal an die Positionen gekoppelt; ein veralteter Demo-Budgethinweis entfällt. */
+/** Hält estTotal an die Positionen gekoppelt; ein Hinweis zur alten Summe (z. B. Budget) entfällt bei Änderung. */
 function withTotal(l: ShoppingListView): ShoppingListView {
   const estTotal = sumItems(l.items).total;
-  const stale = l.priceSource === 'mock' && estTotal !== l.estTotal;
+  const stale = estTotal !== l.estTotal;
   return { ...l, estTotal, note: stale ? undefined : l.note };
 }
 
@@ -128,35 +129,45 @@ export class ShoppingStore {
    * Liste bleiben erhalten. Persistiert das Ergebnis.
    */
   async generatePlan(opts: ShoppingPlanOptions): Promise<ShoppingListView> {
+    const live = this.ai.isLive();
+    if (!live && this.recipes.recipes().length === 0) {
+      throw new Error('Lege zuerst Rezepte an, daraus entsteht die Einkaufsliste.');
+    }
+    // Budget und Markt wirken nur mit Preisen, also nur mit KI-Verbindung.
+    const budget = live ? opts.budget : undefined;
+    const storeName = live ? opts.store : undefined;
     const req = {
       persons: opts.persons,
       days: opts.days,
       meals: opts.meals,
-      budget: opts.budget,
-      store: opts.store,
+      budget,
+      store: storeName,
       recipes: this.recipes.recipes(),
     };
     const result = await this.ai.generateShoppingList(req).catch(async (err: unknown) => {
-      if (this.ai.isLive()) {
+      if (live) {
         // Proxy/KI-Fehler → Mock-Fallback, Fehler an Aufrufer weitergeben
         throw err;
       }
       return this.mock.generateShoppingList(req);
     });
-    const items = withCategories(mergeKept(this._list()?.items ?? [], roundItemsToPackages(result.items)));
+    const generated = withCategories(roundItemsToPackages(result.items));
+    // Ohne KI keine Preise; mit KI fehlende Preise über die Kategorie-Tabelle ergänzen.
+    const priced = live ? fillMissingPrices(generated) : generated;
+    const items = withCategories(mergeKept(this._list()?.items ?? [], priced));
     const list: ShoppingListView = {
       id: makeId('shopping'),
       dishes: Math.max(1, Math.floor(opts.days)) * Math.max(1, opts.meals.length),
       persons: Math.max(1, Math.floor(opts.persons)),
       days: Math.max(1, Math.floor(opts.days)),
       meals: opts.meals,
-      budget: opts.budget,
-      store: opts.store,
+      budget,
+      store: storeName,
       items,
       suggestedDishes: result.suggestedDishes,
       estTotal: sumItems(items).total,
       note: result.note,
-      priceSource: this.ai.isLive() ? 'ai' : 'mock',
+      priceSource: live ? 'ai' : 'mock',
       generatedAt: new Date().toISOString(),
     };
     this._list.set(list);
@@ -171,6 +182,21 @@ export class ShoppingStore {
       const items = l.items.map((it, i) =>
         i === index ? { ...it, checked: !it.checked } : it,
       );
+      return withTotal({ ...l, items });
+    });
+    this.persist();
+  }
+
+  /** Setzt oder löscht (null) den vom Nutzer eingetragenen Preis einer Position. */
+  setItemPrice(index: number, price: number | null): void {
+    const valid = price !== null && Number.isFinite(price) && price >= 0;
+    this._list.update((l) => {
+      if (!l || index < 0 || index >= l.items.length) return l;
+      const items = l.items.map((it, i) => {
+        if (i !== index) return it;
+        const { estPrice: _drop, ...rest } = it;
+        return valid ? { ...rest, estPrice: Math.round((price as number) * 100) / 100 } : rest;
+      });
       return withTotal({ ...l, items });
     });
     this.persist();

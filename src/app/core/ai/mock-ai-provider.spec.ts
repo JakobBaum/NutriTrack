@@ -47,19 +47,18 @@ describe('MockAiProvider — importRecipe (Text-Parser)', () => {
     expect(unknown?.facts).toBeUndefined();
   });
 
-  it('gibt einen Platzhalter zurück, wenn nur eine URL angegeben ist', async () => {
-    // Act
-    const res = await provider.importRecipe({ url: 'https://example.com/rezept' });
+  it('wirft bei reiner URL (Mock kann keine Seiten abrufen)', async () => {
+    await expect(provider.importRecipe({ url: 'https://example.com/rezept' })).rejects.toThrow(/KI-Verbindung/);
+  });
 
-    // Assert
-    expect(res.ingredients).toHaveLength(0);
-    expect(res.sourceUrl).toBe('https://example.com/rezept');
+  it('wirft bei Foto-Import', async () => {
+    await expect(provider.importRecipe({ imageBase64: 'abc' })).rejects.toThrow(/KI-Verbindung/);
   });
 });
 
 describe('MockAiProvider — suggestFastfood Budgets', () => {
   it('filtert nach Geld-Budget', async () => {
-    const res = await provider.suggestFastfood({ restaurant: 'X', kcalBudget: 0, moneyBudget: 4 });
+    const res = await provider.suggestFastfood({ restaurant: 'X', kcalBudget: 5000, moneyBudget: 4 });
     expect(res.length).toBeGreaterThan(0);
     expect(res.every((s) => (s.estPrice ?? 0) <= 4)).toBe(true);
   });

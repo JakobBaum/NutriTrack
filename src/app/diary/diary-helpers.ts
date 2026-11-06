@@ -44,6 +44,7 @@ export function isIsoDate(value: string | null | undefined): value is string {
 }
 
 const roundTo1 = (n: number): number => Math.round(n * 10) / 10;
+const roundTo2 = (n: number): number => Math.round(n * 100) / 100;
 
 /** Skaliert Nährwerte mit einem Faktor (kcal ganzzahlig, Rest auf 0,1 g). Ergebnis ist immer `perPortion`. */
 export function scaleFacts(base: NutritionFacts, factor: number): NutritionFacts {
@@ -54,6 +55,7 @@ export function scaleFacts(base: NutritionFacts, factor: number): NutritionFacts
     fatG: roundTo1(base.fatG * factor),
     fiberG: base.fiberG != null ? roundTo1(base.fiberG * factor) : undefined,
     sugarG: base.sugarG != null ? roundTo1(base.sugarG * factor) : undefined,
+    saltG: base.saltG != null ? roundTo2(base.saltG * factor) : undefined,
     basis: 'perPortion',
   };
 }
@@ -66,6 +68,7 @@ export interface EntryFields {
   fatG: number | null;
   fiberG: number | null;
   sugarG: number | null;
+  saltG: number | null;
 }
 
 export const EMPTY_FIELDS: EntryFields = {
@@ -75,6 +78,7 @@ export const EMPTY_FIELDS: EntryFields = {
   fatG: null,
   fiberG: null,
   sugarG: null,
+  saltG: null,
 };
 
 export function fieldsFromFacts(facts: NutritionFacts): EntryFields {
@@ -85,6 +89,7 @@ export function fieldsFromFacts(facts: NutritionFacts): EntryFields {
     fatG: facts.fatG,
     fiberG: facts.fiberG ?? null,
     sugarG: facts.sugarG ?? null,
+    saltG: facts.saltG ?? null,
   };
 }
 
@@ -102,6 +107,7 @@ export function factsFromFields(fields: EntryFields): NutritionFacts | null {
     fatG: orZero(fields.fatG),
     fiberG: orZero(fields.fiberG),
     sugarG: orZero(fields.sugarG),
+    saltG: orZero(fields.saltG),
     basis: 'perPortion',
   };
 }
@@ -178,7 +184,8 @@ export function factsDiffer(a: NutritionFacts, b: NutritionFacts): boolean {
     a.carbsG !== b.carbsG ||
     a.fatG !== b.fatG ||
     (a.fiberG ?? 0) !== (b.fiberG ?? 0) ||
-    (a.sugarG ?? 0) !== (b.sugarG ?? 0)
+    (a.sugarG ?? 0) !== (b.sugarG ?? 0) ||
+    (a.saltG ?? 0) !== (b.saltG ?? 0)
   );
 }
 
@@ -225,6 +232,11 @@ export function convertAmount(value: number, from: AmountUnit, to: AmountUnit): 
 /** Menge für die Anzeige, z. B. „250 g“, „0,5 l“, „1,2 kg“ (Dezimalkomma). */
 export function formatAmount(amountG: number, unit: AmountUnit = 'g'): string {
   return `${formatNum(fromBaseAmount(amountG, unit), MAX_AMOUNT_DECIMALS)} ${unit}`;
+}
+
+/** Chip-Beschriftung einer Menge: g/ml ohne Nachkommastellen („150“), kg/l mit bis zu 2 („0,25“). */
+export function formatChipAmount(value: number, unit: AmountUnit): string {
+  return formatNum(value, unitFactor(unit) === 1 ? 0 : 2);
 }
 
 const QUICK_AMOUNTS_SMALL: readonly number[] = [50, 100, 150, 200];

@@ -12,6 +12,9 @@ const KCAL_PER_G = { protein: 4, carbs: 4, fat: 9 } as const;
 /** 1 kg Körperfett ≈ 7700 kcal. */
 const KCAL_PER_KG = 7700;
 
+/** Größtes empfohlenes Tempo (kg/Woche); darüber wird gedeckelt. */
+export const MAX_RATE_KG_PER_WEEK = 0.75;
+
 /** PAL-Faktoren je Aktivitätslevel. */
 const ACTIVITY_FACTORS: Record<ActivityLevel, number> = {
   sedentary: 1.2,
@@ -98,11 +101,28 @@ export class NutritionCalcService {
     return !Number.isFinite(uncapped) || uncapped < this.minKcal(p);
   }
 
+  /** Tägliches Defizit/Überschuss (kcal) für ein Tempo in kg/Woche (auf {@link MAX_RATE_KG_PER_WEEK} begrenzt). */
+  dailyDeltaKcal(rateKgPerWeek: number): number {
+    const rate = Math.min(Math.abs(rateKgPerWeek), MAX_RATE_KG_PER_WEEK);
+    return Math.round((rate * KCAL_PER_KG) / 7);
+  }
+
+  /**
+   * Tatsächlich erreichtes Tempo (kg/Woche) nach Mindestzufuhr: kleiner als der
+   * Wunsch, wenn die Untergrenze das Defizit begrenzt. Bei „halten“ 0.
+   */
+  achievedRateKgPerWeek(p: UserProfile): number {
+    if (p.goal === 'maintain') return 0;
+    const wished = Math.min(Math.abs(p.rateKgPerWeek ?? 0.5), MAX_RATE_KG_PER_WEEK);
+    const actualDelta = Math.abs(this.totalDailyEnergy(p) - this.dailyTarget(p).kcal);
+    return Math.min(wished, (actualDelta * 7) / KCAL_PER_KG);
+  }
+
   /** Rechnerisches Kalorienziel vor der Mindestzufuhr. */
   private uncappedKcal(p: UserProfile): number {
     const tdee = this.totalDailyEnergy(p);
     const rate = p.goal === 'maintain' ? 0 : Math.abs(p.rateKgPerWeek ?? 0.5);
-    const dailyDelta = (rate * KCAL_PER_KG) / 7;
+    const dailyDelta = this.dailyDeltaKcal(rate);
     if (p.goal === 'lose') return tdee - dailyDelta;
     if (p.goal === 'gain') return tdee + dailyDelta;
     return tdee;

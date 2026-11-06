@@ -14,11 +14,8 @@ describe('estimateIngredientFacts — Randfälle', () => {
     expect(estimateIngredientFacts('Olivenöl', ' EL ')!.portionG).toBe(15);
   });
 
-  it('nutzt 50 g für unbekannte Einheiten', () => {
-    const f = estimateIngredientFacts('Milch', 'Becher')!;
-    expect(f.basis).toBe('perPortion');
-    expect(f.portionG).toBe(50);
-    expect(f.kcal).toBe(32);
+  it('liefert keine Schätzung für unbekannte Einheiten', () => {
+    expect(estimateIngredientFacts('Milch', 'Becher')).toBeUndefined();
   });
 
   it('rechnet Dose (400 g) und Tasse (240 g) um', () => {
@@ -58,5 +55,32 @@ describe('estimateIngredientFacts — Randfälle', () => {
     expect(estimateIngredientFacts('Olivenöl', 'g')!.kcal).toBe(884);
     expect(estimateIngredientFacts('Eier', 'g')!.kcal).toBe(155);
     expect(estimateIngredientFacts('Kartoffelbrei', 'g')!.kcal).toBe(77);
+  });
+
+  it.each([
+    ['Eiswürfel'], ['Eisbergsalat'], ['Eiweißpulver'], ['Kokosmilch'], ['Mandelmilch'], ['Erdnussbutter'], ['Oliven'],
+  ])('schätzt %s nicht als Ei/Milch/Butter/Öl', (name) => {
+    expect(estimateIngredientFacts(name, 'g')).toBeUndefined();
+  });
+
+  it('erkennt „Ei“ und „Öl“ als ganzes Wort', () => {
+    expect(estimateIngredientFacts('Ei', 'Stk')!.portionG).toBe(60);
+    expect(estimateIngredientFacts('Öl', 'EL')!.kcal).toBe(133);
+    expect(estimateIngredientFacts('Ol', 'g')!.kcal).toBe(884);
+  });
+
+  it('erkennt Buttermilch als Milch, Butter als Butter', () => {
+    expect(estimateIngredientFacts('Buttermilch', 'ml')!.kcal).toBe(64);
+    expect(estimateIngredientFacts('Butter', 'g')!.kcal).toBe(717);
+  });
+
+  it('liefert bei mehreren verschiedenen Treffern keine Schätzung', () => {
+    expect(estimateIngredientFacts('Reis mit Hähnchen', 'g')).toBeUndefined();
+  });
+
+  it('nutzt die gemeinsame Gewichtstabelle (Stk 80, Zehe 5, Bund 50)', () => {
+    expect(estimateIngredientFacts('Tomate', 'Stk')!.portionG).toBe(80);
+    expect(estimateIngredientFacts('Knoblauch', 'Zehe')!.portionG).toBe(5);
+    expect(estimateIngredientFacts('Zwiebel', 'Stk')!.portionG).toBe(80);
   });
 });

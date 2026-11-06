@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, computed, inject, signal } from '@angular/core';
-import { ActionSheetController } from '@ionic/angular';
+import { ActionSheetController, AlertController } from '@ionic/angular';
 import { SharedModule } from '../shared/shared.module';
 import { NumPipe } from '../shared/num.pipe';
 import { FoodItem, MealType, NutritionFacts, Recipe, SavedMeal } from '../core/models';
@@ -9,6 +9,8 @@ import { DiaryStore } from '../core/state/diary.store';
 import { MealsStore } from '../core/state/meals.store';
 import { RecipeStore } from '../core/state/recipe.store';
 import { toDateISO } from '../core/util/date';
+import { confirmDiscard } from './confirm-discard';
+import { isMealDraftDirty, mealSaveBlockReason } from './meal-draft';
 import { UNDO_TOAST_BUTTONS, UNDO_TOAST_MS, UndoableDelete, settleUndoToast } from './undoable-delete';
 
 interface DraftEntry {
@@ -42,6 +44,8 @@ export class MealsListComponent implements OnDestroy {
   private readonly recipeStore = inject(RecipeStore);
   private readonly food = inject(FOOD_PROVIDER);
   private readonly actionSheets = inject(ActionSheetController);
+  private readonly alerts = inject(AlertController);
+  private allowClose = false;
 
   private readonly deletion = new UndoableDelete((id) => this.store.remove(id));
 
@@ -71,19 +75,31 @@ export class MealsListComponent implements OnDestroy {
     this.deletion.flush();
   }
 
+  /** Grund, warum „Mahlzeit speichern“ gerade gesperrt ist (leer = bereit). */
+  saveBlockReason(): string {
+    return mealSaveBlockReason(this.draftName, this.draftEntries.length);
+  }
+
+  /** canDismiss: bei ungespeichertem Entwurf „Verwerfen?“. */
+  readonly canDismissCreate = async (): Promise<boolean> => {
+    if (this.allowClose || !isMealDraftDirty(this.draftName, this.draftEntries.length)) return true;
+    return confirmDiscard(this.alerts);
+  };
+
   openCreate(): void {
+    this.allowClose = false;
     this.draftName = '';
     this.draftEntries = [];
     this.createOpen.set(true);
   }
 
   closeCreate(): void {
+    this.allowClose = false;
     this.createOpen.set(false);
   }
 
   saveMeal(): void {
-    if (!this.draftName.trim()) return;
-    if (this.draftEntries.length === 0) return;
+    if (this.saveBlockReason()) return;
     this.store.add({
       name: this.draftName.trim(),
       entries: this.draftEntries.map((e) => ({
@@ -93,6 +109,7 @@ export class MealsListComponent implements OnDestroy {
         ref: { kind: 'manual' },
       })),
     });
+    this.allowClose = true;
     this.createOpen.set(false);
     this.toastMessage.set(`„${this.draftName.trim()}" gespeichert.`);
   }

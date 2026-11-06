@@ -95,3 +95,18 @@ describe('mergeKept übernimmt Preis und Kategorie der generierten Position', ()
     expect(mergeKept(prev, generated)[0]).toMatchObject({ estPrice: 9, category: 'Sonstiges' });
   });
 });
+
+describe('ShoppingStore.setItemPrice', () => {
+  it('sets, rounds and clears an entered price and keeps estTotal in sync', () => {
+    const store = TestBed.inject(ShoppingStore);
+    store.addItem({ name: 'Brot', amount: 1, unit: 'Stk', checked: false });
+
+    store.setItemPrice(0, 2.499);
+    expect(store.list()?.items[0].estPrice).toBe(2.5);
+    expect(store.list()?.estTotal).toBe(2.5);
+
+    store.setItemPrice(0, null);
+    expect(store.list()?.items[0].estPrice).toBeUndefined();
+    expect(store.list()?.estTotal).toBe(0);
+  });
+});
