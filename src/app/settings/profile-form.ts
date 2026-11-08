@@ -1,3 +1,6 @@
+import { Goal } from '../core/models';
+import { bmiOf } from '../core/nutrition/profile-plausibility';
+
 /** Feldnamen des Bedarfs-Berechners, die eine Zahl brauchen. */
 export type ProfileField = 'weightKg' | 'heightCm' | 'age' | 'rateKgPerWeek';
 
@@ -33,4 +36,33 @@ export function validateProfileForm(values: ProfileFormValues, needsRate: boolea
     const message = fieldError(field, values[field]);
     return message ? { ...acc, [field]: message } : acc;
   }, {});
+}
+
+const TARGET_RANGE = { min: 30, max: 300 } as const;
+/** Zielgewichte unter diesem BMI liegen im Untergewicht (WHO). */
+const TARGET_MIN_BMI = 18.5;
+
+/** Prüft das optionale Zielgewicht; null = in Ordnung (auch leer). */
+export function targetWeightError(
+  target: number | null,
+  weightKg: number | null,
+  goal: Goal,
+  heightCm: number | null,
+): string | null {
+  if (target === null) return null;
+  if (!Number.isFinite(target)) return 'Bitte eine Zahl eingeben.';
+  if (target < TARGET_RANGE.min || target > TARGET_RANGE.max) {
+    return `Das Zielgewicht muss zwischen ${TARGET_RANGE.min} und ${TARGET_RANGE.max} kg liegen.`;
+  }
+  if (weightKg !== null && goal === 'lose' && target >= weightKg) {
+    return 'Zum Abnehmen muss das Zielgewicht unter deinem Gewicht liegen.';
+  }
+  if (weightKg !== null && goal === 'gain' && target <= weightKg) {
+    return 'Zum Zunehmen muss das Zielgewicht über deinem Gewicht liegen.';
+  }
+  const bmi = heightCm === null ? null : bmiOf(target, heightCm);
+  if (bmi !== null && bmi < TARGET_MIN_BMI) {
+    return 'Das Zielgewicht liegt im Untergewicht (BMI unter 18,5). Wähle einen höheren Wert.';
+  }
+  return null;
 }

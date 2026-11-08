@@ -195,12 +195,14 @@ describe('countBackup / describeCounts', () => {
       customFoods: 2,
       shoppingItems: 1,
       hasProfile: true,
+      weightEntries: 0,
+      favorites: 0,
     });
   });
 
   it('treats missing keys as zero', () => {
     expect(countBackup({})).toEqual({
-      diary: 0, recipes: 0, savedMeals: 0, customFoods: 0, shoppingItems: 0, hasProfile: false,
+      diary: 0, recipes: 0, savedMeals: 0, customFoods: 0, shoppingItems: 0, hasProfile: false, weightEntries: 0, favorites: 0,
     });
   });
 
@@ -208,9 +210,38 @@ describe('countBackup / describeCounts', () => {
     expect(describeCounts(countBackup(sampleData))).toBe(
       '3 Tagebucheinträge, 1 Rezept, 0 gespeicherte Mahlzeiten, 2 eigene Lebensmittel, 1 Einkaufsposition, Profil',
     );
-    expect(describeCounts({ diary: 1, recipes: 4, savedMeals: 1, customFoods: 1, shoppingItems: 0, hasProfile: false })).toBe(
+    expect(describeCounts({ diary: 1, recipes: 4, savedMeals: 1, customFoods: 1, shoppingItems: 0, hasProfile: false, weightEntries: 0, favorites: 0 })).toBe(
       '1 Tagebucheintrag, 4 Rezepte, 1 gespeicherte Mahlzeit, 1 eigenes Lebensmittel',
     );
+  });
+});
+
+describe('Gewicht und Favoriten im Backup', () => {
+  const fav = { id: 'f1', label: 'Skyr', facts: { kcal: 60, proteinG: 11, carbsG: 4, fatG: 0.2, basis: 'perPortion' }, createdAt: '2026-11-06T10:00:00.000Z' };
+
+  it('akzeptiert gültige Gewichtseinträge und Favoriten', () => {
+    const data = { weight: [{ dateISO: '2026-11-05', kg: 80.2 }], favorites: [fav] };
+    expect(parseBackup(JSON.stringify(validFile(data))).ok).toBe(true);
+  });
+
+  it.each([
+    ['Gewicht zu klein', { weight: [{ dateISO: '2026-11-05', kg: 5 }] }],
+    ['Gewicht zu groß', { weight: [{ dateISO: '2026-11-05', kg: 401 }] }],
+    ['Datum kaputt', { weight: [{ dateISO: 'gestern', kg: 80 }] }],
+    ['Gewicht kein Zahlenwert', { weight: [{ dateISO: '2026-11-05', kg: '80' }] }],
+    ['zwei Einträge am selben Tag', { weight: [{ dateISO: '2026-11-05', kg: 80 }, { dateISO: '2026-11-05', kg: 81 }] }],
+    ['Favorit ohne Namen', { favorites: [{ ...fav, label: undefined }] }],
+    ['Favorit ohne Nährwerte', { favorites: [{ id: 'f', label: 'X' }] }],
+  ])('lehnt ab: %s', (_name, data) => {
+    expect(parseBackup(JSON.stringify(validFile(data))).ok).toBe(false);
+  });
+
+  it('zählt Gewichtseinträge und Favoriten in der Vorschau', () => {
+    const counts = countBackup({ weight: [{ dateISO: '2026-11-05', kg: 80 }], favorites: [fav, fav] });
+    expect(counts.weightEntries).toBe(1);
+    expect(counts.favorites).toBe(2);
+    expect(describeCounts(counts)).toContain('1 Gewichtseintrag');
+    expect(describeCounts(counts)).toContain('2 Favoriten');
   });
 });
 

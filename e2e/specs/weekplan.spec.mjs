@@ -1,6 +1,6 @@
 // Wochenplan: Rezepte (gemockt, Spoonacular) erzeugen, Karten, Zutaten in der Liste, Favoriten, Kochmodus.
 import { assert, eventually, go, readStore, settle } from '../lib/harness.mjs';
-import { topModal } from '../lib/ionic.mjs';
+import { dismissToasts, stableClick, topModal } from '../lib/ionic.mjs';
 import { seed } from '../lib/fixtures.mjs';
 
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-expose-headers': 'X-Api-Quota-Left' };
@@ -110,7 +110,8 @@ export function register({ test }) {
     const title = (await detail.locator('.wp-detail__title').innerText()).trim();
     assert.match(await detail.innerText(), /Eiweiß/);
 
-    await detail.locator('.wp-fav').click();
+    await dismissToasts(page);
+    await stableClick(detail.locator('.wp-fav'));
     await settle(page);
     const saved = (await readStore(page, 'recipes')).find((r) => r.title === title);
     assert.ok(saved, 'Rezept nicht in Favoriten');
@@ -118,11 +119,13 @@ export function register({ test }) {
     assert.equal(await detail.locator('.wp-fav').isDisabled(), true, 'Button nach Speichern nicht deaktiviert');
     assert.match(await detail.locator('.wp-fav').innerText(), /Gespeichert/);
 
-    await detail.locator('.wp-cook').click();
+    await dismissToasts(page);
+    await stableClick(detail.locator('.wp-cook'));
     const ingredients = page.locator('[data-testid="cook-ingredients"]');
     await ingredients.waitFor();
     assert.match(await ingredients.innerText(), /lentils/i);
-    await page.locator('.cook__nav-btn--next').click();
+    await dismissToasts(page);
+    await stableClick(page.locator('.cook__nav-btn--next'));
     const step = page.locator('[data-testid="cook-step"]');
     await step.waitFor();
     assert.match(await step.innerText(), /Zwiebel schneiden/);

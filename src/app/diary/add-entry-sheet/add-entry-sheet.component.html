@@ -49,6 +49,28 @@
             }
           </nt-food-sources>
 
+          @if (!foodSearch.query.trim() && favoriteList().length) {
+            <h3 class="nt-section-header">Favoriten</h3>
+            <ion-list class="diary-list" lines="none" data-testid="favorites-list">
+              @for (fav of favoriteList(); track fav.id) {
+                <ion-item class="recent" lines="none">
+                  <button type="button" class="recent__main" data-testid="favorite-add" (click)="quickAddFavorite(fav)" [attr.aria-label]="fav.label + ' direkt eintragen'">
+                    <span class="recent__text">
+                      <span class="recent__name">{{ fav.label }}@if (fav.brand) { <span class="entry-brand"> · {{ fav.brand }}</span> }</span>
+                      <span class="recent__meta">
+                        @if (fav.amountG) { {{ formatAmount(fav.amountG, fav.unit) }} · }{{ fav.isPartial ? 'mind. ' : '' }}{{ fav.facts.kcal | ntNum:0 }} kcal
+                      </span>
+                    </span>
+                    <span class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
+                  </button>
+                  <ion-button slot="end" fill="clear" class="touch-btn" (click)="removeFavorite(fav.id)" [attr.aria-label]="fav.label + ' aus den Favoriten entfernen'">
+                    <ion-icon slot="icon-only" name="star" aria-hidden="true"></ion-icon>
+                  </ion-button>
+                </ion-item>
+              }
+            </ion-list>
+          }
+
           @if (!foodSearch.query.trim() && (recentFoods().length || recentRecipes().length)) {
             <h3 class="nt-section-header">Zuletzt benutzt · für {{ selectedMealLabel() }}</h3>
             <ion-list class="diary-list" lines="none">
@@ -63,6 +85,9 @@
                     </span>
                     <span class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
                   </button>
+                  <ion-button slot="end" fill="clear" class="touch-btn" data-testid="recent-favorite" (click)="toggleRecentFavorite(entry)" [attr.aria-pressed]="isFavorite(entry)" [attr.aria-label]="entry.label + (isFavorite(entry) ? ' aus den Favoriten entfernen' : ' als Favorit merken')">
+                    <ion-icon slot="icon-only" [name]="isFavorite(entry) ? 'star' : 'star-outline'" aria-hidden="true"></ion-icon>
+                  </ion-button>
                   <ion-button slot="end" fill="clear" class="touch-btn touch-btn--text recent__edit" (click)="editRecent(entry)" [attr.aria-label]="entry.label + ' vor dem Eintragen anpassen'">Anpassen</ion-button>
                 </ion-item>
               }

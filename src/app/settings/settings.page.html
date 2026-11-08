@@ -26,6 +26,8 @@
       </ion-card>
     }
 
+    <app-weight-card (recalculate)="recalculateWithWeight($event)"></app-weight-card>
+
     <h2 class="nt-section-header">Ziele &amp; KI</h2>
     <ion-list class="nt-grouped" lines="full">
       <ion-item button detail="true" (click)="profileOpen.set(true)">
@@ -205,6 +207,21 @@
             </ion-segment>
           </ion-item>
         </ion-list>
+
+        <h2 class="nt-section-header">Zielgewicht (optional)</h2>
+        <ion-list class="nt-grouped settings-form">
+          <ion-item class="form-row" lines="none">
+            <ion-label>
+              Zielgewicht
+              @if (targetWeightKg === null) { <p class="row-sub">Nicht gesetzt</p> }
+              @if (targetError; as err) { <p class="row-error" role="alert">{{ err }}</p> }
+            </ion-label>
+            <nt-stepper slot="end" data-field="targetWeightKg" label="Zielgewicht" unit="kg" [value]="targetWeightKg" [min]="30" [max]="300" [step]="0.5" [decimals]="1" [start]="weightKg ?? 75" (valueChange)="setTargetWeight($event)"></nt-stepper>
+          </ion-item>
+        </ion-list>
+        @if (targetWeightKg !== null) {
+          <ion-button fill="clear" size="small" (click)="clearTargetWeight()">Zielgewicht entfernen</ion-button>
+        }
 
         @if (showRate) {
           <h2 class="nt-section-header">Tempo (kg pro Woche)</h2>

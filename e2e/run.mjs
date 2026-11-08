@@ -6,6 +6,9 @@ import * as diary from './specs/diary.spec.mjs';
 import * as recipes from './specs/recipes.spec.mjs';
 import * as app from './specs/app.spec.mjs';
 import * as weekplan from './specs/weekplan.spec.mjs';
+import * as weight from './specs/weight.spec.mjs';
+import * as week from './specs/week.spec.mjs';
+import * as favorites from './specs/favorites.spec.mjs';
 
 const filter = process.argv[2] ?? '';
 
@@ -26,7 +29,7 @@ const test = (name, seed, fn) => (name.includes(filter) ? runner.test(name, seed
 
 // Tests registrieren und nacheinander ausführen
 const queue = [];
-for (const spec of [app, diary, recipes, weekplan]) spec.register({ test: (...args) => queue.push(args) });
+for (const spec of [app, diary, recipes, weekplan, weight, week, favorites]) spec.register({ test: (...args) => queue.push(args) });
 for (const args of queue) await test(...args);
 await browser.close();
 

@@ -66,6 +66,8 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSCameraUsageDescription</key>
 	<string>NutriTrack nutzt die Kamera, um Lebensmittel-Etiketten zu scannen und Barcodes zu lesen.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

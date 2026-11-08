@@ -18,10 +18,12 @@ import { CustomFoodStore } from '../core/state/custom-food.store';
 import { SettingsStore } from '../core/state/settings.store';
 import { WeekPlanStore } from '../core/state/week-plan.store';
 import { ShoppingStore } from '../core/state/shopping.store';
+import { WeightStore } from '../core/state/weight.store';
+import { FavoriteStore } from '../core/state/favorite.store';
 import { DebugLogService } from '../core/debug/debug-log.service';
 import { resolveDebugMode, safeLocalStorage } from './debug-flag';
 import { BackupService } from '../core/backup/backup.service';
-import { PROFILE_FIELD_ORDER, ProfileField, ProfileFieldErrors, validateProfileForm } from './profile-form';
+import { PROFILE_FIELD_ORDER, ProfileField, ProfileFieldErrors, targetWeightError, validateProfileForm } from './profile-form';
 import { BackupFile, countBackup, describeCounts, formatBackupDate } from '../core/backup/backup';
 
 /**
@@ -58,6 +60,8 @@ export class SettingsPage implements OnInit {
   private readonly shopping = inject(ShoppingStore);
   private readonly weekPlan = inject(WeekPlanStore);
   private readonly savedMeals = inject(MealsStore);
+  private readonly weightStore = inject(WeightStore);
+  private readonly favoriteStore = inject(FavoriteStore);
   private readonly storage = inject(StorageService);
   readonly formatDecimal = formatDecimal;
   private readonly calc = inject(NutritionCalcService);
@@ -101,6 +105,8 @@ export class SettingsPage implements OnInit {
   sex: Sex = this.existing?.sex ?? 'male';
   activityLevel: ActivityLevel = this.existing?.activityLevel ?? 'moderate';
   goal: Goal = this.existing?.goal ?? 'maintain';
+  /** Optionales Zielgewicht; null = nicht gesetzt. */
+  targetWeightKg: number | null = this.existing?.targetWeightKg ?? null;
   rateKgPerWeek: number | null = this.existing?.goal && this.existing.goal !== 'maintain'
     ? (this.existing.rateKgPerWeek !== undefined && this.existing.rateKgPerWeek <= MAX_RATE_CHOICE && this.existing.rateKgPerWeek >= MIN_RATE
         ? this.existing.rateKgPerWeek
@@ -240,7 +246,27 @@ export class SettingsPage implements OnInit {
   }
 
   get isFormValid(): boolean {
-    return Object.keys(this.fieldErrors).length === 0;
+    return Object.keys(this.fieldErrors).length === 0 && this.targetError === null;
+  }
+
+  /** Fehler des optionalen Zielgewichts (null = in Ordnung oder leer). */
+  get targetError(): string | null {
+    return targetWeightError(this.targetWeightKg, this.weightKg, this.goal, this.heightCm);
+  }
+
+  setTargetWeight(value: number): void {
+    this.targetWeightKg = value;
+  }
+
+  clearTargetWeight(): void {
+    this.targetWeightKg = null;
+  }
+
+  /** Hinweis "Ziel neu berechnen": Profil mit dem zuletzt gewogenen Gewicht öffnen (nichts wird automatisch gespeichert). */
+  recalculateWithWeight(kg: number): void {
+    this.weightKg = kg;
+    this.markTouched('weightKg');
+    this.profileOpen.set(true);
   }
 
   /** Fehlertext nur für Felder, die schon besucht wurden. */
@@ -268,7 +294,7 @@ export class SettingsPage implements OnInit {
   saveProfile(): void {
     const errors = this.fieldErrors;
     const { weightKg, heightCm, age, rateKgPerWeek } = this;
-    if (Object.keys(errors).length > 0 || weightKg === null || heightCm === null || age === null) {
+    if (Object.keys(errors).length > 0 || this.targetError !== null || weightKg === null || heightCm === null || age === null) {
       this.touched = { weightKg: true, heightCm: true, age: true, rateKgPerWeek: true };
       this.focusFirstInvalid(errors);
       return;
@@ -283,6 +309,7 @@ export class SettingsPage implements OnInit {
       activityLevel: this.activityLevel,
       goal: this.goal,
       rateKgPerWeek: rate,
+      ...(this.targetWeightKg !== null ? { targetWeightKg: this.targetWeightKg } : {}),
       updatedAt: new Date().toISOString(),
     };
     this.profileStore.setProfile(profile);
@@ -316,7 +343,7 @@ export class SettingsPage implements OnInit {
     const alert = await this.alertCtrl.create({
       header: 'Alle Daten löschen?',
       message:
-        'Profil, Tagebuch, Rezepte, gespeicherte Mahlzeiten, eigene Lebensmittel, Einkaufsliste und Einstellungen werden von diesem Gerät gelöscht. Das lässt sich nicht rückgängig machen.',
+        'Profil, Tagebuch, Gewichtsverlauf, Favoriten, Rezepte, gespeicherte Mahlzeiten, eigene Lebensmittel, Einkaufsliste und Einstellungen werden von diesem Gerät gelöscht. Das lässt sich nicht rückgängig machen.',
       buttons: [
         { text: 'Abbrechen', role: 'cancel' },
         { text: 'Löschen', role: 'destructive', handler: () => this.resetData() },
@@ -333,6 +360,8 @@ export class SettingsPage implements OnInit {
     this.savedMeals.clear();
     this.shopping.clear();
     this.weekPlan.clear();
+    this.weightStore.clear();
+    this.favoriteStore.clear();
     this.settingsStore.clear();
     this.storage.clearAll();
     this.ai = { ...this.settingsStore.ai() };

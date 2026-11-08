@@ -29,7 +29,29 @@ export async function clickToastButton(page, text) {
   await settle(page, 400);
 }
 
-export const toastMessage = (page) => page.locator('ion-toast .toast-message').last();
+/** Schließt alle offenen Toasts und wartet, bis sie weg sind (ein Toast kann Buttons am unteren Rand überdecken). */
+export async function dismissToasts(page) {
+  await page.evaluate(() => Promise.all([...document.querySelectorAll('ion-toast')].map((t) => t.dismiss?.())));
+  await page.locator('ion-toast').first().waitFor({ state: 'detached', timeout: 3000 }).catch(() => undefined);
+}
+
+/**
+ * Klickt robust: bewegt sich das Element noch (Sheet-Animation, "not stable"), wird kurz gewartet und neu versucht;
+ * erst der letzte Versuch klickt ohne Stabilitätsprüfung.
+ */
+export async function stableClick(locator, { attempts = 4, pauseMs = 250 } = {}) {
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      await locator.click({ timeout: i === attempts ? 4000 : 1500, force: i === attempts });
+      return;
+    } catch (e) {
+      if (i === attempts) throw e;
+      await locator.page().waitForTimeout(pauseMs);
+    }
+  }
+}
+
+export const toastMessage =(page) => page.locator('ion-toast .toast-message').last();
 
 /** Wählt einen Eintrag im ion-action-sheet. */
 export async function pickActionSheet(page, text) {
@@ -62,14 +84,14 @@ export async function stepTo(scope, label, { start, step, target }) {
   const shown = (await stepper.locator('.stepper__value').innerText()).trim();
   let current = start;
   if (shown.startsWith('–')) {
-    await btn('erhöhen').click();
+    await stableClick(btn('erhöhen'));
     await settle(page, 150);
   } else {
     current = parseFloat(shown.replace(',', '.'));
   }
   const diff = Math.round((target - current) / step);
   for (let n = 0; n < Math.abs(diff); n++) {
-    await btn(diff > 0 ? 'erhöhen' : 'verringern').click();
+    await stableClick(btn(diff > 0 ? 'erhöhen' : 'verringern'));
     await settle(page, 150);
   }
 }

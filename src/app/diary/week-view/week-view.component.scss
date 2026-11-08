@@ -1,0 +1,118 @@
+// Wochenansicht (Design "Sanft iOS"). Nur Tokens aus src/theme/variables.scss.
+:host {
+  display: block;
+}
+
+$bar-height: 120px;
+
+.week {
+  &__stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--nt-space-4) var(--nt-space-3);
+    margin-top: var(--nt-space-2);
+  }
+
+  &__chart {
+    margin-top: 0;
+  }
+
+  &__note {
+    margin: var(--nt-space-2) var(--nt-space-5) var(--nt-space-3);
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+  }
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+
+  &__value {
+    font-size: var(--nt-fs-title);
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--nt-ink);
+    font-variant-numeric: tabular-nums;
+
+    &--kcal {
+      color: var(--nt-kcal);
+    }
+
+    &--protein {
+      color: var(--nt-protein);
+    }
+  }
+
+  &__label {
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+  }
+}
+
+.bars {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--nt-space-2);
+  height: $bar-height;
+
+  &__target {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 2px dashed var(--nt-secondary);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  &__col {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    height: 100%;
+    min-width: 0;
+  }
+
+  &__bar {
+    width: 100%;
+    border-radius: 6px 6px 2px 2px;
+    min-height: 2px;
+
+    &--kcal {
+      background: var(--nt-kcal);
+    }
+
+    &--protein {
+      background: var(--nt-protein);
+    }
+
+    &--over {
+      background: var(--nt-over);
+    }
+
+    &--empty {
+      background: var(--nt-track);
+    }
+  }
+
+  &__labels {
+    display: flex;
+    gap: var(--nt-space-2);
+    margin-top: var(--nt-space-2);
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+
+    span {
+      flex: 1;
+      text-align: center;
+    }
+  }
+
+  &__label--today {
+    color: var(--nt-ink);
+    font-weight: 700;
+  }
+}

@@ -1,0 +1,180 @@
+// Gewichtsverlauf im Profil (Design "Sanft iOS"). Nur Tokens aus src/theme/variables.scss.
+:host {
+  display: block;
+}
+
+.weight {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nt-space-3);
+  color: var(--nt-ink);
+
+  &__head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--nt-space-3);
+    flex-wrap: wrap;
+  }
+
+  &__now {
+    display: flex;
+    align-items: baseline;
+    gap: var(--nt-space-2);
+    flex-wrap: wrap;
+  }
+
+  &__value {
+    font-size: var(--nt-fs-large-title);
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__unit,
+  &__when,
+  &__trend {
+    font-size: var(--nt-fs-body);
+    color: var(--nt-secondary);
+  }
+
+  &__trend {
+    font-weight: 600;
+    color: var(--nt-ink);
+  }
+
+  &__chart {
+    position: relative;
+    margin: 0;
+
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+  }
+
+  &__grid {
+    stroke: var(--nt-separator);
+    stroke-width: 1;
+  }
+
+  &__dot {
+    fill: var(--nt-secondary);
+    opacity: 0.55;
+  }
+
+  &__line {
+    stroke: var(--nt-accent);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  &__axis {
+    position: absolute;
+    left: var(--nt-space-1);
+    padding: 0 var(--nt-space-1);
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+    background: var(--nt-card);
+    border-radius: var(--nt-space-1);
+    font-variant-numeric: tabular-nums;
+
+    &--max {
+      top: 0;
+    }
+
+    &--min {
+      bottom: var(--nt-space-5);
+    }
+  }
+
+  &__dates {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 12px;
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+  }
+
+  &__legend,
+  &__empty {
+    margin: 0;
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+  }
+
+  &__empty {
+    font-size: var(--nt-fs-body);
+  }
+
+  &__add {
+    align-self: flex-start;
+  }
+
+  &__drift {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--nt-space-2);
+    padding: var(--nt-space-3);
+    background: var(--nt-accent-tint);
+    border-radius: var(--nt-radius-tile);
+
+    p {
+      margin: 0;
+      font-size: var(--nt-fs-body);
+      color: var(--nt-ink);
+    }
+  }
+
+  &__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    li {
+      display: flex;
+      align-items: center;
+      gap: var(--nt-space-2);
+      min-height: 44px;
+      border-top: 0.5px solid var(--nt-separator);
+      font-size: var(--nt-fs-body);
+    }
+  }
+
+  &__list-day {
+    flex: 1;
+    color: var(--nt-secondary);
+  }
+
+  &__list-kg {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__del {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    background: transparent;
+    color: var(--nt-secondary);
+    font-size: 20px;
+  }
+}
+
+.weight-sheet {
+  padding-top: var(--nt-space-3);
+
+  &__hint {
+    margin: var(--nt-space-3) var(--nt-space-4) 0;
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+  }
+}

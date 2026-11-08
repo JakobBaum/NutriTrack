@@ -16,7 +16,7 @@ export const MAX_BACKUP_BYTES = 20 * 1024 * 1024;
 
 const KEY_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
-const ARRAY_KEYS = ['diary', 'recipes', 'savedMeals', 'customFoods'] as const;
+const ARRAY_KEYS = ['diary', 'recipes', 'savedMeals', 'customFoods', 'favorites', 'weight'] as const;
 const NULLABLE_OBJECT_KEYS = ['profile', 'shopping'] as const;
 const AI_KEY = 'ai-config';
 const RECIPE_SEARCH_KEY = 'recipe-search-config';
@@ -45,6 +45,8 @@ export interface BackupCounts {
   readonly customFoods: number;
   readonly shoppingItems: number;
   readonly hasProfile: boolean;
+  readonly weightEntries: number;
+  readonly favorites: number;
 }
 
 export const BACKUP_ERRORS = {
@@ -165,6 +167,8 @@ export function countBackup(data: BackupData): BackupCounts {
     customFoods: lengthOf(data['customFoods']),
     shoppingItems: isPlainObject(shopping) ? lengthOf(shopping['items']) : 0,
     hasProfile: isPlainObject(data['profile']),
+    weightEntries: lengthOf(data['weight']),
+    favorites: lengthOf(data['favorites']),
   };
 }
 
@@ -178,6 +182,8 @@ export function describeCounts(c: BackupCounts): string {
     plural(c.savedMeals, 'gespeicherte Mahlzeit', 'gespeicherte Mahlzeiten'),
     plural(c.customFoods, 'eigenes Lebensmittel', 'eigene Lebensmittel'),
     ...(c.shoppingItems > 0 ? [plural(c.shoppingItems, 'Einkaufsposition', 'Einkaufspositionen')] : []),
+    ...(c.weightEntries > 0 ? [plural(c.weightEntries, 'Gewichtseintrag', 'Gewichtseinträge')] : []),
+    ...(c.favorites > 0 ? [plural(c.favorites, 'Favorit', 'Favoriten')] : []),
     ...(c.hasProfile ? ['Profil'] : []),
   ];
   return parts.join(', ');

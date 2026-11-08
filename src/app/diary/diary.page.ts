@@ -13,6 +13,7 @@ import { AmountUnit, DiaryEntry, MealType, NutritionFacts } from '../core/models
 import { AiService } from '../core/ai/ai.service';
 import { CopySource, DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
+import { FavoriteStore } from '../core/state/favorite.store';
 import { dayLabel, rollDate, toDateISO } from '../core/util/date';
 import { formatNum } from '../shared/num.pipe';
 import { MEAL_DEFS, mealForHour, mealLabel, isIsoDate, isMealType, isValidAmount, toBaseAmount, toNumberOrNull, inputTextFor, AMOUNT_UNITS, formatAmount, fromBaseAmount, convertAmount, lastAmountForLabel, editBaseFor } from './diary-helpers';
@@ -59,6 +60,7 @@ const SCROLL_TO_MEAL_DELAY_MS = 150;
 export class DiaryPage {
   private readonly diary = inject(DiaryStore);
   private readonly profileStore = inject(ProfileStore);
+  private readonly favorites = inject(FavoriteStore);
   private readonly ai = inject(AiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -71,6 +73,13 @@ export class DiaryPage {
 
   /** Roher Tipptext je Zahlenfeld des Bearbeiten-Dialogs. */
   private readonly rawTexts: Record<string, string> = {};
+
+  /** Tagebuch zeigt entweder einen Tag oder die letzten 7 Tage. */
+  readonly view = signal<'day' | 'week'>('day');
+
+  setView(value: unknown): void {
+    this.view.set(value === 'week' ? 'week' : 'day');
+  }
 
   readonly selectedDate = signal(toDateISO());
   /** Der Tag, den die Seite zuletzt als "heute" kannte (für den Tageswechsel). */
@@ -363,6 +372,19 @@ export class DiaryPage {
     });
     lightHaptic();
     this.closeEdit();
+  }
+
+  /** Der Eintrag im Bearbeiten-Dialog ist als Favorit gemerkt (gleicher Name und gleiche Marke). */
+  isEditFavorite(): boolean {
+    return !!this.editEntry && this.favorites.isFavorite(this.editEntry);
+  }
+
+  toggleEditFavorite(): void {
+    const entry = this.editEntry;
+    if (!entry) return;
+    const added = this.favorites.toggle(entry);
+    lightHaptic();
+    this.showToast(added ? `„${entry.label}“ als Favorit gemerkt` : `„${entry.label}“ aus den Favoriten entfernt`);
   }
 
   deleteFromEdit(): void {

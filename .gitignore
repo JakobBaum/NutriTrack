@@ -42,3 +42,12 @@ Thumbs.db
 
 # Referenz-Screenshots (nicht Teil der App)
 /BeispielFotos/
+
+# Release / Signing (nie committen)
+android/keystore.properties
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+*.p8
+/dist/

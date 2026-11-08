@@ -14,6 +14,7 @@ import { ActionSheetController, ToastController } from '@ionic/angular';
 import { AmountUnit, DiaryEntry, FoodItem, MealType, NutritionFacts, Recipe, SavedMeal } from '../../core/models';
 import { OpenPricesProvider } from '../../core/price/open-prices.provider';
 import { DiaryStore, NewDiaryEntry } from '../../core/state/diary.store';
+import { FavoriteFood, FavoriteStore, newEntryFromFavorite } from '../../core/state/favorite.store';
 import { CustomFood, CustomFoodStore } from '../../core/state/custom-food.store';
 import { MealsStore } from '../../core/state/meals.store';
 import { RecipeStore } from '../../core/state/recipe.store';
@@ -112,6 +113,7 @@ export class AddEntrySheetComponent implements OnChanges {
   private readonly recipeStore = inject(RecipeStore);
   private readonly customFoods = inject(CustomFoodStore);
   private readonly mealsStore = inject(MealsStore);
+  private readonly favoriteStore = inject(FavoriteStore);
   private readonly prices = inject(OpenPricesProvider);
   private readonly toastCtrl = inject(ToastController);
   private readonly sheetCtrl = inject(ActionSheetController);
@@ -487,6 +489,26 @@ export class AddEntrySheetComponent implements OnChanges {
       recipeId: entry.ref?.kind === 'recipe' ? entry.ref.recipeId : undefined,
       isPartial: entry.isPartial,
     });
+  }
+
+  // --- Favoriten ---
+  readonly favoriteList = this.favoriteStore.favorites;
+
+  isFavorite(entry: DiaryEntry): boolean {
+    return this.favoriteStore.isFavorite(entry);
+  }
+
+  toggleRecentFavorite(entry: DiaryEntry): void {
+    this.favoriteStore.toggle(entry);
+  }
+
+  removeFavorite(id: string): void {
+    this.favoriteStore.remove(id);
+  }
+
+  /** Loggt einen Favoriten sofort mit seiner gemerkten Menge. */
+  quickAddFavorite(fav: FavoriteFood): void {
+    this.addAndConfirm([newEntryFromFavorite(fav, this.date(), this.form.meal)]);
   }
 
   // --- Schnell-Loggen (ein Tipp) ---
