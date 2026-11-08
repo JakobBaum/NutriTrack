@@ -86,7 +86,7 @@ export interface RecipeIngredient {
   facts?: NutritionFacts;
 }
 
-export type RecipeOrigin = 'own' | 'url' | 'tiktok' | 'photo' | 'text';
+export type RecipeOrigin = 'own' | 'url' | 'tiktok' | 'photo' | 'text' | 'online';
 
 export interface Recipe {
   id: string;

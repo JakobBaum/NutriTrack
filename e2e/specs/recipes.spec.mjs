@@ -92,4 +92,103 @@ export function register({ test }) {
     await settle(page);
     await topModal(page).locator('.nt-sheet-header__title', { hasText: 'Rezept bearbeiten' }).waitFor();
   });
+
+  test('recipes: Online-Suche ohne Schlüssel zeigt die Einrichtung', seed(), async (page) => {
+    await go(page, 'recipes');
+    await page.locator('[data-testid="online-search-btn"]').click();
+    const modal = topModal(page);
+    await modal.locator('[data-testid="os-no-key"]').waitFor();
+    assert.match(await modal.innerText(), /spoonacular\.com/);
+    assert.match(await modal.innerText(), /Profil › Rezept-Suche/);
+    await modal.locator('button', { hasText: 'Schlüssel eintragen' }).click();
+    await page.waitForURL(/settings\?open=recipe-search/);
+    await page.locator('ion-modal.show-modal .nt-sheet-header__title', { hasText: 'Rezept-Suche' }).waitFor();
+  });
+
+  test('recipes: Online-Suche (gemockt) finden, öffnen, speichern', seed({ 'recipe-search-config': { apiKey: 'test-key', baseUrl: 'https://api.spoonacular.com' } }), async (page) => {
+    const requests = [];
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-expose-headers': 'X-Api-Quota-Left' };
+    await page.route('https://api.spoonacular.com/**', async (route) => {
+      const req = route.request();
+      if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+      requests.push({ url: req.url(), key: req.headers()['x-api-key'] });
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { ...cors, 'X-Api-Quota-Left': '41' },
+        body: JSON.stringify(MOCK_RESPONSE),
+      });
+    });
+
+    await go(page, 'recipes');
+    await page.locator('[data-testid="online-search-btn"]').click();
+    const modal = topModal(page);
+    await modal.locator('.nt-sheet-header__title', { hasText: 'Rezepte online' }).waitFor();
+    await modal.locator('ion-input input[aria-label="Rezept suchen"]').fill('lentil');
+    await modal.locator('.os-search-btn').click();
+    const card = modal.locator('.os-card', { hasText: 'Mock Lentil Soup' });
+    await card.waitFor();
+    assert.match(await card.innerText(), /320 kcal/);
+    assert.match(await card.innerText(), /2 Portionen/);
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].key, 'test-key');
+    assert.match(requests[0].url, /query=lentil/);
+    assert.match(await modal.innerText(), /noch 41 Punkte heute/);
+
+    await card.click();
+    const detail = modal.locator('[data-testid="os-detail"]');
+    await detail.waitFor();
+    assert.match(await detail.innerText(), /Chop the onion/);
+    assert.match(await detail.innerText(), /red lentils/);
+    assert.match(await detail.innerText(), /Quelle: Mock Blog/);
+    await detail.locator('.os-save').click();
+    await settle(page);
+
+    const saved = (await readStore(page, 'recipes')).find((r) => r.title === 'Mock Lentil Soup');
+    assert.ok(saved, 'Rezept nicht gespeichert');
+    assert.equal(saved.origin, 'online');
+    assert.equal(saved.servings, 2);
+    assert.deepEqual(saved.steps, ['Chop the onion.', 'Simmer the lentils for 20 minutes.']);
+    assert.equal(saved.ingredients[0].name, 'red lentils');
+    assert.equal(saved.factsPerServing?.kcal, 320);
+
+    await modal.locator('ion-button', { hasText: 'Schließen' }).click();
+    await settle(page, 800);
+    const listCard = page.locator('article.recipe', { hasText: 'Mock Lentil Soup' });
+    await listCard.waitFor();
+    assert.match(await listCard.innerText(), /320/);
+    await listCard.locator('.recipe__title-btn').click();
+    const sheet = topModal(page);
+    await eventually(async () => assert.match(await sheet.innerText(), /Simmer the lentils/));
+  });
 }
+
+const MOCK_RESPONSE = {
+  offset: 0,
+  number: 10,
+  totalResults: 1,
+  results: [{
+    id: 4242,
+    title: 'Mock Lentil Soup',
+    image: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=',
+    readyInMinutes: 30,
+    servings: 2,
+    sourceName: 'Mock Blog',
+    sourceUrl: 'https://blog.example/lentil-soup',
+    nutrition: {
+      nutrients: [
+        { name: 'Calories', amount: 320, unit: 'kcal' }, { name: 'Protein', amount: 18, unit: 'g' },
+        { name: 'Fat', amount: 6, unit: 'g' }, { name: 'Carbohydrates', amount: 48, unit: 'g' }, { name: 'Fiber', amount: 11, unit: 'g' },
+      ],
+      ingredients: [
+        { id: 1, name: 'red lentils', amount: 200, unit: 'g', nutrients: [{ name: 'Calories', amount: 600, unit: 'kcal' }, { name: 'Protein', amount: 40, unit: 'g' }] },
+        { id: 2, name: 'onion', amount: 1, unit: '', nutrients: [{ name: 'Calories', amount: 40, unit: 'kcal' }] },
+      ],
+    },
+    extendedIngredients: [
+      { id: 1, name: 'lentils', nameClean: 'red lentils', amount: 200, unit: 'g', measures: { metric: { amount: 200, unitShort: 'g' } } },
+      { id: 2, name: 'onion', amount: 1, unit: '', measures: { metric: { amount: 1, unitShort: '' } } },
+    ],
+    analyzedInstructions: [{ name: '', steps: [{ number: 1, step: 'Chop the onion.' }, { number: 2, step: 'Simmer the lentils for 20 minutes.' }] }],
+  }],
+};

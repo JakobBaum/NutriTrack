@@ -41,6 +41,12 @@ ion-modal ion-content {
   .page-head__import { justify-content: center; width: var(--nt-touch); padding: 0; }
 }
 
+// Schmale Phones (375 px): „Online suchen“ und „Import“ nur als Icon, damit der Titel nicht umbricht
+@media (max-width: 429px) {
+  .page-head__import-label { display: none; }
+  .page-head__import { justify-content: center; width: var(--nt-touch); padding: 0; }
+}
+
 .empty {
   display: flex;
   flex-direction: column;
@@ -229,3 +235,4 @@ ion-modal .nt-sheet-header { grid-template-columns: auto minmax(0, 1fr) auto; }
 .cook { max-width: 680px; margin-inline: auto; }
 .cook__step-text { font-size: 28px; line-height: 1.4; }
 .cook__close { @extend %tap-44; }
+

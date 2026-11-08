@@ -25,7 +25,7 @@ ion-content {
 
   &__intro, &__mode { margin: 0 0 var(--nt-space-3); color: var(--nt-secondary); }
   &__intro { font-size: var(--nt-fs-body); }
-  &__mode { font-size: var(--nt-fs-caption); a { color: var(--nt-accent); } }
+  &__mode { font-size: var(--nt-fs-caption); a { color: var(--nt-accent); white-space: nowrap; } }
   &__empty { margin-bottom: var(--nt-space-3); p { margin: 0 0 var(--nt-space-2); } }
   // Grid: Beschriftung oben, Bedienelement darunter.
   &__field { display: grid; gap: var(--nt-space-2); margin-bottom: var(--nt-space-4); }

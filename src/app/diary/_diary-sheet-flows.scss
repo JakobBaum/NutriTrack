@@ -1,0 +1,211 @@
+// Sheet-spezifische Muster (Eintragen, Fastfood-Helfer). Nur von add-entry-sheet und fastfood-sheet eingebunden, nicht von der Tagebuch-Seite (Budget 8 kB).
+
+.sheet-action {
+  margin: var(--nt-space-4) var(--nt-space-4) 0;
+  --border-radius: var(--nt-radius-pill);
+  min-height: var(--nt-touch);
+  font-weight: 600;
+}
+
+.form-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nt-space-2);
+  margin: 0 var(--nt-space-5) var(--nt-space-1);
+  font-size: var(--nt-fs-caption);
+  color: var(--nt-secondary);
+}
+
+ion-searchbar.nt-searchbar {
+  padding: var(--nt-space-2) var(--nt-space-4) 0;
+  --box-shadow: none;
+  font-size: var(--nt-fs-headline);
+}
+
+// Mahlzeit-Wahl im Kopf des Add-Sheets: 4 gleich breite Spalten (passt bei 320 px)
+.meal-picker {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--nt-space-2);
+  margin: var(--nt-space-1) var(--nt-space-4) var(--nt-space-2);
+}
+
+.meal-chip {
+  min-height: var(--nt-touch);
+  padding: 0 var(--nt-space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--nt-card);
+  border: 0;
+  border-radius: var(--nt-radius-pill);
+  color: var(--nt-ink);
+  font: inherit;
+  font-size: var(--nt-fs-caption);
+  font-weight: 600;
+  cursor: pointer;
+
+  &--on {
+    background: var(--nt-accent);
+    color: #fff;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--nt-focus);
+    outline-offset: 2px;
+  }
+}
+
+// "Zuletzt benutzt": Hauptfläche loggt sofort, Stift-Button öffnet das Formular
+.recent {
+  --padding-start: 0;
+  --inner-padding-end: 0;
+
+  &__main {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--nt-space-3);
+    min-height: 56px;
+    padding: var(--nt-space-2) var(--nt-space-2) var(--nt-space-2) var(--nt-space-4);
+    background: transparent;
+    border: 0;
+    color: var(--nt-ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--nt-focus);
+      outline-offset: -2px;
+    }
+  }
+
+  &__text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__name {
+    font-size: var(--nt-fs-headline);
+    font-weight: 600;
+  }
+
+  &__edit {
+    --color: var(--nt-accent);
+    font-size: var(--nt-fs-caption);
+    font-weight: 600;
+    text-transform: none;
+  }
+
+  &__meta {
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+  }
+}
+
+.preview {
+  margin: var(--nt-space-4) var(--nt-space-5) var(--nt-space-3);
+  font-size: var(--nt-fs-body);
+  color: var(--nt-secondary);
+  font-variant-numeric: tabular-nums;
+
+  strong {
+    font-size: var(--nt-fs-title);
+    color: var(--nt-kcal);
+  }
+}
+
+.adjust {
+  padding-bottom: var(--nt-space-2);
+}
+
+// Manuelles Formular: Akkordeon als eine gerundete Karte
+.adjust-group {
+  overflow: hidden;
+  border-radius: var(--nt-radius-card);
+}
+
+.nt-adjust-card {
+  background: var(--nt-card);
+  border-radius: 0 0 var(--nt-radius-card) var(--nt-radius-card);
+  overflow: hidden;
+}
+
+.add-footer ion-toolbar {
+  --background: var(--nt-ground);
+  --padding-start: var(--nt-space-4);
+  --padding-end: var(--nt-space-4);
+  --padding-top: var(--nt-space-2);
+  --padding-bottom: var(--nt-space-2);
+}
+
+.add-footer__save {
+  --border-radius: var(--nt-radius-pill);
+  min-height: var(--nt-touch);
+  font-weight: 600;
+}
+
+.scan-hint {
+  margin: var(--nt-space-2) var(--nt-space-5) 0;
+  font-size: var(--nt-fs-caption);
+  color: var(--nt-secondary);
+
+  &--empty {
+    margin-top: var(--nt-space-6);
+    text-align: center;
+    font-size: var(--nt-fs-body);
+  }
+}
+
+.ff-remaining {
+  margin: 0 var(--nt-space-5);
+  font-size: var(--nt-fs-body);
+  color: var(--nt-ink);
+}
+
+.ff-card {
+  margin: var(--nt-space-3) var(--nt-space-4);
+  background: var(--nt-card);
+  border-radius: var(--nt-radius-card);
+  box-shadow: none;
+
+  ion-card-header {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--nt-space-1);
+  }
+
+  ion-card-title {
+    color: var(--nt-ink);
+    font-size: var(--nt-fs-headline);
+  }
+
+  ion-card-subtitle {
+    color: var(--nt-secondary);
+    text-transform: none;
+  }
+
+  p {
+    margin: 0 0 6px;
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+  }
+}
+
+.adjust__hint {
+  margin: var(--nt-space-2) var(--nt-space-4) 0;
+  color: var(--nt-secondary);
+  font-size: var(--nt-fs-caption);
+}
+
+.adjust__badge {
+  color: var(--nt-secondary);
+  font-size: var(--nt-fs-caption);
+  font-weight: 600;
+}

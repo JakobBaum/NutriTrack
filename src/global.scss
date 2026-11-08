@@ -881,11 +881,49 @@ ion-item {
   --padding-bottom: var(--nt-space-3);
 }
 
+// Ionic setzt den inneren Wrapper auf 52 px mit eckiger weisser Flaeche: der ragt ueber den
+// abgerundeten Rand des Hosts (Unterkante wirkt abgeschnitten) und vergroessert das Feld auf 54 px.
+// Der Host liefert Hintergrund, Rand und Radius; innen nur Inhalt, Hoehe nach Host.
+:root :is(ion-input, ion-select, ion-textarea).nt-field {
+  overflow: hidden;
+
+  .input-wrapper,
+  .select-wrapper {
+    min-height: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: transparent;
+  }
+}
+
 // Fokus: Spezifitaet (0,3,1), damit er die Basisregel oben (Rand) ueberstimmt.
 :root :is(ion-input, ion-select, ion-textarea).nt-field:is(:focus-within, .has-focus, .ion-focused) {
   border-color: var(--nt-focus);
   box-shadow: 0 0 0 3px var(--nt-field-ring);
   outline: none;
+}
+
+// Auswahlfelder: Ionics Auf-/Ab-Pfeil (chevron-expand) durch das Drill-in-Chevron der Zeilen ersetzen.
+// Der Pfeil liegt im Shadow-DOM (part="icon") und wird ausgeblendet; ::after zeichnet dieselbe Form wie
+// Ionics Detail-Chevron (Farbe 30 % Tinte), am Ende des Select-Hosts.
+ion-select::part(icon) {
+  display: none;
+}
+
+ion-select {
+  display: flex;
+  align-items: center;
+}
+
+ion-select::after {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 14px;
+  margin-inline-start: var(--nt-space-2);
+  background: rgba(60, 60, 67, 0.3);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 14'%3E%3Cpath d='M1 1l6 6-6 6' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 14'%3E%3Cpath d='M1 1l6 6-6 6' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1027,4 +1065,29 @@ ion-button.nt-add-btn {
 // FAB ueber der Tab-Bar (16 px Abstand). Auf der Seite zusaetzlich ausblenden, wenn ein Generator/Sheet offen ist.
 :root ion-fab.nt-fab-offset {
   bottom: var(--nt-fab-bottom);
+}
+
+// Preis-Dialog (ion-alert mit Eingabe): Feld im Stil von .nt-field statt Ionic-Standardrahmen.
+ion-alert input.alert-input {
+  height: 44px;
+  margin: var(--nt-space-2) 0 0;
+  padding: 0 var(--nt-space-3);
+  border: 1px solid var(--nt-field-border);
+  border-radius: var(--nt-field-radius);
+  background: var(--nt-card);
+  color: var(--nt-ink);
+  font-size: var(--nt-fs-body);
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+}
+
+ion-alert input.alert-input:focus {
+  border-color: var(--nt-focus);
+  box-shadow: 0 0 0 3px var(--nt-field-ring);
+  outline: none;
+}
+
+// Zwei Hinzufuegen-Pillen untereinander (Zutat / manuelle Zutat) brauchen Luft, sonst kleben sie zusammen.
+ion-modal .nt-add-btn + .nt-add-btn {
+  margin-top: var(--nt-space-2);
 }

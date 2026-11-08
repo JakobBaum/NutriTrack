@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { AiConfig } from '../models';
 import { StorageService } from '../storage/storage.service';
+import { RecipeSearchConfigStore } from './recipe-search-config.store';
 
 const KEY_AI = 'ai-config';
 
@@ -26,6 +27,7 @@ const DEFAULT_AI: AiConfig = {
 @Injectable({ providedIn: 'root' })
 export class SettingsStore {
   private readonly storage = inject(StorageService);
+  private readonly recipeSearch = inject(RecipeSearchConfigStore);
 
   private readonly _ai = signal<AiConfig>(
     this.storage.get<AiConfig>(KEY_AI, DEFAULT_AI),
@@ -44,5 +46,6 @@ export class SettingsStore {
   clear(): void {
     this._ai.set(DEFAULT_AI);
     this.storage.remove(KEY_AI);
+    this.recipeSearch.clear();
   }
 }

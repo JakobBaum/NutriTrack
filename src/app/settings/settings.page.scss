@@ -82,9 +82,9 @@ ion-item {
   }
 }
 
-// Zeilen mit Wert rechts: Wert auf der Grundlinie des Labels.
+// Zeilen mit Wert rechts: Wert mittig zur Zeile (wie iOS-Detailwerte). Baseline lag bei Zwei-Zeilen-Labels oben daneben.
 .settings-page ion-item::part(native) {
-  align-items: baseline;
+  align-items: center;
 }
 
 // Sekundaerwert rechts in einer Zeile (z. B. aktuelles Kalorienziel)

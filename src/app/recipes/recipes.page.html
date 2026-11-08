@@ -3,6 +3,10 @@
     <h1 class="nt-large-title" role="heading" aria-level="1">{{ view() === 'meals' ? 'Mahlzeiten' : 'Rezepte' }}</h1>
     <div class="page-head__actions">
       @if (view() === 'recipes') {
+        <button type="button" class="page-head__import page-head__online" (click)="openOnlineSearch()" aria-label="Rezepte online suchen" data-testid="online-search-btn">
+          <ion-icon name="globe-outline" aria-hidden="true"></ion-icon>
+          <span class="page-head__import-label page-head__online-label">Online suchen</span>
+        </button>
         <button type="button" class="page-head__import" (click)="openImport()" aria-label="Rezept importieren (Text oder Link)">
           <ion-icon name="download-outline" aria-hidden="true"></ion-icon>
           <span class="page-head__import-label">Import</span>

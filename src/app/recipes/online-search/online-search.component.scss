@@ -1,0 +1,73 @@
+// Online-Rezeptsuche. Felder, Sheet-Kopf und Pillen kommen aus global.scss.
+:host { display: block; }
+
+ion-content {
+  --background: var(--nt-ground);
+  --padding-start: var(--nt-page-gutter);
+  --padding-end: var(--nt-page-gutter);
+  --padding-top: var(--nt-space-2);
+  --padding-bottom: var(--nt-space-6);
+}
+
+.back-btn { min-height: var(--nt-touch); }
+
+a { color: var(--nt-text-accent); text-decoration: underline; }
+
+.os-note { margin: var(--nt-space-2) 0 0; font-size: var(--nt-fs-caption); color: var(--nt-secondary); }
+.os-nolimit { margin: 0; }
+.os-center { text-align: center; }
+.os-error { margin: var(--nt-space-3) 0 0; padding: var(--nt-space-3); border-radius: 12px; background: var(--nt-card); color: var(--nt-ink); border: 1px solid var(--nt-separator); font-size: var(--nt-fs-body); }
+.os-link { min-height: var(--nt-touch); padding: 0 var(--nt-space-2); background: none; border: 0; color: var(--nt-text-accent); font: inherit; font-weight: 600; cursor: pointer; }
+.os-source { margin: var(--nt-space-4) 0 0; font-size: var(--nt-fs-caption); color: var(--nt-secondary); }
+
+.os-empty {
+  display: flex; flex-direction: column; align-items: center; gap: var(--nt-space-3);
+  max-width: 480px; margin: 0 auto; padding: var(--nt-space-6) var(--nt-space-2); text-align: center;
+  &__icon { font-size: 48px; color: var(--ion-color-step-400); }
+  &__title { margin: 0; font-size: var(--nt-fs-headline); color: var(--nt-ink); }
+  p { margin: 0; color: var(--nt-muted); }
+}
+.os-steps { margin: 0; padding-left: var(--nt-space-5); text-align: left; color: var(--nt-ink); li { margin: var(--nt-space-2) 0; } }
+
+.os-form { display: flex; gap: var(--nt-space-2); align-items: center; ion-input { flex: 1; min-width: 0; } }
+.os-search-btn { flex: none; }
+@media (max-width: 359px) { .os-search-btn { padding-inline: var(--nt-space-3); } }
+
+.os-filters { display: grid; grid-template-columns: 1fr 1fr; gap: var(--nt-space-3); margin-top: var(--nt-space-3); }
+.os-filter { min-width: 0; &__label { display: block; margin: 0 0 var(--nt-space-1); font-size: var(--nt-fs-caption); color: var(--nt-secondary); } }
+.os-filter--kcal { grid-column: 1 / -1; }
+.os-kcal { display: flex; align-items: center; gap: var(--nt-space-2); flex-wrap: wrap; }
+@media (max-width: 420px) { .os-filters { grid-template-columns: 1fr; } }
+
+.os-results { list-style: none; margin: var(--nt-space-4) 0 0; padding: 0; display: grid; gap: var(--nt-space-2); }
+.os-card {
+  display: flex; align-items: center; gap: var(--nt-space-3); width: 100%; min-height: 72px; padding: var(--nt-space-2);
+  background: var(--nt-card); border: 0; border-radius: var(--nt-radius-card); text-align: left; font: inherit; color: inherit; cursor: pointer;
+  &:focus-visible { outline: 2px solid var(--nt-focus); }
+  &__thumb { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 12px; overflow: hidden; background: var(--nt-track); color: var(--nt-secondary);
+    img { width: 100%; height: 100%; object-fit: cover; } }
+  &__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  &__title { font-size: var(--nt-fs-body); font-weight: 600; color: var(--nt-ink); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  &__meta { font-size: var(--nt-fs-caption); color: var(--nt-secondary); }
+  &__chev { flex: none; color: var(--nt-secondary); }
+}
+.os-more { display: flex; margin: var(--nt-space-4) auto 0; }
+
+.os-detail {
+  &__img { display: block; width: 100%; max-height: 260px; object-fit: cover; border-radius: var(--nt-radius-card); }
+  &__title { margin: var(--nt-space-3) 0 0; font-size: var(--nt-fs-large-title, 28px); line-height: 1.15; color: var(--nt-ink); overflow-wrap: anywhere; }
+}
+.os-meta { margin: var(--nt-space-1) 0 0; font-size: var(--nt-fs-body); color: var(--nt-secondary); }
+.os-macros {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--nt-space-2); margin: var(--nt-space-3) 0 0;
+  > div { padding: var(--nt-space-2) var(--nt-space-3); background: var(--nt-card); border-radius: 12px; min-width: 0; }
+  dt { font-size: 12px; color: var(--nt-secondary); }
+  dd { margin: 0; font-weight: 600; color: var(--nt-ink); font-variant-numeric: tabular-nums; }
+}
+.os-toggle { margin-top: var(--nt-space-3); }
+.os-save { display: flex; margin: var(--nt-space-4) 0 0; width: 100%; justify-content: center; }
+.os-h { margin: var(--nt-space-5) 0 var(--nt-space-2); font-size: var(--nt-fs-headline); color: var(--nt-ink); }
+.os-ingredients { list-style: none; margin: 0; padding: 0; background: var(--nt-card); border-radius: var(--nt-radius-card);
+  li { padding: var(--nt-space-3) var(--nt-space-4); border-bottom: var(--nt-hairline) solid var(--nt-separator); color: var(--nt-ink); overflow-wrap: anywhere; &:last-child { border-bottom: 0; } } }
+.os-ing-amount { font-weight: 600; font-variant-numeric: tabular-nums; margin-right: var(--nt-space-1); }
+.os-instructions { margin: 0; padding-left: var(--nt-space-5); color: var(--nt-ink); li { margin: 0 0 var(--nt-space-3); line-height: 1.45; padding-left: var(--nt-space-1); } }

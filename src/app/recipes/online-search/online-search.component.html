@@ -1,0 +1,165 @@
+<ion-header class="ion-no-border">
+  <div class="nt-sheet-header">
+    <span class="nt-sheet-header__start">
+      @if (selected()) {
+        <ion-button fill="clear" class="back-btn" (click)="back()" aria-label="Zurück zur Trefferliste">
+          <ion-icon slot="start" name="chevron-back" aria-hidden="true"></ion-icon>Zurück
+        </ion-button>
+      }
+    </span>
+    <h2 class="nt-sheet-header__title" role="heading" aria-level="2">{{ selected() ? 'Rezept' : 'Rezepte online' }}</h2>
+    <span class="nt-sheet-header__end">
+      <ion-button fill="clear" (click)="close()">Schließen</ion-button>
+    </span>
+  </div>
+</ion-header>
+
+<ion-content>
+  @if (!hasKey()) {
+    <div class="os-empty" data-testid="os-no-key">
+      <ion-icon name="globe-outline" class="os-empty__icon" aria-hidden="true"></ion-icon>
+      <h3 class="os-empty__title">Rezept-Suche einrichten</h3>
+      <p>Die Online-Suche nutzt die Rezeptdatenbank von spoonacular. Dafür brauchst du einen kostenlosen Schlüssel:</p>
+      <ol class="os-steps">
+        <li>Kostenlos auf <a [href]="spoonacularUrl" target="_blank" rel="noopener noreferrer">spoonacular.com</a> registrieren.</li>
+        <li>Im Bereich „Profile“ den API-Key kopieren.</li>
+        <li>In der App unter Profil › Rezept-Suche eintragen.</li>
+      </ol>
+      <button type="button" class="nt-pill" (click)="openSettings()">
+        <ion-icon name="key-outline" aria-hidden="true"></ion-icon>
+        Schlüssel eintragen
+      </button>
+      <p class="os-note">Der kostenlose Plan reicht für etwa 50 Punkte pro Tag. Rezepte sind auf Englisch.</p>
+    </div>
+  } @else if (shown(); as r) {
+    <article class="os-detail nt-page" data-testid="os-detail">
+      @if (r.imageUrl) { <img class="os-detail__img" [src]="r.imageUrl" alt="" loading="lazy" /> }
+      <h3 class="os-detail__title">{{ r.title }}</h3>
+      <p class="os-meta">{{ metaLine(r) }}</p>
+      @if (r.facts; as f) {
+        <dl class="os-macros">
+          <div><dt>Eiweiß</dt><dd>{{ f.proteinG | ntNum }} g</dd></div>
+          <div><dt>Kohlenh.</dt><dd>{{ f.carbsG | ntNum }} g</dd></div>
+          <div><dt>Fett</dt><dd>{{ f.fatG | ntNum }} g</dd></div>
+        </dl>
+        <p class="os-note">Nährwerte je Portion.</p>
+      }
+      @if (canTranslate) {
+        <ion-toggle class="os-toggle" [checked]="translateOn()" (ionChange)="setTranslate($event.detail.checked)" justify="space-between">Ins Deutsche übersetzen</ion-toggle>
+        @if (translating()) { <p class="os-note" role="status"><ion-spinner name="dots"></ion-spinner> Übersetze …</p> }
+      }
+      <button type="button" class="nt-pill os-save" [disabled]="isSaved() || translating()" (click)="save()">
+        <ion-icon [name]="isSaved() ? 'checkmark' : 'bookmark-outline'" aria-hidden="true"></ion-icon>
+        {{ isSaved() ? 'Gespeichert' : 'Als Rezept speichern' }}
+      </button>
+
+      <h4 class="os-h">Zutaten</h4>
+      <ul class="os-ingredients">
+        @for (ing of r.ingredients; track $index) {
+          <li><span class="os-ing-amount">{{ amountText(ing.amount, ing.unit) }}</span> {{ ing.name }}</li>
+        }
+      </ul>
+
+      <h4 class="os-h">Anleitung</h4>
+      <ol class="os-instructions">
+        @for (step of r.steps; track $index) { <li>{{ step }}</li> }
+      </ol>
+
+      @if (r.sourceUrl) {
+        <p class="os-source">Quelle: <a [href]="r.sourceUrl" target="_blank" rel="noopener noreferrer">{{ r.sourceName || r.sourceUrl }}</a></p>
+      }
+      <p class="os-source">Rezepte von <a [href]="spoonacularUrl" target="_blank" rel="noopener noreferrer">spoonacular.com</a></p>
+    </article>
+  } @else {
+    <div class="nt-page os-search">
+      <form class="os-form" (submit)="$event.preventDefault(); search()">
+        <ion-input
+          class="nt-field"
+          type="search"
+          enterkeyhint="search"
+          aria-label="Rezept suchen"
+          placeholder="Rezept suchen, z. B. chicken, pasta"
+          [ngModel]="query()"
+          (ngModelChange)="query.set($event)"
+          [ngModelOptions]="{ standalone: true }"
+        ></ion-input>
+        <button type="submit" class="nt-pill os-search-btn" [disabled]="loading()">
+          <ion-icon name="search" aria-hidden="true"></ion-icon>
+          Suchen
+        </button>
+      </form>
+
+      <div class="os-filters">
+        <div class="os-filter os-filter--kcal">
+          <span class="os-filter__label" id="os-kcal-label">Max. kcal je Portion</span>
+          <div class="os-kcal">
+            <nt-stepper
+              label="Max. kcal je Portion"
+              unit="kcal"
+              [value]="maxCalories()"
+              [min]="kcalLimit.min"
+              [max]="kcalLimit.max"
+              [step]="kcalLimit.step"
+              [start]="kcalLimit.start"
+              (valueChange)="setMaxCalories($event)"
+            ></nt-stepper>
+            @if (maxCalories() === null) { <span class="os-note os-nolimit">Kein Limit</span> }
+            @if (maxCalories() !== null) {
+              <button type="button" class="os-link" (click)="setMaxCalories(null)">Kein Limit</button>
+            }
+          </div>
+        </div>
+        <div class="os-filter">
+          <span class="os-filter__label" id="os-time-label">Zubereitungszeit</span>
+          <ion-select class="nt-field" aria-labelledby="os-time-label" interface="action-sheet" cancelText="Abbrechen" [ngModel]="maxReadyTime()" (ngModelChange)="maxReadyTime.set($event)" [ngModelOptions]="{ standalone: true }">
+            @for (o of timeOptions; track o.value) { <ion-select-option [value]="o.value">{{ o.label }}</ion-select-option> }
+          </ion-select>
+        </div>
+        <div class="os-filter">
+          <span class="os-filter__label" id="os-diet-label">Ernährung</span>
+          <ion-select class="nt-field" aria-labelledby="os-diet-label" interface="action-sheet" cancelText="Abbrechen" [ngModel]="diet()" (ngModelChange)="diet.set($event)" [ngModelOptions]="{ standalone: true }">
+            @for (o of dietOptions; track o.value) { <ion-select-option [value]="o.value">{{ o.label }}</ion-select-option> }
+          </ion-select>
+        </div>
+      </div>
+
+      @if (error(); as message) { <p class="os-error" role="alert">{{ message }}</p> }
+
+      @if (loading()) {
+        <p class="os-note os-center" role="status"><ion-spinner name="dots"></ion-spinner> Suche läuft …</p>
+      } @else if (searched() && results().length === 0 && !error()) {
+        <p class="os-note os-center">Keine Rezepte gefunden. Lockere die Filter oder suche auf Englisch.</p>
+      }
+
+      <ul class="os-results" data-testid="os-results">
+        @for (r of results(); track r.id) {
+          <li>
+            <button type="button" class="os-card" (click)="open(r)" [attr.aria-label]="r.title + ' ansehen'">
+              <span class="os-card__thumb">
+                @if (r.imageUrl) { <img [src]="r.imageUrl" alt="" loading="lazy" /> } @else { <ion-icon name="restaurant-outline" aria-hidden="true"></ion-icon> }
+              </span>
+              <span class="os-card__text">
+                <span class="os-card__title">{{ r.title }}</span>
+                <span class="os-card__meta">{{ metaLine(r) }}</span>
+              </span>
+              <ion-icon name="chevron-forward" class="os-card__chev" aria-hidden="true"></ion-icon>
+            </button>
+          </li>
+        }
+      </ul>
+
+      @if (hasMore() && !loading()) {
+        <button type="button" class="nt-pill nt-pill--secondary os-more" [disabled]="loadingMore()" (click)="loadMore()">
+          {{ loadingMore() ? 'Lädt …' : 'Mehr laden' }}
+        </button>
+      }
+
+      <p class="os-source">
+        Rezepte von <a [href]="spoonacularUrl" target="_blank" rel="noopener noreferrer">spoonacular.com</a>
+        @if (quotaLeft() !== null) { · noch {{ quotaLeft() }} Punkte heute }
+      </p>
+    </div>
+  }
+
+  <ion-toast [isOpen]="toast() !== null" [message]="toast() ?? ''" [duration]="2500" position="bottom" (didDismiss)="onToastDismiss()"></ion-toast>
+</ion-content>

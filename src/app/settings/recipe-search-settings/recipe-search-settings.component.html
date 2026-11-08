@@ -1,0 +1,50 @@
+<h2 class="nt-section-header">Rezept-Suche</h2>
+<ion-list class="nt-grouped" lines="full">
+  <ion-item button detail="true" (click)="openSheet()" data-testid="recipe-search-row">
+    <ion-icon slot="start" name="globe-outline"></ion-icon>
+    <ion-label>Rezepte online suchen</ion-label>
+    <ion-note slot="end" class="row-note" [class.row-note--on]="isConnected()">{{ status() }}</ion-note>
+  </ion-item>
+</ion-list>
+
+<ion-modal [isOpen]="open()" [handle]="true" (ionModalDidDismiss)="open.set(false)">
+  <ng-template>
+    <div class="nt-sheet-header">
+      <span class="nt-sheet-header__start"></span>
+      <h2 class="nt-sheet-header__title" role="heading" aria-level="2">Rezept-Suche</h2>
+      <span class="nt-sheet-header__end">
+        <ion-button fill="clear" (click)="open.set(false)">Schließen</ion-button>
+      </span>
+    </div>
+    <ion-content>
+      <div class="nt-page sheet">
+        <p class="hint">
+          Die Online-Suche nutzt die Rezeptdatenbank von
+          <a href="https://spoonacular.com/food-api" target="_blank" rel="noopener noreferrer">spoonacular.com</a>.
+          Der kostenlose Plan reicht für etwa 50 Punkte pro Tag. Der Schlüssel bleibt nur auf diesem Gerät.
+        </p>
+        <label class="field-label" id="rs-key-label" for="rs-key">spoonacular API-Key</label>
+        <ion-input
+          id="rs-key"
+          class="nt-field"
+          type="password"
+          aria-labelledby="rs-key-label"
+          [ngModel]="apiKey()"
+          (ngModelChange)="apiKey.set($event)"
+          [clearOnEdit]="false"
+          autocomplete="off"
+          placeholder="Schlüssel einfügen"
+        ></ion-input>
+        <div class="actions">
+          <ion-button fill="outline" expand="block" [disabled]="test().busy || !apiKey().trim()" (click)="testConnection()">Verbindung testen</ion-button>
+        </div>
+        @if (test().message; as msg) {
+          <p class="hint" role="status" [class.hint--warn]="test().ok === false">{{ msg }}</p>
+        }
+        <div class="actions">
+          <ion-button expand="block" (click)="save()">Speichern</ion-button>
+        </div>
+      </div>
+    </ion-content>
+  </ng-template>
+</ion-modal>

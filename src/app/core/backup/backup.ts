@@ -17,6 +17,7 @@ const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const ARRAY_KEYS = ['diary', 'recipes', 'savedMeals', 'customFoods'] as const;
 const NULLABLE_OBJECT_KEYS = ['profile', 'shopping'] as const;
 const AI_KEY = 'ai-config';
+const RECIPE_SEARCH_KEY = 'recipe-search-config';
 
 /** Gespeicherte Daten: Schlüssel (ohne Präfix) → bereits geparster JSON-Wert. */
 export type BackupData = Readonly<Record<string, unknown>>;
@@ -68,9 +69,11 @@ export function backupFileName(date: Date): string {
 
 /** Entfernt den eigenen API-Key, damit er nicht in einer geteilten Datei landet. */
 function withoutSecrets(data: BackupData): BackupData {
-  const ai = data[AI_KEY];
-  if (!isPlainObject(ai) || !('apiKey' in ai)) return data;
-  return { ...data, [AI_KEY]: { ...ai, apiKey: '' } };
+  const blank = (d: BackupData, key: string): BackupData => {
+    const entry = d[key];
+    return isPlainObject(entry) && 'apiKey' in entry ? { ...d, [key]: { ...entry, apiKey: '' } } : d;
+  };
+  return blank(blank(data, AI_KEY), RECIPE_SEARCH_KEY);
 }
 
 /** Erstellt das Backup-Objekt aus den gespeicherten Daten (ohne Meta-Schlüssel und Secrets). */
@@ -176,19 +179,24 @@ export function describeCounts(c: BackupCounts): string {
   return parts.join(', ');
 }
 
+/** Übernimmt beim Wiederherstellen den lokalen API-Key, wenn das Backup keinen enthält. */
+function keepLocalKey(restored: BackupData, current: BackupData, key: string): BackupData {
+  const entry = restored[key];
+  const currentEntry = current[key];
+  if (!isPlainObject(entry) || !isPlainObject(currentEntry)) return restored;
+  const hasOwnKey = typeof entry['apiKey'] === 'string' && entry['apiKey'] !== '';
+  const localKey = currentEntry['apiKey'];
+  if (hasOwnKey || typeof localKey !== 'string' || localKey === '') return restored;
+  return { ...restored, [key]: { ...entry, apiKey: localKey } };
+}
+
 /**
  * Daten, die beim Import geschrieben werden: Backup-Inhalt, aber der lokale API-Key
  * bleibt erhalten, wenn das Backup (wie beim Export üblich) keinen enthält.
  */
 export function prepareRestore(backup: BackupData, current: BackupData): BackupData {
   const restored = Object.fromEntries(Object.entries(backup).filter(([key]) => key !== LAST_BACKUP_KEY));
-  const ai = restored[AI_KEY];
-  const currentAi = current[AI_KEY];
-  if (!isPlainObject(ai) || !isPlainObject(currentAi)) return restored;
-  const hasOwnKey = typeof ai['apiKey'] === 'string' && ai['apiKey'] !== '';
-  const localKey = currentAi['apiKey'];
-  if (hasOwnKey || typeof localKey !== 'string' || localKey === '') return restored;
-  return { ...restored, [AI_KEY]: { ...ai, apiKey: localKey } };
+  return keepLocalKey(keepLocalKey(restored, current, AI_KEY), current, RECIPE_SEARCH_KEY);
 }
 
 /** Formatiert ein ISO-Datum als "06.11.2026, 14:05" (lokal); `null` bei ungültiger Eingabe. */

@@ -13,6 +13,8 @@ import { formatDecimal, parseDecimal } from '../core/util/number-input';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ActionSheetController, AlertController } from '@ionic/angular';
+import { ModalController } from '@ionic/angular/lazy';
+import { OnlineSearchComponent } from './online-search/online-search.component';
 import { hasIncompleteFacts } from '../core/nutrition/units-weight';
 import { importBlockReason, importErrorMessage } from './recipe-view';
 import { confirmDiscard } from '../meals/confirm-discard';
@@ -100,6 +102,7 @@ export class RecipesPage implements OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly alerts = inject(AlertController);
+  private readonly modals = inject(ModalController);
 
   /** Segment „Rezepte | Mahlzeiten“; per `?view=meals` vorwählbar (alte Route /meals). */
   readonly view = signal<RecipesView>('recipes');
@@ -407,6 +410,12 @@ export class RecipesPage implements OnDestroy {
     this.isModalOpen.set(false);
   }
 
+  /** Öffnet die Online-Rezeptsuche (spoonacular) als Sheet. */
+  async openOnlineSearch(): Promise<void> {
+    const modal = await this.modals.create({ component: OnlineSearchComponent });
+    await modal.present();
+  }
+
   // --- Import ---
   openImport(): void {
     this.importText = '';
@@ -478,7 +487,7 @@ export class RecipesPage implements OnDestroy {
     return typeof navigator !== 'undefined' && navigator.onLine === false;
   }
 
-  private _importOrigin: 'own' | 'url' | 'tiktok' | 'photo' | 'text' = 'own';
+  private _importOrigin: 'own' | 'url' | 'tiktok' | 'photo' | 'text' | 'online' = 'own';
 
   // --- Zutaten ---
   removeIngredient(index: number): void {

@@ -1,5 +1,5 @@
 <ion-content>
-  <div class="nt-page nt-tab-clearance settings-page">
+  <div class="nt-page settings-page">
     <div class="nt-page-header">
       <h1 class="nt-large-title">Profil</h1>
     </div>
@@ -41,6 +41,8 @@
         <ion-note slot="end" class="row-note" [class.row-note--on]="aiState() !== 'none'">{{ aiStatus() }}</ion-note>
       </ion-item>
     </ion-list>
+
+    <app-recipe-search-settings></app-recipe-search-settings>
 
     <h2 class="nt-section-header">App</h2>
     <ion-list class="nt-grouped" lines="full">

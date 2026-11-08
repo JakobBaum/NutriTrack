@@ -65,7 +65,7 @@ export function lowerBoundPrefix(missingCount: number): string {
 
 /** True, wenn die Werte des Rezepts aus einem KI-Import stammen. */
 export function isAiOrigin(origin: RecipeOrigin | undefined): boolean {
-  return origin !== undefined && origin !== 'own';
+  return origin !== undefined && origin !== 'own' && origin !== 'online';
 }
 
 /** Auswahl beim Loggen: so viele Portionen werden gegessen (Hälften gehören zum Essen, nicht zur Ergiebigkeit). */
