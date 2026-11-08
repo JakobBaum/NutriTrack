@@ -6,7 +6,7 @@ import { GeminiAiProvider } from './gemini-ai-provider';
 import { SettingsStore } from '../state/settings.store';
 import { AiConfig, UserProfile } from '../models';
 
-const URL_FLASH = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
+const URL_FLASH = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent';
 
 const profile: UserProfile = {
   weightKg: 80, heightCm: 180, age: 30, sex: 'male', activityLevel: 'moderate',
@@ -158,7 +158,7 @@ describe('GeminiAiProvider — Mapping je Funktion', () => {
   it('nutzt einen eigenen Endpoint aus den Einstellungen', async () => {
     configure({ endpoint: ' https://proxy.test/models ' });
     const p = provider.computeTargets(profile);
-    http.expectOne('https://proxy.test/models/gemini-3.8-flash:generateContent').flush(reply('{"kcal":1}'));
+    http.expectOne('https://proxy.test/models/gemini-3.6-flash:generateContent').flush(reply('{"kcal":1}'));
     expect((await p).kcal).toBe(1);
   });
 });

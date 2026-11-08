@@ -5,6 +5,7 @@ describe('ai-status', () => {
   it('is none without server and key', () => {
     expect(aiConnection({})).toBe('none');
     expect(aiConnection({ provider: 'gemini', proxyUrl: '  ', apiKey: ' ' })).toBe('none');
+    expect(aiStatusLabel('server')).toBe('Globaler KI-Server aktiv');
   });
 
   it('prefers an own key over the server', () => {

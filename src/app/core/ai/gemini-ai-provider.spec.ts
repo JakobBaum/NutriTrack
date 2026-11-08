@@ -53,13 +53,13 @@ beforeEach(() => {
 afterEach(() => http.verify());
 
 describe('GeminiAiProvider — Modell-Routing', () => {
-  it('nutzt gemini-3.8-flash als Standardmodell, wenn kein Modell gesetzt ist', async () => {
+  it('nutzt gemini-3.6-flash als Standardmodell, wenn kein Modell gesetzt ist', async () => {
     // Arrange
     configure({ model: '' });
 
     // Act
     const promise = provider.computeTargets(profile);
-    const req = http.expectOne(url('gemini-3.8-flash'));
+    const req = http.expectOne(url('gemini-3.6-flash'));
 
     // Assert
     expect(req.request.headers.get('x-goog-api-key')).toBe('test-key');
@@ -73,7 +73,7 @@ describe('GeminiAiProvider — Modell-Routing', () => {
 
     // Act
     const promise = provider.recognizeLabel('deadbeef', 'per100g');
-    const req = http.expectOne(url('gemini-3.8-flash'));
+    const req = http.expectOne(url('gemini-3.6-flash'));
 
     // Assert
     expect(req.request.body.contents[0].parts[0].inlineData.data).toBe('deadbeef');
@@ -103,7 +103,7 @@ describe('GeminiAiProvider — Robustheit', () => {
 
     // Act / Assert
     await expect(provider.computeTargets(profile)).rejects.toThrow(/API-Key/);
-    http.expectNone(url('gemini-3.8-flash'));
+    http.expectNone(url('gemini-3.6-flash'));
   });
 
   it('klemmt negative Nährwerte aus einer defekten Antwort auf 0', async () => {
@@ -112,7 +112,7 @@ describe('GeminiAiProvider — Robustheit', () => {
 
     // Act
     const promise = provider.computeTargets(profile);
-    const req = http.expectOne(url('gemini-3.8-flash'));
+    const req = http.expectOne(url('gemini-3.6-flash'));
     req.flush(geminiReply('{"kcal":-500,"proteinG":-5,"carbsG":10,"fatG":3}'));
     const target = await promise;
 

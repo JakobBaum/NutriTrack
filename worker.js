@@ -3,8 +3,17 @@
  * - GET  /off-search  → OpenFoodFacts-Suche (CORS-Proxy, 1 h gecacht)
  * - POST /            → KI-Proxy für Gemini (fn + payload)
  *
+ * - GET  /health      → Statusprüfung {ok, hasKey, model, fallbackModel} (kein Key-Wert)
+ *
+ * Deploy (im Projektordner):
+ *   npx wrangler login
+ *   npx wrangler secret put GEMINI_API_KEY   (Key einfügen, wenn gefragt)
+ *   npx wrangler deploy
+ * Prüfen: curl https://nutritrack.baumgartner-jakob12.workers.dev/health
+ *
  * Secrets (über Wrangler/Dashboard setzen):
  *   wrangler secret put GEMINI_API_KEY
+ * Optional: GEMINI_MODEL, GEMINI_FALLBACK_MODEL (Modellnamen überschreiben)
  * Optional:
  *   ALLOWED_ORIGINS  kommagetrennte Browser-Origins (ersetzt DEFAULT_ORIGINS)
  *   AI_LIMITER       Rate-Limiting-Binding (wrangler.toml [[ratelimits]]) für POST /
@@ -15,13 +24,13 @@
  * das Rate-Limit ist der eigentliche Kostenschutz.
  */
 
-const GEMINI_MODEL = 'gemini-3.8-flash';
-// Zweites, leichteres Modell, falls das Hauptmodell überlastet bleibt.
-const GEMINI_FALLBACK_MODEL = 'gemini-3.8-flash-lite';
-const GEMINI_RETRIES = 2; // zusätzliche Versuche pro Modell bei 500/503/429
+const GEMINI_MODEL = 'gemini-3.6-flash';
+// Zweites, leichteres Modell, falls das Hauptmodell überlastet oder unbekannt ist.
+const GEMINI_FALLBACK_MODEL = 'gemini-3.5-flash-lite';
+const GEMINI_RETRIES = 1; // zusätzliche Versuche pro Modell bei 500/503/429
 const GEMINI_BACKOFF_BASE_MS = 600;
-const GEMINI_TOTAL_BUDGET_MS = 50000; // Gesamtzeit über alle Versuche
-const GEMINI_ATTEMPT_TIMEOUT_MS = 25000;
+const GEMINI_TOTAL_BUDGET_MS = 25000; // Gesamtzeit über alle Versuche
+const GEMINI_ATTEMPT_TIMEOUT_MS = 12000;
 const GEMINI_RETRY_AFTER_S = 60;
 const OVERLOADED_MESSAGE = 'Die KI ist gerade überlastet — bitte in einer Minute erneut versuchen.';
 const TRANSIENT_STATUSES = new Set([429, 500, 503]);
@@ -90,6 +99,14 @@ export default {
     try {
       if (request.method === 'GET' && url.pathname === '/off-search') {
         return await offSearch(url, cors);
+      }
+      if (request.method === 'GET' && url.pathname === '/health') {
+        return json({
+          ok: true,
+          hasKey: Boolean(env.GEMINI_API_KEY),
+          model: env.GEMINI_MODEL || GEMINI_MODEL,
+          fallbackModel: env.GEMINI_FALLBACK_MODEL || GEMINI_FALLBACK_MODEL,
+        }, 200, cors);
       }
       if (request.method === 'POST' && url.pathname === '/') {
         return await aiProxy(request, env, cors);
@@ -412,6 +429,11 @@ function extractRecipeText(html) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** True, wenn Gemini das Modell ablehnt (unbekannt/nicht verfügbar) statt die Eingabe. */
+function isModelError(status, message) {
+  return status === 404 || (status === 400 && /model/i.test(message));
+}
+
 /** Ein Gemini-Request; liefert die (ggf. fehlerhafte) Response oder wirft bei Netzfehlern. */
 async function geminiRequest(model, body, env, timeoutMs) {
   return fetch(`${GEMINI_BASE}/${model}:generateContent`, {
@@ -456,7 +478,11 @@ async function geminiWithFallback(body, env) {
         }
         lastTransient = TRANSIENT_STATUSES.has(resp.status);
         lastError = new Error(`Gemini ${resp.status}: ${msg}`);
-        if (!lastTransient) throw lastError;
+        if (!lastTransient) {
+          // Modell unbekannt (404 bzw. 400 "model"): sofort das nächste Modell probieren.
+          if (isModelError(resp.status, msg) && model !== models[models.length - 1]) break;
+          throw lastError;
+        }
       }
       if (attempt < GEMINI_RETRIES) {
         const backoff = GEMINI_BACKOFF_BASE_MS * 2 ** attempt + Math.random() * 250;

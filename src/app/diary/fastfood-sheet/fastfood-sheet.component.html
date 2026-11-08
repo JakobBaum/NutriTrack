@@ -21,7 +21,7 @@
       <app-fastfood-form [form]="ff" [live]="ffLive()" [remainingKcal]="targetKcal() > 0 ? remainingKcal() : null" (formChange)="ff = $event" (connectAi)="closeFastfood()"></app-fastfood-form>
       <ion-button expand="block" class="sheet-action" (click)="runFastfood()" [disabled]="ffLoading() || !ffLive()">
         @if (ffLoading()) {
-          <ion-spinner name="dots" slot="start"></ion-spinner> Suche…
+          <ion-spinner name="dots" slot="start"></ion-spinner> Suche (bis zu 30 s)…
         } @else {
           <ion-icon slot="start" name="sparkles-outline"></ion-icon> Vorschläge holen
         }

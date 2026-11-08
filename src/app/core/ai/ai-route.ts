@@ -1,4 +1,5 @@
 import { AiConfig } from '../models';
+import { effectiveProxyUrl } from './ai-endpoint';
 
 /** Ein Weg, über den KI-Aufrufe laufen können. */
 export type AiRoute = 'ownKey' | 'proxy';
@@ -15,12 +16,13 @@ type RouteConfig = Partial<Pick<AiConfig, 'provider' | 'apiKey' | 'proxyUrl'>>;
 
 /**
  * Nutzbare Wege in Prioritätsreihenfolge: eigener Gemini-Key (direkt) zuerst,
- * danach der KI-Server (Worker). Leeres Array = keine Verbindung.
+ * danach der globale KI-Server (Worker; eigene Adresse oder Standard aus der Umgebung).
+ * Leeres Array = keine Verbindung (nur wenn auch kein Standard-Server konfiguriert ist).
  */
 export function resolveAiRoutes(cfg: RouteConfig): AiRoute[] {
   const routes: AiRoute[] = [];
   if (cfg.provider === 'gemini' && cfg.apiKey?.trim()) routes.push('ownKey');
-  if (cfg.proxyUrl?.trim()) routes.push('proxy');
+  if (effectiveProxyUrl(cfg)) routes.push('proxy');
   return routes;
 }
 

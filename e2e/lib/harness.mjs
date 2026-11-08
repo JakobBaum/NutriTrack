@@ -57,6 +57,13 @@ export async function launchBrowser() {
 /** Neuer, isolierter Kontext; `seed` (Key → Wert) wird einmalig vor dem ersten Laden geschrieben. */
 export async function newPage(browser, seed = null) {
   const ctx = await browser.newContext(CONTEXT_OPTIONS);
+  // E2E darf nie den echten globalen KI-Worker erreichen: jede Anfrage wird lokal mit 503 beantwortet.
+  await ctx.route('https://*.workers.dev/**', (route) => route.fulfill({
+    status: 503,
+    contentType: 'application/json',
+    headers: { 'access-control-allow-origin': '*' },
+    body: '{"error":"E2E: KI-Worker gesperrt"}',
+  }));
   if (seed) {
     await ctx.addInitScript(([prefix, data]) => {
       if (sessionStorage.getItem('__seeded')) return;
