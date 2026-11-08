@@ -393,15 +393,36 @@ describe('GET /recipes/complexSearch (spoonacular)', () => {
     mockFetch(okReply);
 
     // Act
-    await worker.fetch(get('/recipes/complexSearch?query=soup&apiKey=fremd&evil=1&sort=random&diet=vegan'), RECIPE_ENV);
+    await worker.fetch(get('/recipes/complexSearch?query=soup&apiKey=fremd&evil=1&sort=random&sortDirection=sideways&diet=vegan'), RECIPE_ENV);
 
     // Assert
     const params = new URL(upstream[0].url).searchParams;
     assert.equal(params.get('apiKey'), null);
     assert.equal(params.get('evil'), null);
-    assert.equal(params.get('sort'), null);
+    assert.equal(params.get('sort'), 'random');
+    assert.equal(params.get('sortDirection'), null);
     assert.equal(params.get('diet'), 'vegan');
     assert.ok(!upstream[0].url.includes('spoon-secret'));
+  });
+
+  it('reicht type, sort, sortDirection und minProtein nur mit erlaubten Werten durch', async () => {
+    // Arrange
+    mockFetch(okReply);
+
+    // Act
+    await worker.fetch(get('/recipes/complexSearch?type=main%20course&sort=healthiness&sortDirection=desc&minProtein=30'), RECIPE_ENV);
+    await worker.fetch(get('/recipes/complexSearch?type=evil&sort=price&sortDirection=up'), RECIPE_ENV);
+
+    // Assert
+    const first = new URL(upstream[0].url).searchParams;
+    assert.equal(first.get('type'), 'main course');
+    assert.equal(first.get('sort'), 'healthiness');
+    assert.equal(first.get('sortDirection'), 'desc');
+    assert.equal(first.get('minProtein'), '30');
+    const second = new URL(upstream[1].url).searchParams;
+    assert.equal(second.get('type'), null);
+    assert.equal(second.get('sort'), null);
+    assert.equal(second.get('sortDirection'), null);
   });
 
   it('begrenzt number auf 20 und setzt einen Standard bei ungültigem Wert', async () => {

@@ -231,8 +231,4 @@ ion-modal .nt-sheet-header { grid-template-columns: auto minmax(0, 1fr) auto; }
 .detail-list { padding: 0; list-style: none; li { @extend %row; justify-content: space-between; gap: var(--nt-space-3); padding: 8px 0; border-bottom: 0.5px solid var(--nt-separator); } }
 .detail-steps { padding: 0 0 0 var(--nt-space-4); li { padding: 4px 0; } }
 
-// Kochmodus: Lesebreite begrenzen, Schritttext groesser
-.cook { max-width: 680px; margin-inline: auto; }
-.cook__step-text { font-size: 28px; line-height: 1.4; }
-.cook__close { @extend %tap-44; }
 

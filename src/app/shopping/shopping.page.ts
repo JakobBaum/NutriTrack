@@ -7,6 +7,8 @@ import { MealType } from '../core/models';
 import { ProfileStore } from '../core/state/profile.store';
 import { RecipeStore } from '../core/state/recipe.store';
 import { ShoppingStore, sumItems } from '../core/state/shopping.store';
+import { WeekPlanStore } from '../core/state/week-plan.store';
+import { WeekPlanService } from '../core/week-plan/week-plan.service';
 import { UNDO_TOAST_BUTTONS, UNDO_TOAST_MS, UndoableDelete, settleUndoToast } from '../meals/undoable-delete';
 import {
   BUDGET_PRESETS,
@@ -41,6 +43,9 @@ export type ShoppingView = 'recipes' | 'list';
 
 /** Dauer des Hinweises nach „Liste teilen“ in ms. */
 const SHARE_TOAST_MS = 2500;
+/** Dauer des Hinweises nach „Wochenplan erstellt“ (länger, damit „Zur Liste“ erreichbar bleibt). */
+const PLAN_TOAST_MS = 6000;
+const PLAN_TOAST_LIST_ROLE = 'list';
 
 /**
  * Einkaufsliste: generiert einen Wocheneinkauf (Personen × Tage × Mahlzeiten ×
@@ -60,6 +65,8 @@ export class ShoppingPage implements OnDestroy {
   private readonly recipeStore = inject(RecipeStore);
   private readonly alertCtrl = inject(AlertController);
   private readonly actionSheet = inject(ActionSheetController);
+  private readonly weekPlanService = inject(WeekPlanService);
+  private readonly weekPlanStore = inject(WeekPlanStore);
 
   /** Eine ID = Komma-Liste von Indizes (Einzel- oder Sammel-Löschen). */
   private readonly deletion = new UndoableDelete((id) => this.commitRemoval(decodeIndexes(id)));
@@ -120,7 +127,20 @@ export class ShoppingPage implements OnDestroy {
   /** Aktive Ansicht; bleibt über Tab-Wechsel im Seitenzustand erhalten (Standard: Liste). */
   readonly view = signal<ShoppingView>('list');
   readonly isListView = computed(() => this.view() === 'list');
+  /** Rezepte-Segment sichtbar (Wochenplan und Generator). */
   readonly showGenerator = computed(() => this.view() === 'recipes');
+
+  /** Aktueller Wochenplan (Online-Rezepte). */
+  readonly weekPlan = this.weekPlanStore.plan;
+  /** Online-Suche (eigener Key oder globaler Worker) erreichbar. */
+  readonly onlineAvailable = computed(() => this.weekPlanService.isAvailable());
+  /** Generator ausgeklappt; ohne Plan immer, mit Plan nur auf Wunsch. */
+  readonly generatorOpen = signal(false);
+  readonly showForm = computed(() => this.weekPlan() === null || this.generatorOpen());
+  readonly planToastOpen = signal(false);
+  readonly planToastMessage = signal('');
+  readonly planToastButtons = [{ text: 'Zur Liste', role: PLAN_TOAST_LIST_ROLE }];
+  readonly planToastDuration = PLAN_TOAST_MS;
 
   /** Vorbelegung aus dem Profil, sonst aus der letzten generierten Liste. */
   persons = defaultPersonsInRange(this.profileStore.profile(), this.lastGeneratedPersons());
@@ -181,14 +201,36 @@ export class ShoppingPage implements OnDestroy {
     if (value === 'recipes' || value === 'list') this.setView(value);
   }
 
-  /** „Neu generieren“ in der Liste: zur Rezeptansicht wechseln. */
+  /** „Neu generieren“ in der Liste: zur Rezeptansicht wechseln, Generator offen. */
   openGenerator(): void {
+    this.generatorOpen.set(true);
     this.setView('recipes');
   }
 
   /** „Abbrechen“ im Generator: zurück zur Liste. */
   closeGenerator(): void {
+    this.generatorOpen.set(false);
     this.setView('list');
+  }
+
+  /** „Neuen Wochenplan erstellen“: klappt den Generator auf. */
+  expandGenerator(): void {
+    this.generatorOpen.set(true);
+  }
+
+  /** „Abbrechen“ im Generator der Rezepte-Ansicht: mit Plan einklappen, sonst zur Liste. */
+  cancelGenerator(): void {
+    if (this.weekPlan() !== null) {
+      this.generatorOpen.set(false);
+      return;
+    }
+    this.closeGenerator();
+  }
+
+  /** Toast-Aktion „Zur Liste“ wechselt die Ansicht; jeder Dismiss schließt den Toast. */
+  onPlanToastDismiss(event: CustomEvent<{ role?: string }>): void {
+    this.planToastOpen.set(false);
+    if (event.detail?.role === PLAN_TOAST_LIST_ROLE) this.setView('list');
   }
 
   ngOnDestroy(): void {
@@ -216,31 +258,81 @@ export class ShoppingPage implements OnDestroy {
     return role === 'confirm';
   }
 
-  async generate(): Promise<void> {
+  /** Prüft Personen und Tage; setzt bei Fehler die Meldung. */
+  private inputsValid(): boolean {
     if (!Number.isInteger(this.persons) || this.persons < 1) {
       this.error.set('Personen: bitte eine ganze Zahl ab 1 angeben.');
-      return;
+      return false;
     }
     if (!Number.isInteger(this.days) || this.days < 1) {
       this.error.set('Tage: bitte eine ganze Zahl ab 1 angeben.');
-      return;
+      return false;
     }
-    this.deletion.flush();
-    const existing = this.list();
-    if (existing && existing.items.length > 0 && !(await this.confirmRegenerate())) return;
+    return true;
+  }
+
+  private async confirmNewWeekPlan(): Promise<boolean> {
+    const alert = await this.alertCtrl.create({
+      header: 'Neuen Wochenplan erstellen?',
+      message:
+        'Der bisherige Wochenplan wird ersetzt. In der Einkaufsliste bleiben abgehakte und selbst hinzugefügte Positionen erhalten, alle anderen werden ersetzt.',
+      buttons: [
+        { text: 'Abbrechen', role: 'cancel' },
+        { text: 'Neu erstellen', role: 'confirm' },
+      ],
+    });
+    await alert.present();
+    const { role } = await alert.onDidDismiss();
+    return role === 'confirm';
+  }
+
+  private selectedMeals(): MealType[] {
     const meals = this.mealToggles()
       .filter((m) => m.checked)
       .map((m) => m.value);
+    return meals.length ? meals : ['dinner'];
+  }
+
+  /** Wochenplan aus Online-Rezepten erstellen; Zutaten landen in der Einkaufsliste. */
+  async generateWeekPlan(): Promise<void> {
+    if (!this.inputsValid()) return;
+    this.deletion.flush();
+    if (this.weekPlan() !== null && !(await this.confirmNewWeekPlan())) return;
+    this.error.set(null);
+    this.loading.set(true);
+    try {
+      const { itemCount } = await this.weekPlanService.generate({
+        persons: this.persons,
+        days: this.days,
+        meals: this.selectedMeals(),
+      });
+      this.generatorOpen.set(false);
+      this.planToastMessage.set(`Wochenplan erstellt, ${itemCount} Zutaten in der Liste`);
+      this.planToastOpen.set(true);
+    } catch (e: unknown) {
+      this.error.set(e instanceof Error ? e.message : 'Wochenplan konnte nicht erstellt werden.');
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  /** Fallback: Wocheneinkauf aus den eigenen Rezepten (ShoppingStore.generatePlan). */
+  async generate(): Promise<void> {
+    if (!this.inputsValid()) return;
+    this.deletion.flush();
+    const existing = this.list();
+    if (existing && existing.items.length > 0 && !(await this.confirmRegenerate())) return;
     this.error.set(null);
     this.loading.set(true);
     try {
       await this.store.generatePlan({
         persons: this.persons,
         days: this.days,
-        meals: meals.length ? meals : ['dinner'],
+        meals: this.selectedMeals(),
         budget: this.budget ?? undefined,
         store: this.storeName || undefined,
       });
+      this.generatorOpen.set(false);
       this.setView('list');
     } catch (e: unknown) {
       this.error.set(e instanceof Error ? e.message : 'Generierung fehlgeschlagen.');

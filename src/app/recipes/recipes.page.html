@@ -481,52 +481,10 @@
 </ion-modal>
 
 
-<!-- Kochmodus (Vollbild) -->
-<ion-modal class="cook-fullscreen-modal" [isOpen]="cookRecipe() !== null" (ionModalDidDismiss)="closeCook()">
-  <ng-template>
-    @if (cookRecipe(); as recipe) {
-      <div class="cook">
-        <div class="cook__header">
-          <button class="cook__close" (click)="closeCook()" aria-label="Kochmodus beenden">
-            <ion-icon name="close-outline"></ion-icon>
-          </button>
-          <span class="cook__title">{{ recipe.title }}</span>
-          <span class="cook__counter">{{ cookStep() + 1 }} / {{ recipe.steps.length }}</span>
-        </div>
-
-        <div class="cook__progress">
-          <div class="cook__progress-fill" [style.width.%]="((cookStep() + 1) / recipe.steps.length) * 100"></div>
-        </div>
-
-        <div class="cook__body" aria-live="polite" aria-atomic="true">
-          <div class="cook__step-num">Schritt {{ cookStep() + 1 }}</div>
-          <div class="cook__step-text">{{ recipe.steps[cookStep()] }}</div>
-        </div>
-
-        <div class="cook__nav">
-          <ion-button
-            fill="outline"
-            class="cook__nav-btn"
-            [disabled]="cookStep() === 0"
-            aria-label="Vorheriger Schritt"
-            (click)="cookPrev()"
-          >
-            <ion-icon slot="icon-only" name="chevron-back-outline" aria-hidden="true"></ion-icon>
-          </ion-button>
-
-          @if (cookStep() < recipe.steps.length - 1) {
-            <ion-button class="cook__nav-btn cook__nav-btn--next" (click)="cookNext()">
-              Weiter
-              <ion-icon slot="end" name="chevron-forward-outline"></ion-icon>
-            </ion-button>
-          } @else {
-            <ion-button class="cook__nav-btn cook__nav-btn--next" (click)="closeCook()">
-              <ion-icon slot="start" name="checkmark-outline"></ion-icon>
-              Fertig!
-            </ion-button>
-          }
-        </div>
-      </div>
-    }
-  </ng-template>
-</ion-modal>
+<!-- Kochmodus (Vollbild), geteilt mit dem Wochenplan -->
+<nt-cook-mode
+  [open]="cookRecipe() !== null"
+  [title]="cookRecipe()?.title ?? ''"
+  [steps]="cookRecipe()?.steps ?? []"
+  (dismissed)="closeCook()"
+></nt-cook-mode>

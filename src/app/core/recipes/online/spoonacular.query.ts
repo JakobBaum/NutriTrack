@@ -7,7 +7,22 @@ export interface OnlineSearchFilters {
   maxReadyTime: number | null;
   /** Spoonacular-Wert der Ernährungsform; '' = alle. */
   diet: string;
+  /** Gerichtstyp (Allowlist {@link SPOON_TYPES}); leer/fehlend = alle. */
+  type?: string;
+  /** Mindest-Eiweiß in g je Portion; null/fehlend = kein Minimum. */
+  minProtein?: number | null;
+  /** Sortierung (Allowlist {@link SPOON_SORTS}); leer/fehlend = Standard des Anbieters. */
+  sort?: string;
 }
+
+/** Erlaubte Gerichtstypen (identisch mit der Worker-Allowlist). */
+export const SPOON_TYPES: readonly string[] = [
+  'main course', 'side dish', 'dessert', 'appetizer', 'salad', 'bread', 'breakfast',
+  'soup', 'beverage', 'sauce', 'marinade', 'fingerfood', 'snack', 'drink',
+];
+
+/** Erlaubte Sortierungen (identisch mit der Worker-Allowlist). */
+export const SPOON_SORTS: readonly string[] = ['healthiness', 'popularity', 'random'];
 
 export const DEFAULT_PAGE_SIZE = 10;
 
@@ -59,6 +74,15 @@ export function buildSearchParams(
   if (positive(filters.maxCalories)) params['maxCalories'] = String(Math.round(filters.maxCalories));
   if (positive(filters.maxReadyTime)) params['maxReadyTime'] = String(Math.round(filters.maxReadyTime));
   if (filters.diet.trim()) params['diet'] = filters.diet.trim();
+  if (positive(filters.minProtein ?? null)) params['minProtein'] = String(Math.round(filters.minProtein as number));
+  const type = (filters.type ?? '').trim().toLowerCase();
+  if (SPOON_TYPES.includes(type)) params['type'] = type;
+  const sort = (filters.sort ?? '').trim().toLowerCase();
+  // Gesündeste/beliebteste zuerst: absteigend, sonst käme das Ungesündeste zuerst.
+  if (SPOON_SORTS.includes(sort)) {
+    params['sort'] = sort;
+    if (sort !== 'random') params['sortDirection'] = 'desc';
+  }
   params['addRecipeNutrition'] = 'true';
   params['addRecipeInstructions'] = 'true';
   params['fillIngredients'] = 'true';

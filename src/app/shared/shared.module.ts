@@ -11,14 +11,15 @@ import { NtFoodSearchComponent } from './food-search/food-search.component';
 import { AmountRowComponent } from './amount-row/amount-row.component';
 import { NtBarcodeScannerComponent } from './barcode-scanner/barcode-scanner.component';
 import { NtFoodSourcesComponent } from './food-sources/food-sources.component';
+import { NtCookModeComponent } from './cook-mode/cook-mode.component';
 
 /**
  * Bündelt wiederverwendbare UI-Bausteine und die üblichen Standard-Module,
  * damit Feature-Module nur `SharedModule` importieren müssen.
  */
 @NgModule({
-  declarations: [ProgressRingComponent, NtFoodRowComponent, NtStepperComponent, NtDateNavComponent, NtFoodSearchComponent, AmountRowComponent, NtBarcodeScannerComponent, NtFoodSourcesComponent],
+  declarations: [ProgressRingComponent, NtFoodRowComponent, NtStepperComponent, NtDateNavComponent, NtFoodSearchComponent, AmountRowComponent, NtBarcodeScannerComponent, NtFoodSourcesComponent, NtCookModeComponent],
   imports: [CommonModule, FormsModule, IonicModule],
-  exports: [CommonModule, FormsModule, IonicModule, ProgressRingComponent, NtFoodRowComponent, NtStepperComponent, NtDateNavComponent, NtFoodSearchComponent, AmountRowComponent, NtBarcodeScannerComponent, NtFoodSourcesComponent],
+  exports: [CommonModule, FormsModule, IonicModule, ProgressRingComponent, NtFoodRowComponent, NtStepperComponent, NtDateNavComponent, NtFoodSearchComponent, AmountRowComponent, NtBarcodeScannerComponent, NtFoodSourcesComponent, NtCookModeComponent],
 })
 export class SharedModule {}

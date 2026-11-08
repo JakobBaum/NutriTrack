@@ -15,6 +15,7 @@ import { aiConnection, aiStatusLabel, modelOptions } from './ai-status';
 import { AiService } from '../core/ai/ai.service';
 import { CustomFoodStore } from '../core/state/custom-food.store';
 import { SettingsStore } from '../core/state/settings.store';
+import { WeekPlanStore } from '../core/state/week-plan.store';
 import { ShoppingStore } from '../core/state/shopping.store';
 import { DebugLogService } from '../core/debug/debug-log.service';
 import { resolveDebugMode, safeLocalStorage } from './debug-flag';
@@ -53,6 +54,7 @@ export class SettingsPage implements OnInit {
   private readonly recipes = inject(RecipeStore);
   private readonly customFoods = inject(CustomFoodStore);
   private readonly shopping = inject(ShoppingStore);
+  private readonly weekPlan = inject(WeekPlanStore);
   private readonly savedMeals = inject(MealsStore);
   private readonly storage = inject(StorageService);
   readonly formatDecimal = formatDecimal;
@@ -310,6 +312,7 @@ export class SettingsPage implements OnInit {
     this.customFoods.clear();
     this.savedMeals.clear();
     this.shopping.clear();
+    this.weekPlan.clear();
     this.settingsStore.clear();
     this.storage.clearAll();
     this.ai = { ...this.settingsStore.ai() };

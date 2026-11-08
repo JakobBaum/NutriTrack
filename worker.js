@@ -55,9 +55,18 @@ const DEFAULT_ORIGINS = [
 const SPOONACULAR_URL = 'https://api.spoonacular.com/recipes/complexSearch';
 // Erlaubte Parameter = die aus buildSearchParams (spoonacular.query.ts); apiKey wird nie durchgereicht.
 const RECIPE_PARAMS = [
-  'number', 'offset', 'query', 'maxCalories', 'maxReadyTime', 'diet',
+  'number', 'offset', 'query', 'maxCalories', 'maxReadyTime', 'minProtein', 'diet',
   'addRecipeNutrition', 'addRecipeInstructions', 'fillIngredients', 'instructionsRequired',
 ];
+// Parameter mit festem Wertebereich: andere Werte werden verworfen (Spiegel: spoonacular.query.ts).
+const RECIPE_ENUM_PARAMS = {
+  type: [
+    'main course', 'side dish', 'dessert', 'appetizer', 'salad', 'bread', 'breakfast',
+    'soup', 'beverage', 'sauce', 'marinade', 'fingerfood', 'snack', 'drink',
+  ],
+  sort: ['healthiness', 'popularity', 'random'],
+  sortDirection: ['asc', 'desc'],
+};
 const RECIPE_MAX_NUMBER = 20;
 const RECIPE_DEFAULT_NUMBER = 10;
 const RECIPE_TIMEOUT_MS = 12000;
@@ -226,6 +235,10 @@ function buildRecipeUrl(url) {
   for (const key of RECIPE_PARAMS) {
     const value = url.searchParams.get(key);
     if (value !== null) target.searchParams.set(key, value.slice(0, MAX_QUERY_CHARS));
+  }
+  for (const [key, allowed] of Object.entries(RECIPE_ENUM_PARAMS)) {
+    const value = (url.searchParams.get(key) ?? '').trim().toLowerCase();
+    if (allowed.includes(value)) target.searchParams.set(key, value);
   }
   const requested = Math.round(Number(target.searchParams.get('number') ?? RECIPE_DEFAULT_NUMBER));
   const number = Number.isFinite(requested) ? Math.min(Math.max(1, requested), RECIPE_MAX_NUMBER) : RECIPE_DEFAULT_NUMBER;

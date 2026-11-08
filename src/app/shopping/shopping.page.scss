@@ -33,7 +33,18 @@ ion-content {
   &__custom { display: flex; align-items: center; justify-content: space-between; gap: var(--nt-space-2); margin-top: var(--nt-space-2); }
   &__hint { font-size: var(--nt-fs-caption); color: var(--nt-secondary); }
   &__meals { margin-bottom: var(--nt-space-3); }
+  // Fallback „Aus meinen Rezepten planen“: abgesetzt unter dem Hauptweg.
+  &__alt {
+    margin-top: var(--nt-space-5);
+    padding-top: var(--nt-space-4);
+    border-top: var(--nt-hairline) solid var(--nt-separator);
+    .generator__sub { display: block; margin-bottom: var(--nt-space-2); }
+    .generator__mode { margin-bottom: var(--nt-space-3); }
+  }
 }
+
+.own-btn { --border-radius: var(--nt-radius-pill); min-height: var(--nt-touch); font-weight: 600; }
+.plan-summary { padding-bottom: var(--nt-space-2); }
 
 .chips { display: flex; flex-wrap: wrap; gap: var(--nt-space-2); margin-top: var(--nt-space-2); }
 

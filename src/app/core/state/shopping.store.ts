@@ -8,6 +8,8 @@ import { fillMissingPrices } from '../shopping/price-table';
 import { roundItemsToPackages } from '../shopping/package-size';
 import { buildShoppingList } from '../shopping/shopping-generator';
 import { makeId } from '../util/id';
+import { WeekPlan } from '../week-plan/week-plan.model';
+import { weekPlanToRecipes } from '../week-plan/week-plan-recipes';
 import { RecipeStore } from './recipe.store';
 
 /** Optionen für den Wocheneinkauf. */
@@ -63,7 +65,8 @@ export function mergeKept(
   previous: readonly ShoppingItem[],
   generated: readonly ShoppingItem[],
 ): ShoppingItem[] {
-  const kept = previous.filter((it) => it.checked || it.manual || it.estPrice == null);
+  // `manual: false` markiert generierte Positionen (Wochenplan): ohne Preis trotzdem ersetzbar.
+  const kept = previous.filter((it) => it.checked || it.manual === true || (it.estPrice == null && it.manual !== false));
   const byKey = new Map(kept.map((it) => [itemKey(it), it] as const));
   const used = new Set<string>();
   const merged = generated.map((g) => {
@@ -167,6 +170,33 @@ export class ShoppingStore {
       suggestedDishes: result.suggestedDishes,
       estTotal: sumItems(items).total,
       note: result.note,
+      priceSource: live ? 'ai' : 'mock',
+      generatedAt: new Date().toISOString(),
+    };
+    this._list.set(list);
+    this.persist();
+    return list;
+  }
+
+  /**
+   * Schreibt die Zutaten ALLER Wochenplan-Rezepte (auf `persons` skaliert, gleiche Name+Einheit
+   * addiert) in die Liste. Abgehakte und manuelle Positionen bleiben erhalten.
+   */
+  applyWeekPlan(plan: WeekPlan): ShoppingListView {
+    const live = this.ai.isLive();
+    const { items: raw, suggestedDishes } = buildShoppingList(weekPlanToRecipes(plan), plan.recipes.length, plan.persons);
+    const generated = withCategories(roundItemsToPackages(raw)).map((it) => ({ ...it, manual: false }));
+    const priced = live ? fillMissingPrices(generated) : generated;
+    const items = withCategories(mergeKept(this._list()?.items ?? [], priced));
+    const list: ShoppingListView = {
+      id: makeId('shopping'),
+      dishes: plan.recipes.length,
+      persons: plan.persons,
+      days: plan.days,
+      meals: plan.meals,
+      items,
+      suggestedDishes,
+      estTotal: sumItems(items).total,
       priceSource: live ? 'ai' : 'mock',
       generatedAt: new Date().toISOString(),
     };

@@ -1,0 +1,53 @@
+<ion-modal class="cook-fullscreen-modal" [isOpen]="open()" (ionModalDidDismiss)="close()">
+  <ng-template>
+    <div class="cook">
+      <div class="cook__header">
+        <button class="cook__close" (click)="close()" aria-label="Kochmodus beenden">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
+        <span class="cook__title">{{ title() }}</span>
+        @if (total() > 0) {
+          <span class="cook__counter">{{ page() + 1 }} / {{ total() }}</span>
+        }
+      </div>
+
+      <div class="cook__progress">
+        <div class="cook__progress-fill" [style.width.%]="progress()"></div>
+      </div>
+
+      <div class="cook__body" aria-live="polite" aria-atomic="true">
+        @if (total() === 0) {
+          <div class="cook__step-text">Keine Anleitung hinterlegt.</div>
+        } @else if (stepIndex() < 0) {
+          <div class="cook__step-num">Zutaten</div>
+          <ul class="cook__ingredients" data-testid="cook-ingredients">
+            @for (ing of ingredients(); track $index) {
+              <li><span class="cook__ing-amount">{{ amountText(ing.amount, ing.unit) }}</span> {{ ing.name }}</li>
+            }
+          </ul>
+        } @else {
+          <div class="cook__step-num">Schritt {{ stepIndex() + 1 }}</div>
+          <div class="cook__step-text" data-testid="cook-step">{{ steps()[stepIndex()] }}</div>
+        }
+      </div>
+
+      <div class="cook__nav">
+        <ion-button fill="outline" class="cook__nav-btn" [disabled]="page() === 0" aria-label="Vorheriger Schritt" (click)="prev()">
+          <ion-icon slot="icon-only" name="chevron-back-outline" aria-hidden="true"></ion-icon>
+        </ion-button>
+
+        @if (!isLast()) {
+          <ion-button class="cook__nav-btn cook__nav-btn--next" (click)="next()">
+            Weiter
+            <ion-icon slot="end" name="chevron-forward-outline"></ion-icon>
+          </ion-button>
+        } @else {
+          <ion-button class="cook__nav-btn cook__nav-btn--next" (click)="close()">
+            <ion-icon slot="start" name="checkmark-outline"></ion-icon>
+            Fertig!
+          </ion-button>
+        }
+      </div>
+    </div>
+  </ng-template>
+</ion-modal>

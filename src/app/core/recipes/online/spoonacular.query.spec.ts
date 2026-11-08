@@ -19,6 +19,22 @@ describe('buildSearchParams', () => {
     expect(p['query']).toBeUndefined();
   });
 
+  it('adds minProtein, type and sort only with allowed values', () => {
+    const p = buildSearchParams({ ...EMPTY_FILTERS, minProtein: 29.6, type: 'Main Course', sort: 'healthiness' });
+    expect(p).toMatchObject({ minProtein: '30', type: 'main course', sort: 'healthiness', sortDirection: 'desc' });
+    const bad = buildSearchParams({ ...EMPTY_FILTERS, minProtein: 0, type: 'evil', sort: 'price' });
+    expect(bad['minProtein']).toBeUndefined();
+    expect(bad['type']).toBeUndefined();
+    expect(bad['sort']).toBeUndefined();
+    expect(bad['sortDirection']).toBeUndefined();
+  });
+
+  it('sends no direction for random sort', () => {
+    const p = buildSearchParams({ ...EMPTY_FILTERS, sort: 'random' });
+    expect(p['sort']).toBe('random');
+    expect(p['sortDirection']).toBeUndefined();
+  });
+
   it('builds the cheapest request without extras', () => {
     expect(buildSearchParams(EMPTY_FILTERS, 0, 1, false)).toEqual({ number: '1' });
   });
