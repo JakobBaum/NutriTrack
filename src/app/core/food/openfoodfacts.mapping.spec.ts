@@ -82,8 +82,7 @@ describe('OpenFoodFactsProvider — Mapping', () => {
     expect(await mapProduct({ ...base, nutriments: { energy_100g: 1046 } })).toBeNull();
   });
 
-  // Lücke: kJ-only-Produkte (in OFF häufig) werden verworfen statt umgerechnet.
-  // openfoodfacts.provider.ts:157 — Eingabe: energy-kj_100g 1046; erwartet: 250 kcal, tatsächlich: null.
+  // kJ-only-Produkte (in OFF häufig) werden umgerechnet statt verworfen (openfoodfacts.provider.ts, kcal-Ermittlung).
   it('rechnet kJ-only-Produkte in kcal um (1 kcal = 4,184 kJ)', async () => {
     const item = await mapProduct({ ...base, nutriments: { 'energy-kj_100g': 1046 } });
     expect(item?.facts.kcal).toBe(250);

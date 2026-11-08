@@ -2,10 +2,8 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom, timeout } from 'rxjs';
 import {
-  DailyTarget,
   FastFoodRequest,
   FastFoodSuggestion,
-  UserProfile,
 } from '../models';
 import { SettingsStore } from '../state/settings.store';
 import {
@@ -44,23 +42,6 @@ interface GeminiResponse {
 export class GeminiAiProvider implements AiProvider {
   private readonly http = inject(HttpClient);
   private readonly settings = inject(SettingsStore);
-
-  async computeTargets(profile: UserProfile): Promise<DailyTarget> {
-    const sys =
-      'Du bist Ernährungsrechner. Antworte NUR mit JSON: ' +
-      '{"kcal":number,"proteinG":number,"carbsG":number,"fatG":number,"fiberG":number,"sugarG":number}. ' +
-      'Nutze Mifflin-St Jeor + Aktivitätsfaktor + Ziel-Anpassung. Keine Erklärung.';
-    const user = `Profil: ${JSON.stringify(profile)}`;
-    const obj = await this.callJson(sys, user, 400);
-    return {
-      kcal: this.num(obj['kcal']),
-      proteinG: this.num(obj['proteinG']),
-      carbsG: this.num(obj['carbsG']),
-      fatG: this.num(obj['fatG']),
-      fiberG: this.num(obj['fiberG']),
-      sugarG: this.num(obj['sugarG']),
-    };
-  }
 
   async generateShoppingList(req: ShoppingPlanRequest): Promise<ShoppingPlanResult> {
     const recipeTitles = req.recipes.map((r) => ({

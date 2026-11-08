@@ -28,6 +28,8 @@ export interface UserProfile {
   goal: Goal;
   /** Gewünschte Rate (kg/Woche) für lose/gain; 0 bei maintain. */
   rateKgPerWeek?: number;
+  /** Optionales Zielgewicht (kg); ersetzt bei BMI über 30 das Referenzgewicht der Eiweißberechnung. */
+  targetWeightKg?: number;
   updatedAt: string;
 }
 

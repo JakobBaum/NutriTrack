@@ -9,7 +9,7 @@
     <div class="empty">
       <ion-icon name="sparkles-outline" class="empty__icon"></ion-icon>
       <h1>Willkommen bei NutriTrack</h1>
-      <p>Richte dein Profil ein, damit wir deinen Tagesbedarf berechnen können.</p>
+      <p>Richte dein Profil ein. Dein Tagesbedarf ist eine Schätzung nach Formel (Mifflin-St Jeor).</p>
       <p class="empty__hint">Deine Daten bleiben lokal auf diesem Gerät. KI-Funktionen sind optional.</p>
       <ion-button expand="block" (click)="openSettings()">Profil einrichten</ion-button>
     </div>
@@ -26,43 +26,71 @@
       </button>
     </div>
 
-    <!-- Hero: kcal übrig (öffnet den Kalorien-Drill), gegessen / Ziel -->
-    <section class="hero" [class.hero--over]="kcalOverBy() > 0" aria-label="Kalorien">
-      <button type="button" class="hero__main" [attr.aria-label]="heroLabel()" (click)="openDrill('kcal')">
-        <span class="hero__big">{{ (kcalOverBy() > 0 ? kcalOverBy() : kcalRemaining()) | ntNum:0 }}</span>
-        <span class="hero__unit">
-          kcal{{ kcalOverBy() > 0 ? '' : ' übrig' }}
-          @if (kcalOverBy() > 0) {
-            <span class="hero__chip">über Ziel</span>
-          }
-        </span>
-      </button>
-      <div class="hero__meta">
-        <div><strong>{{ kcalEaten() | ntNum:0 }}</strong> gegessen</div>
-        <div><strong>{{ kcalTarget() | ntNum:0 }}</strong> Ziel</div>
-      </div>
-    </section>
-
-    <!-- Nährwerte: 3 x 2 Ringe; jede Kachel öffnet den Drill -->
-    <section class="nt-card macros" [class.macros--empty]="isEmptyDay()" aria-label="Nährwerte">
-      @for (m of macros(); track m.key) {
-        <button type="button" class="macros__col" [attr.aria-label]="m.label + ' ' + (m.eaten | ntNum) + ' von ' + (m.target | ntNum) + ' ' + m.unit + (m.overBy > 0 ? ', ' + (m.overBy | ntNum) + ' ' + m.unit + ' über Ziel' : '') + ', Details anzeigen'" (click)="openDrill(m.key)">
-          <app-progress-ring [value]="m.eaten" [max]="m.target" [color]="m.color" [track]="m.track" [size]="68" [stroke]="6">
-            <span class="macros__num">{{ m.eaten | ntNum }}</span>
-          </app-progress-ring>
-          <span class="macros__text">
-            <span class="macros__label">{{ m.label }}</span>
-            <span class="macros__val">von {{ m.target | ntNum }} {{ m.unit }}</span>
-            @if (m.overBy > 0 && m.key !== 'kcal') {
-              <span class="macros__delta">+{{ m.overBy | ntNum }} {{ m.unit }}</span>
+    <!-- Hero: kcal übrig und noch Z g Eiweiß gleichwertig; jeder Wert öffnet seinen Drill -->
+    <section class="hero" aria-label="Kalorien und Eiweiß">
+      <div class="hero__item" [class.hero__item--over]="kcalOverBy() > 0">
+        <button type="button" class="hero__main" [attr.aria-label]="heroLabel()" (click)="openDrill('kcal')">
+          <span class="hero__big">{{ (kcalOverBy() > 0 ? kcalOverBy() : kcalRemaining()) | ntNum:0 }}</span>
+          <span class="hero__unit">
+            kcal{{ kcalOverBy() > 0 ? '' : ' übrig' }}
+            @if (kcalOverBy() > 0) {
+              <span class="hero__chip">über Ziel</span>
             }
           </span>
         </button>
+        <div class="hero__meta"><strong class="hero__eaten">{{ kcalEaten() | ntNum:0 }}</strong> von <span class="hero__target">{{ kcalTarget() | ntNum:0 }}</span> kcal</div>
+      </div>
+      <div class="hero__item hero__item--protein">
+        <button type="button" class="hero__main" [attr.aria-label]="proteinHeroLabel()" (click)="openDrill('protein')">
+          @if (proteinReached()) {
+            <span class="hero__big hero__big--protein">Ziel</span>
+            <span class="hero__unit">Eiweiß erreicht</span>
+          } @else {
+            <span class="hero__big hero__big--protein">{{ proteinRemaining() | ntNum:0 }}</span>
+            <span class="hero__unit">g Eiweiß noch</span>
+          }
+        </button>
+        <div class="hero__meta">
+          <strong>{{ proteinEaten() | ntNum:0 }}</strong> von {{ proteinTarget() | ntNum:0 }} g
+          @if (proteinOverBy() > 0) { <span class="hero__plus">(+{{ proteinOverBy() | ntNum:0 }} g)</span> }
+        </div>
+      </div>
+    </section>
+
+    <!-- Nährwerte: Eiweiß und Kalorien groß, der Rest klein; jede Kachel öffnet den Drill -->
+    <section class="nt-card macros" [class.macros--empty]="isEmptyDay()" aria-label="Nährwerte">
+      <div class="macros__primary">
+        @for (m of primaryMacros(); track m.key) {
+          <ng-container *ngTemplateOutlet="macroTpl; context: { $implicit: m, size: 88, stroke: 8 }"></ng-container>
+        }
+      </div>
+      <div class="macros__secondary">
+        @for (m of secondaryMacros(); track m.key) {
+          <ng-container *ngTemplateOutlet="macroTpl; context: { $implicit: m, size: 56, stroke: 5 }"></ng-container>
+        }
+      </div>
+      @if (energyShares(); as sh) {
+        <p class="macros__share">Anteil an der gegessenen Energie: Eiweiß {{ sh.proteinPct }} % · Kohlenhydrate {{ sh.carbsPct }} % · Fett {{ sh.fatPct }} %</p>
       }
       @if (isEmptyDay()) {
         <p class="macros__hint">Noch nichts eingetragen</p>
       }
     </section>
+
+    <ng-template #macroTpl let-m let-size="size" let-stroke="stroke">
+      <button type="button" class="macros__col" [class.macros__col--small]="size < 80" [attr.aria-label]="m.label + ' ' + (m.eaten | ntNum) + ' von ' + (m.target | ntNum) + ' ' + m.unit + (m.overBy > 0 ? ', ' + (m.overBy | ntNum) + ' ' + m.unit + ' über Ziel' : '') + ', Details anzeigen'" (click)="openDrill(m.key)">
+        <app-progress-ring [value]="m.eaten" [max]="m.target" [color]="m.color" [track]="m.track" [warn]="m.warn" [size]="size" [stroke]="stroke">
+          <span class="macros__num">{{ m.eaten | ntNum }}</span>
+        </app-progress-ring>
+        <span class="macros__text">
+          <span class="macros__label">{{ m.displayLabel }}</span>
+          <span class="macros__val">von {{ m.target | ntNum }} {{ m.unit }}</span>
+          @if (m.overBy > 0 && m.key !== 'kcal') {
+            <span class="macros__delta">+{{ m.overBy | ntNum }} {{ m.unit }}</span>
+          }
+        </span>
+      </button>
+    </ng-template>
 
     <!-- Mahlzeiten -->
     <h2 class="nt-section-header">Mahlzeiten</h2>
@@ -74,7 +102,7 @@
             <span class="row__stack">
               <span class="row__label">{{ meal.label }}</span>
               @if (meal.count > 0) {
-                <span class="row__sub">{{ entryCountLabel(meal.count) }}</span>
+                <span class="row__sub">{{ mealSubLabel(meal) }}</span>
               }
             </span>
             <span class="row__note">{{ meal.kcal | ntNum:0 }} kcal</span>
@@ -93,7 +121,7 @@
           <span class="row__stack">
             <span class="row__label">Fastfood-Helfer</span>
             <span class="row__sub">
-              @if (kcalOverBy() > 0) { Ziel überschritten } @else { {{ kcalRemaining() | ntNum:0 }} kcal übrig — was passt? }
+              @if (kcalOverBy() > 0) { Ziel überschritten } @else { {{ kcalRemaining() | ntNum:0 }} kcal übrig@if (fastfoodProteinHint(); as hint) {, {{ hint }} } — was passt? }
             </span>
           </span>
           <ion-icon name="chevron-forward-outline" class="nt-grouped__chevron" aria-hidden="true"></ion-icon>
@@ -133,7 +161,10 @@
         @if (drill.items.length === 0) {
           <p class="drill-empty">Noch keine Einträge an diesem Tag.</p>
         } @else {
-          <p class="drill-hint">Anteil am Tag</p>
+          <p class="drill-hint">
+            @if (drill.target > 0) { {{ drill.targetPercent }} % vom Tagesziel ({{ drill.target | ntNum }} {{ drill.unit }}). }
+            Die Prozentwerte unten zeigen den Anteil an der Tagessumme.
+          </p>
           <ion-list lines="none" class="nt-grouped">
             @for (item of drill.items; track item.label) {
               <ion-item class="drill-item">

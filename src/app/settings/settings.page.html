@@ -12,8 +12,9 @@
             <span class="num">{{ t.kcal | ntNum:0 }}</span><span class="unit">kcal / Tag</span>
           </div>
           @if (savedMinKcalApplied) {
-            <p class="target-card__note">Mindestzufuhr aktiv: Die Formel läge darunter, das Ziel wurde auf den Mindestwert angehoben.</p>
+            <p class="target-card__note">Mindestzufuhr aktiv (nur beim Abnehmen): Die Formel läge darunter, das Ziel wurde auf den Mindestwert angehoben.</p>
           }
+          <p class="target-card__note target-card__note--disclaimer">Schätzung nach Formel (Mifflin-St Jeor), keine medizinische Beratung.</p>
           <div class="target-card__macros">
             <span><strong>{{ t.proteinG | ntNum:0 }}</strong> g Eiweiß</span>
             <span><strong>{{ t.carbsG | ntNum:0 }}</strong> g Kohlenhydrate</span>
@@ -212,7 +213,13 @@
               <button type="button" class="rate-chip" [class.rate-chip--on]="rateKgPerWeek === r" [attr.aria-pressed]="rateKgPerWeek === r" (click)="setRate(r)">{{ r | ntNum:2 }}</button>
             }
           </div>
-          <p class="hint" role="status">{{ rateDeltaLabel }} · höchstens 0,75 kg pro Woche, mehr wird nicht empfohlen.</p>
+          <p class="hint" role="status">
+            {{ rateDeltaLabel }}@if (maxRateText) { · höchstens {{ maxRateText }} kg pro Woche (1 % deines Gewichts), mehr wird nicht empfohlen.}
+            @if (rateIsCapped) { Dein gewähltes Tempo wird darauf begrenzt. }
+          </p>
+        }
+        @for (note of plausibilityNotes; track note.code) {
+          <p class="hint hint--warn" role="status">{{ note.text }}</p>
         }
         @if (formMinKcalApplied) {
           <p class="hint hint--warn" role="status">

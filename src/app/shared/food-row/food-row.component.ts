@@ -21,8 +21,9 @@ export class NtFoodRowComponent {
   protected readonly meta = computed(() => {
     const it = this.item();
     const per100 = it.facts.basis === 'per100g' ? ' / 100 g' : '';
-    const kcal = `${Math.round(it.facts.kcal)} kcal${per100}`;
-    return it.quantity ? `${it.quantity} · ${kcal}` : kcal;
+    const protein = Number.isFinite(it.facts.proteinG) ? ` · ${Math.round(it.facts.proteinG)} g Eiweiß` : '';
+    const nutrients = `${Math.round(it.facts.kcal)} kcal${protein}${per100}`;
+    return it.quantity ? `${it.quantity} · ${nutrients}` : nutrients;
   });
 
   protected readonly scoreLabel = computed(() => {

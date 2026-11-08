@@ -9,14 +9,10 @@ import { GeminiAiProvider } from './gemini-ai-provider';
 import { ProxyAiProvider } from './proxy-ai-provider';
 import { SettingsStore } from '../state/settings.store';
 import { DebugLogService } from '../debug/debug-log.service';
-import { AiConfig, UserProfile } from '../models';
+import { AiConfig } from '../models';
 import { AI_ERROR_MESSAGES } from './ai-errors';
 
-const profile: UserProfile = {
-  weightKg: 80, heightCm: 180, age: 30, sex: 'male', activityLevel: 'moderate',
-  goal: 'maintain', updatedAt: '2026-10-13T00:00:00.000Z',
-};
-const TARGET = { kcal: 1, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0 };
+const FACTS = { kcal: 1, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0 };
 const PROXY_URL = 'https://p.test';
 
 let svc: AiService;
@@ -29,9 +25,8 @@ function configure(ai: AiConfig): void {
 function spyAll(token: ProviderToken<AiProvider>) {
   const p = TestBed.inject(token);
   return {
-    computeTargets: vi.spyOn(p, 'computeTargets').mockResolvedValue(TARGET),
     generateShoppingList: vi.spyOn(p, 'generateShoppingList').mockResolvedValue({ items: [], suggestedDishes: [], estTotal: 0 }),
-    recognizeLabel: vi.spyOn(p, 'recognizeLabel').mockResolvedValue({ name: 'n', facts: { ...TARGET, basis: 'per100g' } }),
+    recognizeLabel: vi.spyOn(p, 'recognizeLabel').mockResolvedValue({ name: 'n', facts: { ...FACTS, basis: 'per100g' } }),
     suggestFastfood: vi.spyOn(p, 'suggestFastfood').mockResolvedValue([]),
     importRecipe: vi.spyOn(p, 'importRecipe').mockResolvedValue({ title: 't', servings: 1, ingredients: [], steps: [] }),
   };
@@ -48,8 +43,8 @@ describe('AiService — Routing', () => {
   it('nutzt ohne Key/Proxy den Mock', async () => {
     const mock = spyAll(MockAiProvider);
     expect(svc.isLive()).toBe(false);
-    await svc.computeTargets(profile);
-    expect(mock.computeTargets).toHaveBeenCalledWith(profile);
+    await svc.suggestFastfood({ restaurant: 'X', kcalBudget: 0 });
+    expect(mock.suggestFastfood).toHaveBeenCalledTimes(1);
   });
 
   it('ignoriert einen Key aus Leerzeichen oder bei anderem Anbieter', () => {
@@ -63,7 +58,6 @@ describe('AiService — Routing', () => {
     configure({ provider: 'gemini', apiKey: 'key' });
     const gemini = spyAll(GeminiAiProvider);
     expect(svc.isLive()).toBe(true);
-    await svc.computeTargets(profile);
     await svc.generateShoppingList({ persons: 1, days: 1, meals: [], recipes: [] });
     await svc.recognizeLabel('b64', 'per100g');
     await svc.suggestFastfood({ restaurant: 'X', kcalBudget: 0 });

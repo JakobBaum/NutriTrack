@@ -2,10 +2,8 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom, timeout } from 'rxjs';
 import {
-  DailyTarget,
   FastFoodRequest,
   FastFoodSuggestion,
-  UserProfile,
 } from '../models';
 import { SettingsStore } from '../state/settings.store';
 import {
@@ -57,10 +55,6 @@ export class ProxyAiProvider implements AiProvider {
       this.log.error(`✗ ${fn}: ${(err as Error).message}`);
       throw mapTimeoutError(err);
     }
-  }
-
-  computeTargets(profile: UserProfile): Promise<DailyTarget> {
-    return this.call<DailyTarget>('computeTargets', profile);
   }
 
   generateShoppingList(req: ShoppingPlanRequest): Promise<ShoppingPlanResult> {

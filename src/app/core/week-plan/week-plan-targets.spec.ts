@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_MIN_PROTEIN_G, mealMaxCalories, mealMinProtein, proteinSteps } from './week-plan-targets';
+import { mealMaxCalories, mealMinProtein, proteinSteps } from './week-plan-targets';
 
 describe('mealMaxCalories', () => {
   it('splits the daily target 25/35/30/10 percent per meal', () => {
@@ -29,8 +29,10 @@ describe('mealMinProtein', () => {
     expect(mealMinProtein(0, 'snack')).toBe(10);
   });
 
-  it('caps very high goals so searches stay viable', () => {
-    expect(mealMinProtein(400, 'lunch')).toBe(MAX_MIN_PROTEIN_G);
+  it('follows the daily goal without a fixed cap (the goal itself is capped at 2.2 g/kg)', () => {
+    // 80 kg * 2,2 = 176 g -> Mittag 35 % = 62 g
+    expect(mealMinProtein(176, 'lunch')).toBe(62);
+    expect(mealMinProtein(400, 'lunch')).toBe(140);
   });
 });
 

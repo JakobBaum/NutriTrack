@@ -9,7 +9,8 @@ import { RecipeStore } from '../core/state/recipe.store';
 import { MealsStore } from '../core/state/meals.store';
 import { formatDecimal } from '../core/util/number-input';
 import { StorageService } from '../core/storage/storage.service';
-import { MAX_RATE_KG_PER_WEEK, NutritionCalcService } from '../core/nutrition/nutrition-calc.service';
+import { NutritionCalcService } from '../core/nutrition/nutrition-calc.service';
+import { ProfileNote, profileNotes } from '../core/nutrition/profile-plausibility';
 import { effectiveProxyUrl, defaultAiProxyUrl } from '../core/ai/ai-endpoint';
 import { aiConnection, aiStatusLabel, modelOptions } from './ai-status';
 import { AiService } from '../core/ai/ai.service';
@@ -27,8 +28,9 @@ import { BackupFile, countBackup, describeCounts, formatBackupDate } from '../co
  * Einstellungen: Profil erfassen → Tagesbedarf berechnen (deterministisch),
  * KI-Anbieter konfigurieren (lokal gespeichert) und Daten zurücksetzen.
  */
-/** Wählbare Tempi (kg/Woche); das größte entspricht dem Deckel der Berechnung. */
-const RATE_CHOICES: readonly number[] = [0.25, 0.5, MAX_RATE_KG_PER_WEEK];
+/** Wählbare Tempi (kg/Woche). Die Berechnung deckelt zusätzlich bei 1 % des Körpergewichts pro Woche. */
+const MAX_RATE_CHOICE = 0.75;
+const RATE_CHOICES: readonly number[] = [0.25, 0.5, MAX_RATE_CHOICE];
 const DEFAULT_RATE = 0.5;
 /** Kleinste Schrittweite beim Angebot „niedrigeres Tempo“. */
 const RATE_OFFER_STEP = 0.05;
@@ -100,7 +102,7 @@ export class SettingsPage implements OnInit {
   activityLevel: ActivityLevel = this.existing?.activityLevel ?? 'moderate';
   goal: Goal = this.existing?.goal ?? 'maintain';
   rateKgPerWeek: number | null = this.existing?.goal && this.existing.goal !== 'maintain'
-    ? (this.existing.rateKgPerWeek !== undefined && this.existing.rateKgPerWeek <= MAX_RATE_KG_PER_WEEK && this.existing.rateKgPerWeek >= MIN_RATE
+    ? (this.existing.rateKgPerWeek !== undefined && this.existing.rateKgPerWeek <= MAX_RATE_CHOICE && this.existing.rateKgPerWeek >= MIN_RATE
         ? this.existing.rateKgPerWeek
         : nearestRate(this.existing.rateKgPerWeek))
     : DEFAULT_RATE;
@@ -175,8 +177,26 @@ export class SettingsPage implements OnInit {
 
   /** Tägliches Defizit/Überschuss zum gewählten Tempo, z. B. „≈ −550 kcal/Tag“. */
   get rateDeltaLabel(): string {
-    const kcal = this.calc.dailyDeltaKcal(Number(this.rateKgPerWeek) || 0);
+    const kcal = this.calc.dailyDeltaKcal(Number(this.rateKgPerWeek) || 0, Number(this.weightKg) || 0);
     return `≈ ${this.goal === 'lose' ? '−' : '+'}${kcal} kcal/Tag`;
+  }
+
+  /** Größtes Tempo für das eingegebene Gewicht (1 % pro Woche), z. B. „0,8“; leer ohne Gewicht. */
+  get maxRateText(): string {
+    const max = this.calc.maxRateKgPerWeek(Number(this.weightKg) || 0);
+    return max > 0 ? formatDecimal(Math.round(max * 100) / 100) : '';
+  }
+
+  /** True, wenn das gewählte Tempo über 1 % des Körpergewichts liegt und gedeckelt wird. */
+  get rateIsCapped(): boolean {
+    const max = this.calc.maxRateKgPerWeek(Number(this.weightKg) || 0);
+    return max > 0 && (Number(this.rateKgPerWeek) || 0) > max;
+  }
+
+  /** Hinweise zu Alter und BMI der Formulareingabe (leer, solange Werte fehlen oder unauffällig sind). */
+  get plausibilityNotes(): ProfileNote[] {
+    if (this.weightKg === null || this.heightCm === null || this.age === null) return [];
+    return profileNotes({ weightKg: this.weightKg, heightCm: this.heightCm, age: this.age, goal: this.goal });
   }
 
   /** Erreichtes Tempo bei aktiver Mindestzufuhr, z. B. „0,3“ (kg/Woche). */

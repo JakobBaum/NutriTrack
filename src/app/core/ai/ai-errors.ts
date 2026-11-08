@@ -5,6 +5,7 @@ export const AI_ERROR_MESSAGES = {
   rateLimited: 'Zu viele KI-Anfragen — bitte kurz warten und erneut versuchen.',
   offline: 'Keine Verbindung zur KI. Prüfe deine Internetverbindung.',
   unauthorized: 'KI-Zugang abgelehnt. Prüfe den Schlüssel unter Profil › KI-Verbindung.',
+  unreadable: 'Die Antwort der KI war nicht lesbar oder wurde blockiert - bitte noch einmal versuchen.',
   timeout: 'Die KI antwortet gerade nicht - bitte erneut versuchen.',
   generic: 'Die KI-Anfrage ist fehlgeschlagen. Bitte erneut versuchen.',
 } as const;
@@ -16,6 +17,7 @@ export const AI_TIMEOUT_MS = 30000;
 export function friendlyAiErrorMessage(status: number): string {
   if (status === 0) return AI_ERROR_MESSAGES.offline;
   if (status === 429) return AI_ERROR_MESSAGES.rateLimited;
+  if (status === 422) return AI_ERROR_MESSAGES.unreadable;
   if (status === 401 || status === 403) return AI_ERROR_MESSAGES.unauthorized;
   if (status === 503 || status === 502 || status === 504 || status === 500) return AI_ERROR_MESSAGES.overloaded;
   return AI_ERROR_MESSAGES.generic;

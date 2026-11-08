@@ -1,11 +1,8 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import {
-  DailyTarget,
   FastFoodRequest,
   FastFoodSuggestion,
-  UserProfile,
 } from '../models';
-import { NutritionCalcService } from '../nutrition/nutrition-calc.service';
 import { estimateIngredientFacts } from '../nutrition/ingredient-estimate';
 import { buildWeekPlan } from '../shopping/shopping-generator';
 import {
@@ -45,13 +42,6 @@ export function canonicalUnit(raw: string): string {
  */
 @Injectable({ providedIn: 'root' })
 export class MockAiProvider implements AiProvider {
-  private readonly calc = inject(NutritionCalcService);
-
-  async computeTargets(profile: UserProfile): Promise<DailyTarget> {
-    // Mock = deterministische Fallback-Formel.
-    return this.calc.dailyTarget(profile);
-  }
-
   async generateShoppingList(req: ShoppingPlanRequest): Promise<ShoppingPlanResult> {
     const plan = buildWeekPlan(req.recipes, req.persons, req.days, req.meals.length);
     // Ehrlich ohne KI: nur Mengen, keine erfundenen Preise.

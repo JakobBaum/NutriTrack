@@ -7,21 +7,10 @@ import {
 } from '@angular/common/http/testing';
 import { GeminiAiProvider } from './gemini-ai-provider';
 import { SettingsStore } from '../state/settings.store';
-import { AiConfig, UserProfile } from '../models';
+import { AiConfig } from '../models';
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const url = (model: string) => `${BASE}/${model}:generateContent`;
-
-const profile: UserProfile = {
-  weightKg: 80,
-  heightCm: 180,
-  age: 30,
-  sex: 'male',
-  activityLevel: 'moderate',
-  goal: 'lose',
-  rateKgPerWeek: 0.5,
-  updatedAt: '2026-10-13T00:00:00.000Z',
-};
 
 const TARGET_JSON =
   '{"kcal":2000,"proteinG":150,"carbsG":200,"fatG":60,"fiberG":30,"sugarG":40}';
@@ -58,12 +47,12 @@ describe('GeminiAiProvider — Modell-Routing', () => {
     configure({ model: '' });
 
     // Act
-    const promise = provider.computeTargets(profile);
+    const promise = provider.recognizeLabel('b64', 'per100g');
     const req = http.expectOne(url('gemini-3.6-flash'));
 
     // Assert
     expect(req.request.headers.get('x-goog-api-key')).toBe('test-key');
-    req.flush(geminiReply(TARGET_JSON));
+    req.flush(geminiReply(LABEL_JSON));
     await promise;
   });
 
@@ -86,12 +75,12 @@ describe('GeminiAiProvider — Modell-Routing', () => {
     configure({ model: 'gemini-3.8-pro' });
 
     // Act
-    const promise = provider.computeTargets(profile);
+    const promise = provider.recognizeLabel('b64', 'per100g');
     const req = http.expectOne(url('gemini-3.8-pro'));
 
     // Assert
     expect(req.request.body.generationConfig.responseMimeType).toBe('application/json');
-    req.flush(geminiReply(TARGET_JSON));
+    req.flush(geminiReply(LABEL_JSON));
     await promise;
   });
 });
@@ -102,7 +91,7 @@ describe('GeminiAiProvider — Robustheit', () => {
     configure({ apiKey: '' });
 
     // Act / Assert
-    await expect(provider.computeTargets(profile)).rejects.toThrow(/API-Key/);
+    await expect(provider.recognizeLabel('b64', 'per100g')).rejects.toThrow(/API-Key/);
     http.expectNone(url('gemini-3.6-flash'));
   });
 
@@ -111,10 +100,10 @@ describe('GeminiAiProvider — Robustheit', () => {
     configure({ model: '' });
 
     // Act
-    const promise = provider.computeTargets(profile);
+    const promise = provider.recognizeLabel('b64', 'per100g');
     const req = http.expectOne(url('gemini-3.6-flash'));
     req.flush(geminiReply('{"kcal":-500,"proteinG":-5,"carbsG":10,"fatG":3}'));
-    const target = await promise;
+    const { facts: target } = await promise;
 
     // Assert
     expect(target.kcal).toBe(0);

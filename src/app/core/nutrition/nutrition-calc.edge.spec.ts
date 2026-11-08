@@ -107,14 +107,14 @@ describe('NutritionCalcService — Randfälle', () => {
       expect(svc.dailyTarget(unknown).kcal).toBe(1350);
     });
 
-    it('klemmt Kohlenhydrate bei sehr hohem Protein auf 0 statt negativ', () => {
+    it('rechnet Eiweiß bei extremem BMI mit Referenzgewicht, Kohlenhydrate nie negativ', () => {
       const heavy: UserProfile = {
         ...tiny, weightKg: 150, heightCm: 100, age: 90, sex: 'female',
       };
       const t = svc.dailyTarget(heavy);
       expect(t.kcal).toBe(1200);
-      expect(t.proteinG).toBe(270);
-      expect(t.carbsG).toBe(0);
+      expect(t.proteinG).toBe(45); // 1,8 * 25 kg (BMI 25 bei 1 m)
+      expect(t.carbsG).toBe(165);
     });
   });
 

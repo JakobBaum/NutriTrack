@@ -23,9 +23,14 @@ describe('NtFoodRowComponent', () => {
     const el = render(item);
     expect(el.querySelector('.name')?.textContent).toContain('Nutella');
     expect(el.querySelector('.brand')?.textContent).toContain('Ferrero');
-    expect(el.querySelector('.meta')?.textContent).toContain('400 g · 539 kcal / 100 g');
+    expect(el.querySelector('.meta')?.textContent).toContain('400 g · 539 kcal · 6 g Eiweiß / 100 g');
     expect(el.querySelector('.score')?.getAttribute('aria-label')).toBe('Nutri-Score E');
     expect(el.querySelector('img')?.getAttribute('loading')).toBe('lazy');
+  });
+
+  it('zeigt Eiweiß je Portion ohne 100-g-Zusatz', () => {
+    const el = render({ ...item, quantity: undefined, facts: { ...item.facts, basis: 'perPortion', proteinG: 12.4 } });
+    expect(el.querySelector('.meta')?.textContent?.trim()).toBe('539 kcal · 12 g Eiweiß');
   });
 
   it('blendet Marke, Score aus und zeigt Fallback-Icon ohne Bild', () => {
@@ -34,6 +39,6 @@ describe('NtFoodRowComponent', () => {
     expect(el.querySelector('.score')).toBeNull();
     expect(el.querySelector('img')).toBeNull();
     expect(el.querySelector('ion-icon')).not.toBeNull();
-    expect(el.querySelector('.meta')?.textContent?.trim()).toBe('539 kcal / 100 g');
+    expect(el.querySelector('.meta')?.textContent?.trim()).toBe('539 kcal · 6 g Eiweiß / 100 g');
   });
 });

@@ -4,14 +4,9 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { GeminiAiProvider } from './gemini-ai-provider';
 import { SettingsStore } from '../state/settings.store';
-import { AiConfig, UserProfile } from '../models';
+import { AiConfig } from '../models';
 
 const URL_FLASH = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent';
-
-const profile: UserProfile = {
-  weightKg: 80, heightCm: 180, age: 30, sex: 'male', activityLevel: 'moderate',
-  goal: 'maintain', updatedAt: '2026-10-13T00:00:00.000Z',
-};
 
 const reply = (...texts: string[]) => ({ candidates: [{ content: { parts: texts.map((text) => ({ text })) } }] });
 
@@ -39,42 +34,42 @@ afterEach(() => {
 // Defensives Parsen von (fehlerhaften) Modellantworten.
 describe('GeminiAiProvider — JSON-Extraktion', () => {
   it('entfernt ```json-Codezäune', async () => {
-    const p = provider.computeTargets(profile);
+    const p = provider.recognizeLabel('b64', 'per100g');
     http.expectOne(URL_FLASH).flush(reply('```json\n{"kcal":1800}\n```'));
-    expect((await p).kcal).toBe(1800);
+    expect((await p).facts.kcal).toBe(1800);
   });
 
   it('findet JSON mitten in Fließtext', async () => {
-    const p = provider.computeTargets(profile);
+    const p = provider.recognizeLabel('b64', 'per100g');
     http.expectOne(URL_FLASH).flush(reply('Hier ist das Ergebnis: {"kcal":2100,"proteinG":"120"} Viel Erfolg!'));
     const t = await p;
-    expect(t.kcal).toBe(2100);
-    expect(t.proteinG).toBe(120); // numerischer String wird akzeptiert
+    expect(t.facts.kcal).toBe(2100);
+    expect(t.facts.proteinG).toBe(120); // numerischer String wird akzeptiert
   });
 
   it('setzt fehlende, nicht-numerische und Komma-Werte auf 0', async () => {
-    const p = provider.computeTargets(profile);
+    const p = provider.recognizeLabel('b64', 'per100g');
     http.expectOne(URL_FLASH).flush(reply('{"kcal":"viel","carbsG":"12,5","fatG":null}'));
     const t = await p;
-    expect(t).toEqual({ kcal: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0 });
+    expect(t.facts).toMatchObject({ kcal: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0 });
   });
 
   it('wirft bei ungültigem JSON eine klare Meldung', async () => {
-    const p = provider.computeTargets(profile);
+    const p = provider.recognizeLabel('b64', 'per100g');
     http.expectOne(URL_FLASH).flush(reply('{kaputt: ]'));
     await expect(p).rejects.toThrow('KI-Antwort war kein gültiges JSON.');
   });
 
   it('wirft bei leerer Antwort ohne candidates', async () => {
-    const p = provider.computeTargets(profile);
+    const p = provider.recognizeLabel('b64', 'per100g');
     http.expectOne(URL_FLASH).flush({});
     await expect(p).rejects.toThrow(/kein gültiges JSON/);
   });
 
   it('fügt mehrere Text-Parts zusammen', async () => {
-    const p = provider.computeTargets(profile);
+    const p = provider.recognizeLabel('b64', 'per100g');
     http.expectOne(URL_FLASH).flush(reply('{"kcal":', '1500}'));
-    expect((await p).kcal).toBe(1500);
+    expect((await p).facts.kcal).toBe(1500);
   });
 });
 
@@ -157,25 +152,25 @@ describe('GeminiAiProvider — Mapping je Funktion', () => {
 
   it('nutzt einen eigenen Endpoint aus den Einstellungen', async () => {
     configure({ endpoint: ' https://proxy.test/models ' });
-    const p = provider.computeTargets(profile);
+    const p = provider.recognizeLabel('b64', 'per100g');
     http.expectOne('https://proxy.test/models/gemini-3.6-flash:generateContent').flush(reply('{"kcal":1}'));
-    expect((await p).kcal).toBe(1);
+    expect((await p).facts.kcal).toBe(1);
   });
 });
 
 describe('GeminiAiProvider — Retry', () => {
   it('wiederholt bei 503 und liefert dann das Ergebnis', async () => {
     vi.useFakeTimers();
-    const p = provider.computeTargets(profile);
+    const p = provider.recognizeLabel('b64', 'per100g');
     http.expectOne(URL_FLASH).flush(null, { status: 503, statusText: 'Unavailable' });
     await vi.advanceTimersByTimeAsync(600);
     http.expectOne(URL_FLASH).flush(reply('{"kcal":1900}'));
-    expect((await p).kcal).toBe(1900);
+    expect((await p).facts.kcal).toBe(1900);
   });
 
   it('meldet nach 3× 503 „überlastet"', async () => {
     vi.useFakeTimers();
-    const p = provider.computeTargets(profile);
+    const p = provider.recognizeLabel('b64', 'per100g');
     const assertion = expect(p).rejects.toThrow(/gerade überlastet/);
     http.expectOne(URL_FLASH).flush(null, { status: 503, statusText: 'Unavailable' });
     await vi.advanceTimersByTimeAsync(600);
@@ -186,13 +181,13 @@ describe('GeminiAiProvider — Retry', () => {
   });
 
   it('meldet 401 als ungültigen Schlüssel', async () => {
-    const p = provider.computeTargets(profile);
+    const p = provider.recognizeLabel('b64', 'per100g');
     http.expectOne(URL_FLASH).flush(null, { status: 401, statusText: 'Unauthorized' });
     await expect(p).rejects.toThrow(/Schlüssel/);
   });
 
   it('wiederholt bei 400 nicht und reicht den Fehler weiter', async () => {
-    const p = provider.computeTargets(profile);
+    const p = provider.recognizeLabel('b64', 'per100g');
     http.expectOne(URL_FLASH).flush({ error: 'bad' }, { status: 400, statusText: 'Bad Request' });
     await expect(p).rejects.toThrow(/fehlgeschlagen/);
     http.expectNone(URL_FLASH);

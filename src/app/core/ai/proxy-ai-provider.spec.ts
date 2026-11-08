@@ -6,13 +6,9 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ProxyAiProvider } from './proxy-ai-provider';
 import { SettingsStore } from '../state/settings.store';
 import { DebugLogService } from '../debug/debug-log.service';
-import { UserProfile } from '../models';
 
 const PROXY = 'https://proxy.test/ai';
-const profile: UserProfile = {
-  weightKg: 80, heightCm: 180, age: 30, sex: 'male', activityLevel: 'moderate',
-  goal: 'maintain', updatedAt: '2026-10-13T00:00:00.000Z',
-};
+const REQ = { restaurant: 'X', kcalBudget: 0 };
 
 let http: HttpTestingController;
 let provider: ProxyAiProvider;
@@ -37,16 +33,16 @@ afterEach(() => http.verify());
 describe('ProxyAiProvider', () => {
   it('wirft ohne Proxy-URL', async () => {
     setProxy('  ');
-    await expect(provider.computeTargets(profile)).rejects.toThrow('Keine KI-Proxy-URL konfiguriert.');
+    await expect(provider.suggestFastfood(REQ)).rejects.toThrow('Keine KI-Proxy-URL konfiguriert.');
   });
 
   it('sendet { fn, payload } und protokolliert Erfolg', async () => {
-    const p = provider.computeTargets(profile);
+    const p = provider.suggestFastfood(REQ);
     const req = http.expectOne(PROXY);
-    expect(req.request.body).toEqual({ fn: 'computeTargets', payload: profile });
-    req.flush({ kcal: 2000 });
-    expect((await p).kcal).toBe(2000);
-    expect(log.entries()[0]).toMatchObject({ level: 'success', msg: '✓ computeTargets OK' });
+    expect(req.request.body).toEqual({ fn: 'suggestFastfood', payload: REQ });
+    req.flush([]);
+    expect(await p).toEqual([]);
+    expect(log.entries()[0]).toMatchObject({ level: 'success', msg: '✓ suggestFastfood OK' });
   });
 
   it('leitet alle Funktionen mit passendem fn weiter', async () => {
@@ -71,7 +67,7 @@ describe('ProxyAiProvider', () => {
   });
 
   it('meldet Status 0 als Offline-Hinweis', async () => {
-    const p = provider.computeTargets(profile);
+    const p = provider.suggestFastfood(REQ);
     http.expectOne(PROXY).error(new ProgressEvent('error'), { status: 0 });
     await expect(p).rejects.toThrow(AI_ERROR_MESSAGES.offline);
     expect(log.entries()[0].level).toBe('error');
@@ -87,7 +83,7 @@ describe('ProxyAiProvider', () => {
       [413, AI_ERROR_MESSAGES.generic],
     ];
     for (const [status, message] of cases) {
-      const p = provider.computeTargets(profile);
+      const p = provider.suggestFastfood(REQ);
       http.expectOne(PROXY).flush({ error: 'Gemini 503' }, { status, statusText: 'x' });
       await expect(p).rejects.toThrow(message);
     }
@@ -98,7 +94,7 @@ describe('ProxyAiProvider Zeitlimit', () => {
   it('meldet nach 30 s eine klare deutsche Meldung', async () => {
     vi.useFakeTimers();
     try {
-      const p = provider.computeTargets(profile);
+      const p = provider.suggestFastfood(REQ);
       const assertion = expect(p).rejects.toThrow(AI_ERROR_MESSAGES.timeout);
       http.expectOne(PROXY);
       await vi.advanceTimersByTimeAsync(30001);

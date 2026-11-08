@@ -1,13 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { MockAiProvider } from './mock-ai-provider';
-import { NutritionCalcService } from '../nutrition/nutrition-calc.service';
-import { UserProfile } from '../models';
 
-const profile: UserProfile = {
-  weightKg: 80, heightCm: 180, age: 30, sex: 'male', activityLevel: 'moderate',
-  goal: 'maintain', updatedAt: '2026-10-13T00:00:00.000Z',
-};
 
 let provider: MockAiProvider;
 
@@ -19,11 +13,6 @@ beforeEach(() => {
 
 // Randfälle des deterministischen Mock-Anbieters.
 describe('MockAiProvider — Randfälle', () => {
-  it('liefert die Fallback-Formel als Tagesziel', async () => {
-    const expected = TestBed.inject(NutritionCalcService).dailyTarget(profile);
-    expect(await provider.computeTargets(profile)).toEqual(expected);
-  });
-
   it('liefert Etikett-Werte je Basis', async () => {
     const per100 = await provider.recognizeLabel('', 'per100g');
     expect(per100.facts.kcal).toBe(380);

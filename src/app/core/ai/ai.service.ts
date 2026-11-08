@@ -1,9 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import {
-  DailyTarget,
   FastFoodRequest,
   FastFoodSuggestion,
-  UserProfile,
 } from '../models';
 import { SettingsStore } from '../state/settings.store';
 import { DebugLogService } from '../debug/debug-log.service';
@@ -51,10 +49,6 @@ export class AiService implements AiProvider {
   /** True, wenn echte KI aktiv ist (eigener Key ODER KI-Server) statt Mock. */
   isLive(): boolean {
     return this.routes().length > 0;
-  }
-
-  computeTargets(profile: UserProfile): Promise<DailyTarget> {
-    return this.run((p) => p.computeTargets(profile));
   }
 
   generateShoppingList(req: ShoppingPlanRequest): Promise<ShoppingPlanResult> {

@@ -97,12 +97,20 @@ describe('NutritionCalcService', () => {
     expect(svc.isMinKcalApplied(male)).toBe(false);
   });
 
-  it('rechnet Tempo in tägliches Defizit um und deckelt bei 0,75 kg/Woche', () => {
-    expect(svc.dailyDeltaKcal(0.5)).toBe(550);
-    expect(svc.dailyDeltaKcal(0.25)).toBe(275);
-    expect(svc.dailyDeltaKcal(2)).toBe(svc.dailyDeltaKcal(0.75));
+  it('rechnet Tempo in tägliches Defizit um und deckelt bei 1 % Körpergewicht pro Woche', () => {
+    // 80 kg -> Deckel 0,8 kg/Woche
+    expect(svc.dailyDeltaKcal(0.5, 80)).toBe(550);
+    expect(svc.dailyDeltaKcal(0.25, 80)).toBe(275);
+    expect(svc.dailyDeltaKcal(2, 80)).toBe(svc.dailyDeltaKcal(0.8, 80));
     expect(svc.dailyTarget({ ...male, goal: 'lose', rateKgPerWeek: 2 }).kcal)
-      .toBe(svc.dailyTarget({ ...male, goal: 'lose', rateKgPerWeek: 0.75 }).kcal);
+      .toBe(svc.dailyTarget({ ...male, goal: 'lose', rateKgPerWeek: 0.8 }).kcal);
+  });
+
+  it('begrenzt das Tempo relativ zum Gewicht: bei 60 kg auf 0,6, bei 120 kg bleibt 0,75 erlaubt', () => {
+    expect(svc.maxRateKgPerWeek(60)).toBeCloseTo(0.6, 5);
+    expect(svc.dailyDeltaKcal(0.75, 60)).toBe(660);
+    expect(svc.maxRateKgPerWeek(120)).toBeCloseTo(1.2, 5);
+    expect(svc.dailyDeltaKcal(0.75, 120)).toBe(825);
   });
 
   it('liefert das erreichte Tempo, wenn die Mindestzufuhr greift', () => {
@@ -116,6 +124,69 @@ describe('NutritionCalcService', () => {
     expect(achieved).toBeGreaterThanOrEqual(0);
     expect(svc.achievedRateKgPerWeek({ ...male, goal: 'lose', rateKgPerWeek: 0.5 })).toBeCloseTo(0.5, 2);
     expect(svc.achievedRateKgPerWeek(male)).toBe(0);
+  });
+
+  it('meldet das gedeckelte Tempo als erreichtes Tempo', () => {
+    const light: UserProfile = { ...male, weightKg: 60, goal: 'lose', rateKgPerWeek: 0.75 };
+    expect(svc.achievedRateKgPerWeek(light)).toBeCloseTo(0.6, 1);
+  });
+
+  describe('Eiweißziel (g/kg mit Referenzgewicht)', () => {
+    it('nutzt bei BMI bis 30 das tatsächliche Gewicht', () => {
+      expect(svc.proteinReferenceWeightKg(male)).toBe(80);
+      expect(svc.proteinReferenceWeightKg({ ...male, weightKg: 97.2 })).toBe(97.2); // BMI genau 30
+    });
+
+    it('nutzt bei BMI über 30 das Gewicht bei BMI 25', () => {
+      const heavy: UserProfile = { ...male, weightKg: 120, goal: 'lose' };
+      // 25 * 1,8^2 = 81
+      expect(svc.proteinReferenceWeightKg(heavy)).toBeCloseTo(81, 5);
+      expect(svc.dailyTarget(heavy).proteinG).toBe(146); // 1,8 * 81
+    });
+
+    it('bevorzugt bei BMI über 30 das Zielgewicht, falls vorhanden', () => {
+      const heavy: UserProfile = { ...male, weightKg: 120, targetWeightKg: 90, goal: 'lose' };
+      expect(svc.proteinReferenceWeightKg(heavy)).toBe(90);
+      expect(svc.dailyTarget(heavy).proteinG).toBe(162);
+    });
+
+    it('ignoriert ein unplausibles Zielgewicht', () => {
+      const heavy: UserProfile = { ...male, weightKg: 120, targetWeightKg: 0 };
+      expect(svc.proteinReferenceWeightKg(heavy)).toBeCloseTo(81, 5);
+    });
+
+    it('liegt nie über 2,2 g je kg Referenzgewicht', () => {
+      (['lose', 'maintain', 'gain'] as const).forEach((goal) => {
+        const p = { ...male, goal };
+        expect(svc.dailyTarget(p).proteinG).toBeLessThanOrEqual(Math.round(2.2 * svc.proteinReferenceWeightKg(p)));
+      });
+    });
+  });
+
+  describe('Fett und Mindestzufuhr', () => {
+    it('setzt Fett auf 30 % der kcal', () => {
+      const t = svc.dailyTarget(male);
+      expect(t.fatG).toBe(Math.round((t.kcal * 0.3) / 9)); // 92
+    });
+
+    it('hebt beim Halten nicht auf die Mindestzufuhr an', () => {
+      const small: UserProfile = {
+        weightKg: 45, heightCm: 150, age: 70, sex: 'female',
+        activityLevel: 'sedentary', goal: 'maintain', updatedAt: '',
+      };
+      expect(svc.isMinKcalApplied(small)).toBe(false);
+      expect(svc.dailyTarget(small).kcal).toBe(Math.round(svc.totalDailyEnergy(small)));
+      expect(svc.dailyTarget(small).kcal).toBeLessThan(1200);
+    });
+
+    it('hebt beim Abnehmen weiter an', () => {
+      const small: UserProfile = {
+        weightKg: 45, heightCm: 150, age: 70, sex: 'female',
+        activityLevel: 'sedentary', goal: 'lose', rateKgPerWeek: 0.25, updatedAt: '',
+      };
+      expect(svc.isMinKcalApplied(small)).toBe(true);
+      expect(svc.dailyTarget(small).kcal).toBe(1200);
+    });
   });
 
   it('summiert mehrere Nährwert-Sätze', () => {

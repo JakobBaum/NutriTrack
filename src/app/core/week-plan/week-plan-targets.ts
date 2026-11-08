@@ -16,9 +16,6 @@ export const FALLBACK_MIN_PROTEIN_G: Readonly<Record<MealType, number>> = {
   snack: 10,
 };
 
-/** Obergrenze für das Eiweiß-Minimum: darüber findet spoonacular kaum noch Treffer. */
-export const MAX_MIN_PROTEIN_G = 50;
-
 /** spoonacular-Gerichtstyp je Mahlzeit. */
 export const SPOON_MEAL_TYPE: Readonly<Record<MealType, string>> = {
   breakfast: 'breakfast',
@@ -46,10 +43,14 @@ export function mealMaxCalories(dailyKcal: number | null | undefined, meal: Meal
   return positive(dailyKcal) ? Math.round(dailyKcal * MEAL_SHARE[meal]) : null;
 }
 
-/** Eiweiß-Minimum je Portion: Anteil des Proteinziels, sonst Fallback; gedeckelt auf {@link MAX_MIN_PROTEIN_G}. */
+/**
+ * Eiweiß-Minimum je Portion: Anteil des Tages-Proteinziels, sonst Fallback.
+ * Kein fester Deckel: Das Tagesziel ist selbst auf 2,2 g/kg begrenzt, und {@link proteinSteps}
+ * lockert das Minimum, wenn die Suche damit keine Treffer liefert.
+ */
 export function mealMinProtein(dailyProteinG: number | null | undefined, meal: MealType): number {
   const target = positive(dailyProteinG) ? Math.round(dailyProteinG * MEAL_SHARE[meal]) : FALLBACK_MIN_PROTEIN_G[meal];
-  return Math.min(Math.max(1, target), MAX_MIN_PROTEIN_G);
+  return Math.max(1, target);
 }
 
 /** Lockerungsstufen für das Eiweiß-Minimum: voll, halbiert, weggelassen (null). */
