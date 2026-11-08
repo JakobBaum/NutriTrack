@@ -1,3 +1,5 @@
+import { hasValidRecords } from './backup-records';
+
 /**
  * Reine Funktionen für Daten-Backups (Export/Import aller `nutritrack:`-Schlüssel).
  * Keine Abhängigkeit zu Angular oder Browser-APIs, damit alles unit-testbar bleibt.
@@ -52,6 +54,7 @@ export const BACKUP_ERRORS = {
   badVersion: 'Die Backup-Version wird nicht unterstützt.',
   badDate: 'Das Backup ist beschädigt: Das Exportdatum fehlt oder ist ungültig.',
   badData: 'Das Backup ist beschädigt: Der Datenbereich fehlt oder ist ungültig.',
+  badContent: 'Das Backup ist beschädigt: Einträge sind unvollständig oder fehlerhaft.',
   tooLarge: 'Die Datei ist zu groß für ein NutriTrack-Backup.',
   empty: 'Die Datei ist leer.',
 } as const;
@@ -128,6 +131,7 @@ export function validateBackup(value: unknown): BackupParseResult {
   if (!isValidIsoDate(value['exportedAt'])) return { ok: false, error: BACKUP_ERRORS.badDate };
   const data = value['data'];
   if (!validateData(data)) return { ok: false, error: BACKUP_ERRORS.badData };
+  if (!hasValidRecords(data)) return { ok: false, error: BACKUP_ERRORS.badContent };
   const backup: BackupFile = {
     format: BACKUP_FORMAT,
     version: value['version'] as number,
@@ -190,13 +194,31 @@ function keepLocalKey(restored: BackupData, current: BackupData, key: string): B
   return { ...restored, [key]: { ...entry, apiKey: localKey } };
 }
 
+/** Felder mit Zieladressen: Sie dürfen nie aus einem Backup kommen (sonst ginge der lokale Key an einen fremden Host). */
+const ENDPOINT_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  [AI_KEY]: ['endpoint', 'proxyUrl'],
+  [RECIPE_SEARCH_KEY]: ['baseUrl'],
+};
+
+/** Ersetzt Zieladressen des Backups durch die lokalen (oder entfernt sie, wenn lokal keine gesetzt sind). */
+function dropEndpoints(restored: BackupData, current: BackupData): BackupData {
+  return Object.entries(ENDPOINT_FIELDS).reduce<BackupData>((acc, [key, fields]) => {
+    const entry = acc[key];
+    if (!isPlainObject(entry)) return acc;
+    const local = isPlainObject(current[key]) ? (current[key] as Record<string, unknown>) : {};
+    const cleaned = Object.fromEntries(Object.entries(entry).filter(([k]) => !fields.includes(k)));
+    const kept = Object.fromEntries(fields.filter((k) => k in local).map((k) => [k, local[k]]));
+    return { ...acc, [key]: { ...cleaned, ...kept } };
+  }, restored);
+}
+
 /**
  * Daten, die beim Import geschrieben werden: Backup-Inhalt, aber der lokale API-Key
  * bleibt erhalten, wenn das Backup (wie beim Export üblich) keinen enthält.
  */
 export function prepareRestore(backup: BackupData, current: BackupData): BackupData {
   const restored = Object.fromEntries(Object.entries(backup).filter(([key]) => key !== LAST_BACKUP_KEY));
-  return keepLocalKey(keepLocalKey(restored, current, AI_KEY), current, RECIPE_SEARCH_KEY);
+  return dropEndpoints(keepLocalKey(keepLocalKey(restored, current, AI_KEY), current, RECIPE_SEARCH_KEY), current);
 }
 
 /** Formatiert ein ISO-Datum als "06.11.2026, 14:05" (lokal); `null` bei ungültiger Eingabe. */

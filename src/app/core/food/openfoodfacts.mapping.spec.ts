@@ -50,10 +50,17 @@ describe('OpenFoodFactsProvider — Mapping', () => {
     expect(item?.id.startsWith('off_')).toBe(true);
   });
 
-  it('setzt fehlende Makros auf 0', async () => {
+  it('setzt fehlende Hauptmakros auf 0, lässt fehlende Ballaststoffe/Zucker/Salz aber leer statt 0 (FDB-01)', async () => {
     const item = await mapProduct(base);
     expect(item?.facts.proteinG).toBe(0);
-    expect(item?.facts.saltG).toBe(0);
+    expect(item?.facts.fiberG).toBeUndefined();
+    expect(item?.facts.sugarG).toBeUndefined();
+    expect(item?.facts.saltG).toBeUndefined();
+  });
+
+  it('übernimmt vorhandene Salz-, Zucker- und Ballaststoffwerte, auch echte 0 (FDB-01)', async () => {
+    const item = await mapProduct({ ...base, nutriments: { 'energy-kcal_100g': 10, salt_100g: 0, sugars_100g: 1.5, fiber_100g: '2' } });
+    expect(item?.facts).toMatchObject({ saltG: 0, sugarG: 1.5, fiberG: 2 });
   });
 
   it('akzeptiert numerische Strings und klemmt negative Werte', async () => {

@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  HostListener,
   inject,
   signal,
 } from '@angular/core';
@@ -12,7 +13,7 @@ import { AmountUnit, DiaryEntry, MealType, NutritionFacts } from '../core/models
 import { AiService } from '../core/ai/ai.service';
 import { CopySource, DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
-import { dayLabel, toDateISO } from '../core/util/date';
+import { dayLabel, rollDate, toDateISO } from '../core/util/date';
 import { formatNum } from '../shared/num.pipe';
 import { MEAL_DEFS, mealForHour, mealLabel, isIsoDate, isMealType, isValidAmount, toBaseAmount, toNumberOrNull, inputTextFor, AMOUNT_UNITS, formatAmount, fromBaseAmount, convertAmount, lastAmountForLabel, editBaseFor } from './diary-helpers';
 import { confirmDiscardSheet, pickMealSheet } from './diary-sheets';
@@ -72,8 +73,10 @@ export class DiaryPage {
   private readonly rawTexts: Record<string, string> = {};
 
   readonly selectedDate = signal(toDateISO());
+  /** Der Tag, den die Seite zuletzt als "heute" kannte (für den Tageswechsel). */
+  private readonly today = signal(toDateISO());
   readonly dateLabel = computed(() => dayLabel(this.selectedDate()));
-  readonly isToday = computed(() => this.selectedDate() === toDateISO());
+  readonly isToday = computed(() => this.selectedDate() === this.today());
 
   readonly totalKcal = computed(() =>
     Math.round(this.diary.totalsForDate(this.selectedDate()).kcal),
@@ -165,6 +168,22 @@ export class DiaryPage {
   /** Scrollt zur Mahlzeit-Gruppe (Deep-Link ?meal=lunch). */
   private scrollToMeal(meal: MealType): void {
     document.getElementById('meal-' + meal)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /** Beim Betreten der Seite und beim Zurückkehren in die App: nach Mitternacht auf den neuen Tag springen. */
+  ionViewWillEnter(): void {
+    this.refreshToday();
+  }
+
+  @HostListener('document:visibilitychange')
+  onVisibilityChange(): void {
+    if (document.visibilityState === 'visible') this.refreshToday();
+  }
+
+  private refreshToday(): void {
+    const next = rollDate(this.selectedDate(), this.today(), toDateISO());
+    this.today.set(next.today);
+    this.selectedDate.set(next.selected);
   }
 
   setDate(dateISO: string): void {
@@ -305,7 +324,7 @@ export class DiaryPage {
       return;
     }
     const patch: Parameters<typeof this.diary.update>[1] = {
-      label: this.editForm.label.trim() || undefined,
+      label: this.editForm.label,
       meal: this.editForm.meal,
     };
     if (this.editBaseFacts && isValidAmount(editBase)) {
@@ -315,10 +334,14 @@ export class DiaryPage {
       const isDerivedBase = !this.editEntry.baseFacts;
       if (isDerivedBase && editBase !== this.editEntry.amountG) patch.baseFacts = this.editBaseFacts;
     }
-    if (this.editMode === 'optional' && isValidAmount(editBase)) {
-      // Nur Anzeige-Menge: ohne Bezugswerte bleiben die Nährwerte unverändert.
-      patch.amountG = editBase;
-      patch.unit = this.editUnit;
+    if (this.editMode === 'optional') {
+      // Nur Anzeige-Menge: ohne Bezugswerte bleiben die Nährwerte unverändert; leeres Feld entfernt die Menge.
+      if (isValidAmount(editBase)) {
+        patch.amountG = editBase;
+        patch.unit = this.editUnit;
+      } else {
+        patch.clearAmount = true;
+      }
     }
     this.diary.update(this.editEntry.id, patch);
     lightHaptic();
@@ -333,7 +356,7 @@ export class DiaryPage {
     }
     const next = withServings(entry, this.editServings);
     this.diary.update(entry.id, {
-      label: this.editForm.label.trim() || entry.label,
+      label: this.editForm.label,
       meal: this.editForm.meal,
       servings: next.servings,
       facts: next.facts,
@@ -351,9 +374,11 @@ export class DiaryPage {
   /** Löscht einen Eintrag; „Rückgängig“ legt ihn (am Ende der Mahlzeit) neu an. */
   remove(entry: DiaryEntry): void {
     lightHaptic();
+    const index = this.diary.indexOf(entry.id);
     this.diary.remove(entry.id);
+    // Rückgängig stellt den Eintrag mit alter Id und an alter Position wieder her.
     this.showToast(`„${entry.label}“ gelöscht`, () => {
-      this.diary.add(entryToInput(entry));
+      this.diary.restore(entry, index);
     });
   }
 
@@ -366,10 +391,12 @@ export class DiaryPage {
 
   // --- Wie gestern / Tag kopieren ---
   readonly copyFromButtonText = copyFromButtonText;
+  /** Sperrt „Tag kopieren“ gegen Doppelklick, solange der Dialog offen ist. */
+  private copyBusy = false;
 
   /** Übernimmt eine leere Mahlzeit vom letzten Tag, an dem sie Einträge hatte. */
   copyMeal(group: MealGroup): void {
-    if (!group.copySource) return;
+    if (!group.copySource || this.copyBusy) return;
     const copies = this.diary.copyEntries(group.copySource.entries, this.selectedDate());
     this.confirmCopy(copies, `${group.label} ${copyFromText(group.copySource.dateISO)}`);
   }
@@ -377,12 +404,21 @@ export class DiaryPage {
   /** Fragt den Quelltag ab (letzte 7 Tage) und kopiert ihn nach Bestätigung in den gezeigten Tag. */
   async copyDay(): Promise<void> {
     const sources = this.daySources();
-    if (sources.length === 0) return;
-    const sourceDate = await this.askCopyDay(sources);
-    const source = sources.find((s) => s.dateISO === sourceDate);
-    if (!source) return;
-    const copies = this.diary.copyEntries(source.entries, this.selectedDate());
-    this.confirmCopy(copies, `Tag ${copyFromText(source.dateISO)}`);
+    if (sources.length === 0 || this.copyBusy) return;
+    this.copyBusy = true;
+    try {
+      const sourceDate = await this.askCopyDay(sources);
+      const source = sources.find((s) => s.dateISO === sourceDate);
+      if (!source) return;
+      const copies = this.diary.copyEntries(source.entries, this.selectedDate());
+      if (copies.length === 0) {
+        this.showToast('Diese Einträge sind schon vorhanden — nichts kopiert.');
+        return;
+      }
+      this.confirmCopy(copies, `Tag ${copyFromText(source.dateISO)}`);
+    } finally {
+      this.copyBusy = false;
+    }
   }
 
   private async askCopyDay(sources: CopySource[]): Promise<string | null> {

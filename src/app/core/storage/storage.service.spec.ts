@@ -54,3 +54,27 @@ describe('StorageService snapshot/replaceAll', () => {
     expect(store.getItem('nutritrack:profile')).toBeNull();
   });
 });
+
+describe('StorageService Schreibfehler (QAE-02)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('meldet false und zählt den Fehler, wenn der Speicher voll ist', () => {
+    vi.stubGlobal('localStorage', memoryStorage({}, 'nutritrack:diary'));
+    const service = new StorageService();
+
+    const ok = service.set('diary', [{ id: 'd1' }]);
+
+    expect(ok).toBe(false);
+    expect(service.writeFailures()).toBe(1);
+  });
+
+  it('meldet true und lässt den Zähler bei Erfolg unverändert', () => {
+    vi.stubGlobal('localStorage', memoryStorage({}));
+    const service = new StorageService();
+
+    const ok = service.set('diary', []);
+
+    expect(ok).toBe(true);
+    expect(service.writeFailures()).toBe(0);
+  });
+});

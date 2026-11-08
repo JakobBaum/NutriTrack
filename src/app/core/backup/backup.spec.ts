@@ -21,13 +21,26 @@ function validFile(data: Record<string, unknown> = {}, overrides: Record<string,
   return { format: BACKUP_FORMAT, version: BACKUP_VERSION, exportedAt: NOW.toISOString(), data, ...overrides };
 }
 
+const entry = (id: string): Record<string, unknown> => ({
+  id,
+  dateISO: '2026-11-06',
+  meal: 'lunch',
+  label: 'Reis',
+  ref: { kind: 'manual' },
+  facts: { kcal: 100, proteinG: 2, carbsG: 20, fatG: 1, basis: 'perPortion' },
+  createdAt: '2026-11-06T10:00:00.000Z',
+});
+
 const sampleData = {
-  diary: [{ id: 'd1' }, { id: 'd2' }, { id: 'd3' }],
-  recipes: [{ id: 'r1' }],
+  diary: [entry('d1'), entry('d2'), entry('d3')],
+  recipes: [{ id: 'r1', title: 'Pasta', servings: 2, ingredients: [{ name: 'Nudeln', amount: 200, unit: 'g' }], steps: [] }],
   savedMeals: [],
-  customFoods: [{ id: 'c1' }, { id: 'c2' }],
+  customFoods: [
+    { id: 'c1', name: 'A', facts: { kcal: 1, proteinG: 0, carbsG: 0, fatG: 0, basis: 'perPortion' } },
+    { id: 'c2', name: 'B', facts: { kcal: 1, proteinG: 0, carbsG: 0, fatG: 0, basis: 'perPortion' } },
+  ],
   profile: { weightKg: 80 },
-  shopping: { id: 's', items: [{ name: 'Milch' }] },
+  shopping: { id: 's', items: [{ name: 'Milch', amount: 1, unit: 'l', checked: false }] },
   'ai-config': { provider: 'gemini', apiKey: 'geheim', proxyUrl: '' },
 };
 
@@ -134,6 +147,45 @@ describe('validateBackup', () => {
   });
 });
 
+describe('validateBackup Inhaltsprüfung (QAE-01)', () => {
+  const bad = (data: Record<string, unknown>) => validateBackup(validFile(data));
+
+  it('lehnt Tagebuch-Einträge ohne createdAt ab (würde entriesForDate abstürzen lassen)', () => {
+    const { createdAt: _drop, ...noCreatedAt } = entry('d1');
+    expect(bad({ diary: [noCreatedAt] })).toEqual({ ok: false, error: BACKUP_ERRORS.badContent });
+  });
+
+  it.each([
+    ['ohne id', { id: undefined }],
+    ['falsche Mahlzeit', { meal: 'brunch' }],
+    ['kaputtes Datum', { dateISO: 'heute' }],
+    ['Name keine Zeichenkette', { label: 5 }],
+    ['kcal nicht endlich', { facts: { kcal: null, proteinG: 1, carbsG: 1, fatG: 1, basis: 'perPortion' } }],
+    ['facts fehlen', { facts: undefined }],
+  ])('lehnt Tagebuch-Eintrag %s ab', (_name, patch) => {
+    expect(bad({ diary: [{ ...entry('d1'), ...patch }] }).ok).toBe(false);
+  });
+
+  it('lehnt Rezepte ohne Titel oder mit kaputten Zutaten ab', () => {
+    expect(bad({ recipes: [{ id: 'r', servings: 2, ingredients: [] }] }).ok).toBe(false);
+    expect(bad({ recipes: [{ id: 'r', title: 'X', servings: 2, ingredients: [{ name: 'a', amount: 'viel', unit: 'g' }] }] }).ok).toBe(false);
+  });
+
+  it('lehnt Einkaufspositionen ohne Menge oder Namen ab', () => {
+    expect(bad({ shopping: { items: [{ name: 'Milch', unit: 'l', checked: false }] } }).ok).toBe(false);
+    expect(bad({ shopping: { items: [{ amount: 1, unit: 'l', checked: false }] } }).ok).toBe(false);
+  });
+
+  it('lehnt eigene Lebensmittel und gespeicherte Mahlzeiten ohne Pflichtfelder ab', () => {
+    expect(bad({ customFoods: [{ id: 'c' }] }).ok).toBe(false);
+    expect(bad({ savedMeals: [{ id: 'm', name: 'M' }] }).ok).toBe(false);
+  });
+
+  it('akzeptiert vollständige Datensätze', () => {
+    expect(bad({ diary: [entry('d1')] }).ok).toBe(true);
+  });
+});
+
 describe('countBackup / describeCounts', () => {
   it('counts all record types', () => {
     expect(countBackup(sampleData)).toEqual({
@@ -173,9 +225,29 @@ describe('prepareRestore', () => {
     expect(restored['ai-config']).toEqual({ apiKey: 'backup' });
   });
 
+  it('verwirft endpoint und proxyUrl aus dem Backup und behält die lokalen (SEC-01)', () => {
+    const restored = prepareRestore(
+      { 'ai-config': { provider: 'gemini', apiKey: '', endpoint: 'https://evil.example', proxyUrl: 'https://evil.example' } },
+      { 'ai-config': { apiKey: 'lokal', endpoint: '', proxyUrl: 'https://mein-worker.example' } },
+    );
+    expect(restored['ai-config']).toEqual({ provider: 'gemini', apiKey: 'lokal', endpoint: '', proxyUrl: 'https://mein-worker.example' });
+  });
+
+  it('entfernt endpoint, proxyUrl und baseUrl ganz, wenn lokal keine existieren (SEC-01)', () => {
+    const restored = prepareRestore(
+      {
+        'ai-config': { provider: 'gemini', apiKey: 'k', endpoint: 'https://evil.example', proxyUrl: 'https://evil.example' },
+        'recipe-search-config': { apiKey: 'k', baseUrl: 'https://evil.example' },
+      },
+      {},
+    );
+    expect(restored['ai-config']).toEqual({ provider: 'gemini', apiKey: 'k' });
+    expect(restored['recipe-search-config']).toEqual({ apiKey: 'k' });
+  });
+
   it('drops the last-backup key and leaves other data untouched', () => {
-    const restored = prepareRestore({ diary: [{ id: 'd' }], [LAST_BACKUP_KEY]: 'x' }, {});
-    expect(restored).toEqual({ diary: [{ id: 'd' }] });
+    const restored = prepareRestore({ diary: [entry('d')], [LAST_BACKUP_KEY]: 'x' }, {});
+    expect(restored).toEqual({ diary: [entry('d')] });
   });
 });
 

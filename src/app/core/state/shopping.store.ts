@@ -7,6 +7,7 @@ import { withCategories, withCategory } from '../shopping/shopping-category';
 import { fillMissingPrices } from '../shopping/price-table';
 import { roundItemsToPackages } from '../shopping/package-size';
 import { buildShoppingList } from '../shopping/shopping-generator';
+import { fromNormalized, itemKey, normalizeUnit } from '../shopping/shopping-units';
 import { makeId } from '../util/id';
 import { WeekPlan } from '../week-plan/week-plan.model';
 import { weekPlanToRecipes } from '../week-plan/week-plan-recipes';
@@ -42,41 +43,85 @@ export function sumItems(items: readonly ShoppingItem[]): { total: number; unpri
   return { total: Math.round(total * 100) / 100, unpriced };
 }
 
-const itemKey = (it: ShoppingItem): string =>
-  `${it.name.trim().toLowerCase()}|${it.unit.trim().toLowerCase()}`;
+const keyOf = (it: ShoppingItem): string => itemKey(it.name, it.unit);
 
-/** Führt eine behaltene Position mit der generierten gleichen Name+Einheit zusammen. */
+const round2 = (n: number): number => Math.round(n * 100) / 100;
+
+/** Menge einer Position in der Basiseinheit (g, ml, Stk, ...), damit g/kg usw. vergleichbar sind. */
+const baseAmount = (it: ShoppingItem): number => normalizeUnit(it.amount, it.unit).amount;
+
+/** Preise zweier Positionen addieren; fehlt einer, zählt der vorhandene. */
+function sumPrice(a?: number, b?: number): number | undefined {
+  if (a == null) return b;
+  if (b == null) return a;
+  return round2(a + b);
+}
+
+/** Fasst mehrere behaltene Positionen derselben Ware (Name + Einheitenfamilie) zu einer zusammen. */
+function collapseDuplicates(items: readonly ShoppingItem[]): ShoppingItem[] {
+  const byKey = new Map<string, ShoppingItem>();
+  for (const it of items) {
+    const key = keyOf(it);
+    const first = byKey.get(key);
+    if (!first) {
+      byKey.set(key, it);
+      continue;
+    }
+    const amount = round2(first.amount + fromNormalized(baseAmount(it), first.unit));
+    byKey.set(key, {
+      ...first,
+      amount,
+      checked: first.checked && it.checked,
+      estPrice: sumPrice(first.estPrice, it.estPrice),
+      category: first.category ?? it.category,
+    });
+  }
+  return [...byKey.values()];
+}
+
+/**
+ * Führt eine behaltene Position mit der generierten gleichen Ware zusammen: Es gilt die größere
+ * Menge (Einheit der behaltenen Position); wächst der Bedarf, wird die Position wieder offen.
+ */
 function mergeOne(old: ShoppingItem, g: ShoppingItem): ShoppingItem {
-  // Manuelle Position "ohne Menge" (0) darf die generierte Menge nicht verlieren.
-  const amount = old.amount > 0 ? old.amount : g.amount;
+  const needBase = baseAmount(g);
+  const grows = old.amount <= 0 || needBase > baseAmount(old);
+  const amount = grows ? round2(fromNormalized(needBase, old.unit)) : old.amount;
   const category = old.category ?? g.category;
-  if (old.estPrice != null) return { ...old, amount, category };
-  // Ohne eigenen Preis den generierten übernehmen, auf die behaltene Menge skaliert.
-  const estPrice =
-    g.estPrice != null && g.amount > 0 ? Math.round((g.estPrice * amount * 100) / g.amount) / 100 : g.estPrice;
-  return { ...old, amount, category, estPrice };
+  const checked = grows ? false : old.checked;
+  if (old.estPrice != null) {
+    const scaled = grows && old.amount > 0 ? round2((old.estPrice * amount) / old.amount) : old.estPrice;
+    return { ...old, amount, category, checked, estPrice: scaled };
+  }
+  // Ohne eigenen Preis den generierten übernehmen, auf die Menge skaliert.
+  const gAmount = fromNormalized(needBase, old.unit);
+  const estPrice = g.estPrice != null && gAmount > 0 ? round2((g.estPrice * amount) / gAmount) : g.estPrice;
+  return { ...old, amount, category, checked, estPrice };
 }
 
 /**
  * Übernimmt beim Neu-Generieren abgehakte und manuelle Positionen (manuell =
- * Markierung `manual` oder ohne Schätzpreis). Gleicher Name+Einheit ersetzt die neu generierte Position.
+ * Markierung `manual` oder ohne Schätzpreis). Gleiche Ware (Name + Einheitenfamilie)
+ * ersetzt die neu generierte Position; die größere Menge gewinnt, mehrere manuelle Duplikate werden addiert.
  */
 export function mergeKept(
   previous: readonly ShoppingItem[],
   generated: readonly ShoppingItem[],
 ): ShoppingItem[] {
-  // `manual: false` markiert generierte Positionen (Wochenplan): ohne Preis trotzdem ersetzbar.
-  const kept = previous.filter((it) => it.checked || it.manual === true || (it.estPrice == null && it.manual !== false));
-  const byKey = new Map(kept.map((it) => [itemKey(it), it] as const));
+  // `manual: false` markiert generierte Positionen: ohne Preis trotzdem ersetzbar.
+  const kept = collapseDuplicates(
+    previous.filter((it) => it.checked || it.manual === true || (it.estPrice == null && it.manual !== false)),
+  );
+  const byKey = new Map(kept.map((it) => [keyOf(it), it] as const));
   const used = new Set<string>();
   const merged = generated.map((g) => {
-    const key = itemKey(g);
+    const key = keyOf(g);
     const old = byKey.get(key);
     if (!old || used.has(key)) return g;
     used.add(key);
     return mergeOne(old, g);
   });
-  const rest = kept.filter((it) => !used.has(itemKey(it)));
+  const rest = kept.filter((it) => !used.has(keyOf(it)));
   return [...merged, ...rest];
 }
 
@@ -106,26 +151,6 @@ export class ShoppingStore {
   /** Aktuelle Einkaufsliste (oder null). */
   readonly list = this._list.asReadonly();
 
-  /** Generiert eine neue Liste aus Gerichte-/Personenanzahl. */
-  generate(dishes: number, persons: number): ShoppingList {
-    const { items, suggestedDishes } = buildShoppingList(
-      this.recipes.recipes(),
-      dishes,
-      persons,
-    );
-    const list: ShoppingList = {
-      id: makeId('shopping'),
-      dishes: Math.max(1, Math.floor(dishes)),
-      persons: Math.max(1, Math.floor(persons)),
-      items,
-      suggestedDishes,
-      generatedAt: new Date().toISOString(),
-    };
-    this._list.set(list);
-    this.persist();
-    return list;
-  }
-
   /**
    * Generiert einen Wocheneinkauf über den KI-Anbieter (Mock oder Claude),
    * inkl. Schätzpreisen. Abgehakte und manuelle Positionen der bisherigen
@@ -154,7 +179,7 @@ export class ShoppingStore {
       }
       return this.mock.generateShoppingList(req);
     });
-    const generated = withCategories(roundItemsToPackages(result.items));
+    const generated = withCategories(roundItemsToPackages(result.items)).map((it) => ({ ...it, manual: false }));
     // Ohne KI keine Preise; mit KI fehlende Preise über die Kategorie-Tabelle ergänzen.
     const priced = live ? fillMissingPrices(generated) : generated;
     const items = withCategories(mergeKept(this._list()?.items ?? [], priced));
@@ -244,7 +269,7 @@ export class ShoppingStore {
           suggestedDishes: [],
           generatedAt: new Date().toISOString(),
         };
-      return withTotal({ ...base, items: [...base.items, withCategory(item)] });
+      return withTotal({ ...base, items: [...base.items, withCategory({ ...item, manual: item.manual ?? true })] });
     });
     this.persist();
   }

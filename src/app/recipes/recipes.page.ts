@@ -590,7 +590,7 @@ export class RecipesPage implements OnDestroy {
   }
 
   private toNum(v: number | null): number {
-    return typeof v === 'number' && Number.isFinite(v) ? v : 0;
+    return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0;
   }
 
   // --- Speichern ---

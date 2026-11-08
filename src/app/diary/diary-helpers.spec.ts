@@ -10,6 +10,7 @@ import {
   isValidAmount,
   rebaseTo100,
   unitForName,
+  shouldRememberAsCustomFood,
   unitFactor,
   baseUnitOf,
   toBaseAmount,
@@ -330,5 +331,20 @@ describe('salt in fields', () => {
     expect(facts?.saltG).toBe(1.5);
     expect(fieldsFromFacts(facts!).saltG).toBe(1.5);
     expect(scaleFacts({ ...facts!, basis: 'per100g' }, 0.5).saltG).toBe(0.75);
+  });
+});
+
+describe('shouldRememberAsCustomFood (FDB-04)', () => {
+  it('merkt manuelle Eingaben als eigenes Lebensmittel', () => {
+    expect(shouldRememberAsCustomFood({ recipeId: undefined, baseUnit: undefined, isEstimate: false })).toBe(true);
+  });
+
+  it('merkt KI-Schätzungen nicht still als Lebensmittel', () => {
+    expect(shouldRememberAsCustomFood({ recipeId: undefined, baseUnit: undefined, isEstimate: true })).toBe(false);
+  });
+
+  it('merkt weder Rezepte noch gramm-basierte Datenbank-Treffer', () => {
+    expect(shouldRememberAsCustomFood({ recipeId: 'r1', baseUnit: undefined, isEstimate: false })).toBe(false);
+    expect(shouldRememberAsCustomFood({ recipeId: undefined, baseUnit: 'g', isEstimate: false })).toBe(false);
   });
 });

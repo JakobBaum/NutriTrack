@@ -263,3 +263,12 @@ export function inputTextFor(raw: string | undefined, value: number | null): str
   if (raw !== undefined && toNumberOrNull(raw) === value) return raw;
   return numberToInputText(value);
 }
+
+/** Ob ein gespeicherter Eintrag zusätzlich als eigenes Lebensmittel gemerkt wird (nie bei Rezept, g-Treffer oder KI-Schätzung). */
+export function shouldRememberAsCustomFood(opts: {
+  recipeId: string | null | undefined;
+  baseUnit: string | undefined;
+  isEstimate: boolean;
+}): boolean {
+  return !opts.recipeId && opts.baseUnit !== 'g' && !opts.isEstimate;
+}

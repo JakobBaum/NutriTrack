@@ -1,11 +1,11 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import { FoodItem, NutritionFacts } from '../models';
 import { makeId } from '../util/id';
 import { parseDecimal } from '../util/number-input';
 import { FoodProvider } from './food-provider';
-import { toFoodLookupError } from './food-errors';
+import { FOOD_TIMEOUT_MS, toFoodLookupError } from './food-errors';
 import { SettingsStore } from '../state/settings.store';
 import { environment } from '../../../environments/environment';
 import { DebugLogService } from '../debug/debug-log.service';
@@ -100,7 +100,7 @@ export class OpenFoodFactsProvider implements FoodProvider {
             fields: SEARCH_FIELDS,
             langs: LANGS,
           },
-        }),
+        }).pipe(timeout(FOOD_TIMEOUT_MS)),
       );
       const entries = (res.hits ?? []).flatMap((p): RankEntry[] => {
         const item = this.toFoodItem(p);
@@ -130,7 +130,7 @@ export class OpenFoodFactsProvider implements FoodProvider {
         this.http.get<ProductV3Response>(
           `${PRODUCT_V3_URL}/${encodeURIComponent(code)}.json`,
           { params: { fields: FIELDS } },
-        ),
+        ).pipe(timeout(FOOD_TIMEOUT_MS)),
       );
       if (!res.product || res.status === 'failure') return null;
       return this.toFoodItem(res.product);
@@ -145,6 +145,12 @@ export class OpenFoodFactsProvider implements FoodProvider {
   private num(v: number | string | undefined): number {
     const n = parseDecimal(v);
     return n !== null ? Math.max(0, n) : 0;
+  }
+
+  /** Optionaler Nährwert: undefined statt 0, wenn OFF ihn nicht liefert (kein erfundenes "0 g Salz"). */
+  private optionalNum(v: number | string | undefined): number | undefined {
+    const n = parseDecimal(v);
+    return n !== null ? Math.max(0, n) : undefined;
   }
 
   /** kcal je 100 g; fehlt der Wert, wird aus kJ umgerechnet. null = keine Naehrwerte (nie still 0 kcal). */
@@ -172,9 +178,9 @@ export class OpenFoodFactsProvider implements FoodProvider {
       proteinG: this.num(n['proteins_100g']),
       carbsG: this.num(n['carbohydrates_100g']),
       fatG: this.num(n['fat_100g']),
-      fiberG: this.num(n['fiber_100g']),
-      sugarG: this.num(n['sugars_100g']),
-      saltG: this.num(n['salt_100g']),
+      fiberG: this.optionalNum(n['fiber_100g']),
+      sugarG: this.optionalNum(n['sugars_100g']),
+      saltG: this.optionalNum(n['salt_100g']),
       basis: 'per100g',
     };
     return {

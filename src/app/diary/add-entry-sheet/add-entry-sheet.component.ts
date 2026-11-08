@@ -42,6 +42,7 @@ import {
   perServingFacts,
   rebaseTo100,
   scaleFacts,
+  shouldRememberAsCustomFood,
   toBaseAmount,
   toNumberOrNull,
   unitForName,
@@ -207,8 +208,12 @@ export class AddEntrySheetComponent implements OnChanges {
     if (changes['isOpen']?.currentValue === true) this.startEntry(this.meal());
   }
 
+  /** Sperrt „Eintragen“ nach dem ersten Klick (kein doppelter Eintrag durch Doppeltippen). */
+  private isSaving = false;
+
   /** Setzt Formular und Zustand für einen neuen Eintrag zurück. */
   private startEntry(meal: MealType): void {
+    this.isSaving = false;
     this.addDirty = false;
     this.kcalManual = false;
     this.form = { ...EMPTY_FORM, meal };
@@ -541,6 +546,8 @@ export class AddEntrySheetComponent implements OnChanges {
   }
 
   private addAndConfirm(inputs: NewDiaryEntry[]): void {
+    if (this.isSaving) return;
+    this.isSaving = true;
     lightHaptic();
     const added = inputs.map((input) => this.diary.add(input));
     this.closeAdd();
@@ -571,6 +578,7 @@ export class AddEntrySheetComponent implements OnChanges {
 
   // --- Speichern ---
   save(): void {
+    if (this.isSaving) return;
     const label = this.form.label.trim();
     if (!label) {
       this.error.set('Der Name fehlt — gib ein, was du gegessen hast.');
@@ -596,6 +604,7 @@ export class AddEntrySheetComponent implements OnChanges {
       return;
     }
 
+    this.isSaving = true;
     const isPortion = base?.unit === 'portion';
     const recipeId = this.pickedRecipeId;
     const entry = this.diary.add({
@@ -612,7 +621,8 @@ export class AddEntrySheetComponent implements OnChanges {
       isPartial: this.isPartialSource || undefined,
       unit: this.baseAmount ? this.amountUnit : undefined,
     });
-    if (!recipeId && base?.unit !== 'g') this.customFoods.save(label, facts);
+    const remember = shouldRememberAsCustomFood({ recipeId, baseUnit: base?.unit, isEstimate: this.isAiEstimate() });
+    if (remember) this.customFoods.save(label, facts);
 
     lightHaptic();
     this.closeAdd();

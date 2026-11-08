@@ -1,10 +1,10 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { MealType, NutritionFacts } from '../core/models';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { formatNum } from '../shared/num.pipe';
-import { dayLabel, toDateISO } from '../core/util/date';
+import { dayLabel, rollDate, toDateISO } from '../core/util/date';
 import { MEAL_DEFS, mealForHour, mealLabel } from '../diary/diary-helpers';
 
 interface MacroView {
@@ -60,8 +60,10 @@ export class DashboardPage {
   private readonly router = inject(Router);
 
   readonly selectedDate = signal(toDateISO());
+  /** Der Tag, den die Seite zuletzt als "heute" kannte (für den Tageswechsel). */
+  private readonly today = signal(toDateISO());
   readonly dateLabel = computed(() => dayLabel(this.selectedDate()));
-  readonly isToday = computed(() => this.selectedDate() === toDateISO());
+  readonly isToday = computed(() => this.selectedDate() === this.today());
 
   readonly hasProfile = this.profileStore.hasProfile;
   readonly target = this.profileStore.target;
@@ -161,6 +163,22 @@ export class DashboardPage {
 
   openDrill(key: string): void { this.drillMacro.set(key); }
   closeDrill(): void { this.drillMacro.set(null); }
+
+  /** Beim Betreten der Seite und beim Zurückkehren in die App: nach Mitternacht auf den neuen Tag springen. */
+  ionViewWillEnter(): void {
+    this.refreshToday();
+  }
+
+  @HostListener('document:visibilitychange')
+  onVisibilityChange(): void {
+    if (document.visibilityState === 'visible') this.refreshToday();
+  }
+
+  private refreshToday(): void {
+    const next = rollDate(this.selectedDate(), this.today(), toDateISO());
+    this.today.set(next.today);
+    this.selectedDate.set(next.selected);
+  }
 
   setDate(dateISO: string): void {
     this.selectedDate.set(dateISO);
