@@ -8,11 +8,11 @@ const base: WeekPlanRecipe = {
 };
 
 describe('recipeMetaLine', () => {
-  it('shows kcal, protein per serving, minutes and portions', () => {
+  it('shows kcal, Eiweiß per serving, minutes and portions', () => {
     const line = recipeMetaLine({
       ...base, readyInMinutes: 30, facts: { kcal: 420, proteinG: 37.6, carbsG: 1, fatG: 1, basis: 'perPortion' },
     });
-    expect(line).toBe('420 kcal · 38 g Protein · 30 Min · 2 Portionen');
+    expect(line).toBe('420 kcal · 38 g Eiweiß · 30 Min · 2 Portionen');
   });
 
   it('omits missing values and uses the singular', () => {

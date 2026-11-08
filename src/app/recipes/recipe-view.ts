@@ -136,7 +136,7 @@ export function importErrorMessage(e: unknown, isOffline = false): string {
   if (isOffline || /failed to fetch|networkerror|load failed|nicht erreichbar/i.test(raw)) {
     return 'Keine Verbindung zur KI — Internet und KI-Verbindung prüfen.';
   }
-  if (/\b503\b|überlastet/i.test(raw)) return 'Die KI ist gerade überlastet (503) — bitte in ein paar Sekunden erneut versuchen.';
-  if (/\b429\b|zu viele|rate/i.test(raw)) return 'Zu viele KI-Anfragen (429) — bitte kurz warten und erneut versuchen.';
+  if (/\b503\b|überlastet/i.test(raw)) return 'Die KI ist gerade überlastet — bitte in ein paar Sekunden erneut versuchen.';
+  if (/\b429\b|zu viele|rate/i.test(raw)) return 'Zu viele KI-Anfragen — bitte kurz warten und erneut versuchen.';
   return raw ? `Import fehlgeschlagen: ${raw}` : 'Import fehlgeschlagen, Grund unbekannt.';
 }

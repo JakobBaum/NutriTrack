@@ -15,10 +15,10 @@ function de(n: number): string {
   return String(n).replace('.', ',');
 }
 
-/** „320 kcal · 38 g Protein · 30 Min · 2 Portionen“ (fehlende Werte entfallen). */
+/** „320 kcal · 38 g Eiweiß · 30 Min · 2 Portionen“ (fehlende Werte entfallen). */
 export function recipeMetaLine(r: WeekPlanRecipe): string {
   const parts: string[] = [];
-  if (r.facts) parts.push(`${de(r.facts.kcal)} kcal`, `${de(Math.round(r.facts.proteinG))} g Protein`);
+  if (r.facts) parts.push(`${de(r.facts.kcal)} kcal`, `${de(Math.round(r.facts.proteinG))} g Eiweiß`);
   if (r.readyInMinutes) parts.push(`${r.readyInMinutes} Min`);
   parts.push(r.portions === 1 ? '1 Portion' : `${r.portions} Portionen`);
   return parts.join(' · ');

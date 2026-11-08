@@ -43,7 +43,7 @@ der Blick auf „Heute" zeigt sofort, was vom Tagesbedarf noch übrig ist.
   (Suche, Barcode, Etikett, Rezept oder gespeicherte Mahlzeit).
 - Kochen: Rezepte anlegen oder importieren, Portionen ins Tagebuch loggen.
 - Einkaufen: Liste aus Rezepten, Personen, Tagen und Budget erzeugen, im Laden abhaken.
-- Tabs heute: Heute, Tagebuch, Rezepte, Einkauf, Mahlzeiten, Profil.
+- Tabs (5): Heute, Tagebuch, Rezepte (Segment „Rezepte | Mahlzeiten“), Einkauf (Segment „Wochenplan | Liste“), Profil.
 
 ## Capabilities and Constraints
 
@@ -52,10 +52,21 @@ der Blick auf „Heute" zeigt sofort, was vom Tagesbedarf noch übrig ist.
 - Lebensmittel: Open Food Facts (Suche über Cloudflare-Worker-Proxy, Barcode direkt), Nährwerte
   je 100 g oder je Portion.
 - KI über Cloudflare-Worker zu Google Gemini (oder eigener Key „Gemini direkt"); rate-limitiert.
-- Speicherung: localStorage über `StorageService`; kein Backup/Export (Backlog Prio 1).
+- Speicherung: localStorage über `StorageService`; Backup-Export und -Import liegen im Profil.
 - Kein Medizinprodukt: keine Therapie- oder Diagnose-Aussagen.
 - Offen: App-Store-Veröffentlichung, Konten/Cloud-Sync (würde Art. 9 DSGVO auslösen),
   Gemini-Billing vor Fremdnutzung.
+
+## Glossar (Sprache der Oberfläche)
+
+| Begriff | Bedeutung | Nicht verwenden für |
+|---|---|---|
+| Essenszeit | Frühstück, Mittag, Abend, Snack (Gruppe im Tagebuch) | gespeicherte Vorlagen |
+| Mahlzeit | gespeicherte Vorlage aus Lebensmitteln und Rezepten (Segment „Mahlzeiten“ unter Rezepte) | Frühstück, Mittag usw. |
+| Eintrag | eine Zeile im Tagebuch | |
+| Eiweiß | immer so, nie „Protein“ (Abkürzung „E“ nur in Tagebuchzeilen, mit Legende) | |
+| eintragen | einziges Verb für das Tagebuch („In Frühstück eintragen“, „Noch nichts eingetragen“) | erfassen, hinzufügen (hinzufügen bleibt für Einkaufsliste, Zutaten und Schritte) |
+| Wochenplan | Rezeptvorschläge für mehrere Tage im Einkauf-Tab | „Rezepte“ als Segmentname im Einkauf |
 
 ## Brand Commitments
 

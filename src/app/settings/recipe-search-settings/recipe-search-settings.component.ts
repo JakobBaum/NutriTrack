@@ -63,7 +63,7 @@ export class RecipeSearchSettingsComponent {
 
   /** Prüft den eingegebenen Key (auch ungespeichert) mit einer 1-Treffer-Anfrage ohne Zusatzdaten. */
   async testConnection(): Promise<void> {
-    this.test.set({ busy: true, ok: null, message: 'Prüfe Verbindung …' });
+    this.test.set({ busy: true, ok: null, message: 'Prüfe Verbindung…' });
     try {
       const left = await this.provider.ping({ apiKey: this.apiKey() });
       const quota = left === null ? '' : ` Noch ${left} Punkte heute.`;

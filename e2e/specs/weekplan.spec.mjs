@@ -8,10 +8,13 @@ const RESULTS_PER_TYPE = 12;
 
 const typeSeed = (type) => [...String(type)].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) * 100;
 
+// Spoonacular liefert englische Originaltitel; der Mock nutzt neutrale Titel ohne Nummern-Suffix.
+const MOCK_TITLES = ['Red Lentil Dal', 'Chicken Quinoa Bowl', 'Tofu Stir Fry', 'Greek Yogurt Pancakes', 'Baked Salmon with Greens', 'Chickpea Curry'];
+
 function mockRecipe(id, type) {
   return {
     id,
-    title: `Mock ${type} ${id}`,
+    title: MOCK_TITLES[id % MOCK_TITLES.length],
     image: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=',
     readyInMinutes: 25,
     servings: 2,
@@ -50,7 +53,7 @@ async function mockSpoonacular(page) {
 }
 
 async function openRecipes(page) {
-  await page.locator('ion-segment-button', { hasText: 'Rezepte' }).first().click();
+  await page.locator('ion-segment-button', { hasText: 'Wochenplan' }).first().click();
   await settle(page);
 }
 
@@ -79,7 +82,7 @@ export function register({ test }) {
     assert.equal(new Set(plan.recipes.map((r) => r.id)).size, plan.recipes.length, 'doppelte Rezepte im Plan');
     const cards = page.locator('.wp-card');
     assert.equal(await cards.count(), plan.recipes.length);
-    assert.match(await cards.first().innerText(), /38 g Protein/);
+    assert.match(await cards.first().innerText(), /38 g Eiweiß/);
   });
 
   test('weekplan: alle Zutaten landen in der Liste, Ansicht bleibt bei Rezepten', SEEDED(), async (page) => {
@@ -105,7 +108,7 @@ export function register({ test }) {
     const detail = page.locator('[data-testid="wp-detail"]');
     await detail.waitFor();
     const title = (await detail.locator('.wp-detail__title').innerText()).trim();
-    assert.match(await detail.innerText(), /Protein/);
+    assert.match(await detail.innerText(), /Eiweiß/);
 
     await detail.locator('.wp-fav').click();
     await settle(page);

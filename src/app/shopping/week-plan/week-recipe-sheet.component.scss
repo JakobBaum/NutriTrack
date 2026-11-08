@@ -18,7 +18,7 @@ ion-content {
   > div { padding: var(--nt-space-2) var(--nt-space-3); background: var(--nt-card); border-radius: 12px; min-width: 0; }
   dt { font-size: 12px; color: var(--nt-secondary); }
   dd { margin: 0; font-weight: 600; color: var(--nt-ink); font-variant-numeric: tabular-nums; }
-  &__main dd { color: var(--nt-accent); }
+  &__main dd { color: var(--nt-protein); }
 }
 
 .wp-note { margin: var(--nt-space-2) 0 0; font-size: var(--nt-fs-caption); color: var(--nt-secondary); }

@@ -215,7 +215,7 @@ export class MealsListComponent implements OnDestroy {
   // --- Use saved meal → add to diary ---
   async useMeal(meal: SavedMeal): Promise<void> {
     const sheet = await this.actionSheets.create({
-      header: `„${meal.name}" als welche Mahlzeit?`,
+      header: `„${meal.name}" als welche Essenszeit eintragen?`,
       buttons: [
         ...this.mealOptions.map((m) => ({ text: m.label, data: m.value })),
         { text: 'Abbrechen', role: 'cancel' },

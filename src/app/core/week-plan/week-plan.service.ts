@@ -10,7 +10,7 @@ import { makeId } from '../util/id';
 import { WeekPlanDraft, buildWeekPlanRecipes } from './week-plan-builder';
 import { WeekPlan } from './week-plan.model';
 
-export const NO_RECIPES_FOUND_MESSAGE = 'Keine passenden Rezepte gefunden. Versuche es später oder mit weniger Mahlzeiten.';
+export const NO_RECIPES_FOUND_MESSAGE = 'Keine passenden Rezepte gefunden. Versuche es später oder mit weniger Essenszeiten.';
 
 export interface WeekPlanOptions {
   persons: number;

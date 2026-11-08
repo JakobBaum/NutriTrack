@@ -114,7 +114,7 @@ export function register({ test }) {
     await go(page, 'dashboard');
     await page.locator('.row__btn', { hasText: 'Fastfood-Helfer' }).click();
     const modal = topModal(page);
-    await modal.locator('ion-title', { hasText: 'Fastfood-Helfer' }).waitFor();
+    await modal.locator('.nt-sheet-header__title', { hasText: 'Fastfood-Helfer' }).waitFor();
     assert.ok(!page.url().includes('/diary'), 'Fastfood-Helfer darf nicht zum Tagebuch navigieren');
     await modal.locator('ion-button', { hasText: 'Abbrechen' }).click();
     await settle(page);

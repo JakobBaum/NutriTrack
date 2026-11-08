@@ -97,7 +97,7 @@ function mealNotices(meal: MealType, days: number, found: MealSearch): string[] 
   const notices: string[] = [];
   if (found.relaxed) {
     const detail = found.usedMinProtein === null ? 'ohne Mindestwert' : `mind. ${found.usedMinProtein} g`;
-    notices.push(`${label}: weniger Protein als Ziel (${detail}).`);
+    notices.push(`${label}: weniger Eiweiß als Ziel (${detail}).`);
   }
   if (found.picked.length < days) {
     notices.push(`${label}: nur ${found.picked.length} von ${days} Rezepten gefunden.`);

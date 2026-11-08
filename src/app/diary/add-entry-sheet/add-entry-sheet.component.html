@@ -3,19 +3,19 @@
   <ng-template>
     <div class="sheet-grabber" aria-hidden="true"></div>
     <ion-header class="ion-no-border sheet-header">
-      <ion-toolbar>
-        @if (view() !== 'search') {
-          <ion-buttons slot="start">
-            <ion-button (click)="backToSearch()" aria-label="Zurück zur Suche">
+      <div class="nt-sheet-header">
+        <div class="nt-sheet-header__start">
+          @if (view() !== 'search') {
+            <ion-button fill="clear" (click)="backToSearch()" aria-label="Zurück zur Suche">
               <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
             </ion-button>
-          </ion-buttons>
-        }
-        <ion-title role="heading" aria-level="2">{{ modalTitle() }}</ion-title>
-        <ion-buttons slot="end">
-          <ion-button (click)="requestCloseAdd()">Abbrechen</ion-button>
-        </ion-buttons>
-      </ion-toolbar>
+          }
+        </div>
+        <h2 class="nt-sheet-header__title" role="heading" aria-level="2">{{ modalTitle() }}</h2>
+        <div class="nt-sheet-header__end">
+          <ion-button fill="clear" (click)="requestCloseAdd()">Abbrechen</ion-button>
+        </div>
+      </div>
     </ion-header>
 
     <ion-content class="sheet-content">
@@ -23,7 +23,7 @@
         <p class="form-error" role="alert">{{ error() }}</p>
       }
 
-      <div class="meal-picker" role="radiogroup" aria-label="Mahlzeit">
+      <div class="meal-picker" role="radiogroup" aria-label="Essenszeit">
         @for (opt of mealOptions; track opt.value) {
           <button type="button" class="meal-chip" role="radio" [attr.aria-checked]="form.meal === opt.value" [class.meal-chip--on]="form.meal === opt.value" [attr.aria-label]="opt.label" (click)="form.meal = opt.value">{{ opt.short }}</button>
         }

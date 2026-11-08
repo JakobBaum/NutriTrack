@@ -306,7 +306,7 @@ export class SettingsPage implements OnInit {
 
   /** Prüft den aktiven Weg der gespeicherten Konfiguration ohne KI-Kosten. */
   async testAi(): Promise<void> {
-    this.aiTest.set({ busy: true, ok: null, message: 'Prüfe Verbindung …' });
+    this.aiTest.set({ busy: true, ok: null, message: 'Prüfe Verbindung…' });
     const result = await this.aiService.testConnection();
     this.aiTest.set({ busy: false, ok: result.ok, message: result.message });
   }

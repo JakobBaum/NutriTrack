@@ -20,7 +20,7 @@
       <div class="head__text">
         <h1 class="nt-large-title">{{ isToday() ? 'Heute' : 'Rückblick' }}</h1>
       </div>
-      <button type="button" class="nt-pill head__add" (click)="openAddForNow()" [attr.aria-label]="'Zu ' + currentMealLabel() + ' hinzufügen'">
+      <button type="button" class="nt-pill head__add" (click)="openAddForNow()" [attr.aria-label]="'In ' + currentMealLabel() + ' eintragen'">
         <ion-icon name="add" aria-hidden="true"></ion-icon>
         Eintragen
       </button>
@@ -92,8 +92,8 @@
       </button>
     </ng-template>
 
-    <!-- Mahlzeiten -->
-    <h2 class="nt-section-header">Mahlzeiten</h2>
+    <!-- Essenszeiten -->
+    <h2 class="nt-section-header">Essenszeiten</h2>
     <ul class="nt-grouped">
       @for (meal of meals(); track meal.type) {
         <li class="row" [class.row--empty]="meal.count === 0">
@@ -146,16 +146,17 @@
   <ng-template>
     @if (drillData(); as drill) {
       <ion-header class="ion-no-border">
-        <ion-toolbar>
-          <ion-title role="heading" aria-level="2">
+        <div class="nt-sheet-header">
+          <div class="nt-sheet-header__start"></div>
+          <h2 class="nt-sheet-header__title" role="heading" aria-level="2">
             <span class="drill-title__dot" [style.background]="drill.color"></span>
             <span class="drill-title">{{ drill.label }}</span>
             <span class="drill-title__total"> — {{ drill.total | ntNum }} {{ drill.unit }}</span>
-          </ion-title>
-          <ion-buttons slot="end">
-            <ion-button (click)="closeDrill()">Schließen</ion-button>
-          </ion-buttons>
-        </ion-toolbar>
+          </h2>
+          <div class="nt-sheet-header__end">
+            <ion-button fill="clear" (click)="closeDrill()">Schließen</ion-button>
+          </div>
+        </div>
       </ion-header>
       <ion-content class="drill-content">
         @if (drill.items.length === 0) {

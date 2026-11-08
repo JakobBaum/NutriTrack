@@ -11,7 +11,7 @@
   </div>
   <div class="nt-page view-switch">
     <ion-segment [value]="view()" (ionChange)="onViewChange($any($event).detail.value)" aria-label="Ansicht wählen">
-      <ion-segment-button value="recipes" class="view-segment__btn"><ion-label>Rezepte</ion-label></ion-segment-button>
+      <ion-segment-button value="recipes" class="view-segment__btn"><ion-label>Wochenplan</ion-label></ion-segment-button>
       <ion-segment-button value="list" class="view-segment__btn"><ion-label>Liste</ion-label></ion-segment-button>
     </ion-segment>
   </div>
@@ -38,7 +38,7 @@
       <ion-card class="generator">
         <ion-card-content>
           @if (weekPlan() === null) {
-            <p class="generator__intro" role="status">Noch kein Wochenplan. Die App sucht gesunde High-Protein-Rezepte, zeigt sie hier mit Anleitung und legt alle Zutaten in die Einkaufsliste.</p>
+            <p class="generator__intro" role="status">Noch kein Wochenplan. Die App sucht gesunde eiweißreiche Rezepte, zeigt sie hier mit Anleitung und legt alle Zutaten in die Einkaufsliste.</p>
           }
           @if (!onlineAvailable()) {
             <p class="generator__mode" role="note">
@@ -66,7 +66,7 @@
           </div>
 
           <div class="generator__meals" role="group" aria-labelledby="meals-label">
-            <span class="generator__sub" id="meals-label">Mahlzeiten</span>
+            <span class="generator__sub" id="meals-label">Essenszeiten</span>
             <div class="chips">
               @for (m of mealToggles(); track m.value) {
                 <button

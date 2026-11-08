@@ -648,7 +648,7 @@ export class RecipesPage implements OnDestroy {
    */
   async logToDiary(recipe: Recipe): Promise<void> {
     const sheet = await this.actionSheets.create({
-      header: 'Als welche Mahlzeit eintragen?',
+      header: 'Als welche Essenszeit eintragen?',
       buttons: [
         ...this.mealOptions.map((m) => ({ text: m.label, data: m.value })),
         { text: 'Abbrechen', role: 'cancel' },

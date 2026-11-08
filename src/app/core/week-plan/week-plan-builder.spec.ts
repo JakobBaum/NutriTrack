@@ -87,7 +87,7 @@ describe('buildWeekPlanRecipes', () => {
 
     expect(recipes).toHaveLength(3);
     expect(calls.map((c) => c.filters.minProtein)).toEqual([45, 23, null]);
-    expect(notices).toEqual(['Abend: weniger Protein als Ziel (ohne Mindestwert).']);
+    expect(notices).toEqual(['Abend: weniger Eiweiß als Ziel (ohne Mindestwert).']);
   });
 
   it('stops relaxing as soon as enough recipes are found', async () => {
@@ -96,7 +96,7 @@ describe('buildWeekPlanRecipes', () => {
     const { notices } = await buildWeekPlanRecipes(search, input({ meals: ['dinner'] }), () => 0);
 
     expect(calls).toHaveLength(2);
-    expect(notices).toEqual(['Abend: weniger Protein als Ziel (mind. 23 g).']);
+    expect(notices).toEqual(['Abend: weniger Eiweiß als Ziel (mind. 23 g).']);
   });
 
   it('plans with what exists and notes the shortage', async () => {
