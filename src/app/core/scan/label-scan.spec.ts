@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { parseNutritionLabel } from '../core/scan/nutrition-label-parser';
-import { downscaleFactor } from '../core/scan/label-image';
+import { parseNutritionLabel } from './nutrition-label-parser';
+import { downscaleFactor } from './label-image';
 import { LABEL_FAILED_MESSAGE, LABEL_READ_HINT, blankFieldsFor, evaluateLabelParse } from './label-scan';
 
 describe('evaluateLabelParse', () => {

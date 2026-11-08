@@ -1,0 +1,59 @@
+<ion-modal [isOpen]="open()" cssClass="barcode-fullscreen-modal" (willPresent)="onWillPresent()" (didPresent)="onPresent()" (didDismiss)="onDismiss()">
+  <ng-template>
+    <div class="bc-fullscreen">
+      <video id="ntBarcodeVideo" #barcodeVideo class="bc-video" muted autoplay playsinline></video>
+
+      <div class="bc-overlay">
+        @if (!noCamera()) { <div class="bc-frame"></div> }
+        @if (looking()) {
+          <p class="bc-status" role="status">Produkt wird gesucht…</p>
+        } @else if (!noCamera()) {
+          <p class="bc-status" role="status">Barcode in den Rahmen halten</p>
+        }
+        @if (error()) {
+          <p class="bc-error" role="alert">{{ error() }}</p>
+        }
+      </div>
+
+      <ion-fab vertical="top" horizontal="end" slot="fixed" class="bc-close-fab">
+        <ion-fab-button size="small" color="dark" (click)="closed.emit()" aria-label="Scanner schließen">
+          <ion-icon name="close"></ion-icon>
+        </ion-fab-button>
+      </ion-fab>
+
+      @if (!noCamera()) {
+        <div class="bc-manual-btn-wrap">
+          <ion-button fill="solid" color="dark" size="small" (click)="toggleManual()">
+            <ion-icon slot="start" name="create-outline"></ion-icon>
+            Code eintippen
+          </ion-button>
+        </div>
+      }
+
+      @if (manualOpen()) {
+        <div class="bc-manual-panel">
+          <ion-list inset="true">
+            <ion-item lines="none">
+              <ion-input
+                label="Barcode"
+                labelPlacement="stacked"
+                inputmode="numeric"
+                enterkeyhint="search"
+                [(ngModel)]="manualCode"
+                (keyup.enter)="submitManual()"
+                placeholder="z. B. 4000417025005"
+              ></ion-input>
+            </ion-item>
+          </ion-list>
+          <ion-button expand="block" (click)="submitManual()" [disabled]="looking()">
+            @if (looking()) {
+              <ion-spinner name="dots" slot="start"></ion-spinner> Suche…
+            } @else {
+              <ion-icon slot="start" name="search-outline"></ion-icon> Nachschlagen
+            }
+          </ion-button>
+        </div>
+      }
+    </div>
+  </ng-template>
+</ion-modal>

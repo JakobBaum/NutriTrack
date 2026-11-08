@@ -1,6 +1,6 @@
 // Onboarding/Profil, Einkaufsliste (Enter), Dashboard (Summen + Über-Ziel-Zustand).
 import { assert, eventually, go, readStore, settle } from '../lib/harness.mjs';
-import { pickActionSheet, stepTo, topModal } from '../lib/ionic.mjs';
+import { ionInput, pickActionSheet, stepTo, topModal } from '../lib/ionic.mjs';
 import { DIARY_NORMAL, DIARY_OVER, SHOPPING, seed } from '../lib/fixtures.mjs';
 
 const sumKcal = (entries) => entries.reduce((s, e) => s + e.facts.kcal, 0);
@@ -20,7 +20,7 @@ export function register({ test }) {
     // ?setup=1 öffnet den Bedarfs-Berechner automatisch
     await page.waitForURL(/settings\?setup=1/);
     const modal = topModal(page);
-    await modal.locator('ion-title', { hasText: 'Mein Profil' }).waitFor();
+    await modal.locator('.nt-sheet-header__title', { hasText: 'Mein Profil' }).waitFor();
     await stepTo(modal, 'Gewicht', { start: 75, step: 0.5, target: 72.5 });
     await stepTo(modal, 'Größe', { start: 175, step: 1, target: 175 });
     await stepTo(modal, 'Alter', { start: 30, step: 1, target: 28 });
@@ -43,11 +43,12 @@ export function register({ test }) {
 
   test('shopping: Artikel mit Enter hinzufügen', seed({ shopping: SHOPPING }), async (page) => {
     await go(page, 'shopping');
-    // Eingabeleiste ist hinter dem schwebenden "+"-Button verborgen
+    // "+" öffnet das Bottom Sheet
     await page.locator('ion-fab.add-fab ion-fab-button').click();
-    const name = page.locator('ion-input.add-name input');
+    await page.locator('ion-modal.add-sheet').waitFor({ state: 'visible' });
+    const name = page.locator('ion-modal.add-sheet ion-input.add-name input');
     await name.fill('Hafermilch');
-    await page.locator('ion-input.add-amount input').fill('1,5');
+    await page.locator('ion-modal.add-sheet ion-input.add-amount input').fill('1,5');
     await name.press('Enter');
     await settle(page);
     const list = await readStore(page, 'shopping');
@@ -56,6 +57,7 @@ export function register({ test }) {
     assert.equal(item.amount, 1.5);
     await eventually(async () => assert.equal(await page.locator('.check-row__name', { hasText: 'Hafermilch' }).count(), 1));
     assert.equal(await name.inputValue(), '', 'Eingabefeld sollte geleert werden');
+    assert.ok(await page.locator('ion-modal.add-sheet').isVisible(), 'Sheet bleibt für den nächsten Artikel offen');
     // zweites Enter mit leerem Feld darf nichts anlegen
     await name.press('Enter');
     await settle(page, 300);
@@ -83,7 +85,39 @@ export function register({ test }) {
     await page.locator('section.hero.hero--over').waitFor();
     assert.match(await page.locator('.hero__unit').innerText(), /kcal über Ziel/);
     assert.equal(toInt(await page.locator('.hero__big').innerText()), eaten - target);
+    assert.match(await page.locator('.row__btn', { hasText: 'Fastfood-Helfer' }).innerText(), /Ziel überschritten/, 'Fastfood-Zeile soll Überschreitung nennen');
     const label = await page.locator('.hero__main').getAttribute('aria-label');
     assert.match(label ?? '', /über/i, 'aria-label sollte Über-Ziel nennen');
+  });
+
+  test('dashboard: Mahlzeit trägt direkt auf Heute ein', seed({ diary: DIARY_NORMAL }), async (page) => {
+    await go(page, 'dashboard');
+    const eatenText = () => page.locator('.hero__meta div', { hasText: 'gegessen' }).innerText();
+    const before = toInt(await eatenText());
+    await page.locator('.row__btn', { hasText: 'Mittagessen' }).click();
+    const modal = topModal(page);
+    await modal.locator('.nt-source-btn', { hasText: 'Manuell' }).click();
+    await ionInput(modal, 'Name').waitFor();
+    await ionInput(modal, 'Name').fill('Testbrot');
+    await ionInput(modal, 'Kalorien (kcal)').fill('250');
+    await modal.locator('.add-footer__save').click();
+    await settle(page);
+
+    assert.ok(!page.url().includes('/diary'), 'Heute-Seite darf nicht zum Tagebuch wechseln');
+    const stored = (await readStore(page, 'diary')).find((e) => e.label === 'Testbrot');
+    assert.ok(stored, 'Eintrag nicht gespeichert');
+    assert.equal(stored.meal, 'lunch');
+    await eventually(async () => assert.equal(toInt(await eatenText()), before + 250));
+  });
+
+  test('dashboard: Fastfood-Helfer öffnet als Sheet auf Heute', seed({ diary: DIARY_NORMAL }), async (page) => {
+    await go(page, 'dashboard');
+    await page.locator('.row__btn', { hasText: 'Fastfood-Helfer' }).click();
+    const modal = topModal(page);
+    await modal.locator('ion-title', { hasText: 'Fastfood-Helfer' }).waitFor();
+    assert.ok(!page.url().includes('/diary'), 'Fastfood-Helfer darf nicht zum Tagebuch navigieren');
+    await modal.locator('ion-button', { hasText: 'Abbrechen' }).click();
+    await settle(page);
+    await page.locator('.hero').waitFor();
   });
 }

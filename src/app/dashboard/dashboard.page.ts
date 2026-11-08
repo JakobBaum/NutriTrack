@@ -15,8 +15,6 @@ interface MacroView {
   track: string;
   eaten: number;
   target: number;
-  /** Anteil über dem Ziel, ab dem die Warnfarbe greift (kcal: 0, Makros: 10 %). */
-  warnAbove: number;
   /** Überschreitung in Einheiten (0, solange das Ziel nicht überschritten ist). */
   overBy: number;
 }
@@ -44,8 +42,6 @@ interface MealView {
   kcal: number;
   count: number;
 }
-
-const MACRO_WARN_ABOVE = 0.1;
 
 /**
  * Tages-Dashboard ("Heute"): Kalorien-Hero + sechs Nährwertringe + Mahlzeiten.
@@ -94,7 +90,6 @@ export class DashboardPage {
       key: MacroView['key'], label: string, unit: string, color: string, eaten: number, target: number,
     ): MacroView => ({
       key, label, unit, color, track: 'var(--nt-track)', eaten, target,
-      warnAbove: key === 'kcal' ? 0 : MACRO_WARN_ABOVE,
       overBy: Math.max(0, eaten - target),
     });
     return [
@@ -119,6 +114,11 @@ export class DashboardPage {
   /** True, solange am gewählten Tag nichts eingetragen ist. */
   readonly isEmptyDay = computed(() => this.diary.entriesForDate(this.selectedDate()).length === 0);
 
+  /** Eintragen-Sheet und Fastfood-Helfer werden auf dieser Seite geöffnet. */
+  readonly addOpen = signal(false);
+  readonly addMeal = signal<MealType>('breakfast');
+  readonly ffOpen = signal(false);
+
   readonly drillMacro = signal<string | null>(null);
 
   readonly drillData = computed<DrillData | null>(() => {
@@ -131,7 +131,7 @@ export class DashboardPage {
     const label = key === 'kcal' ? 'Kalorien' : (this.macros().find(m => m.key === key)?.label ?? key);
     const unit = key === 'kcal' ? 'kcal' : 'g';
     const macro = this.macros().find(m => m.key === key);
-    const over = !!macro && macro.target > 0 && macro.eaten > macro.target * (1 + macro.warnAbove);
+    const over = !!macro && macro.overBy > 0;
     const items = entries
       .map(e => ({ label: e.label, value: this.factValue(e.facts, key) }))
       .filter(d => d.value > 0)
@@ -170,15 +170,10 @@ export class DashboardPage {
     void this.router.navigate(['/settings'], { queryParams: { setup: '1' } });
   }
 
-  openDiary(meal?: MealType): void {
-    if (!meal) {
-      void this.router.navigate(['/diary']);
-      return;
-    }
-    const date = this.selectedDate();
-    const queryParams: Record<string, string> = { meal };
-    if (date !== toDateISO()) queryParams['date'] = date;
-    void this.router.navigate(['/diary'], { queryParams });
+  /** Eintragen-Sheet für eine Mahlzeit, auf dem gewählten Tag (bleibt auf „Heute“). */
+  openAdd(meal: MealType): void {
+    this.addMeal.set(meal);
+    this.addOpen.set(true);
   }
 
   /** Text unter der Mahlzeit, z.B. "2 Einträge". */
@@ -195,16 +190,13 @@ export class DashboardPage {
     return mealLabel(this.currentMeal());
   }
 
-  /** FAB: öffnet im Tagebuch direkt das Add-Modal für die passende Mahlzeit. */
+  /** FAB / „Eintragen“: Sheet für die Mahlzeit zur aktuellen Uhrzeit. */
   openAddForNow(): void {
-    const date = this.selectedDate();
-    const queryParams: Record<string, string> = { add: this.currentMeal() };
-    if (date !== toDateISO()) queryParams['date'] = date;
-    void this.router.navigate(['/diary'], { queryParams });
+    this.openAdd(this.currentMeal());
   }
 
-  /** Öffnet den Fastfood-Helfer im Tagebuch (einzige Implementierung). */
+  /** Öffnet den Fastfood-Helfer als Sheet (bleibt auf „Heute“). */
   openFastfood(): void {
-    void this.router.navigate(['/diary'], { queryParams: { fastfood: '1' } });
+    this.ffOpen.set(true);
   }
 }

@@ -20,6 +20,9 @@ import { DebugLogService } from '../debug/debug-log.service';
 import { friendlyAiErrorMessage } from './ai-errors';
 import { normalizeRecipeImport } from './recipe-import-normalize';
 
+const PING_FN = 'ping';
+const UNKNOWN_FUNCTION_PATTERN = /^Unbekannte Funktion/;
+
 /**
  * KI-Anbieter über den **internen Proxy** (Cloudflare-Worker `worker.js`).
  *
@@ -74,4 +77,29 @@ export class ProxyAiProvider implements AiProvider {
     const raw = await this.call<unknown>('importRecipe', input);
     return normalizeRecipeImport(raw, input.url);
   }
+
+  /**
+   * Erreichbarkeitstest ohne KI-Kosten. `ping` ist keine gültige Funktion: Der Worker
+   * antwortet mit 400 „Unbekannte Funktion“, bevor Rate-Limit oder Gemini ausgelöst werden.
+   * Diese Antwort zählt als erreichbar (auch bei einem älteren Worker ohne neue Routen).
+   */
+  async ping(): Promise<void> {
+    const url = this.settings.ai().proxyUrl?.trim();
+    if (!url) throw new Error('Keine KI-Proxy-URL konfiguriert.');
+    try {
+      await firstValueFrom(
+        this.http.post(url, { fn: PING_FN, payload: {} }, { headers: { 'content-type': 'application/json' } }),
+      );
+    } catch (err: unknown) {
+      if (isUnknownFunctionResponse(err)) return;
+      const status = err instanceof HttpErrorResponse ? err.status : 0;
+      throw new Error(friendlyAiErrorMessage(status));
+    }
+  }
+}
+
+function isUnknownFunctionResponse(err: unknown): boolean {
+  if (!(err instanceof HttpErrorResponse) || err.status !== 400) return false;
+  const detail: unknown = err.error?.error;
+  return typeof detail === 'string' && UNKNOWN_FUNCTION_PATTERN.test(detail);
 }

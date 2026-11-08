@@ -1,0 +1,22 @@
+// Schnellwahl-Chips in der Mengenzeile: eine Zeile, gleich breit
+.quick-amounts {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--nt-space-2);
+  margin-top: var(--nt-space-3);
+}
+
+.quick-chip {
+  min-height: var(--nt-touch);
+  min-width: 0;
+  padding-inline: var(--nt-space-1);
+  flex-direction: column;
+  line-height: 1.1;
+
+  small {
+    display: block;
+    font-size: 11px;
+    font-weight: 400;
+  }
+}

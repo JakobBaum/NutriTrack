@@ -1,4 +1,5 @@
 import { AiConfig } from '../core/models';
+import { resolveAiRoutes } from '../core/ai/ai-route';
 
 export type AiConnection = 'none' | 'server' | 'ownKey';
 
@@ -9,17 +10,18 @@ export const KNOWN_MODELS: readonly { value: string; label: string }[] = [
   { value: 'gemini-3.8-pro', label: 'gemini-3.8-pro (gründlicher)' },
 ];
 
-/** Welche Verbindung tatsächlich aktiv ist (Server hat Vorrang vor eigenem Schlüssel). */
-export function aiConnection(cfg: Pick<AiConfig, 'proxyUrl' | 'apiKey'>): AiConnection {
-  if (cfg.proxyUrl?.trim()) return 'server';
-  if (cfg.apiKey?.trim()) return 'ownKey';
+/** Aktiver Weg: eigener Schlüssel (Gemini direkt) vor KI-Server; sonst nicht verbunden. */
+export function aiConnection(cfg: Partial<Pick<AiConfig, 'provider' | 'proxyUrl' | 'apiKey'>>): AiConnection {
+  const [route] = resolveAiRoutes(cfg);
+  if (route === 'ownKey') return 'ownKey';
+  if (route === 'proxy') return 'server';
   return 'none';
 }
 
 export function aiStatusLabel(connection: AiConnection): string {
   switch (connection) {
-    case 'server': return 'Aktiv (KI-Server)';
-    case 'ownKey': return 'Aktiv (eigener Schlüssel)';
+    case 'ownKey': return 'Aktiv: eigener Schlüssel (Gemini direkt)';
+    case 'server': return 'Aktiv: KI-Server (Worker)';
     default: return 'Nicht verbunden';
   }
 }

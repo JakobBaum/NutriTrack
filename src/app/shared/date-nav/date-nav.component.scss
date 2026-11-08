@@ -1,5 +1,7 @@
+// Datumsleiste: eigene Zeile, Pfeile und Datum in einer Reihe, Ziele mindestens 44 px.
 :host {
   display: block;
+  margin-top: var(--nt-space-3);
 }
 
 .date-nav {
@@ -7,7 +9,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--nt-space-1);
-  padding: 0 var(--nt-space-3);
+  padding: 0;
 
   &__step,
   &__label {
@@ -49,8 +51,4 @@
       color: var(--nt-accent);
     }
   }
-}
-
-.nt-date-modal {
-  --height: auto;
 }

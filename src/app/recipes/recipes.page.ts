@@ -1,9 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  ElementRef,
   OnDestroy,
-  ViewChild,
   computed,
   effect,
   inject,
@@ -14,16 +12,13 @@ import { UNIT_OPTIONS } from '../core/util/units';
 import { formatDecimal, parseDecimal } from '../core/util/number-input';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
-import type { IScannerControls } from '@zxing/browser';
 import { ActionSheetController, AlertController } from '@ionic/angular';
 import { hasIncompleteFacts } from '../core/nutrition/units-weight';
-import { QUICK_UNITS, importBlockReason, importErrorMessage, moreUnits, unitChips } from './recipe-view';
+import { importBlockReason, importErrorMessage } from './recipe-view';
 import { confirmDiscard } from '../meals/confirm-discard';
-import { FoodItem, MealType, NutritionFacts, Recipe, RecipeIngredient } from '../core/models';
+import { MealType, NutritionFacts, Recipe, RecipeIngredient } from '../core/models';
 import { AiService } from '../core/ai/ai.service';
-import { FOOD_PROVIDER } from '../core/food/food-provider';
-import { foodErrorMessage } from '../core/food/food-errors';
-import { BarcodeScannerService } from '../core/scan/barcode-scanner.service';
+import { FoodSourceResult } from '../shared/food-sources/food-sources.component';
 import { CameraService } from '../core/scan/camera.service';
 import { DiaryStore } from '../core/state/diary.store';
 import { RecipeDraft, RecipeStore } from '../core/state/recipe.store';
@@ -99,8 +94,6 @@ const MEAL_OPTIONS: { value: MealType; label: string }[] = [
 export class RecipesPage implements OnDestroy {
   private readonly store = inject(RecipeStore);
   private readonly diary = inject(DiaryStore);
-  private readonly food = inject(FOOD_PROVIDER);
-  private readonly barcode = inject(BarcodeScannerService);
   private readonly camera = inject(CameraService);
   private readonly actionSheets = inject(ActionSheetController);
   private readonly ai = inject(AiService);
@@ -145,8 +138,6 @@ export class RecipesPage implements OnDestroy {
     void this.router.navigate(['/settings']);
   }
 
-  @ViewChild('ingBarcodeVideo') barcodeVideo?: ElementRef<HTMLVideoElement>;
-
   /** Rezepte ohne das gerade zum Löschen vorgemerkte. */
   readonly recipes = computed(() => this.store.recipes().filter((r) => r.id !== this.deletion.pendingId()));
   readonly approxUnits = APPROX_UNITS;
@@ -156,7 +147,6 @@ export class RecipesPage implements OnDestroy {
   readonly lowerBoundPrefix = lowerBoundPrefix;
   readonly lowerBoundNote = lowerBoundNote;
   readonly optionalGramsLabel = optionalGramsLabel;
-  readonly quickUnits = QUICK_UNITS;
   readonly servingsLabel = servingsLabel;
   readonly recipeFacts = recipeDisplayFacts;
 
@@ -176,25 +166,19 @@ export class RecipesPage implements OnDestroy {
     ing.unit = unit;
   }
 
-  /** Chips einer Zutat: Schnell-Einheiten plus ihre aktuelle Einheit. */
-  chipsFor(ing: IngredientForm): string[] {
-    return unitChips(ing.unit, this.quickUnits);
+  private readonly rawAmounts = new WeakMap<IngredientForm, string>();
+
+  /** Anzeigetext der Menge: Roh-Eingabe behalten, solange sie zum Wert passt ("2," bleibt stehen). */
+  amountText(ing: IngredientForm): string {
+    const raw = this.rawAmounts.get(ing);
+    return raw !== undefined && parseDecimal(raw) === ing.amount ? raw : formatDecimal(ing.amount);
   }
 
-  /** „weitere“: restliche Einheiten im Action-Sheet (eine Einheiten-Steuerung je Zutat). */
-  async pickMoreUnit(ing: IngredientForm): Promise<void> {
-    const sheet = await this.actionSheets.create({
-      header: 'Einheit wählen',
-      buttons: [
-        ...moreUnits(this.unitOptions, this.quickUnits).map((u) => ({ text: u, data: u })),
-        { text: 'Abbrechen', role: 'cancel' },
-      ],
-    });
-    await sheet.present();
-    const { data, role } = await sheet.onDidDismiss<string>();
-    if (role === 'cancel' || !data) return;
-    this.setUnit(ing, data);
+  setAmountText(ing: IngredientForm, text: string): void {
+    this.rawAmounts.set(ing, text);
+    ing.amount = parseDecimal(text);
   }
+
   readonly parseDecimal = parseDecimal;
   readonly formatDecimal = formatDecimal;
 
@@ -219,12 +203,8 @@ export class RecipesPage implements OnDestroy {
     return confirmDiscard(this.alerts);
   };
 
-  // --- Zutaten-Picker (Suche + Barcode) ---
+  // --- Zutaten-Picker (nt-food-sources) ---
   readonly pickerOpen = signal(false);
-  pickerQuery = '';
-  readonly pickerResults = signal<FoodItem[]>([]);
-  readonly pickerSearching = signal(false);
-  readonly pickerError = signal<string | null>(null);
 
   /** Nimmt ein Rezept-Foto (native Kamera) auf und importiert es via KI. */
   async importFromCamera(): Promise<void> {
@@ -295,14 +275,6 @@ export class RecipesPage implements OnDestroy {
     });
   }
 
-  // --- Barcode-Scanner im Picker (Vollbild) ---
-  readonly bcOpen = signal(false);
-  readonly bcError = signal<string | null>(null);
-  readonly bcLooking = signal(false);
-  readonly bcManualOpen = signal(false);
-  manualBarcode = '';
-  private scanControls?: IScannerControls;
-
   constructor() {
     effect(() => {
       const requested = this.queryParams()?.get('view');
@@ -311,7 +283,6 @@ export class RecipesPage implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.stopScanner();
     this.deletion.flush();
   }
 
@@ -584,9 +555,6 @@ export class RecipesPage implements OnDestroy {
 
   // --- Zutaten-Picker ---
   openPicker(): void {
-    this.pickerQuery = '';
-    this.pickerResults.set([]);
-    this.pickerError.set(null);
     this.pickerOpen.set(true);
   }
 
@@ -594,97 +562,16 @@ export class RecipesPage implements OnDestroy {
     this.pickerOpen.set(false);
   }
 
-  async searchFood(): Promise<void> {
-    const q = this.pickerQuery.trim();
-    if (!q) return;
-    this.pickerError.set(null);
-    this.pickerSearching.set(true);
-    try {
-      this.pickerResults.set(await this.food.searchByText(q));
-      if (this.pickerResults().length === 0) this.pickerError.set('Keine Treffer gefunden.');
-    } catch (e: unknown) {
-      this.pickerError.set(foodErrorMessage(e));
-    } finally {
-      this.pickerSearching.set(false);
-    }
-  }
-
   /** Übernimmt einen Food-Treffer als Zutat (Standardmenge = Portion oder 100 g). */
-  pickFood(item: FoodItem): void {
-    const amount = item.servingG && item.servingG > 0 ? Math.round(item.servingG) : 100;
+  pickSource(res: FoodSourceResult): void {
+    const amount = res.servingG && res.servingG > 0 ? Math.round(res.servingG) : 100;
+    const name = res.name.trim() || 'Zutat';
     this.form.ingredients = [
       ...this.form.ingredients,
-      { name: item.name, amount, unit: 'g', facts: item.facts, foodItemId: item.id },
+      { name, amount, unit: 'g', facts: res.facts, foodItemId: res.foodItemId },
     ];
     this.closePicker();
-    this.toastMessage.set(`„${item.name}" als Zutat hinzugefügt.`);
-  }
-
-  // --- Barcode im Picker ---
-  openBarcode(): void {
-    this.manualBarcode = '';
-    this.bcError.set(null);
-    this.bcLooking.set(false);
-    this.bcManualOpen.set(false);
-    this.bcOpen.set(true);
-  }
-
-  closeBarcode(): void {
-    this.bcOpen.set(false);
-  }
-
-  toggleBcManual(): void {
-    this.bcManualOpen.update((v) => !v);
-  }
-
-  async onBarcodePresent(): Promise<void> {
-    const video =
-      this.barcodeVideo?.nativeElement ??
-      (document.querySelector('video#ingBarcodeVideo') as HTMLVideoElement | null);
-    if (!video || !this.barcode.isSupported()) return;
-    try {
-      this.scanControls = await this.barcode.start(
-        video,
-        (code) => this.lookupBarcode(code),
-        () => this.bcError.set('Kamerazugriff fehlgeschlagen — Code manuell eingeben.'),
-      );
-    } catch {
-      this.bcError.set('Kamera nicht verfügbar — Code manuell eingeben.');
-    }
-  }
-
-  onBarcodeDismiss(): void {
-    this.stopScanner();
-  }
-
-  private stopScanner(): void {
-    this.scanControls?.stop();
-    this.scanControls = undefined;
-  }
-
-  submitManualBarcode(): void {
-    const code = this.manualBarcode.trim();
-    if (code) this.lookupBarcode(code);
-  }
-
-  private async lookupBarcode(code: string): Promise<void> {
-    if (this.bcLooking()) return;
-    this.stopScanner();
-    this.bcError.set(null);
-    this.bcLooking.set(true);
-    try {
-      const item = await this.food.lookupByBarcode(code);
-      if (!item) {
-        this.bcError.set(`Kein Produkt zu Barcode ${code} gefunden.`);
-        return;
-      }
-      this.closeBarcode();
-      this.pickFood(item);
-    } catch (e: unknown) {
-      this.bcError.set(foodErrorMessage(e));
-    } finally {
-      this.bcLooking.set(false);
-    }
+    this.toastMessage.set(`„${name}" als Zutat hinzugefügt.`);
   }
 
   setFact(ing: IngredientForm, key: 'kcal' | 'proteinG' | 'carbsG' | 'fatG' | 'fiberG' | 'sugarG', value: unknown): void {

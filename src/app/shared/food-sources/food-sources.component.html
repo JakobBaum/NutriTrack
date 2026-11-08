@@ -1,0 +1,19 @@
+<nt-food-search [placeholder]="placeholder()" (picked)="onPicked($event)" (manualEntry)="onManual()">
+  <div class="nt-sources" role="group" aria-label="Quellen">
+    <button type="button" class="nt-source-btn" (click)="openBarcode()">
+      <ion-icon name="barcode-outline" aria-hidden="true"></ion-icon> <span>Barcode</span>
+    </button>
+    <button type="button" class="nt-source-btn" (click)="startLabelScan(labelInput)" [disabled]="scanning()">
+      @if (scanning()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="image-outline" aria-hidden="true"></ion-icon> }
+      <span>Etikett</span>
+    </button>
+    <ng-content></ng-content>
+    <button type="button" class="nt-source-btn" (click)="onManual()">
+      <ion-icon name="create-outline" aria-hidden="true"></ion-icon> <span>Manuell</span>
+    </button>
+  </div>
+  <input #labelInput type="file" accept="image/*" capture="environment" hidden (change)="onLabelFile($event)" />
+  @if (error(); as message) { <p class="nt-source-error" role="alert">{{ message }}</p> }
+</nt-food-search>
+
+<nt-barcode-scanner [open]="barcodeOpen()" (found)="onBarcode($event)" (closed)="barcodeOpen.set(false)"></nt-barcode-scanner>

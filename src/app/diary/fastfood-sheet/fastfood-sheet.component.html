@@ -1,0 +1,54 @@
+<!-- Fastfood-Helfer modal (einzige Implementierung; Dashboard verlinkt hierher) -->
+<ion-modal [isOpen]="isOpen()" (didDismiss)="closeFastfood()">
+  <ng-template>
+    <div class="sheet-grabber" aria-hidden="true"></div>
+    <ion-header class="ion-no-border sheet-header">
+      <ion-toolbar>
+        <ion-title role="heading" aria-level="2">Fastfood-Helfer</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="closeFastfood()">Abbrechen</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="sheet-content">
+      @if (targetKcal() > 0) {
+        <p class="ff-remaining"><strong>{{ remainingKcal() | ntNum:0 }} kcal</strong> übrig</p>
+      }
+      <p class="scan-hint">Sag, wohin du gehst und was du ausgeben willst — du bekommst Vorschläge, die in dein Budget passen.</p>
+      @if (error()) {
+        <p class="form-error" role="alert">{{ error() }}</p>
+      }
+      <app-fastfood-form [form]="ff" [live]="ffLive()" [remainingKcal]="targetKcal() > 0 ? remainingKcal() : null" (formChange)="ff = $event" (connectAi)="closeFastfood()"></app-fastfood-form>
+      <ion-button expand="block" class="sheet-action" (click)="runFastfood()" [disabled]="ffLoading() || !ffLive()">
+        @if (ffLoading()) {
+          <ion-spinner name="dots" slot="start"></ion-spinner> Suche…
+        } @else {
+          <ion-icon slot="start" name="sparkles-outline"></ion-icon> Vorschläge holen
+        }
+      </ion-button>
+
+      @if (ffSearched() && !ffLoading() && ffResults().length === 0) {
+        <p class="scan-hint" role="status">Keine Vorschläge im Budget. Budget erhöhen oder später erneut versuchen.</p>
+      }
+
+      @for (s of ffResults(); track s.itemName) {
+        <ion-card class="ff-card">
+          <ion-card-header>
+            <span class="ai-badge">KI-Schätzung</span>
+            <ion-card-title>{{ s.itemName }}</ion-card-title>
+            <ion-card-subtitle>
+              {{ s.facts.kcal | ntNum:0 }} kcal · {{ s.facts.proteinG | ntNum }} g Eiweiß
+              @if (s.estPrice !== undefined) { · ≈ {{ s.estPrice | ntNum:2:2 }} € }
+            </ion-card-subtitle>
+          </ion-card-header>
+          <ion-card-content>
+            <p>{{ s.rationale }}</p>
+            <ion-button size="small" fill="clear" class="touch-btn touch-btn--text" (click)="logFastfood(s)">
+              <ion-icon slot="start" name="add-circle-outline"></ion-icon> Eintragen
+            </ion-button>
+          </ion-card-content>
+        </ion-card>
+      }
+    </ion-content>
+  </ng-template>
+</ion-modal>

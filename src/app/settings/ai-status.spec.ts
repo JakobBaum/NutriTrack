@@ -4,12 +4,13 @@ import { aiConnection, aiStatusLabel, modelOptions } from './ai-status';
 describe('ai-status', () => {
   it('is none without server and key', () => {
     expect(aiConnection({})).toBe('none');
-    expect(aiConnection({ proxyUrl: '  ', apiKey: ' ' })).toBe('none');
+    expect(aiConnection({ provider: 'gemini', proxyUrl: '  ', apiKey: ' ' })).toBe('none');
   });
 
-  it('prefers the server over an own key', () => {
-    expect(aiConnection({ proxyUrl: 'https://x', apiKey: 'k' })).toBe('server');
-    expect(aiConnection({ apiKey: 'k' })).toBe('ownKey');
+  it('prefers an own key over the server', () => {
+    expect(aiConnection({ provider: 'gemini', proxyUrl: 'https://x', apiKey: 'k' })).toBe('ownKey');
+    expect(aiConnection({ provider: 'gemini', proxyUrl: 'https://x' })).toBe('server');
+    expect(aiConnection({ provider: 'gemini', apiKey: 'k' })).toBe('ownKey');
   });
 
   it('labels each state', () => {

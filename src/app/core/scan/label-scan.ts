@@ -1,6 +1,6 @@
-import { NutritionFacts } from '../core/models';
-import { LabelOcrService } from '../core/scan/label-ocr.service';
-import { LabelField, ParsedNutritionLabel, parseNutritionLabel } from '../core/scan/nutrition-label-parser';
+import { NutritionFacts } from '../models';
+import { LabelOcrService } from './label-ocr.service';
+import { LabelField, ParsedNutritionLabel, parseNutritionLabel } from './nutrition-label-parser';
 
 /** Mindestens so viele der drei Makros (Fett, Kohlenhydrate, Eiweiß) müssen gelesen sein. */
 const MIN_MACROS = 2;

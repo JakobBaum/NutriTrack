@@ -1,9 +1,11 @@
-<div class="amount">
-  <span class="amount__label" [id]="labelId">{{ label }}</span>
+<div class="amount" [class.amount--compact]="compact">
+  <span class="amount__label" [class.amount__label--hidden]="compact" [id]="labelId">{{ label }}</span>
   <div class="amount__row">
+    @if (showSteppers) {
     <button type="button" class="amount__step" (click)="stepped.emit(-1)" [attr.aria-label]="label + ' verringern'">
       <ion-icon name="remove-outline" aria-hidden="true"></ion-icon>
     </button>
+    }
     <div class="amount__field">
       <ion-input
         #field
@@ -24,9 +26,11 @@
         <span class="amount__suffix">{{ suffix }}</span>
       }
     </div>
+    @if (showSteppers) {
     <button type="button" class="amount__step" (click)="stepped.emit(1)" [attr.aria-label]="label + ' erhöhen'">
       <ion-icon name="add-outline" aria-hidden="true"></ion-icon>
     </button>
+    }
   </div>
   <ng-content></ng-content>
 </div>

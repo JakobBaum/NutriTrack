@@ -47,7 +47,7 @@
     <section class="nt-card macros" [class.macros--empty]="isEmptyDay()" aria-label="Nährwerte">
       @for (m of macros(); track m.key) {
         <button type="button" class="macros__col" [attr.aria-label]="m.label + ' ' + (m.eaten | ntNum) + ' von ' + (m.target | ntNum) + ' ' + m.unit + (m.overBy > 0 ? ', ' + (m.overBy | ntNum) + ' ' + m.unit + ' über Ziel' : '') + ', Details anzeigen'" (click)="openDrill(m.key)">
-          <app-progress-ring [value]="m.eaten" [max]="m.target" [color]="m.color" [warnAbove]="m.warnAbove" [track]="m.track" [size]="68" [stroke]="6">
+          <app-progress-ring [value]="m.eaten" [max]="m.target" [color]="m.color" [track]="m.track" [size]="68" [stroke]="6">
             <span class="macros__num">{{ m.eaten | ntNum }}</span>
           </app-progress-ring>
           <span class="macros__text">
@@ -69,7 +69,7 @@
     <ul class="nt-grouped">
       @for (meal of meals(); track meal.type) {
         <li class="row" [class.row--empty]="meal.count === 0">
-          <button type="button" class="row__btn" (click)="openDiary(meal.type)">
+          <button type="button" class="row__btn" (click)="openAdd(meal.type)">
             <ion-icon [name]="meal.icon" class="row__icon" aria-hidden="true"></ion-icon>
             <span class="row__stack">
               <span class="row__label">{{ meal.label }}</span>
@@ -93,7 +93,7 @@
           <span class="row__stack">
             <span class="row__label">Fastfood-Helfer</span>
             <span class="row__sub">
-              @if (kcalOverBy() > 0) { Ziel erreicht } @else { {{ kcalRemaining() | ntNum:0 }} kcal übrig — was passt? }
+              @if (kcalOverBy() > 0) { Ziel überschritten } @else { {{ kcalRemaining() | ntNum:0 }} kcal übrig — was passt? }
             </span>
           </span>
           <ion-icon name="chevron-forward-outline" class="nt-grouped__chevron" aria-hidden="true"></ion-icon>
@@ -103,6 +103,10 @@
    </div>
   }
 </ion-content>
+
+<!-- Eintragen-Sheet und Fastfood-Helfer: bleiben auf „Heute“ (gleiche Komponenten wie im Tagebuch) -->
+<app-add-entry-sheet [isOpen]="addOpen()" [meal]="addMeal()" [date]="selectedDate()" (closed)="addOpen.set(false)"></app-add-entry-sheet>
+<app-fastfood-sheet [isOpen]="ffOpen()" [date]="selectedDate()" [targetKcal]="kcalTarget()" [remainingKcal]="kcalRemaining()" (closed)="ffOpen.set(false)"></app-fastfood-sheet>
 
 <!-- Makro-Drill-Down Bottom Sheet -->
 <ion-modal

@@ -1,52 +1,44 @@
-ion-header ion-toolbar.view-bar {
-  --background: var(--nt-ground);
-  --padding-start: var(--nt-space-4);
-  --padding-end: var(--nt-space-4);
-  --border-width: 0;
-}
+// Rezepte-Seite. Rand, Kopf, Felder und Sheet-Kopf kommen aus der globalen Grundlage (global.scss).
 
-.page-head {
-  padding: calc(var(--nt-space-4) + env(safe-area-inset-top, 0px)) var(--nt-space-5) var(--nt-space-2);
-  background: var(--nt-ground);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--nt-space-3);
-}
+%hint { font-size: 12px; color: var(--nt-muted); }
+%row { display: flex; align-items: center; gap: 6px; }
+%center { display: inline-flex; align-items: center; justify-content: center; }
+%tap-44 { min-width: var(--nt-touch); min-height: var(--nt-touch); }
+%note { margin: var(--nt-space-2) 0 0; font-size: var(--nt-fs-caption); color: var(--nt-secondary); }
 
-ion-segment {
-  min-height: 44px;
-}
+$footer-clearance: calc(var(--nt-touch) + var(--nt-space-6) + var(--nt-space-4) + env(safe-area-inset-bottom, 0px));
 
-ion-segment-button {
-  min-height: 44px;
-}
+ion-header ion-toolbar.view-bar { --background: var(--nt-ground); --border-width: 0; max-width: var(--nt-page-max); margin: 0 auto; }
+ion-modal ion-buttons ion-button, .touch-btn { min-height: var(--nt-touch); }
+ion-content { --background: var(--nt-ground); --padding-top: var(--nt-space-2); }
 
-ion-content {
-  --background: var(--nt-ground);
-  --padding-start: 0;
-  --padding-end: 0;
-  --padding-top: var(--nt-space-2);
-}
-
-// Modal-Inhalt: seitlicher Rand (schlägt das globale ion-content-Padding 0)
 ion-modal ion-content {
-  --padding-start: var(--nt-space-4);
-  --padding-end: var(--nt-space-4);
+  --padding-start: var(--nt-page-gutter);
+  --padding-end: var(--nt-page-gutter);
+  --padding-top: var(--nt-space-2);
+  --padding-bottom: var(--nt-space-4);
 }
 
-// Modals: Felder als inset gruppierte Karten
-ion-modal ion-list[inset='true'] {
-  margin: 0 0 var(--nt-space-2);
-  border-radius: var(--nt-radius-card);
-  background: var(--nt-card);
-  overflow: hidden;
+
+.page-head__actions { @extend %row; flex: none; }
+
+.page-head__import {
+  @extend %row;
+  height: var(--nt-touch);
+  padding: 0 var(--nt-space-3);
+  background: transparent;
+  border: 0;
+  color: var(--nt-accent);
+  font-size: var(--nt-fs-body);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-ion-modal ion-item {
-  --background: var(--nt-card);
-  --min-height: 44px;
-  --inner-border-color: var(--nt-separator);
+// 320 px: Import nur als Icon, damit "Neu" nicht abgeschnitten wird
+@media (max-width: 359px) {
+  .page-head__import-label { display: none; }
+  .page-head__import { justify-content: center; width: var(--nt-touch); padding: 0; }
 }
 
 .empty {
@@ -56,658 +48,184 @@ ion-modal ion-item {
   text-align: center;
   gap: 8px;
   padding: 40px 20px;
-
-  &__title {
-    margin: 0;
-    font-size: var(--nt-fs-headline);
-    color: var(--nt-ink);
-  }
-
-  &__icon {
-    font-size: 48px;
-    color: var(--ion-color-step-400);
-  }
-
-  p {
-    margin: 0;
-    color: var(--nt-muted);
-  }
+  &__title { margin: 0; font-size: var(--nt-fs-headline); color: var(--nt-ink); }
+  &__icon { font-size: 48px; color: var(--ion-color-step-400); }
+  p { margin: 0; color: var(--nt-muted); }
 }
 
 .recipe {
-  margin: 0 var(--nt-space-4) var(--nt-space-3);
+  margin: 0 0 var(--nt-space-3);
   padding: var(--nt-space-4);
 
-  &__title {
-    margin: 0;
-    font-size: var(--nt-fs-headline);
-    font-weight: 600;
-    color: var(--nt-ink);
-  }
-
-  &__head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--nt-space-2);
-  }
-
-  &__head-text {
-    min-width: 0;
-    flex: 1;
-  }
+  &__title { margin: 0; font-size: var(--nt-fs-headline); font-weight: 600; color: var(--nt-ink); }
+  &__title-btn { padding: 0; background: none; border: 0; font: inherit; color: inherit; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+  &__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--nt-space-2); }
+  &__head-text { min-width: 0; flex: 1; }
+  &__meta { @extend %note; margin-top: var(--nt-space-2); }
+  &__missing { @extend %note; @extend %row; gap: 4px; margin-top: var(--nt-space-1); }
 
   &__kcal {
     margin: var(--nt-space-3) 0 0;
     font-size: var(--nt-fs-body);
     color: var(--nt-secondary);
-
-    strong {
-      font-size: 34px;
-      line-height: 1.1;
-      font-weight: 700;
-      color: var(--nt-kcal);
-      font-variant-numeric: tabular-nums;
-      margin-inline-end: 2px;
-    }
+    strong { font-size: 34px; line-height: 1.1; font-weight: 700; color: var(--nt-kcal); font-variant-numeric: tabular-nums; }
   }
 
-  // Makros: drei gleich breite Spalten, volle Wörter, brechen nie um
   &__macros {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     gap: var(--nt-space-2);
     margin: var(--nt-space-3) 0 0;
-
-    > div {
-      min-width: 0;
-      padding: var(--nt-space-2) var(--nt-space-3);
-      background: var(--nt-ground);
-      border-radius: 12px;
-    }
-
-    dt {
-      font-size: 12px;
-      color: var(--nt-secondary);
-      white-space: nowrap;
-    }
-
-    dd {
-      margin: 2px 0 0;
-      font-size: var(--nt-fs-body);
-      font-weight: 600;
-      font-variant-numeric: tabular-nums;
-      color: var(--nt-ink);
-    }
+    > div { min-width: 0; padding: var(--nt-space-2) var(--nt-space-3); background: var(--nt-ground); border-radius: 12px; }
+    dt { font-size: 12px; color: var(--nt-secondary); }
+    dd { margin: 2px 0 0; font-size: var(--nt-fs-body); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--nt-ink); }
   }
 
-  &__meta {
-    margin: var(--nt-space-2) 0 0;
-    font-size: var(--nt-fs-caption);
-    color: var(--nt-secondary);
-  }
-
-  &__missing {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    margin: var(--nt-space-1) 0 0;
-    font-size: var(--nt-fs-caption);
-    color: var(--nt-secondary);
-  }
-
+  // Eine Button-Familie fuer Karte und Detail-Footer: gleiche Hoehe, gleiche Form
   &__actions {
     display: flex;
-    flex-wrap: nowrap;
+
     align-items: center;
     gap: var(--nt-space-2);
     margin-top: var(--nt-space-3);
+    ion-button.recipe__btn {
+      flex: 1 1 0;
+      height: var(--nt-touch);
 
-    ion-button {
-      height: 44px;
       margin: 0;
+      --border-radius: var(--nt-radius-pill);
+      --background: var(--nt-accent);
+      --color: var(--nt-on-accent);
+      --box-shadow: none;
+      font-weight: 600;
     }
-
-    .recipe__btn:first-child {
-      flex: 1;
-    }
-  }
-
-  &__edit {
-    --color: var(--nt-accent);
-    margin-inline-start: auto !important;
-  }
-
-  &__btn {
-    --border-radius: var(--nt-radius-pill);
-    --background: var(--nt-accent);
-    --color: var(--nt-on-accent);
-    --box-shadow: none;
-    font-weight: 600;
-
-    &--tint,
-    .recipe__actions &--tint {
-      --background: var(--nt-accent-tint) !important;
-      --color: var(--nt-accent) !important;
-    }
+    ion-button.recipe__btn--tint { --background: var(--nt-accent-tint); --color: var(--nt-accent); }
   }
 
   &__icon-btn {
-    min-width: 44px;
-    --border-radius: var(--nt-radius-pill);
-
+    @extend %tap-44;
     margin: calc(-1 * var(--nt-space-2)) calc(-1 * var(--nt-space-2)) 0 0;
     flex: none;
+    --border-radius: var(--nt-radius-pill);
     --color: var(--nt-secondary);
-
-    // Löschen mit Abstand zum Bearbeiten (Fehltipp-Schutz)
-    &--delete {
-      margin-inline-start: var(--nt-space-6, 24px) !important;
-    }
   }
 }
 
-.form-error {
-  margin: 0 0 8px;
-  font-weight: 600;
-}
+.form-error { margin: 0 0 var(--nt-space-2); font-weight: 600; }
+.field-label { display: block; margin: var(--nt-space-5) var(--nt-space-1) 6px; font-size: var(--nt-fs-caption); font-weight: 400; }
 
-// Abschnitts-Label: globale .nt-section-header, hier nur kompakter Abstand im Sheet
-.field-label {
-  display: block;
-  margin: var(--nt-space-5) var(--nt-space-1) 6px;
-  font-size: var(--nt-fs-caption);
-  font-weight: 400;
-}
+// Zutat: Name oben, darunter "Menge | Einheit" und Naehrwert-Toggle
+.ing { display: flex; flex-direction: column; gap: var(--nt-space-2); min-width: 0; padding: var(--nt-space-3) 0; }
+.ing-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--nt-space-2); }
+.ing-amount { display: block; flex: none; max-width: 200px; }
 
-// Gestrichelte Aktions-Buttons: "Rezept importieren", "+ Zutat/Schritt hinzufügen"
-.page-head__actions {
-  display: flex;
-  align-items: center;
-  gap: var(--nt-space-2);
-  flex: none;
-}
-
-.page-head__import {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 44px;
-  padding: 0 var(--nt-space-3);
-  background: transparent;
-  border: 0;
-  border-radius: var(--nt-radius-pill);
-  color: var(--nt-accent);
-  font-size: var(--nt-fs-body);
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-
-  ion-icon {
-    font-size: 20px;
-  }
-}
-
-.dashed-add {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  min-height: 44px;
-  padding: 14px;
-  margin: var(--nt-space-2) 0 4px;
-  background: var(--nt-accent-tint);
-  border: 0;
-  border-radius: var(--nt-radius-pill);
-  color: var(--nt-accent);
-  font-size: var(--nt-fs-body);
-  font-weight: 600;
-  cursor: pointer;
-
-  ion-icon {
-    font-size: 18px;
-  }
-
-}
-
-// Editierbarer Zutatname (ersetzt die frühere read-only Überschrift)
-.ing-name {
-  font-weight: 700;
-  --padding-start: 0;
-  --padding-top: 2px;
-  --padding-bottom: 0;
-  min-height: 24px;
-}
-
-.link-add {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin: 4px 6px 0;
-  background: transparent;
-  border: 0;
-  color: var(--nt-muted);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-// Menge/Einheit rechts in der Zutatenzeile
-.ing-qty {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 128px;
-
-  ion-input {
-    --padding-start: 6px;
-    --padding-end: 6px;
-    text-align: right;
-    font-weight: 600;
-    border: 1px solid var(--nt-border);
-    border-radius: 6px;
-    min-width: 56px;
-  }
-
-  &__unit {
-    min-width: 64px;
-    max-width: 80px;
-    --padding-start: 6px;
-    --padding-end: 4px;
-    color: var(--nt-muted);
-    font-weight: 600;
-    font-size: 13px;
-    border: 1px solid var(--nt-border);
-    border-radius: 6px;
-  }
-}
-
-// Live-Nährwertkarte
-.nutri-card {
-  margin: var(--nt-space-4) 0 var(--nt-space-1);
-  padding: var(--nt-space-4);
-  background: var(--nt-card);
-  border-radius: var(--nt-radius-card);
-
-  &__head {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 10px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--nt-muted);
-
-    h2 {
-      margin: 0;
-      font: inherit;
-      letter-spacing: inherit;
-    }
-  }
-
-  &__total {
-    color: var(--nt-text-accent);
-  }
-
-  &__note {
-    margin: 10px 0 0;
-    font-size: 13px;
-    color: var(--nt-muted);
-  }
-}
-
-.nutri-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1px;
-  background: var(--nt-border);
-  border-radius: var(--nt-radius-sm);
-  overflow: hidden;
-
-  &__cell {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    padding: 14px 8px;
-    background: var(--nt-surface-2);
-
-    strong {
-      font-size: 18px;
-      font-weight: 700;
-    }
-
-    span {
-      font-size: 12px;
-      color: var(--nt-muted);
-    }
-  }
-}
-
-.unit-chip--more {
-  background: transparent;
-  border: 1px dashed var(--nt-accent);
-}
-
-.ai-needed {
-  margin: 8px 0 12px;
-  font-size: 13px;
-  color: var(--ion-color-medium);
-
-  p { margin: 0 0 4px; }
-}
-
-.block-reason {
-  text-align: center;
-}
-
-.servings-stepper {
-  display: block;
-  margin: 4px 16px 0;
-}
-
-.two-col {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-// Zubereitungsschritt mit Nummer
-.step-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin: 6px 2px;
-
-  &__no {
-    flex: 0 0 auto;
-    width: 26px;
-    height: 26px;
-    margin-top: 10px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--nt-border);
-    border-radius: 50%;
-    font-size: 13px;
-    color: var(--nt-muted);
-  }
-
-  ion-textarea {
-    flex: 1;
-    --background: var(--nt-surface-2);
-    --padding-start: 12px;
-    --padding-end: 12px;
-    border-radius: var(--nt-radius-sm);
-  }
-}
-
-.save-btn {
-  margin-top: 20px;
-}
-
-.save-error {
-  margin: 8px 0 0;
-  padding: 10px 14px;
-  background: rgba(var(--ion-color-danger-rgb), 0.1);
-  border-radius: var(--nt-radius-sm);
-  font-size: 14px;
-}
-
-.auto-weight-hint {
-  margin: 4px 8px 0;
-  font-size: 12px;
-  color: var(--nt-muted);
-}
-
-.weight-detail {
-  margin: 0 8px;
-  font-size: 12px;
-  color: var(--nt-muted);
-
-  summary {
-    display: flex;
-    align-items: center;
-    min-height: 44px;
-    cursor: pointer;
-  }
-
-  p {
-    margin: 0 0 8px;
-  }
-}
-
-.scan-hint {
-  margin: 8px 12px 0;
-  font-size: 12px;
-  color: var(--nt-muted);
-}
-
-.tiktok-hint {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 6px 4px 4px;
-  font-size: 12px;
-  color: var(--nt-muted);
-
-  ion-icon {
-    font-size: 16px;
-    flex-shrink: 0;
-  }
-}
-
-.content-spacer {
-  height: 80px;
-}
-
-/* --- Zutat-Nährwerte: Toggle + Detailpanel (Item A) --- */
 .ing-facts-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 2px;
+  @extend %row;
+  min-height: var(--nt-touch);
   padding: 0;
   background: none;
   border: none;
   font-size: 12px;
   color: var(--nt-muted);
   cursor: pointer;
-
-  &--missing {
-    color: #9a5b00;
-    font-weight: 600;
-  }
-
-  ion-icon {
-    font-size: 14px;
-  }
+  &--missing { color: #9a5b00; font-weight: 600; }
+  ion-icon { font-size: 14px; }
 }
+
+.unit-warn { @extend %row; gap: 4px; font-size: 12px; color: #9a5b00; }
 
 .ing-detail {
   margin: 0 12px 10px;
   padding: 12px;
   border-radius: var(--nt-radius);
   background: var(--nt-surface-2);
-
   &__grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 8px 6px;
-
-    div {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    strong {
-      font-size: 15px;
-    }
-
-    span {
-      font-size: 11px;
-      color: var(--nt-muted);
-    }
+    div { display: flex; flex-direction: column; align-items: center; }
+    strong { font-size: 15px; }
+    span { font-size: 11px; color: var(--nt-muted); }
   }
-
-  &__note {
-    margin: 10px 0 6px;
-    font-size: 11px;
-    color: var(--nt-muted);
-  }
-
-  &__hint {
-    display: flex;
-    gap: 6px;
-    align-items: flex-start;
-    margin: 0 0 10px;
-    font-size: 13px;
-    color: var(--nt-muted);
-
-    ion-icon {
-      font-size: 18px;
-      flex-shrink: 0;
-      color: #9a5b00;
-    }
-  }
-
-  &__inputs {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 6px 10px;
-    margin-top: 10px;
-
-    label {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      font-size: 12px;
-      color: var(--nt-muted);
-    }
-
-    ion-input {
-      --padding-start: 8px;
-      --padding-end: 8px;
-      max-width: 90px;
-      text-align: right;
-      border: 1px solid var(--nt-border);
-      border-radius: 8px;
-    }
-  }
+  &__note { @extend %hint; margin: 10px 0 6px; font-size: 11px; }
+  &__hint { @extend %hint; @extend %row; align-items: flex-start; margin: 0 0 10px; font-size: 13px; ion-icon { font-size: 18px; flex-shrink: 0; color: #9a5b00; } }
+  &__inputs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 }
 
-// Touch-Ziele >= 44px
-ion-modal ion-buttons ion-button {
-  min-height: 44px;
-  min-width: 44px;
-}
-
-.cook__close {
-  min-width: 44px;
-  min-height: 44px;
-}
-
-.link-add {
-  min-height: 44px;
-}
-
-.recipe__title-btn {
-  padding: 0;
-  background: none;
-  border: 0;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-// Footer außerhalb des Scrollbereichs: nie abgeschnitten
-.save-footer {
-  ion-toolbar {
-    --background: var(--nt-ground);
-    --padding-start: var(--nt-space-4);
-    --padding-end: var(--nt-space-4);
-    --padding-bottom: calc(var(--nt-space-3) + env(safe-area-inset-bottom, 0px));
-    --padding-top: var(--nt-space-2);
-  }
-
-  .save-btn {
-    margin: 0;
-  }
-
-  .save-error {
-    margin: 0 0 var(--nt-space-2);
-  }
-}
-
-// 1-Tipp-Einheiten
-.unit-chips {
+.ing-field {
+  @extend %hint;
   display: flex;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: none;
+  flex-direction: column;
   gap: 4px;
-  margin-top: 4px;
+
 }
 
-.unit-chip {
-  flex: none;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0 10px;
-  background: var(--nt-accent-tint);
-  border: 0;
-  border-radius: var(--nt-radius-pill);
-  color: var(--nt-accent);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-
-  &--on {
-    background: var(--nt-accent);
-    color: var(--nt-on-accent);
-  }
+// Feld mit Einheit rechts ("g")
+.unit-field {
+  position: relative;
+  ion-input { --padding-end: 40px; }
+  &__suffix { position: absolute; right: var(--nt-space-4); top: 50%; transform: translateY(-50%); color: var(--nt-secondary); pointer-events: none; }
 }
 
-.unit-warn {
+.step-row {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  margin: 4px 0 0;
-  font-size: 12px;
-  color: #9a5b00;
-  white-space: normal;
+  align-items: flex-start;
+  gap: var(--nt-space-2);
+  margin: 6px 0;
+  &__no { @extend %center; flex: 0 0 26px; width: 26px; height: 26px; margin-top: 16px; border: 1px solid var(--nt-separator); border-radius: 50%; font-size: 13px; color: var(--nt-muted); }
+  ion-textarea { flex: 1; min-width: 0; }
+  &__remove { @extend %center; @extend %tap-44; flex: 0 0 var(--nt-touch); background: none; border: 0; color: var(--nt-muted); font-size: 22px; }
 }
 
-.detail-list,
-.detail-steps {
-  margin: 0;
-  padding: 0 0 0 var(--nt-space-4);
-  color: var(--nt-ink);
-}
-
-.detail-list {
-  padding: 0;
-  list-style: none;
-
-  li {
-    display: flex;
-    justify-content: space-between;
-    gap: var(--nt-space-3);
-    padding: 8px 0;
-    border-bottom: 0.5px solid var(--nt-separator);
-  }
-}
-
-.detail-steps li {
-  padding: 4px 0;
-}
-
-// Im Sheet liegt der Grund selbst auf --nt-ground: Kacheln dort weiß
-ion-modal .recipe__macros > div {
+// Live-Naehrwertkarte
+.nutri-card {
+  margin: var(--nt-space-4) 0 var(--nt-space-1);
+  padding: var(--nt-space-4);
   background: var(--nt-card);
+  border-radius: var(--nt-radius-card);
+  &__head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--nt-muted); h2 { margin: 0; font: inherit; } }
+  &__total { color: var(--nt-accent); }
+  &__note { @extend %hint; margin: 10px 0 0; font-size: 13px; }
 }
+
+.nutri-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--nt-separator);
+  border-radius: var(--nt-radius-sm);
+  overflow: hidden;
+  &__cell { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 8px; background: var(--nt-card); strong { font-size: 18px; font-weight: 700; } span { @extend %hint; } }
+}
+
+.ai-needed { @extend %hint; margin: 8px 0 12px; font-size: 13px; }
+.block-reason { text-align: center; }
+// Sheet-Kopf: Seitenspalten mind. 80 px, damit der Titel nie unter "Schließen"/"Abbrechen" liegt
+ion-modal .nt-sheet-header { grid-template-columns: auto minmax(0, 1fr) auto; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.save-btn { margin-top: var(--nt-space-4); }
+.auto-weight-hint { @extend %hint; margin: 4px var(--nt-space-1) 0; }
+.scan-hint { @extend %hint; margin: 8px 0 0; }
+.weight-detail { @extend %hint; margin: 0 var(--nt-space-1); summary { @extend %row; min-height: var(--nt-touch); cursor: pointer; } p { margin: 0 0 8px; } }
+.scan-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--nt-space-2); margin-bottom: var(--nt-space-2); }
+.tiktok-hint { @extend %hint; @extend %row; margin: 6px var(--nt-space-1) 4px; ion-icon { font-size: 16px; } }
+.content-spacer { height: 80px; }
+
+// Platz unter dem letzten Editor-Feld, damit der Sticky-Footer nichts verdeckt
+.editor-spacer { height: $footer-clearance; }
+
+.save-footer {
+  ion-toolbar { --background: var(--nt-ground); --padding-start: var(--nt-space-4); --padding-end: var(--nt-space-4); --padding-bottom: calc(var(--nt-space-3) + env(safe-area-inset-bottom, 0px)); --padding-top: var(--nt-space-2); }
+  .save-btn { margin: 0; }
+}
+
+.save-error { margin: 0 0 var(--nt-space-2); padding: 10px 14px; background: rgba(var(--ion-color-danger-rgb), 0.1); border-radius: var(--nt-radius-sm); font-size: 14px; }
+
+.detail-list, .detail-steps { margin: 0; color: var(--nt-ink); }
+.detail-list { padding: 0; list-style: none; li { @extend %row; justify-content: space-between; gap: var(--nt-space-3); padding: 8px 0; border-bottom: 0.5px solid var(--nt-separator); } }
+.detail-steps { padding: 0 0 0 var(--nt-space-4); li { padding: 4px 0; } }
+
+// Kochmodus: Lesebreite begrenzen, Schritttext groesser
+.cook { max-width: 680px; margin-inline: auto; }
+.cook__step-text { font-size: 28px; line-height: 1.4; }
+.cook__close { @extend %tap-44; }

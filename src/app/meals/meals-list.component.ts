@@ -2,10 +2,12 @@ import { ChangeDetectionStrategy, Component, OnDestroy, computed, inject, signal
 import { ActionSheetController, AlertController } from '@ionic/angular';
 import { SharedModule } from '../shared/shared.module';
 import { NumPipe } from '../shared/num.pipe';
-import { FoodItem, MealType, NutritionFacts, Recipe, SavedMeal, SavedMealEntry } from '../core/models';
+import { MealType, NutritionFacts, Recipe, SavedMeal, SavedMealEntry } from '../core/models';
 import { DiaryStore } from '../core/state/diary.store';
 import { MealsStore } from '../core/state/meals.store';
 import { RecipeStore } from '../core/state/recipe.store';
+import { FoodSourceResult } from '../shared/food-sources/food-sources.component';
+import { formatDecimal, parseDecimal } from '../core/util/number-input';
 import { toDateISO } from '../core/util/date';
 import { confirmDiscard } from './confirm-discard';
 import { isMealDraftChanged, mealSaveBlockReason, rescaleEntryAmount } from './meal-draft';
@@ -17,6 +19,18 @@ const MEAL_OPTIONS: { value: MealType; label: string }[] = [
   { value: 'dinner', label: 'Abendessen' },
   { value: 'snack', label: 'Snack' },
 ];
+
+interface ManualDraft {
+  name: string;
+  kcal: string;
+  proteinG: string;
+  carbsG: string;
+  fatG: string;
+}
+
+function emptyManual(): ManualDraft {
+  return { name: '', kcal: '', proteinG: '', carbsG: '', fatG: '' };
+}
 
 /**
  * Gespeicherte Mahlzeiten (Vorlagen aus Lebensmitteln und Rezepten): Liste,
@@ -61,6 +75,8 @@ export class MealsListComponent implements OnDestroy {
 
   // --- Food search within create modal ---
   readonly pickerOpen = signal(false);
+  readonly pickerView = signal<'sources' | 'manual'>('sources');
+  manual: ManualDraft = emptyManual();
 
   ngOnDestroy(): void {
     this.deletion.flush();
@@ -92,6 +108,7 @@ export class MealsListComponent implements OnDestroy {
     this.draftName = name;
     this.draftEntries = [...entries];
     this.baseline = { name, entries: [...entries] };
+    this.rawAmounts.clear();
     this.createOpen.set(true);
   }
 
@@ -112,6 +129,7 @@ export class MealsListComponent implements OnDestroy {
   }
 
   removeEntry(index: number): void {
+    this.rawAmounts.clear();
     this.draftEntries = this.draftEntries.filter((_, i) => i !== index);
   }
 
@@ -119,10 +137,19 @@ export class MealsListComponent implements OnDestroy {
     return Math.round(this.draftEntries.reduce((s, e) => s + e.facts.kcal, 0));
   }
 
+  private readonly rawAmounts = new Map<number, string>();
+
+  /** Anzeigetext der Menge: Roh-Eingabe behalten, solange sie zum Wert passt ("2," bleibt stehen). */
+  amountText(index: number, amountG: number): string {
+    const raw = this.rawAmounts.get(index);
+    return raw !== undefined && parseDecimal(raw) === amountG ? raw : formatDecimal(amountG);
+  }
+
   /** Ändert die Menge eines Eintrags (g); Nährwerte werden mitskaliert. */
-  setEntryAmount(index: number, event: Event): void {
-    const value = Number((event as CustomEvent<{ value?: string | number | null }>).detail?.value);
-    if (!(value > 0)) return;
+  setEntryAmountText(index: number, text: string): void {
+    this.rawAmounts.set(index, text);
+    const value = parseDecimal(text);
+    if (value === null || !(value > 0)) return;
     this.draftEntries = this.draftEntries.map((e, i) => (i === index ? rescaleEntryAmount(e, value) : e));
   }
 
@@ -137,6 +164,7 @@ export class MealsListComponent implements OnDestroy {
 
   // --- Food picker ---
   openPicker(): void {
+    this.pickerView.set('sources');
     this.pickerOpen.set(true);
   }
 
@@ -144,18 +172,43 @@ export class MealsListComponent implements OnDestroy {
     this.pickerOpen.set(false);
   }
 
-  pickFood(item: FoodItem): void {
-    const amountG = item.servingG && item.servingG > 0 ? Math.round(item.servingG) : 100;
-    const factor = item.facts.basis === 'per100g' ? amountG / 100 : 1;
+  /** Übernimmt Suche, Barcode oder Etikett als Eintrag (Standardmenge = Portion oder 100 g). */
+  pickSource(res: FoodSourceResult): void {
+    const amountG = res.servingG && res.servingG > 0 ? Math.round(res.servingG) : 100;
+    const factor = res.facts.basis === 'per100g' ? amountG / 100 : 1;
     const scaled: NutritionFacts = {
-      ...item.facts,
-      kcal: Math.round(item.facts.kcal * factor),
-      proteinG: Math.round(item.facts.proteinG * factor * 10) / 10,
-      carbsG: Math.round(item.facts.carbsG * factor * 10) / 10,
-      fatG: Math.round(item.facts.fatG * factor * 10) / 10,
+      ...res.facts,
+      kcal: Math.round(res.facts.kcal * factor),
+      proteinG: Math.round(res.facts.proteinG * factor * 10) / 10,
+      carbsG: Math.round(res.facts.carbsG * factor * 10) / 10,
+      fatG: Math.round(res.facts.fatG * factor * 10) / 10,
       basis: 'perPortion',
     };
-    this.draftEntries = [...this.draftEntries, { label: item.name, facts: scaled, amountG, ref: { kind: 'manual' } }];
+    const label = res.name.trim() || 'Eingescanntes Lebensmittel';
+    this.draftEntries = [...this.draftEntries, { label, facts: scaled, amountG, ref: { kind: 'manual' } }];
+    this.closePicker();
+  }
+
+  openManual(name: string): void {
+    this.manual = { ...emptyManual(), name };
+    this.pickerView.set('manual');
+  }
+
+  manualValid(): boolean {
+    return this.manual.name.trim() !== '' && (parseDecimal(this.manual.kcal) ?? 0) > 0;
+  }
+
+  addManual(): void {
+    if (!this.manualValid()) return;
+    const m = this.manual;
+    const facts: NutritionFacts = {
+      kcal: parseDecimal(m.kcal) ?? 0,
+      proteinG: parseDecimal(m.proteinG) ?? 0,
+      carbsG: parseDecimal(m.carbsG) ?? 0,
+      fatG: parseDecimal(m.fatG) ?? 0,
+      basis: 'perPortion',
+    };
+    this.draftEntries = [...this.draftEntries, { label: m.name.trim(), facts, ref: { kind: 'manual' } }];
     this.closePicker();
   }
 

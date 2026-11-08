@@ -1,39 +1,30 @@
 <ion-header class="ion-no-border">
-  <ion-toolbar>
-    <ion-title role="heading" aria-level="1">Einkaufsliste</ion-title>
-    @if (list() !== null) {
-      <ion-buttons slot="end">
-        <ion-button class="share-btn" (click)="shareList()" aria-label="Liste teilen">
+  <div class="nt-page-header">
+    <h1 class="nt-large-title" role="heading" aria-level="1">Einkaufsliste</h1>
+    @if (isListView() && list() !== null) {
+      <div class="nt-page-header__action">
+        <ion-button class="share-btn" fill="clear" (click)="shareList()" aria-label="Liste teilen">
           <ion-icon slot="icon-only" name="share-outline"></ion-icon>
         </ion-button>
-      </ion-buttons>
+      </div>
     }
-  </ion-toolbar>
+  </div>
+  <div class="nt-page view-switch">
+    <ion-segment [value]="view()" (ionChange)="onViewChange($any($event).detail.value)" aria-label="Ansicht wählen">
+      <ion-segment-button value="recipes" class="view-segment__btn"><ion-label>Rezepte</ion-label></ion-segment-button>
+      <ion-segment-button value="list" class="view-segment__btn"><ion-label>Liste</ion-label></ion-segment-button>
+    </ion-segment>
+  </div>
 </ion-header>
 
 <ion-content>
-  <div class="page-col">
-  @if (addOpen()) {
-  <div class="add-bar">
-    <div class="add-row">
-      <ion-input #addName class="add-name" enterkeyhint="done" [(ngModel)]="newItemName" (keyup.enter)="addManual()" placeholder="Artikel" aria-label="Artikel" fill="outline"></ion-input>
-      <div class="add-row__line">
-        <ion-input class="add-amount" type="text" inputmode="decimal" enterkeyhint="done" [(ngModel)]="newItemAmountText" (keyup.enter)="addManual()" placeholder="Menge" aria-label="Menge" fill="outline"></ion-input>
-        <ion-select class="add-unit" [(ngModel)]="newItemUnit" aria-label="Einheit" interface="action-sheet" cancelText="Abbrechen" fill="outline">
-          @for (u of unitOptions; track u) {
-            <ion-select-option [value]="u">{{ u }}</ion-select-option>
-          }
-        </ion-select>
-        <ion-button fill="clear" class="add-btn" (click)="addManual()" aria-label="Hinzufügen">
-          <ion-icon slot="icon-only" name="add-circle-outline"></ion-icon>
-        </ion-button>
-      </div>
-    </div>
-  </div>
-  }
+  <div class="nt-page">
   @if (showGenerator()) {
     <ion-card class="generator">
       <ion-card-content>
+        @if (list() === null) {
+          <p class="generator__intro" role="status">Noch keine Liste. Wähle Personen und Rezepte, dann entsteht dein Wocheneinkauf.</p>
+        }
         @if (live()) {
           <p class="generator__mode" role="note">Mit KI-Verbindung: Preise werden geschätzt.</p>
         } @else {
@@ -98,7 +89,7 @@
             </div>
           </div>
           <div class="generator__field">
-            <ion-select label="Markt" labelPlacement="stacked" [(ngModel)]="storeName" interface="action-sheet" cancelText="Abbrechen" fill="outline">
+            <ion-select class="nt-field" label="Markt" labelPlacement="stacked" [(ngModel)]="storeName" interface="action-sheet" cancelText="Abbrechen">
               @for (s of stores; track s) {
                 <ion-select-option [value]="s">{{ s || 'egal' }}</ion-select-option>
               }
@@ -123,171 +114,243 @@
     </ion-card>
   }
 
-  @if (list(); as l) {
-    @if (!showGenerator()) {
+  @if (isListView()) {
+    @if (list(); as l) {
       <div class="summary">
         <span class="summary__text">
           Einkauf für {{ l.persons }} {{ l.persons === 1 ? 'Person' : 'Personen' }}
           @if ((l.days ?? null) !== null) { · {{ l.days }} {{ l.days === 1 ? 'Tag' : 'Tage' }} }
         </span>
-        <ion-button fill="outline" class="summary__btn" (click)="openGenerator()">
+        <ion-button class="nt-add-btn summary__btn" (click)="openGenerator()">
           <ion-icon slot="start" name="refresh-outline"></ion-icon>
           Neu generieren
         </ion-button>
       </div>
-    }
 
-    @if (showTotals()) {
-      <div class="totals">
-        <div class="totals__main">
-          <span class="totals__group">
-            <span class="totals__label">{{ isMockPrice() ? 'Eingetragen' : 'Gesamt' }}</span>
-            <span class="totals__sum" [class.over]="live() && overBudget()">{{ isMockPrice() ? '' : '≈ ' }}{{ totals().total | ntNum:2:2 }} €</span>
-          </span>
-          <span class="totals__group">
-            <span class="totals__label">Offen</span>
-            <span class="totals__open">{{ isMockPrice() ? '' : '≈ ' }}{{ totals().open | ntNum:2:2 }} €</span>
-          </span>
+      @if (showTotals()) {
+        <div class="totals">
+          <div class="totals__main">
+            <span class="totals__group">
+              <span class="totals__label">{{ isMockPrice() ? 'Eingetragen gesamt' : 'Gesamt' }}</span>
+              <span class="totals__sum" [class.over]="live() && overBudget()">{{ isMockPrice() ? '' : '≈ ' }}{{ totals().total | ntNum:2:2 }} €</span>
+            </span>
+            <span class="totals__group">
+              <span class="totals__label">Davon offen</span>
+              <span class="totals__open">{{ isMockPrice() ? '' : '≈ ' }}{{ totals().open | ntNum:2:2 }} €</span>
+            </span>
+          </div>
+          <div class="totals__meta">
+            <span class="ai-badge">{{ isMockPrice() ? 'Nur eingetragene Preise' : 'KI-Schätzung' }}</span>
+            @if (live() && (l.budget ?? null) !== null) {
+              <span class="totals__budget">Budget {{ l.budget! | ntNum:2:2 }} €</span>
+            }
+          </div>
         </div>
-        <div class="totals__meta">
-          <span class="ai-badge">{{ isMockPrice() ? 'Nur eingetragene Preise' : 'KI-Schätzung' }}</span>
-          @if (live() && (l.budget ?? null) !== null) {
-            <span class="totals__budget">Budget {{ l.budget! | ntNum:2:2 }} €</span>
+      }
+      @if (totals().unpriced > 0) {
+        <p class="totals__detail">
+          {{ totals().unpriced }} {{ totals().unpriced === 1 ? 'Position' : 'Positionen' }} ohne Preis, nicht in der Summe
+        </p>
+      }
+      @if (l.note) {
+        <p class="totals__note" role="status">{{ l.note }}</p>
+      }
+
+      @if (l.suggestedDishes && l.suggestedDishes.length) {
+        <div class="suggested">
+          <span class="suggested__label">Gerichte (antippen = Zutaten hinzufügen):</span>
+          @for (dish of l.suggestedDishes; track dish) {
+            <ion-chip (click)="addDish(dish)" [attr.aria-label]="dish + ': Zutaten hinzufügen'">{{ dish }}</ion-chip>
           }
         </div>
-      </div>
-    }
-    @if (totals().unpriced > 0) {
-      <p class="totals__detail">
-        {{ totals().unpriced }} {{ totals().unpriced === 1 ? 'Position' : 'Positionen' }} ohne Preis, nicht in der Summe
-      </p>
-    }
-    @if (l.note) {
-      <p class="totals__note" role="status">{{ l.note }}</p>
-    }
-
-    @if (l.suggestedDishes && l.suggestedDishes.length) {
-      <div class="suggested">
-        <span class="suggested__label">Gerichte (antippen = Zutaten hinzufügen):</span>
-        @for (dish of l.suggestedDishes; track dish) {
-          <ion-chip (click)="addDish(dish)" [attr.aria-label]="dish + ': Zutaten hinzufügen'">{{ dish }}</ion-chip>
-        }
-      </div>
-    }
-
-    <!-- Eine Zeile (offen oder erledigt); Index = Position in der gespeicherten Liste. -->
-    <ng-template #rowTpl let-row>
-      @let item = row.item;
-      <ion-item-sliding>
-        <ion-item class="check-row" detail="false" lines="full">
-          <ion-checkbox
-            class="check-row__box"
-            labelPlacement="end"
-            justify="start"
-            alignment="center"
-            [checked]="item.checked"
-            (ionChange)="setChecked(row.index, $event.detail.checked)"
-          >
-            <span class="check-row__text" [class.checked]="item.checked">
-              <span class="check-row__name">{{ item.name }}</span>
-              <span class="qty">
-                @let hasAmount = item.amount > 0;
-                @let hasPrice = (item.estPrice ?? null) !== null;
-                @if (hasAmount) { {{ item.amount | ntNum:2 }} {{ item.unit }} }
-                @if (hasAmount && hasPrice) { · }
-                @if (hasPrice) { {{ isMockPrice() ? '' : '≈ ' }}{{ item.estPrice! | ntNum:2:2 }} € }
-                @if (!hasAmount && !hasPrice) { ohne Menge }
-                @else if (!hasAmount) { ohne Menge }
-              </span>
-            </span>
-          </ion-checkbox>
-          <ion-button slot="end" fill="clear" size="small" class="price-btn" (click)="editPrice(row.index)" [attr.aria-label]="item.name + ': Preis eintragen'">
-            {{ (item.estPrice ?? null) !== null ? 'Preis ändern' : 'Preis eintragen' }}
-          </ion-button>
-          <ion-button slot="end" fill="clear" color="medium" class="nt-hover-delete" (click)="removeItem(row.index)" [attr.aria-label]="item.name + ' löschen'">
-            <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
-          </ion-button>
-        </ion-item>
-        <ion-item-options side="end">
-          <ion-item-option color="danger" (click)="removeItem(row.index)" [attr.aria-label]="item.name + ' löschen'">
-            <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
-          </ion-item-option>
-        </ion-item-options>
-      </ion-item-sliding>
-    </ng-template>
-
-    @for (group of openGroups(); track group.category ?? '') {
-      @if (group.category) {
-        <h2 class="nt-section-header cat-header">{{ categoryLabel(group.category) }}</h2>
       }
-      <ion-list class="nt-grouped" lines="full">
-        @for (row of group.rows; track row.index) {
-          <ng-container *ngTemplateOutlet="rowTpl; context: { $implicit: row }"></ng-container>
-        }
-      </ion-list>
-    }
-    @if (openCount() === 0) {
-      <ion-list class="nt-grouped" lines="none">
-        <ion-item lines="none">
-          <ion-label color="medium">{{ rows().length === 0 ? 'Liste ist leer.' : 'Alles erledigt.' }}</ion-label>
-        </ion-item>
-      </ion-list>
-    }
 
-    @if (doneRows().length > 0) {
-      <div class="done-head">
-        <button
-          type="button"
-          class="done-head__toggle"
-          [attr.aria-expanded]="doneOpen()"
-          aria-controls="done-list"
-          (click)="toggleDone()"
-        >
-          <ion-icon [name]="doneOpen() ? 'chevron-up-outline' : 'chevron-down-outline'" aria-hidden="true"></ion-icon>
-          Erledigt ({{ doneRows().length }})
-        </button>
-        <ion-button fill="clear" class="done-head__clear" (click)="removeChecked()">Erledigte entfernen</ion-button>
-      </div>
-      @if (doneOpen()) {
-        <ion-list id="done-list" class="nt-grouped done-list" lines="full">
-          @for (row of doneRows(); track row.index) {
+      <!-- Eine Zeile (offen oder erledigt); Index = Position in der gespeicherten Liste. -->
+      <ng-template #rowTpl let-row>
+        @let item = row.item;
+        <ion-item-sliding>
+          <ion-item class="check-row" detail="false" lines="full">
+            <ion-checkbox
+              class="check-row__box"
+              labelPlacement="end"
+              justify="start"
+              alignment="center"
+              [checked]="item.checked"
+              (ionChange)="setChecked(row.index, $event.detail.checked)"
+            >
+              <span class="check-row__text" [class.checked]="item.checked">
+                <span class="check-row__name">{{ item.name }}</span>
+                <span class="qty">
+                  @let hasAmount = item.amount > 0;
+                  @let hasPrice = (item.estPrice ?? null) !== null;
+                  @if (hasAmount) { {{ item.amount | ntNum:2 }} {{ item.unit }} }
+                  @if (hasAmount && hasPrice) { · }
+                  @if (hasPrice) { {{ isMockPrice() ? '' : '≈ ' }}{{ item.estPrice! | ntNum:2:2 }} € }
+                  @if (!hasAmount && !hasPrice) { ohne Menge }
+                  @else if (!hasAmount) { ohne Menge }
+                </span>
+              </span>
+            </ion-checkbox>
+            <ion-button slot="end" fill="clear" size="small" class="price-btn" (click)="editPrice(row.index)" [attr.aria-label]="item.name + ': Preis eintragen'">
+              {{ (item.estPrice ?? null) !== null ? 'Preis ändern' : 'Preis eintragen' }}
+            </ion-button>
+            <ion-button slot="end" fill="clear" color="medium" class="nt-hover-delete" (click)="removeItem(row.index)" [attr.aria-label]="item.name + ' löschen'">
+              <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+            </ion-button>
+          </ion-item>
+          <ion-item-options side="end">
+            <ion-item-option color="danger" (click)="removeItem(row.index)" [attr.aria-label]="item.name + ' löschen'">
+              <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+            </ion-item-option>
+          </ion-item-options>
+        </ion-item-sliding>
+      </ng-template>
+
+      @for (group of openGroups(); track group.category ?? '') {
+        @if (group.category) {
+          <h2 class="nt-section-header cat-header">{{ categoryLabel(group.category) }}</h2>
+        }
+        <ion-list class="nt-grouped" lines="full">
+          @for (row of group.rows; track row.index) {
             <ng-container *ngTemplateOutlet="rowTpl; context: { $implicit: row }"></ng-container>
           }
         </ion-list>
       }
-    }
+      @if (openCount() === 0) {
+        <ion-list class="nt-grouped" lines="none">
+          <ion-item lines="none">
+            <ion-label color="medium">{{ rows().length === 0 ? 'Liste ist leer.' : 'Alles erledigt.' }}</ion-label>
+          </ion-item>
+        </ion-list>
+      }
 
-    <p class="price-note">
-      @if (isMockPrice()) { Ohne KI keine Preisschätzung. Preise zählen nur, wenn du sie selbst einträgst. }
-      @else { Preise sind KI-Schätzungen und können im Markt abweichen. }
-    </p>
-    <ion-toast
-      [isOpen]="undoOpen()"
-      [message]="undoMessage()"
-      [duration]="undoDuration"
-      [buttons]="undoButtons"
-      position="bottom"
-      (didDismiss)="onUndoDismiss($any($event))"
-    ></ion-toast>
-    <ion-toast
-      [isOpen]="shareToastOpen()"
-      [message]="shareToastMessage()"
-      [duration]="shareToastDuration"
-      position="bottom"
-      (didDismiss)="onShareToastDismiss()"
-    ></ion-toast>
-  } @else {
-    <div class="empty">
-      <ion-icon name="cart-outline" class="empty__icon" aria-hidden="true"></ion-icon>
-      <p>Noch keine Liste. Tippe auf „+“, um Artikel hinzuzufügen, oder generiere einen Wocheneinkauf.</p>
-    </div>
+      @if (doneRows().length > 0) {
+        <div class="done-head">
+          <button
+            type="button"
+            class="done-head__toggle"
+            [attr.aria-expanded]="doneOpen()"
+            aria-controls="done-list"
+            (click)="toggleDone()"
+          >
+            <ion-icon [name]="doneOpen() ? 'chevron-up-outline' : 'chevron-down-outline'" aria-hidden="true"></ion-icon>
+            Erledigt ({{ doneRows().length }})
+          </button>
+          <ion-button fill="clear" class="done-head__clear" (click)="removeChecked()">Erledigte entfernen</ion-button>
+        </div>
+        @if (doneOpen()) {
+          <ion-list id="done-list" class="nt-grouped done-list" lines="full">
+            @for (row of doneRows(); track row.index) {
+              <ng-container *ngTemplateOutlet="rowTpl; context: { $implicit: row }"></ng-container>
+            }
+          </ion-list>
+        }
+      }
+
+      <p class="price-note">
+        @if (isMockPrice()) { Ohne KI keine Preisschätzung. Preise zählen nur, wenn du sie selbst einträgst. }
+        @else { Preise sind KI-Schätzungen und können im Markt abweichen. }
+      </p>
+    } @else {
+      <div class="empty">
+        <ion-icon name="cart-outline" class="empty__icon" aria-hidden="true"></ion-icon>
+        <p>Noch keine Liste. Tippe auf „+“, um Artikel von Hand hinzuzufügen, oder erstelle einen Wocheneinkauf aus deinen Rezepten.</p>
+        <ion-button class="nt-add-btn empty__btn" (click)="setView('recipes')">Zu den Rezepten</ion-button>
+      </div>
+    }
   }
+
+  <ion-toast
+    [isOpen]="undoOpen()"
+    [message]="undoMessage()"
+    [duration]="undoDuration"
+    [buttons]="undoButtons"
+    position="bottom"
+    (didDismiss)="onUndoDismiss($any($event))"
+  ></ion-toast>
+  <ion-toast
+    [isOpen]="shareToastOpen()"
+    [message]="shareToastMessage()"
+    [duration]="shareToastDuration"
+    position="bottom"
+    (didDismiss)="onShareToastDismiss()"
+  ></ion-toast>
 
   <div class="content-spacer"></div>
   </div>
-  <ion-fab slot="fixed" vertical="bottom" horizontal="end" class="add-fab">
-    <ion-fab-button (click)="toggleAdd()" [attr.aria-label]="addOpen() ? 'Eingabe schließen' : 'Artikel hinzufügen'" [attr.aria-expanded]="addOpen()">
-      <ion-icon [name]="addOpen() ? 'close-outline' : 'add-outline'"></ion-icon>
-    </ion-fab-button>
-  </ion-fab>
+  @if (isListView()) {
+    <ion-fab slot="fixed" vertical="bottom" horizontal="end" class="add-fab nt-fab-offset">
+      <ion-fab-button (click)="openAdd()" aria-label="Artikel hinzufügen" aria-haspopup="dialog">
+        <ion-icon name="add-outline"></ion-icon>
+      </ion-fab-button>
+    </ion-fab>
+  }
 </ion-content>
+
+<!-- Artikel hinzufügen: Bottom Sheet (ziehen oder Backdrop-Tipp schließt) -->
+<ion-modal
+  class="add-sheet"
+  [isOpen]="addOpen()"
+  [breakpoints]="addBreakpoints"
+  [initialBreakpoint]="addInitialBreakpoint"
+  [handle]="true"
+  [backdropDismiss]="true"
+  [backdropBreakpoint]="0.5"
+  (didPresent)="focusName()"
+  (didDismiss)="closeAdd()"
+>
+  <ng-template>
+    <div class="nt-sheet-header">
+      <span class="nt-sheet-header__start" aria-hidden="true"></span>
+      <h2 class="nt-sheet-header__title" role="heading" aria-level="2">Artikel hinzufügen</h2>
+      <span class="nt-sheet-header__end">
+        <ion-button fill="clear" (click)="closeAdd()">Fertig</ion-button>
+      </span>
+    </div>
+    <ion-content class="add-sheet__content">
+      <div class="nt-page add-form">
+        <ion-input
+          #addName
+          class="nt-field add-name"
+          enterkeyhint="done"
+          [autofocus]="true"
+          [(ngModel)]="newItemName"
+          (keyup.enter)="addManual()"
+          placeholder="Artikel"
+          aria-label="Artikel"
+        ></ion-input>
+        <div class="add-form__line">
+          <div class="amount-unit" role="group" aria-label="Menge und Einheit">
+            <ion-input
+              class="add-amount"
+              type="text"
+              inputmode="decimal"
+              enterkeyhint="done"
+              [(ngModel)]="newItemAmountText"
+              (keyup.enter)="addManual()"
+              (ionFocus)="selectAll($event)"
+              placeholder="1"
+              aria-label="Menge"
+            ></ion-input>
+            <span class="amount-unit__sep" aria-hidden="true"></span>
+            <button type="button" class="amount-unit__unit" (click)="pickUnit()" [attr.aria-label]="'Einheit wählen, aktuell ' + newItemUnit">
+              {{ newItemUnit }}
+              <ion-icon name="chevron-down-outline" aria-hidden="true"></ion-icon>
+            </button>
+          </div>
+          <ion-input
+            class="nt-field add-price"
+            type="text"
+            inputmode="decimal"
+            enterkeyhint="done"
+            [(ngModel)]="newItemPriceText"
+            (keyup.enter)="addManual()"
+            placeholder="Preis (optional)"
+            aria-label="Preis in Euro, optional"
+          ></ion-input>
+        </div>
+        <button type="button" class="nt-add-btn add-submit" (click)="addManual()">Hinzufügen</button>
+      </div>
+    </ion-content>
+  </ng-template>
+</ion-modal>

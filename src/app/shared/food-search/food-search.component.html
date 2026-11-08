@@ -18,7 +18,7 @@
     <p class="scan-hint" role="status"><ion-spinner name="dots"></ion-spinner> Suche läuft…</p>
   }
   @if (error(); as message) { <p class="scan-hint" role="alert">{{ message }}</p> }
-  @if (search.hint()) { <p class="scan-hint" role="status">{{ search.hint() }}</p> }
+  @if (search.hint() && !search.searching()) { <p class="scan-hint" role="status">{{ search.hint() }}</p> }
   @if (allowManual() && search.noResults() && !search.searching()) {
     <button type="button" class="inline-action" (click)="manualEntry.emit(search.query.trim())">
       <ion-icon name="create-outline" aria-hidden="true"></ion-icon> Manuell eintragen

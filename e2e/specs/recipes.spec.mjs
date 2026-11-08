@@ -11,11 +11,11 @@ async function createRecipe(page) {
   await go(page, 'recipes');
   await page.locator('.page-head__add').click();
   const modal = topModal(page);
-  await modal.locator('ion-title', { hasText: 'Neues Rezept' }).waitFor();
+  await modal.locator('.nt-sheet-header__title', { hasText: 'Neues Rezept' }).waitFor();
   await fillAndBlur(byAria(modal, 'Name'), TITLE);
-  await modal.locator('.link-add').click();
+  await modal.locator('.nt-add-btn', { hasText: 'manuelle Zutat' }).click();
   await fillAndBlur(byAria(modal, 'Zutatname'), 'Rote Linsen');
-  await fillAndBlur(byAria(modal, 'Menge'), '300');
+  await amountInput(modal, 'Menge').first().fill('300');
   await modal.locator('.ing-facts-toggle').first().click();
   await fillAndBlur(byAria(modal, 'kcal je 100g'), '100');
   await fillAndBlur(byAria(modal, 'Eiweiß je 100g'), '24,5');
@@ -54,7 +54,7 @@ export function register({ test }) {
     await go(page, 'diary');
     await page.locator('.page-head__add').click();
     const modal = topModal(page);
-    await modal.locator('.source-btn', { hasText: 'Rezept' }).click();
+    await modal.locator('.nt-source-btn', { hasText: 'Rezept' }).click();
     await modal.locator('ion-item', { hasText: TITLE }).click();
     const portions = amountInput(modal, 'Portionen');
     await portions.fill('0,5');
@@ -73,7 +73,7 @@ export function register({ test }) {
     await card.locator('.recipe__icon-btn').click();
     await pickActionSheet(page, 'Bearbeiten');
     const modal = topModal(page);
-    await modal.locator('ion-title', { hasText: 'Rezept bearbeiten' }).waitFor();
+    await modal.locator('.nt-sheet-header__title', { hasText: 'Rezept bearbeiten' }).waitFor();
     assert.equal(await byAria(modal, 'Name').inputValue(), TITLE, 'Editor nicht vorbefüllt');
     await fillAndBlur(byAria(modal, 'Name'), TITLE + ' neu');
     await modal.locator('.save-btn').click();
@@ -90,6 +90,6 @@ export function register({ test }) {
     const sheet = topModal(page);
     await sheet.locator('ion-button', { hasText: 'Bearbeiten' }).first().click();
     await settle(page);
-    await topModal(page).locator('ion-title', { hasText: 'Rezept bearbeiten' }).waitFor();
+    await topModal(page).locator('.nt-sheet-header__title', { hasText: 'Rezept bearbeiten' }).waitFor();
   });
 }

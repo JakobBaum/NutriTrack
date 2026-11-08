@@ -61,11 +61,24 @@ ion-modal .nt-grouped {
   margin-right: 0;
 }
 
-.name-item {
-  --background: var(--nt-card);
-  --min-height: 56px;
-  border-radius: var(--nt-radius-card);
-  overflow: hidden;
+ion-modal ion-content {
+  --padding-start: var(--nt-page-gutter);
+  --padding-end: var(--nt-page-gutter);
+}
+
+// Sheet-Kopf: Seitenspalten mind. 80 px, damit der Titel nie unter "Abbrechen" liegt
+ion-modal .nt-sheet-header { grid-template-columns: minmax(80px, auto) minmax(0, 1fr) minmax(80px, auto); }
+
+// "Eintragen" als beschriftete Pille (44 px), ersetzt das bloße +-Symbol
+.meal-use {
+  height: var(--nt-touch);
+  min-height: var(--nt-touch);
+  margin: 0 var(--nt-space-1);
+  --color: var(--nt-accent);
+  --padding-start: var(--nt-space-2);
+  --padding-end: var(--nt-space-2);
+  font-weight: 600;
+  text-transform: none;
 }
 
 .draft-total {
@@ -105,16 +118,60 @@ ion-modal ion-buttons ion-button {
   color: var(--ion-color-medium);
 }
 
-// Mengen-Eingabe je Eintrag (Gramm)
-.amount-input {
-  flex: none;
-  width: 72px;
-  min-height: var(--nt-touch);
-  text-align: right;
-  --padding-start: 0;
+// Entwurfs-Zeilen im Editor: Name + kcal links, Menge "22 | g", Entfernen. Volle Breite, S1-Karte.
+.draft-list {
+  margin: var(--nt-space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  background: var(--nt-card);
+  border-radius: var(--nt-radius-card);
+  overflow: hidden;
 }
 
-.amount-unit {
-  color: var(--nt-secondary);
+.draft-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px 44px;
+  align-items: center;
+  column-gap: var(--nt-space-2);
+  min-height: 64px;
+  padding: var(--nt-space-2) var(--nt-space-1) var(--nt-space-2) var(--nt-space-4);
+
+  & + & {
+    border-top: 0.5px solid var(--nt-separator);
+  }
+
+  &__text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__name {
+    font-weight: 600;
+    color: var(--nt-ink);
+    overflow-wrap: anywhere;
+    text-wrap: pretty;
+  }
+
+  &__kcal {
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__amount {
+    display: block;
+    grid-column: 2;
+  }
+
+  .icon-btn {
+    grid-column: 3;
+  }
+}
+
+.manual-hint {
+  margin: var(--nt-space-2) var(--nt-space-1) var(--nt-space-4);
   font-size: var(--nt-fs-caption);
+  color: var(--nt-secondary);
 }

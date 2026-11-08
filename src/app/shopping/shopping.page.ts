@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, ElementRef, OnDestroy, computed, inject, signal, viewChild } from '@angular/core';
-import { AlertController } from '@ionic/angular';
+import { ActionSheetController, AlertController } from '@ionic/angular';
 import { formatDecimal, parseDecimal } from '../core/util/number-input';
 import { UNIT_OPTIONS } from '../core/util/units';
 import { AiService } from '../core/ai/ai.service';
@@ -36,6 +36,9 @@ export interface MealToggle {
   checked: boolean;
 }
 
+/** Ansichten der Einkaufsseite: Rezepte (Generator) oder Liste (Einkauf). */
+export type ShoppingView = 'recipes' | 'list';
+
 /** Dauer des Hinweises nach „Liste teilen“ in ms. */
 const SHARE_TOAST_MS = 2500;
 
@@ -56,6 +59,7 @@ export class ShoppingPage implements OnDestroy {
   private readonly ai = inject(AiService);
   private readonly recipeStore = inject(RecipeStore);
   private readonly alertCtrl = inject(AlertController);
+  private readonly actionSheet = inject(ActionSheetController);
 
   /** Eine ID = Komma-Liste von Indizes (Einzel- oder Sammel-Löschen). */
   private readonly deletion = new UndoableDelete((id) => this.commitRemoval(decodeIndexes(id)));
@@ -113,10 +117,10 @@ export class ShoppingPage implements OnDestroy {
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
 
-  /** Ob das Formular trotz vorhandener Liste aufgeklappt ist ("Neu generieren"). */
-  readonly formOpen = signal(false);
-  /** Ohne Liste immer sichtbar; mit Liste nur auf Wunsch (Checkliste bleibt oben). */
-  readonly showGenerator = computed(() => this.list() === null || this.formOpen());
+  /** Aktive Ansicht; bleibt über Tab-Wechsel im Seitenzustand erhalten (Standard: Liste). */
+  readonly view = signal<ShoppingView>('list');
+  readonly isListView = computed(() => this.view() === 'list');
+  readonly showGenerator = computed(() => this.view() === 'recipes');
 
   /** Vorbelegung aus dem Profil, sonst aus der letzten generierten Liste. */
   persons = defaultPersonsInRange(this.profileStore.profile(), this.lastGeneratedPersons());
@@ -135,6 +139,9 @@ export class ShoppingPage implements OnDestroy {
 
   newItemName = '';
   newItemAmountText = '';
+  newItemPriceText = '';
+  readonly addBreakpoints = [0, 0.5, 1];
+  readonly addInitialBreakpoint = 0.5;
   readonly categoryLabel = categoryLabel;
   readonly parseDecimal = parseDecimal;
   readonly formatDecimal = formatDecimal;
@@ -144,7 +151,14 @@ export class ShoppingPage implements OnDestroy {
     'addName',
     { read: ElementRef },
   );
-  newItemUnit = 'g';
+  private readonly unitSignal = signal('g');
+  /** Signal-gestützt, damit die OnPush-Ansicht die per Action Sheet gewählte Einheit zeigt. */
+  get newItemUnit(): string {
+    return this.unitSignal();
+  }
+  set newItemUnit(value: string) {
+    this.unitSignal.set(value);
+  }
   readonly addOpen = signal(false);
 
   toggleMeal(value: MealType): void {
@@ -153,12 +167,28 @@ export class ShoppingPage implements OnDestroy {
     );
   }
 
-  openGenerator(): void {
-    this.formOpen.set(true);
+  /** Wechselt die Ansicht. Ein offenes „Löschen rückgängig“ wird beim Verlassen der Liste bestätigt. */
+  setView(view: ShoppingView): void {
+    if (view !== 'list') {
+      this.deletion.flush();
+      this.undoOpen.set(false);
+    }
+    this.view.set(view);
   }
 
+  /** Segment-Wechsel; unbekannte Werte werden ignoriert. */
+  onViewChange(value: unknown): void {
+    if (value === 'recipes' || value === 'list') this.setView(value);
+  }
+
+  /** „Neu generieren“ in der Liste: zur Rezeptansicht wechseln. */
+  openGenerator(): void {
+    this.setView('recipes');
+  }
+
+  /** „Abbrechen“ im Generator: zurück zur Liste. */
   closeGenerator(): void {
-    this.formOpen.set(false);
+    this.setView('list');
   }
 
   ngOnDestroy(): void {
@@ -211,7 +241,7 @@ export class ShoppingPage implements OnDestroy {
         budget: this.budget ?? undefined,
         store: this.storeName || undefined,
       });
-      this.formOpen.set(false);
+      this.setView('list');
     } catch (e: unknown) {
       this.error.set(e instanceof Error ? e.message : 'Generierung fehlgeschlagen.');
     } finally {
@@ -342,11 +372,12 @@ export class ShoppingPage implements OnDestroy {
     const alert = await this.alertCtrl.create({
       header: 'Preis eintragen',
       subHeader: item.name,
+      message: 'Betrag in Euro (€)',
       inputs: [
         {
           name: 'price',
           type: 'text',
-          placeholder: 'Preis in €',
+          placeholder: '0,00 €',
           value: item.estPrice != null ? formatDecimal(item.estPrice) : '',
           attributes: { inputmode: 'decimal' },
         },
@@ -363,26 +394,61 @@ export class ShoppingPage implements OnDestroy {
     this.store.setItemPrice(index, raw === '' ? null : parseDecimal(raw));
   }
 
-  toggleAdd(): void {
-    const next = !this.addOpen();
-    this.addOpen.set(next);
-    if (next) setTimeout(() => void this.addNameInput()?.nativeElement.setFocus?.(), 50);
+  openAdd(): void {
+    this.addOpen.set(true);
   }
 
+  closeAdd(): void {
+    this.addOpen.set(false);
+  }
+
+  focusName(): void {
+    void this.addNameInput()?.nativeElement.setFocus?.();
+  }
+
+  selectAll(event: Event): void {
+    const el = event.target as { getInputElement?: () => Promise<HTMLInputElement> } | null;
+    void el?.getInputElement?.().then((input) => input.select());
+  }
+
+  async pickUnit(): Promise<void> {
+    const sheet = await this.actionSheet.create({
+      header: 'Einheit',
+      buttons: [
+        ...this.unitOptions.map((u) => ({
+          text: u,
+          role: u === this.newItemUnit ? 'selected' : undefined,
+          handler: () => {
+            this.newItemUnit = u;
+          },
+        })),
+        { text: 'Abbrechen', role: 'cancel' },
+      ],
+    });
+    await sheet.present();
+  }
+
+  /** Legt den Artikel an, leert die Felder und lässt das Sheet für den nächsten offen. */
   addManual(): void {
     const name = this.newItemName.trim();
-    if (!name) return;
+    if (!name) {
+      this.focusName();
+      return;
+    }
+    const price = parseDecimal(this.newItemPriceText);
     this.store.addItem({
       name,
       // Leer, ungültig oder ≤ 0 = „ohne Menge“.
       amount: Math.max(0, parseDecimal(this.newItemAmountText) ?? 0),
       unit: this.newItemUnit || 'g',
       checked: false,
+      ...(price !== null && price > 0 ? { estPrice: price } : {}),
     });
     this.newItemName = '';
     this.newItemAmountText = '';
+    this.newItemPriceText = '';
     this.newItemUnit = 'g';
-    void this.addNameInput()?.nativeElement.setFocus?.();
+    this.focusName();
   }
 
   overBudget(): boolean {

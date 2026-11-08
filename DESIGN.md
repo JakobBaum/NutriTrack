@@ -41,6 +41,18 @@ Typo: Systemschrift, tabular-nums; 13 / 15 / 17 / 22 / 34, Hero 60 (kcal uebrig)
 - Tab-Bar: schwebende Kapsel (16 seitlich, Safe-Area + 8 unten, Hoehe 64, weiss 85 % + Blur, 0.5px Ring, weicher Schatten), aktiver Tab = weisse Pille mit Akzent-Text, Labels 13 px.
   Tab-Inhalt bekommt unten Platz (`ion-tabs ion-content`).
 
+## Gemeinsame Bausteine (src/global.scss, Abschnitt "Gemeinsame UI-Grundlage")
+- Tokens (`:root`): `--nt-field-height` 52, `--nt-field-radius` 14, `--nt-field-bg`, `--nt-field-border`, `--nt-field-ring`, `--nt-field-placeholder`, `--nt-page-max` 720, `--nt-page-gutter` 16, `--nt-tabbar-clearance` (Safe-Area + 96), `--nt-fab-bottom` (Tab-Bar + 16).
+- `.nt-field`: Eingabefeld fuer `ion-input`, `ion-select`, `ion-textarea` (Textarea: Mindesthoehe 96, Innenabstand 12). Fokus = Markenfarbe mit Ring am Radius.
+- `ion-segment` / `ion-segment-button`: iOS-Thumb, nowrap, Reiter 40 px in 44 px Spur.
+- `.nt-page`: Inhaltsbreite max. 720, zentriert, 16 px Rand. `.nt-page-header`: Titel (`.nt-large-title`) und Aktion in einer Zeile, oben mit Safe-Area.
+- `.nt-sheet-header`: Modal-Kopf, Grid aus Start / Titel (mittig) / Ende. Griff kommt vom `ion-modal`.
+- `ion-modal.nt-date-modal`: Datepicker-Sheet, Phone volle Breite, Tablet/Desktop 360 px, Hoehe nach Inhalt.
+- `.nt-add-btn`: einziger Sekundaer-Stil fuer "Hinzufuegen" (Pille, Akzent-Tint, 44 px), als `button` oder `ion-button`.
+- Tab-Bar-Freiraum: `ion-tabs ion-content` nutzt `--nt-tabbar-clearance`; fuer andere Scroll-Container `.nt-tab-clearance`.
+- `.nt-fab-offset` (auf `ion-fab`): FAB 16 px ueber der Tab-Bar.
+- Komponenten: `nt-stepper` (Zeile 56, Buttons 36 mit 44 px Tippflaeche), `nt-food-row` (Zeile 64, feste Score-Spalte, Platzhalter-Icon), `nt-food-sources` (vier gleiche Spalten, "Manuell" immer sichtbar), `nt-amount-row` (Feld wie `.nt-field`).
+
 ## Regeln
 - Touch-Ziele >= 44 px; Fokusringe sichtbar (2px Akzent); `prefers-reduced-motion` wird respektiert.
 - Keine Verlaeufe, kein Glow, keine Emojis. Farbe traegt Bedeutung (Naehrwert/Status), nie Dekoration.

@@ -2,26 +2,25 @@ ion-content {
   --background: var(--nt-ground);
 }
 
-ion-toolbar {
-  --background: var(--nt-ground);
+// Seite und Sheets nutzen .nt-page (720 px, 16 px Rand) und .nt-sheet-header aus global.scss.
+// Gruppen und Ueberschriften liegen deshalb buendig auf dem Seitenrand, ohne eigene Einrückung.
+.settings-page .nt-grouped,
+.settings-sheet .nt-grouped {
+  margin-inline: 0;
 }
 
-ion-title {
-  font-size: var(--nt-fs-large-title);
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  color: var(--nt-ink);
+.settings-page .nt-section-header,
+.settings-sheet .nt-section-header {
+  margin-inline: 0;
 }
 
-// Modal-Titel: normale Titelgroesse, damit "Bedarfs-Berechner" nicht abgeschnitten wird.
-ion-modal ion-title {
-  font-size: 17px;
-  letter-spacing: 0;
+.settings-page .nt-section-header {
+  margin-top: var(--nt-space-6);
 }
 
 // Tagesziel: weisse Karte, kcal gross in Akzent.
 .target-card {
-  margin: var(--nt-space-2) var(--nt-space-4) 0;
+  margin: var(--nt-space-2) 0 0;
   background: var(--nt-card);
   color: var(--nt-ink);
   border-radius: var(--nt-radius-card);
@@ -83,17 +82,105 @@ ion-item {
   }
 }
 
+// Zeilen mit Wert rechts: Wert auf der Grundlinie des Labels.
+.settings-page ion-item::part(native) {
+  align-items: baseline;
+}
+
 // Sekundaerwert rechts in einer Zeile (z. B. aktuelles Kalorienziel)
 .row-note {
   --color: var(--nt-secondary);
   color: var(--nt-secondary);
   font-size: var(--nt-fs-body);
+  white-space: nowrap;
 }
 
 // Unterzeile in einer Gruppenzeile (z. B. "Letztes Backup: ...")
 .row-sub {
   margin: 2px 0 0;
   font-size: var(--nt-fs-caption);
+  color: var(--nt-secondary);
+}
+
+// Formular im Profil-Sheet: feste Zeilenhoehe, Stepper mit Luft zum Rand.
+.form-row {
+  --min-height: 60px;
+  --padding-top: var(--nt-space-2);
+  --padding-bottom: var(--nt-space-2);
+  --inner-padding-end: var(--nt-space-3);
+
+  nt-stepper {
+    margin-inline-start: var(--nt-space-3);
+  }
+}
+
+// Segment (Abnehmen / Halten / Zunehmen): eigene Zeile mit Abstand oben und unten.
+.form-row--segment {
+  --min-height: 56px;
+  --padding-top: var(--nt-space-3);
+  --padding-bottom: var(--nt-space-3);
+
+  ion-segment {
+    width: 100%;
+  }
+}
+
+// Tempo-Auswahl als Chips, 44 px Tippflaeche.
+.rate-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nt-space-2);
+  margin-top: var(--nt-space-2);
+}
+
+.rate-chip {
+  min-height: var(--nt-touch);
+  padding: 0 var(--nt-space-4);
+  border: 0;
+  border-radius: var(--nt-radius-pill);
+  background: var(--nt-accent-tint);
+  color: var(--ion-color-primary-shade);
+  font: inherit;
+  font-size: var(--nt-fs-body);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+
+  &--on {
+    background: var(--nt-accent);
+    color: var(--nt-on-accent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--nt-focus);
+    outline-offset: 2px;
+  }
+}
+
+// Speichern-Button: Abstand oben zum letzten Inhalt, Abstand unten zum Sheet-Rand.
+.form-actions {
+  padding: var(--nt-space-6) 0 var(--nt-space-6);
+
+  &--top {
+    padding: var(--nt-space-2) 0 0;
+  }
+}
+
+// Feldgruppe im KI-Sheet: Beschriftung oberhalb, Feld .nt-field.
+.field-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nt-space-2);
+  margin-top: var(--nt-space-3);
+
+  &.is-inactive {
+    opacity: 0.5;
+  }
+}
+
+.field-label {
+  font-size: var(--nt-fs-caption);
+  font-weight: 600;
   color: var(--nt-secondary);
 }
 
@@ -118,7 +205,7 @@ ion-item {
 }
 
 .hint {
-  margin: 0 var(--nt-space-5) var(--nt-space-1);
+  margin: 0 0 var(--nt-space-1);
   font-size: var(--nt-fs-caption);
   color: var(--nt-secondary);
 }
@@ -128,8 +215,14 @@ ion-item {
   font-weight: 600;
 }
 
+.settings-info {
+  padding-top: var(--nt-space-3);
+  padding-bottom: var(--nt-space-6);
+  color: var(--nt-ink);
+}
+
 .debug-log {
-  margin: var(--nt-space-3) var(--nt-space-4) var(--nt-space-4);
+  margin: var(--nt-space-3) 0 var(--nt-space-4);
   background: #111;
   border-radius: var(--nt-radius-tile);
   padding: 8px;

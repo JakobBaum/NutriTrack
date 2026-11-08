@@ -1,8 +1,7 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, ViewChild, inject } from '@angular/core';
 import { ActionSheetController } from '@ionic/angular';
-import { AmountUnit } from '../core/models';
-import { AMOUNT_UNITS } from './diary-helpers';
-import type { StepDirection } from './diary-edit';
+import { AMOUNT_UNITS } from '../../diary/diary-helpers';
+import type { StepDirection } from '../../diary/diary-edit';
 
 /** Eingabefeld mit Einheiten-Menü. */
 interface IonInputLike {
@@ -30,10 +29,16 @@ export class AmountRowComponent {
   @Input() text = '';
   @Input() placeholder = '';
   /** Gewählte Einheit; null = Portionen (kein Menü). */
-  @Input() unit: AmountUnit | null = null;
+  @Input() unit: string | null = null;
+  /** Auswählbare Einheiten (Standard: g, kg, ml, l). */
+  @Input() units: readonly string[] = AMOUNT_UNITS;
   @Input() suffix = '';
+  /** Ohne −/+ (z. B. in engen Listenzeilen). */
+  @Input() showSteppers = true;
+  /** Ohne sichtbares Label und ohne Außenabstand; das Label bleibt für Screenreader. */
+  @Input() compact = false;
   @Output() readonly textChange = new EventEmitter<string>();
-  @Output() readonly unitChange = new EventEmitter<AmountUnit>();
+  @Output() readonly unitChange = new EventEmitter<string>();
   @Output() readonly stepped = new EventEmitter<StepDirection>();
 
   @ViewChild('field') private field?: IonInputLike;
@@ -60,7 +65,7 @@ export class AmountRowComponent {
     const sheet = await this.actionSheet.create({
       header: 'Einheit',
       buttons: [
-        ...AMOUNT_UNITS.map((u) => ({
+        ...this.units.map((u) => ({
           text: u,
           role: u === this.unit ? 'selected' : undefined,
           handler: () => this.unitChange.emit(u),

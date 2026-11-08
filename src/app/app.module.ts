@@ -17,7 +17,7 @@ function prefersReducedMotion(): boolean {
 
 @NgModule({
   declarations: [AppComponent],
-  imports: [BrowserModule, IonicModule.forRoot({ animated: !prefersReducedMotion() }), AppRoutingModule],
+  imports: [BrowserModule, IonicModule.forRoot({ mode: 'ios', animated: !prefersReducedMotion() }), AppRoutingModule],
   providers: [
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
     { provide: FOOD_PROVIDER, useExisting: OpenFoodFactsProvider },

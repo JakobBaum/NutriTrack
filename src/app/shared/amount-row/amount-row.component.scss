@@ -9,6 +9,20 @@
     color: var(--nt-secondary);
   }
 
+  &--compact {
+    padding: 0;
+  }
+
+  &__label--hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
   &__row {
     display: flex;
     align-items: center;
@@ -48,10 +62,17 @@
     flex: 1;
     align-items: center;
     min-width: 0;
-    height: var(--nt-touch);
+    box-sizing: border-box;
+    height: var(--nt-field-height);
     padding-left: var(--nt-space-3);
-    background: var(--nt-ground);
-    border-radius: var(--nt-radius-tile);
+    background: var(--nt-field-bg);
+    border: 1px solid var(--nt-field-border);
+    border-radius: var(--nt-field-radius);
+
+    &:focus-within {
+      border-color: var(--nt-focus);
+      box-shadow: 0 0 0 3px var(--nt-field-ring);
+    }
   }
 
   ion-input {

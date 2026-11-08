@@ -18,13 +18,29 @@ beforeEach(() => {
 });
 
 describe('ShoppingPage add FAB', () => {
-  it('toggles the add form open and closed', () => {
+  it('opens and closes the add sheet', () => {
     const { page } = createPage();
     expect(page.addOpen()).toBe(false);
-    page.toggleAdd();
+    page.openAdd();
     expect(page.addOpen()).toBe(true);
-    page.toggleAdd();
+    page.closeAdd();
     expect(page.addOpen()).toBe(false);
+  });
+
+  it('uses 0.5 as initial breakpoint with a closing 0 breakpoint', () => {
+    const { page } = createPage();
+    expect(page.addBreakpoints[0]).toBe(0);
+    expect(page.addBreakpoints).toContain(page.addInitialBreakpoint);
+  });
+
+  it('stores an optional price and clears all fields', () => {
+    const { page, store } = createPage();
+    page.newItemName = 'Käse';
+    page.newItemPriceText = '2,49';
+    page.addManual();
+    expect(store.list()?.items.at(-1)?.estPrice).toBe(2.49);
+    expect(page.newItemPriceText).toBe('');
+    expect(page.newItemName).toBe('');
   });
 });
 
@@ -77,10 +93,55 @@ describe('ShoppingPage meal chips', () => {
   });
 });
 
-describe('ShoppingPage generator visibility', () => {
-  it('shows the generator while there is no list', () => {
+describe('ShoppingPage view switch', () => {
+  it('defaults to the list view and hides the generator', () => {
     const { page } = createPage();
+    expect(page.view()).toBe('list');
+    expect(page.isListView()).toBe(true);
+    expect(page.showGenerator()).toBe(false);
+  });
+
+  it('shows the generator only in the recipes view', () => {
+    const { page } = createPage();
+    page.setView('recipes');
     expect(page.showGenerator()).toBe(true);
+    expect(page.isListView()).toBe(false);
+    page.setView('list');
+    expect(page.showGenerator()).toBe(false);
+    expect(page.isListView()).toBe(true);
+  });
+
+  it('ignores unknown values from the segment', () => {
+    const { page } = createPage();
+    page.setView('recipes');
+    page.onViewChange('bogus');
+    expect(page.view()).toBe('recipes');
+    page.onViewChange('list');
+    expect(page.view()).toBe('list');
+  });
+
+  it('keeps an open undo delete until the list view is left, then commits it', () => {
+    const { page, store } = createPage();
+    store.addItem({ name: 'Reis', amount: 500, unit: 'g', checked: false });
+    store.addItem({ name: 'Nudeln', amount: 500, unit: 'g', checked: false });
+    page.removeItem(0);
+    expect(page.undoOpen()).toBe(true);
+    expect(page.rows().map((r) => r.item.name)).toEqual(['Nudeln']);
+
+    page.setView('recipes');
+    expect(page.undoOpen()).toBe(false);
+    expect(store.list()?.items.map((i) => i.name)).toEqual(['Nudeln']);
+  });
+});
+
+describe('ShoppingPage generator visibility', () => {
+  it('opens the generator on request and returns to the list on close', () => {
+    const { page, store } = createPage();
+    store.addItem({ name: 'Reis', amount: 500, unit: 'g', checked: false });
+    page.openGenerator();
+    expect(page.view()).toBe('recipes');
+    page.closeGenerator();
+    expect(page.view()).toBe('list');
   });
 
   it('collapses the generator once a list exists and reopens on request', () => {

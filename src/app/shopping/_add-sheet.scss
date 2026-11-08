@@ -1,0 +1,62 @@
+// Sheet "Artikel hinzufuegen" (wird von shopping.page.scss eingebunden).
+// Sheet: auf Tablet 720 px breit.
+ion-modal:not(.barcode-fullscreen-modal):not(.cook-fullscreen-modal).add-sheet {
+  @media (min-width: 768px) {
+    --width: min(720px, 100%);
+    --max-width: min(720px, 100%);
+  }
+}
+
+.add-sheet__content {
+  --background: transparent;
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-bottom: calc(var(--nt-space-4) + env(safe-area-inset-bottom, 0px));
+}
+
+.add-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nt-space-3);
+  padding-top: var(--nt-space-2);
+  &__line { display: flex; align-items: center; gap: var(--nt-space-2); }
+}
+
+.add-price { flex: 1 1 0; min-width: 0; }
+
+// Menge und Einheit in einem Feld (.nt-field-Tokens).
+.amount-unit {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-height: var(--nt-field-height);
+  border: 1px solid var(--nt-field-border);
+  border-radius: var(--nt-field-radius);
+  background: var(--nt-field-bg);
+  &:focus-within { border-color: var(--nt-focus); box-shadow: 0 0 0 3px var(--nt-field-ring); }
+
+  .add-amount {
+    width: 72px;
+    --background: transparent;
+    --highlight-height: 0;
+    --padding-start: var(--nt-space-3);
+    --padding-end: var(--nt-space-2);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  &__sep { width: 1px; align-self: stretch; margin: 10px 0; background: var(--nt-field-border); }
+  &__unit {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: var(--nt-field-height);
+    padding: 0 var(--nt-space-3);
+    border: 0;
+    background: none;
+    color: var(--nt-accent);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    &:focus-visible { outline: 2px solid var(--nt-focus); outline-offset: -2px; border-radius: var(--nt-field-radius); }
+  }
+}

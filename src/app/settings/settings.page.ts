@@ -11,6 +11,7 @@ import { formatDecimal } from '../core/util/number-input';
 import { StorageService } from '../core/storage/storage.service';
 import { MAX_RATE_KG_PER_WEEK, NutritionCalcService } from '../core/nutrition/nutrition-calc.service';
 import { aiConnection, aiStatusLabel, modelOptions } from './ai-status';
+import { AiService } from '../core/ai/ai.service';
 import { CustomFoodStore } from '../core/state/custom-food.store';
 import { SettingsStore } from '../core/state/settings.store';
 import { ShoppingStore } from '../core/state/shopping.store';
@@ -62,6 +63,11 @@ export class SettingsPage implements OnInit {
   readonly debugMode = resolveDebugMode(this.win?.location.search ?? '', safeLocalStorage(this.win));
 
   readonly target = this.profileStore.target;
+  /** Ziel des gespeicherten Profils als Lesetext (z. B. „Abnehmen“), sonst null. */
+  readonly profileGoalLabel = computed(() => {
+    const goal = this.profileStore.profile()?.goal;
+    return this.goals.find((g) => g.value === goal)?.label ?? null;
+  });
   readonly savedToast = signal<string | null>(null);
 
   readonly profileOpen = signal(false);
@@ -99,6 +105,11 @@ export class SettingsPage implements OnInit {
   /** Aktive KI-Verbindung (gespeicherter Stand) und ihre Beschriftung für die Zeile. */
   readonly aiState = computed(() => aiConnection(this.settingsStore.ai()));
   readonly aiStatus = computed(() => aiStatusLabel(this.aiState()));
+  private readonly aiService = inject(AiService);
+  /** Ergebnis des Verbindungstests (prüft die gespeicherte Konfiguration). */
+  readonly aiTest = signal<{ busy: boolean; ok: boolean | null; message: string | null }>({
+    busy: false, ok: null, message: null,
+  });
 
   // --- KI-Konfiguration (Kopie zum Bearbeiten) ---
   ai: AiConfig = { ...this.settingsStore.ai() };
@@ -263,8 +274,16 @@ export class SettingsPage implements OnInit {
       apiKey,
       provider: apiKey ? 'gemini' : 'none',
     });
+    this.aiTest.set({ busy: false, ok: null, message: null });
     this.aiOpen.set(false);
     this.savedToast.set('KI-Einstellungen gespeichert.');
+  }
+
+  /** Prüft den aktiven Weg der gespeicherten Konfiguration ohne KI-Kosten. */
+  async testAi(): Promise<void> {
+    this.aiTest.set({ busy: true, ok: null, message: 'Prüfe Verbindung …' });
+    const result = await this.aiService.testConnection();
+    this.aiTest.set({ busy: false, ok: result.ok, message: result.message });
   }
 
   /** Fragt vor dem unwiderruflichen Löschen aller lokalen Daten nach. */

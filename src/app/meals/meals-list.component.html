@@ -3,7 +3,7 @@
     <ion-icon name="nutrition-outline" class="empty__icon" aria-hidden="true"></ion-icon>
     <h2>Noch keine Mahlzeiten</h2>
     <p>Speichere häufige Mahlzeiten (Rezept + Lebensmittel kombiniert) und füge sie mit einem Tippen ins Tagebuch ein.</p>
-    <ion-button expand="block" (click)="openCreate()">Erste Mahlzeit anlegen</ion-button>
+    <button type="button" class="nt-add-btn" (click)="openCreate()">Erste Mahlzeit anlegen</button>
   </div>
 } @else {
   <h2 class="nt-section-header">Gespeicherte Mahlzeiten</h2>
@@ -16,8 +16,9 @@
             <h3>{{ meal.name }}</h3>
             <p>{{ meal.entries.length }} Einträge · {{ totalKcal(meal) | ntNum: 0 }} kcal</p>
           </ion-label>
-          <ion-button slot="end" fill="clear" class="icon-btn" [attr.aria-label]="'„' + meal.name + '“ ins Tagebuch eintragen'" (click)="$event.stopPropagation(); useMeal(meal)">
-            <ion-icon slot="icon-only" name="add-circle-outline" aria-hidden="true"></ion-icon>
+          <ion-button slot="end" fill="clear" class="meal-use" [attr.aria-label]="'„' + meal.name + '“ ins Tagebuch eintragen'" (click)="$event.stopPropagation(); useMeal(meal)">
+            <ion-icon slot="start" name="add-circle-outline" aria-hidden="true"></ion-icon>
+            Eintragen
           </ion-button>
           <ion-button slot="end" fill="clear" color="danger" class="icon-btn nt-hover-delete" [attr.aria-label]="'„' + meal.name + '“ löschen'" (click)="$event.stopPropagation(); removeMeal(meal.id)">
             <ion-icon slot="icon-only" name="trash-outline" aria-hidden="true"></ion-icon>
@@ -57,59 +58,51 @@
 <ion-modal [isOpen]="createOpen()" [canDismiss]="canDismissCreate" (ionModalDidDismiss)="closeCreate()">
   <ng-template>
     <ion-header class="ion-no-border">
-      <ion-toolbar>
-        <ion-title role="heading" aria-level="2">{{ editingId() ? 'Mahlzeit bearbeiten' : 'Mahlzeit anlegen' }}</ion-title>
-        <ion-buttons slot="end">
-          <ion-button (click)="closeCreate()">Abbrechen</ion-button>
-        </ion-buttons>
-      </ion-toolbar>
+      <div class="nt-sheet-header">
+        <div class="nt-sheet-header__start"></div>
+        <h2 class="nt-sheet-header__title" role="heading" aria-level="2">{{ editingId() ? 'Mahlzeit bearbeiten' : 'Mahlzeit anlegen' }}</h2>
+        <div class="nt-sheet-header__end">
+          <ion-button fill="clear" (click)="closeCreate()">Abbrechen</ion-button>
+        </div>
+      </div>
     </ion-header>
-    <ion-content class="ion-padding">
-      <ion-item class="name-item">
-        <ion-input
-          label="Name der Mahlzeit"
-          labelPlacement="stacked"
-          placeholder="z. B. Frühstück Standard"
-          [(ngModel)]="draftName"
-        ></ion-input>
-      </ion-item>
+    <ion-content>
+      <label class="field-label nt-section-header" for="meal-name">Name der Mahlzeit</label>
+      <ion-input
+        id="meal-name"
+        class="nt-field"
+        aria-label="Name der Mahlzeit"
+        placeholder="z. B. Frühstück Standard"
+        [(ngModel)]="draftName"
+      ></ion-input>
 
       <h2 class="section-sub nt-section-header">Zutaten &amp; Komponenten</h2>
 
       @if (draftEntries.length > 0) {
-        <ion-list class="nt-grouped" lines="none">
+        <ul class="draft-list">
           @for (entry of draftEntries; track i; let i = $index) {
-            <ion-item>
-              <ion-label>
-                <div>{{ entry.label }}</div>
-                <p>{{ entry.facts.kcal | ntNum: 0 }} kcal</p>
-              </ion-label>
+            <li class="draft-row">
+              <div class="draft-row__text">
+                <span class="draft-row__name">{{ entry.label }}</span>
+                <span class="draft-row__kcal">{{ entry.facts.kcal | ntNum: 0 }} kcal</span>
+              </div>
               @if (entry.amountG) {
-                <ion-input
-                  slot="end"
-                  class="amount-input"
-                  type="number"
-                  inputmode="decimal"
-                  aria-label="Menge in Gramm"
-                  [value]="entry.amountG"
-                  (ionChange)="setEntryAmount(i, $event)"
-                ></ion-input>
-                <span slot="end" class="amount-unit" aria-hidden="true">g</span>
+                <app-amount-row class="draft-row__amount" [label]="'Menge ' + entry.label" [compact]="true" suffix="g" [showSteppers]="false" [text]="amountText(i, entry.amountG)" (textChange)="setEntryAmountText(i, $event)"></app-amount-row>
               }
-              <ion-button slot="end" fill="clear" color="danger" class="icon-btn" [attr.aria-label]="'„' + entry.label + '“ entfernen'" (click)="removeEntry(i)">
+              <ion-button fill="clear" color="danger" class="icon-btn" [attr.aria-label]="'„' + entry.label + '“ entfernen'" (click)="removeEntry(i)">
                 <ion-icon slot="icon-only" name="close-circle-outline" aria-hidden="true"></ion-icon>
               </ion-button>
-            </ion-item>
+            </li>
           }
-        </ion-list>
+        </ul>
         <div class="draft-total">Gesamt: {{ totalDraftKcal() | ntNum: 0 }} kcal</div>
       }
 
       <div class="add-btns">
-        <ion-button expand="block" fill="outline" (click)="openPicker()">
-          <ion-icon slot="start" name="search-outline" aria-hidden="true"></ion-icon>
-          Lebensmittel suchen
-        </ion-button>
+        <button type="button" class="nt-add-btn" (click)="openPicker()">
+          <ion-icon name="add-outline" aria-hidden="true"></ion-icon>
+          Lebensmittel hinzufügen
+        </button>
 
         @if (recipes().length > 0) {
           <h2 class="section-sub nt-section-header">Rezept hinzufügen</h2>
@@ -145,19 +138,41 @@
   </ng-template>
 </ion-modal>
 
-<!-- Lebensmittel-Picker -->
+<!-- Lebensmittel-Picker: Suche, Barcode, Etikett, Manuell -->
 <ion-modal [isOpen]="pickerOpen()" (ionModalDidDismiss)="closePicker()">
   <ng-template>
     <ion-header class="ion-no-border">
-      <ion-toolbar>
-        <ion-title role="heading" aria-level="2">Lebensmittel</ion-title>
-        <ion-buttons slot="end">
-          <ion-button (click)="closePicker()">Fertig</ion-button>
-        </ion-buttons>
-      </ion-toolbar>
+      <div class="nt-sheet-header">
+        <div class="nt-sheet-header__start">
+          @if (pickerView() === 'manual') {
+            <ion-button fill="clear" (click)="pickerView.set('sources')" aria-label="Zurück zur Suche">
+              <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
+            </ion-button>
+          }
+        </div>
+        <h2 class="nt-sheet-header__title" role="heading" aria-level="2">{{ pickerView() === 'manual' ? 'Manuell hinzufügen' : 'Lebensmittel' }}</h2>
+        <div class="nt-sheet-header__end">
+          <ion-button fill="clear" (click)="closePicker()">Abbrechen</ion-button>
+        </div>
+      </div>
     </ion-header>
-    <ion-content class="ion-padding">
-      <nt-food-search [allowManual]="false" (picked)="pickFood($event)"></nt-food-search>
+    <ion-content>
+      @if (pickerView() === 'sources') {
+        <nt-food-sources (result)="pickSource($event)" (manual)="openManual($event)"></nt-food-sources>
+      } @else {
+        <label class="field-label nt-section-header" for="manual-name">Name</label>
+        <ion-input id="manual-name" class="nt-field" aria-label="Name" placeholder="z. B. Haferflocken" enterkeyhint="next" [(ngModel)]="manual.name"></ion-input>
+        <label class="field-label nt-section-header" for="manual-kcal">Kalorien (kcal)</label>
+        <ion-input id="manual-kcal" class="nt-field" aria-label="Kalorien (kcal)" inputmode="decimal" placeholder="0" enterkeyhint="next" [(ngModel)]="manual.kcal"></ion-input>
+        <label class="field-label nt-section-header" for="manual-protein">Eiweiß (g)</label>
+        <ion-input id="manual-protein" class="nt-field" aria-label="Eiweiß (g)" inputmode="decimal" placeholder="0" enterkeyhint="next" [(ngModel)]="manual.proteinG"></ion-input>
+        <label class="field-label nt-section-header" for="manual-carbs">Kohlenhydrate (g)</label>
+        <ion-input id="manual-carbs" class="nt-field" aria-label="Kohlenhydrate (g)" inputmode="decimal" placeholder="0" enterkeyhint="next" [(ngModel)]="manual.carbsG"></ion-input>
+        <label class="field-label nt-section-header" for="manual-fat">Fett (g)</label>
+        <ion-input id="manual-fat" class="nt-field" aria-label="Fett (g)" inputmode="decimal" placeholder="0" enterkeyhint="done" [(ngModel)]="manual.fatG"></ion-input>
+        <p class="manual-hint">Werte für die ganze Portion in dieser Mahlzeit.</p>
+        <ion-button expand="block" [disabled]="!manualValid()" (click)="addManual()">Hinzufügen</ion-button>
+      }
     </ion-content>
   </ng-template>
 </ion-modal>

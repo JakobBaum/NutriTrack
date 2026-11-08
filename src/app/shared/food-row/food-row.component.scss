@@ -1,8 +1,11 @@
+// Zeile: [Bild 44] [Text, flexibel] [Nutri-Score, feste Spalte 28 px]. Mindesthoehe 64 px.
 :host {
-  display: flex;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 28px;
   align-items: center;
   gap: var(--nt-space-3);
   min-width: 0;
+  min-height: 64px;
 }
 
 .thumb {
@@ -11,8 +14,8 @@
   height: 44px;
   border-radius: 10px;
   overflow: hidden;
-  background: var(--nt-track);
-  color: var(--nt-secondary);
+  background: var(--nt-accent-tint);
+  color: var(--nt-accent);
   display: grid;
   place-items: center;
 
@@ -32,7 +35,6 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-  flex: 1 1 auto;
 }
 
 .name {
@@ -61,8 +63,20 @@
   display: flex;
   align-items: center;
   gap: var(--nt-space-2);
+  min-width: 0;
   font-size: var(--nt-fs-caption);
   color: var(--nt-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Feste rechte Spalte: Scores stehen unabhaengig von der Textlaenge buendig untereinander.
+.side {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
 }
 
 .score {

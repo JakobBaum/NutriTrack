@@ -304,7 +304,7 @@ textarea {
 /* --- Primäre Buttons: vollflächiges Akzent-Teal, weißer Text (5.2:1), kein Verlauf/Glow --- */
 // „Primär“ = ohne color-Attribut, color="primary" oder .ion-color-primary.
 // Toolbar-Buttons (ion-buttons) bleiben Text-Buttons und werden unten behandelt.
-ion-button:not([fill='outline']):not([fill='clear']):not(ion-buttons ion-button):is(
+ion-button:not([fill='outline']):not([fill='clear']):not(ion-buttons ion-button):not(.nt-add-btn):is(
     :not([color]),
     [color='primary'],
     .ion-color-primary
@@ -570,9 +570,13 @@ ion-modal:not(.barcode-fullscreen-modal):not(.cook-fullscreen-modal) {
   }
 }
 
-// Segment (iOS): graue Spur, Radius 9, aktiver Reiter weiss (Radius 7, kleiner Schatten), 44 px, keine Grossbuchstaben
+// Segment (iOS): graue Spur, Radius 9, aktiver Reiter weiss (Radius 7, kleiner Schatten), 44 px, keine Grossbuchstaben.
+// Reiter 4 px kleiner als die Spur (2 px Padding oben/unten), damit die Gesamthoehe genau 44 px bleibt.
 ion-segment {
   --background: rgba(118, 118, 128, 0.12);
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
   min-height: var(--nt-touch);
   padding: 2px;
   border-radius: 9px;
@@ -584,10 +588,24 @@ ion-segment-button {
   --indicator-color: #ffffff;
   --indicator-box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 0.5px 1px rgba(0, 0, 0, 0.08);
   --border-radius: 7px;
-  min-height: var(--nt-touch);
+  --padding-start: var(--nt-space-2);
+  --padding-end: var(--nt-space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  height: calc(var(--nt-touch) - 4px);
+  min-height: calc(var(--nt-touch) - 4px);
+  font-size: var(--nt-fs-body);
   font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
+  white-space: nowrap;
+
+  &::part(native) {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 
 ion-segment-button.segment-button-checked {
@@ -612,9 +630,10 @@ ion-select:focus-within {
   --highlight-color-focused: var(--nt-accent);
 }
 
-// Inhalt in den Tabs bekommt Platz unter der schwebenden Kapsel-Bar.
+// Inhalt in den Tabs bekommt Platz unter der schwebenden Kapsel-Bar (Kapsel 64 + 8 Abstand + 24 Luft).
+// Siehe Abschnitt "Gemeinsame UI-Grundlage" unten (--nt-tabbar-clearance, .nt-tab-clearance).
 ion-tabs ion-content {
-  --padding-bottom: calc(var(--nt-tabbar-height) + 24px + env(safe-area-inset-bottom, 0px));
+  --padding-bottom: var(--nt-tabbar-clearance);
 }
 
 
@@ -760,4 +779,252 @@ ion-item {
   .nt-hover-delete:hover {
     background: rgba(198, 40, 57, 0.1);
   }
+}
+
+// Quellen-Kacheln (nt-food-sources): Barcode / Etikett / weitere / Manuell.
+// Gleich breite Spalten, die sich in die Breite teilen: kein horizontales Abschneiden, "Manuell" bleibt sichtbar.
+.nt-sources {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--nt-space-2);
+  margin: var(--nt-space-4) var(--nt-space-4) var(--nt-space-1);
+}
+
+.nt-source-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 64px;
+  padding: var(--nt-space-2);
+  background: var(--nt-card);
+  border: 0;
+  border-radius: var(--nt-radius-tile);
+  color: var(--nt-accent);
+  font: inherit;
+  font-size: var(--nt-fs-caption);
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 150ms ease-out;
+
+  &:active { opacity: 0.7; }
+  &:disabled { opacity: 0.5; }
+  &:focus-visible { outline: 2px solid var(--nt-focus); outline-offset: 2px; }
+  ion-icon { font-size: 24px; }
+}
+
+.nt-source-error {
+  margin: var(--nt-space-2) var(--nt-space-5) 0;
+  font-size: var(--nt-fs-body);
+  font-weight: 600;
+  color: var(--nt-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nt-source-btn { transition: none; }
+}
+
+/* =========================================================================
+ * Gemeinsame UI-Grundlage (Runde 6): Tokens, Felder, Seiten, Sheets, Buttons,
+ * Tab-Bar-Abstand. Dokumentation: DESIGN.md, Abschnitt "Gemeinsame Bausteine".
+ * ========================================================================= */
+
+:root {
+  --nt-field-height: 52px;
+  --nt-field-radius: 14px;
+  --nt-field-bg: var(--nt-card);
+  --nt-field-border: var(--nt-separator);
+  --nt-field-ring: var(--nt-accent-tint);
+  --nt-field-placeholder: var(--nt-secondary);
+  --nt-page-max: 720px;
+  --nt-page-gutter: var(--nt-space-4);
+  // Freiraum unten, damit Inhalt nicht unter der Kapsel-Tab-Bar verschwindet (Bar 64 + 8 + 24 Luft).
+  --nt-tabbar-clearance: calc(var(--ion-safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 96px);
+  // FAB: 16 px ueber der Tab-Bar (Bar-Oberkante = Safe-Area + 8 + 64).
+  --nt-fab-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px + var(--nt-tabbar-height) + var(--nt-space-4));
+}
+
+// Einheitliches Eingabefeld: ion-input, ion-select, ion-textarea mit Klasse .nt-field.
+// Eine Fuellung, 1 px Rand, Radius 14, Fokus = Markenfarbe mit Ring, der dem Radius folgt.
+// :root erhoeht die Spezifitaet ueber die Host-Klassen der Ionic-Komponenten.
+:root :is(ion-input, ion-select, ion-textarea).nt-field {
+  --background: var(--nt-field-bg);
+  --color: var(--nt-ink);
+  --placeholder-color: var(--nt-field-placeholder);
+  --placeholder-opacity: 1;
+  --highlight-height: 0;
+  --padding-start: var(--nt-space-4);
+  --padding-end: var(--nt-space-4);
+  --padding-top: 0;
+  --padding-bottom: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--nt-field-height);
+  border: 1px solid var(--nt-field-border);
+  border-radius: var(--nt-field-radius);
+  background: var(--nt-field-bg);
+  color: var(--nt-ink);
+  font-size: var(--nt-fs-body);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+:root ion-textarea.nt-field {
+  align-items: stretch;
+  height: auto;
+  min-height: 96px;
+  --padding-top: var(--nt-space-3);
+  --padding-bottom: var(--nt-space-3);
+}
+
+// Fokus: Spezifitaet (0,3,1), damit er die Basisregel oben (Rand) ueberstimmt.
+:root :is(ion-input, ion-select, ion-textarea).nt-field:is(:focus-within, .has-focus, .ion-focused) {
+  border-color: var(--nt-focus);
+  box-shadow: 0 0 0 3px var(--nt-field-ring);
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nt-field { transition: none; }
+}
+
+// Seitencontainer: 720 px Maximum, zentriert, 16 px Seitenrand.
+.nt-page {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--nt-page-max);
+  margin: 0 auto;
+  padding-inline: var(--nt-page-gutter);
+}
+
+// Seitenkopf: Titel und Aktion in einer Zeile, oben mit Safe-Area (nie weniger als 12 px).
+.nt-page-header {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nt-space-3);
+  flex-wrap: nowrap;
+  width: 100%;
+  max-width: var(--nt-page-max);
+  margin: 0 auto;
+  padding: max(var(--nt-space-3), env(safe-area-inset-top, 0px)) var(--nt-page-gutter) var(--nt-space-2);
+
+  > .nt-large-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  > ion-button,
+  > .nt-page-header__action {
+    flex: none;
+  }
+}
+
+// Modal-Kopf (Sheet): links/rechts Aktionen, Titel mittig, 16 px Rand. Der Griff kommt vom ion-modal.
+.nt-sheet-header {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--nt-space-2);
+  min-height: var(--nt-touch);
+  padding: var(--nt-space-2) var(--nt-page-gutter) 0;
+
+  &__title {
+    margin: 0;
+    min-width: 0;
+    font-size: var(--nt-fs-headline);
+    font-weight: 600;
+    color: var(--nt-ink);
+    text-align: center;
+    text-wrap: balance;
+    overflow-wrap: anywhere;
+  }
+
+  &__start,
+  &__end {
+    display: flex;
+    align-items: center;
+    min-width: var(--nt-touch);
+  }
+
+  &__start { justify-self: start; }
+  &__end { justify-self: end; }
+}
+
+// Datepicker-Sheet: Phone volle Breite, Tablet/Desktop an den Inhalt angepasst (kein halb gefuelltes Sheet).
+// Spezifitaet (0,3,1) schlaegt die globale Tablet-Hoehenregel oben.
+ion-modal:not(.barcode-fullscreen-modal):not(.cook-fullscreen-modal).nt-date-modal {
+  --width: 100%;
+  --height: auto;
+  --max-width: 100%;
+
+  ion-datetime {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+@media (min-width: 768px) {
+  ion-modal:not(.barcode-fullscreen-modal):not(.cook-fullscreen-modal).nt-date-modal {
+    --width: min(360px, 100%);
+    --max-width: min(360px, 100%);
+  }
+}
+
+// Einheitlicher Sekundaer-Button "Hinzufuegen" (button und ion-button).
+.nt-add-btn {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: var(--nt-touch);
+  padding: 0 var(--nt-page-gutter);
+  border: 0;
+  border-radius: var(--nt-radius-pill);
+  background: var(--nt-accent-tint);
+  color: var(--ion-color-primary-shade);
+  font: inherit;
+  font-size: var(--nt-fs-headline);
+  font-weight: 600;
+  cursor: pointer;
+
+  &:active { opacity: 0.7; }
+  &:disabled { opacity: 0.4; cursor: default; }
+  &:focus-visible { outline: 2px solid var(--nt-focus); outline-offset: 2px; }
+}
+
+ion-button.nt-add-btn {
+  --background: var(--nt-accent-tint);
+  --background-activated: var(--nt-accent-tint);
+  --background-hover: var(--nt-accent-tint);
+  --background-focused: var(--nt-accent-tint);
+  --color: var(--ion-color-primary-shade);
+  --box-shadow: none;
+  --border-radius: var(--nt-radius-pill);
+  width: 100%;
+  font-weight: 600;
+
+  &::part(native) {
+    background: var(--background);
+    color: var(--color);
+  }
+}
+
+// Tab-Bar-Freiraum fuer Scroll-Container ausserhalb von ion-content.
+.nt-tab-clearance {
+  padding-bottom: var(--nt-tabbar-clearance);
+}
+
+// FAB ueber der Tab-Bar (16 px Abstand). Auf der Seite zusaetzlich ausblenden, wenn ein Generator/Sheet offen ist.
+:root ion-fab.nt-fab-offset {
+  bottom: var(--nt-fab-bottom);
 }

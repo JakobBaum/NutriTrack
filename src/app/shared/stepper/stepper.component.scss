@@ -1,5 +1,8 @@
+// Stepper: Zeile mindestens 56 px hoch, Buttons sichtbar 36 px, Tippfläche 44 px (::before).
 :host {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: 56px;
 }
 
 .stepper {
@@ -8,15 +11,26 @@
   gap: var(--nt-space-2);
 
   &__btn {
-    width: var(--nt-touch, 44px);
-    height: var(--nt-touch, 44px);
+    position: relative;
+    box-sizing: border-box;
+    width: 36px;
+    height: 36px;
+    padding: 0;
     border: none;
     border-radius: var(--nt-radius-pill);
     background: var(--nt-accent-tint);
     color: var(--nt-accent);
-    font-size: 22px;
+    font-size: 20px;
     line-height: 1;
     cursor: pointer;
+
+    // Unsichtbare Tippfläche auf 44 px, ohne den sichtbaren Kreis zu vergroessern.
+    &::before {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: inherit;
+    }
 
     &:disabled {
       opacity: 0.4;

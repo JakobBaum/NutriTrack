@@ -183,6 +183,25 @@ export class GeminiAiProvider implements AiProvider {
     return normalizeRecipeImport(obj, input.url);
   }
 
+  /**
+   * Prüft Key und Endpoint ohne Modellaufruf (kein Token-Verbrauch): Modellliste mit pageSize=1.
+   * Wirft eine verständliche deutsche Meldung.
+   */
+  async ping(): Promise<void> {
+    const cfg = this.settings.ai();
+    if (!cfg.apiKey?.trim()) throw new Error('Kein Gemini-API-Key in den Einstellungen hinterlegt.');
+    const base = cfg.endpoint?.trim() || DEFAULT_BASE;
+    try {
+      await firstValueFrom(
+        this.http.get(`${base}?pageSize=1`, { headers: { 'x-goog-api-key': cfg.apiKey.trim() } }),
+      );
+    } catch (e: unknown) {
+      const status = e instanceof HttpErrorResponse ? e.status : 0;
+      // Google antwortet auf einen ungültigen Schlüssel mit 400 (API_KEY_INVALID).
+      throw new Error(friendlyAiErrorMessage(status === 400 ? 401 : status));
+    }
+  }
+
   // --- intern ---
 
   private model(): string {

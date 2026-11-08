@@ -1,127 +1,130 @@
-<ion-header class="ion-no-border">
-  <ion-toolbar>
-    <ion-title role="heading" aria-level="1">Profil</ion-title>
-  </ion-toolbar>
-</ion-header>
-
 <ion-content>
-  <!-- Aktuelles Tagesziel -->
-  @if (target(); as t) {
-    <ion-card class="target-card">
-      <ion-card-content>
-        <div class="target-card__kcal">
-          <span class="num">{{ t.kcal | ntNum:0 }}</span><span class="unit">kcal / Tag</span>
-        </div>
-        @if (savedMinKcalApplied) {
-          <p class="target-card__note">Mindestzufuhr aktiv: Die Formel läge darunter, das Ziel wurde auf den Mindestwert angehoben.</p>
-        }
-        <div class="target-card__macros">
-          <span><strong>{{ t.proteinG | ntNum:0 }}</strong> g Eiweiß</span>
-          <span><strong>{{ t.carbsG | ntNum:0 }}</strong> g Kohlenhydrate</span>
-          <span><strong>{{ t.fatG | ntNum:0 }}</strong> g Fett</span>
-          <span><strong>{{ t.fiberG | ntNum:0 }}</strong> g Ballaststoffe</span>
-          <span><strong>{{ t.sugarG | ntNum:0 }}</strong> g Zucker max.</span>
-        </div>
-      </ion-card-content>
-    </ion-card>
-  }
+  <div class="nt-page nt-tab-clearance settings-page">
+    <div class="nt-page-header">
+      <h1 class="nt-large-title">Profil</h1>
+    </div>
 
-  <h2 class="nt-section-header">Ziele &amp; KI</h2>
-  <ion-list class="nt-grouped" lines="full">
-    <ion-item button detail="true" (click)="profileOpen.set(true)">
-      <ion-icon slot="start" name="body-outline"></ion-icon>
-      <ion-label>Mein Profil (Gewicht, Ziel)</ion-label>
-      <ion-note slot="end" class="row-note">{{ target() ? (target()!.kcal | ntNum:0) + ' kcal/Tag' : 'Einrichten' }}</ion-note>
-    </ion-item>
-    <ion-item button detail="true" (click)="aiOpen.set(true)">
-      <ion-icon slot="start" name="sparkles-outline"></ion-icon>
-      <ion-label>KI-Verbindung</ion-label>
-      <ion-note slot="end" class="row-note" [class.row-note--on]="aiState() !== 'none'">{{ aiStatus() }}</ion-note>
-    </ion-item>
-  </ion-list>
+    <!-- Aktuelles Tagesziel -->
+    @if (target(); as t) {
+      <ion-card class="target-card">
+        <ion-card-content>
+          <div class="target-card__kcal">
+            <span class="num">{{ t.kcal | ntNum:0 }}</span><span class="unit">kcal / Tag</span>
+          </div>
+          @if (savedMinKcalApplied) {
+            <p class="target-card__note">Mindestzufuhr aktiv: Die Formel läge darunter, das Ziel wurde auf den Mindestwert angehoben.</p>
+          }
+          <div class="target-card__macros">
+            <span><strong>{{ t.proteinG | ntNum:0 }}</strong> g Eiweiß</span>
+            <span><strong>{{ t.carbsG | ntNum:0 }}</strong> g Kohlenhydrate</span>
+            <span><strong>{{ t.fatG | ntNum:0 }}</strong> g Fett</span>
+            <span><strong>{{ t.fiberG | ntNum:0 }}</strong> g Ballaststoffe</span>
+            <span><strong>{{ t.sugarG | ntNum:0 }}</strong> g Zucker max.</span>
+          </div>
+        </ion-card-content>
+      </ion-card>
+    }
 
-  <h2 class="nt-section-header">App</h2>
-  <ion-list class="nt-grouped" lines="full">
-    <ion-item button detail="true" (click)="infoSection.set('anleitung')">
-      <ion-icon slot="start" name="book-outline"></ion-icon>
-      <ion-label>Anleitung</ion-label>
-    </ion-item>
-    <ion-item button detail="true" (click)="infoSection.set('hilfe')">
-      <ion-icon slot="start" name="help-circle-outline"></ion-icon>
-      <ion-label>Hilfe &amp; Kontakt</ion-label>
-    </ion-item>
-  </ion-list>
-
-  <h2 class="nt-section-header">Rechtliches</h2>
-  <ion-list class="nt-grouped" lines="full">
-    <ion-item button detail="true" (click)="infoSection.set('datenschutz')">
-      <ion-icon slot="start" name="shield-outline"></ion-icon>
-      <ion-label>Datenschutzerklärung</ion-label>
-    </ion-item>
-    <ion-item button detail="true" (click)="infoSection.set('agb')">
-      <ion-icon slot="start" name="document-text-outline"></ion-icon>
-      <ion-label>Nutzungsbedingungen</ion-label>
-    </ion-item>
-  </ion-list>
-
-  <h2 class="nt-section-header">Daten</h2>
-  <ion-list class="nt-grouped" lines="full">
-    <ion-item button detail="false" [disabled]="backupBusy()" (click)="exportBackup()">
-      <ion-icon slot="start" name="cloud-download-outline"></ion-icon>
-      <ion-label>
-        Backup exportieren
-        <p class="row-sub">{{ lastBackupLabel() }}</p>
-      </ion-label>
-    </ion-item>
-    <ion-item button detail="false" [disabled]="backupBusy()" (click)="backupInput.click()">
-      <ion-icon slot="start" name="cloud-upload-outline"></ion-icon>
-      <ion-label>Backup importieren</ion-label>
-    </ion-item>
-    <ion-item button detail="false" class="danger-row" lines="none" (click)="confirmReset()">
-      <ion-icon slot="start" name="trash-outline" color="danger"></ion-icon>
-      <ion-label>Alle lokalen Daten zurücksetzen</ion-label>
-    </ion-item>
-  </ion-list>
-  <!-- Unsichtbare Dateiauswahl für den Backup-Import -->
-  <input
-    #backupInput
-    type="file"
-    accept=".json,application/json"
-    class="backup-input"
-    tabindex="-1"
-    (change)="onBackupFileSelected($event)"
-  />
-  <p class="hint data-hint">Alle Daten liegen nur auf diesem Gerät. Exportiere regelmäßig ein Backup, um sie bei Gerätewechsel oder Neuinstallation wiederherzustellen.</p>
-
-  @if (debugMode) {
-    <!-- Debug-Log: nur mit ?debug=1 -->
-    <h2 class="nt-section-header">Debug-Log</h2>
-    <ion-list class="nt-grouped" lines="none">
-      <ion-item button detail="false" (click)="logOpen.set(!logOpen())">
-        <ion-icon slot="start" name="terminal-outline"></ion-icon>
-        <ion-label>Log anzeigen ({{ logEntries().length }})</ion-label>
-        <ion-icon slot="end" [name]="logOpen() ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
+    <h2 class="nt-section-header">Ziele &amp; KI</h2>
+    <ion-list class="nt-grouped" lines="full">
+      <ion-item button detail="true" (click)="profileOpen.set(true)">
+        <ion-icon slot="start" name="body-outline"></ion-icon>
+        <ion-label>
+          Mein Profil
+          @if (profileGoalLabel(); as goal) { <p class="row-sub">Ziel: {{ goal }}</p> }
+        </ion-label>
+        <ion-note slot="end" class="row-note">{{ target() ? (target()!.kcal | ntNum:0) + ' kcal/Tag' : 'Einrichten' }}</ion-note>
       </ion-item>
-      <ion-item button detail="false" (click)="testConnection()">
-        <ion-icon slot="start" name="wifi-outline"></ion-icon>
-        <ion-label>Worker-Verbindung testen</ion-label>
+      <ion-item button detail="true" (click)="aiOpen.set(true)">
+        <ion-icon slot="start" name="sparkles-outline"></ion-icon>
+        <ion-label>KI-Verbindung</ion-label>
+        <ion-note slot="end" class="row-note" [class.row-note--on]="aiState() !== 'none'">{{ aiStatus() }}</ion-note>
       </ion-item>
     </ion-list>
-    @if (logOpen()) {
-      <div class="debug-log">
-        <button class="debug-log__clear" (click)="debugLog.clear()">Log leeren</button>
-        @if (logEntries().length === 0) {
-          <p class="debug-log__empty">Noch keine Einträge.</p>
-        }
-        @for (entry of logEntries(); track $index) {
-          <div class="debug-log__entry" [class]="'debug-log__entry--' + entry.level">
-            <span class="debug-log__ts">{{ entry.ts }}</span>
-            <span class="debug-log__msg">{{ entry.msg }}</span>
-          </div>
-        }
-      </div>
+
+    <h2 class="nt-section-header">App</h2>
+    <ion-list class="nt-grouped" lines="full">
+      <ion-item button detail="true" (click)="infoSection.set('anleitung')">
+        <ion-icon slot="start" name="book-outline"></ion-icon>
+        <ion-label>Anleitung</ion-label>
+      </ion-item>
+      <ion-item button detail="true" (click)="infoSection.set('hilfe')">
+        <ion-icon slot="start" name="help-circle-outline"></ion-icon>
+        <ion-label>Hilfe &amp; Kontakt</ion-label>
+      </ion-item>
+    </ion-list>
+
+    <h2 class="nt-section-header">Rechtliches</h2>
+    <ion-list class="nt-grouped" lines="full">
+      <ion-item button detail="true" (click)="infoSection.set('datenschutz')">
+        <ion-icon slot="start" name="shield-outline"></ion-icon>
+        <ion-label>Datenschutzerklärung</ion-label>
+      </ion-item>
+      <ion-item button detail="true" (click)="infoSection.set('agb')">
+        <ion-icon slot="start" name="document-text-outline"></ion-icon>
+        <ion-label>Nutzungsbedingungen</ion-label>
+      </ion-item>
+    </ion-list>
+
+    <h2 class="nt-section-header">Daten</h2>
+    <ion-list class="nt-grouped" lines="full">
+      <ion-item button detail="false" [disabled]="backupBusy()" (click)="exportBackup()">
+        <ion-icon slot="start" name="cloud-download-outline"></ion-icon>
+        <ion-label>
+          Backup exportieren
+          <p class="row-sub">{{ lastBackupLabel() }}</p>
+        </ion-label>
+      </ion-item>
+      <ion-item button detail="false" [disabled]="backupBusy()" (click)="backupInput.click()">
+        <ion-icon slot="start" name="cloud-upload-outline"></ion-icon>
+        <ion-label>Backup importieren</ion-label>
+      </ion-item>
+      <ion-item button detail="false" class="danger-row" lines="none" (click)="confirmReset()">
+        <ion-icon slot="start" name="trash-outline" color="danger"></ion-icon>
+        <ion-label>Alle lokalen Daten zurücksetzen</ion-label>
+      </ion-item>
+    </ion-list>
+    <!-- Unsichtbare Dateiauswahl für den Backup-Import -->
+    <input
+      #backupInput
+      type="file"
+      accept=".json,application/json"
+      class="backup-input"
+      tabindex="-1"
+      (change)="onBackupFileSelected($event)"
+    />
+    <p class="hint data-hint">Alle Daten liegen nur auf diesem Gerät. Exportiere regelmäßig ein Backup, um sie bei Gerätewechsel oder Neuinstallation wiederherzustellen.</p>
+
+    @if (debugMode) {
+      <!-- Debug-Log: nur mit ?debug=1 -->
+      <h2 class="nt-section-header">Debug-Log</h2>
+      <ion-list class="nt-grouped" lines="none">
+        <ion-item button detail="false" (click)="logOpen.set(!logOpen())">
+          <ion-icon slot="start" name="terminal-outline"></ion-icon>
+          <ion-label>Log anzeigen ({{ logEntries().length }})</ion-label>
+          <ion-icon slot="end" [name]="logOpen() ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
+        </ion-item>
+        <ion-item button detail="false" (click)="testConnection()">
+          <ion-icon slot="start" name="wifi-outline"></ion-icon>
+          <ion-label>Worker-Verbindung testen</ion-label>
+        </ion-item>
+      </ion-list>
+      @if (logOpen()) {
+        <div class="debug-log">
+          <button class="debug-log__clear" (click)="debugLog.clear()">Log leeren</button>
+          @if (logEntries().length === 0) {
+            <p class="debug-log__empty">Noch keine Einträge.</p>
+          }
+          @for (entry of logEntries(); track $index) {
+            <div class="debug-log__entry" [class]="'debug-log__entry--' + entry.level">
+              <span class="debug-log__ts">{{ entry.ts }}</span>
+              <span class="debug-log__msg">{{ entry.msg }}</span>
+            </div>
+          }
+        </div>
+      }
     }
-  }
+  </div>
 
   <ion-toast
     [isOpen]="savedToast() !== null"
@@ -133,212 +136,227 @@
 </ion-content>
 
 <!-- Mein Profil Modal -->
-<ion-modal [isOpen]="profileOpen()" (ionModalDidDismiss)="profileOpen.set(false)">
+<ion-modal [isOpen]="profileOpen()" [handle]="true" (ionModalDidDismiss)="profileOpen.set(false)">
   <ng-template>
-    <ion-header class="ion-no-border">
-      <ion-toolbar>
-        <ion-title role="heading" aria-level="2">Mein Profil</ion-title>
-        <ion-buttons slot="end">
-          <ion-button (click)="profileOpen.set(false)">Schließen</ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-    </ion-header>
+    <div class="nt-sheet-header">
+      <span class="nt-sheet-header__start"></span>
+      <h2 class="nt-sheet-header__title" role="heading" aria-level="2">Mein Profil</h2>
+      <span class="nt-sheet-header__end">
+        <ion-button fill="clear" (click)="profileOpen.set(false)">Schließen</ion-button>
+      </span>
+    </div>
     <ion-content>
-      <ion-list class="nt-grouped">
-        <ion-item>
-          <ion-label>
-            Gewicht
-            @if (weightKg === null) { <p class="row-sub">z. B. 75 kg</p> }
-            @if (visibleError('weightKg'); as err) { <p class="row-error" role="alert">{{ err }}</p> }
-          </ion-label>
-          <nt-stepper slot="end" data-field="weightKg" label="Gewicht" unit="kg" [value]="weightKg" [min]="30" [max]="300" [step]="0.5" [decimals]="1" [start]="75" (valueChange)="setField('weightKg', $event)"></nt-stepper>
-        </ion-item>
-        <ion-item>
-          <ion-label>
-            Größe
-            @if (heightCm === null) { <p class="row-sub">z. B. 175 cm</p> }
-            @if (visibleError('heightCm'); as err) { <p class="row-error" role="alert">{{ err }}</p> }
-          </ion-label>
-          <nt-stepper slot="end" data-field="heightCm" label="Größe" unit="cm" [value]="heightCm" [min]="100" [max]="250" [step]="1" [start]="175" (valueChange)="setField('heightCm', $event)"></nt-stepper>
-        </ion-item>
-        <ion-item>
-          <ion-label>
-            Alter
-            @if (age === null) { <p class="row-sub">z. B. 30 Jahre</p> }
-            @if (visibleError('age'); as err) { <p class="row-error" role="alert">{{ err }}</p> }
-          </ion-label>
-          <nt-stepper slot="end" data-field="age" label="Alter" unit="Jahre" [value]="age" [min]="14" [max]="100" [step]="1" [start]="30" (valueChange)="setField('age', $event)"></nt-stepper>
-        </ion-item>
-        <ion-item>
-          <ion-select label="Geschlecht" [(ngModel)]="sex" interface="action-sheet" cancelText="Abbrechen">
-            @for (s of sexes; track s.value) {
-              <ion-select-option [value]="s.value">{{ s.label }}</ion-select-option>
-            }
-          </ion-select>
-        </ion-item>
-        @if (sex === 'diverse') {
-          <ion-item lines="none">
-            <ion-icon slot="start" name="information-circle-outline" color="warning"></ion-icon>
-            <ion-label class="ion-text-wrap" style="font-size:12px;color:var(--ion-color-warning)">
-              Hinweis: Für „Divers“ verwenden wir den Durchschnittswert aus männlichen und weiblichen Referenzwerten. Das Ergebnis ist eine Näherung – individuelle Abweichungen sind möglich.
+      <div class="nt-page settings-sheet">
+        <ion-list class="nt-grouped settings-form">
+          <ion-item class="form-row">
+            <ion-label>
+              Gewicht
+              @if (weightKg === null) { <p class="row-sub">z. B. 75 kg</p> }
+              @if (visibleError('weightKg'); as err) { <p class="row-error" role="alert">{{ err }}</p> }
             </ion-label>
+            <nt-stepper slot="end" data-field="weightKg" label="Gewicht" unit="kg" [value]="weightKg" [min]="30" [max]="300" [step]="0.5" [decimals]="1" [start]="75" (valueChange)="setField('weightKg', $event)"></nt-stepper>
           </ion-item>
-        }
-        <ion-item>
-          <ion-select label="Aktivität" [(ngModel)]="activityLevel" interface="action-sheet" cancelText="Abbrechen">
-            @for (a of activities; track a.value) {
-              <ion-select-option [value]="a.value">{{ a.label }}</ion-select-option>
-            }
-          </ion-select>
-        </ion-item>
-        <ion-item lines="none">
-          <ion-segment [value]="goal" aria-label="Ziel" (ionChange)="setGoal($any($event).detail.value)">
-            @for (g of goals; track g.value) {
-              <ion-segment-button [value]="g.value"><ion-label>{{ g.label }}</ion-label></ion-segment-button>
-            }
-          </ion-segment>
-        </ion-item>
-      </ion-list>
-
-      @if (showRate) {
-        <h2 class="nt-section-header">Tempo (kg pro Woche)</h2>
-        <div class="rate-chips" role="group" aria-label="Tempo in Kilogramm pro Woche">
-          @for (r of rateChoices; track r) {
-            <button type="button" class="rate-chip" [class.rate-chip--on]="rateKgPerWeek === r" [attr.aria-pressed]="rateKgPerWeek === r" (click)="setRate(r)">{{ r | ntNum:2 }}</button>
+          <ion-item class="form-row">
+            <ion-label>
+              Größe
+              @if (heightCm === null) { <p class="row-sub">z. B. 175 cm</p> }
+              @if (visibleError('heightCm'); as err) { <p class="row-error" role="alert">{{ err }}</p> }
+            </ion-label>
+            <nt-stepper slot="end" data-field="heightCm" label="Größe" unit="cm" [value]="heightCm" [min]="100" [max]="250" [step]="1" [start]="175" (valueChange)="setField('heightCm', $event)"></nt-stepper>
+          </ion-item>
+          <ion-item class="form-row">
+            <ion-label>
+              Alter
+              @if (age === null) { <p class="row-sub">z. B. 30 Jahre</p> }
+              @if (visibleError('age'); as err) { <p class="row-error" role="alert">{{ err }}</p> }
+            </ion-label>
+            <nt-stepper slot="end" data-field="age" label="Alter" unit="Jahre" [value]="age" [min]="14" [max]="100" [step]="1" [start]="30" (valueChange)="setField('age', $event)"></nt-stepper>
+          </ion-item>
+          <ion-item class="form-row">
+            <ion-select label="Geschlecht" [(ngModel)]="sex" interface="action-sheet" cancelText="Abbrechen">
+              @for (s of sexes; track s.value) {
+                <ion-select-option [value]="s.value">{{ s.label }}</ion-select-option>
+              }
+            </ion-select>
+          </ion-item>
+          @if (sex === 'diverse') {
+            <ion-item lines="none" class="form-row">
+              <ion-icon slot="start" name="information-circle-outline" color="warning"></ion-icon>
+              <ion-label class="ion-text-wrap" style="font-size:12px;color:var(--ion-color-warning)">
+                Hinweis: Für „Divers“ verwenden wir den Durchschnittswert aus männlichen und weiblichen Referenzwerten. Das Ergebnis ist eine Näherung – individuelle Abweichungen sind möglich.
+              </ion-label>
+            </ion-item>
           }
-        </div>
-        <p class="hint" role="status">{{ rateDeltaLabel }} · höchstens 0,75 kg pro Woche, mehr wird nicht empfohlen.</p>
-      }
-      @if (formMinKcalApplied) {
-        <p class="hint hint--warn" role="status">
-          Mindestzufuhr aktiv: Die Formel läge darunter, das Ziel wird auf den Mindestwert angehoben – tatsächlich ca. {{ achievedRateText }} kg/Woche.
-        </p>
-        @if (lowerRateOffer !== null) {
-          <ion-button fill="clear" size="small" class="ion-margin-horizontal" (click)="setRate(lowerRateOffer)">
-            Tempo auf {{ lowerRateOffer | ntNum:2 }} kg/Woche senken
-          </ion-button>
+          <ion-item class="form-row">
+            <ion-select label="Aktivität" [(ngModel)]="activityLevel" interface="action-sheet" cancelText="Abbrechen">
+              @for (a of activities; track a.value) {
+                <ion-select-option [value]="a.value">{{ a.label }}</ion-select-option>
+              }
+            </ion-select>
+          </ion-item>
+          <ion-item lines="none" class="form-row form-row--segment">
+            <ion-segment [value]="goal" aria-label="Ziel" (ionChange)="setGoal($any($event).detail.value)">
+              @for (g of goals; track g.value) {
+                <ion-segment-button [value]="g.value"><ion-label>{{ g.label }}</ion-label></ion-segment-button>
+              }
+            </ion-segment>
+          </ion-item>
+        </ion-list>
+
+        @if (showRate) {
+          <h2 class="nt-section-header">Tempo (kg pro Woche)</h2>
+          <div class="rate-chips" role="group" aria-label="Tempo in Kilogramm pro Woche">
+            @for (r of rateChoices; track r) {
+              <button type="button" class="rate-chip" [class.rate-chip--on]="rateKgPerWeek === r" [attr.aria-pressed]="rateKgPerWeek === r" (click)="setRate(r)">{{ r | ntNum:2 }}</button>
+            }
+          </div>
+          <p class="hint" role="status">{{ rateDeltaLabel }} · höchstens 0,75 kg pro Woche, mehr wird nicht empfohlen.</p>
         }
-      }
-      @if (!isFormValid) {
-        <p class="hint" role="status">Bitte Gewicht, Größe und Alter angeben.</p>
-      }
-      <ion-button expand="block" class="ion-margin-horizontal ion-margin-bottom" [disabled]="!isFormValid" (click)="saveProfile()">
-        Speichern
-      </ion-button>
+        @if (formMinKcalApplied) {
+          <p class="hint hint--warn" role="status">
+            Mindestzufuhr aktiv: Die Formel läge darunter, das Ziel wird auf den Mindestwert angehoben – tatsächlich ca. {{ achievedRateText }} kg/Woche.
+          </p>
+          @if (lowerRateOffer !== null) {
+            <ion-button fill="clear" size="small" (click)="setRate(lowerRateOffer)">
+              Tempo auf {{ lowerRateOffer | ntNum:2 }} kg/Woche senken
+            </ion-button>
+          }
+        }
+        @if (!isFormValid) {
+          <p class="hint" role="status">Bitte Gewicht, Größe und Alter angeben.</p>
+        }
+        <div class="form-actions">
+          <ion-button expand="block" [disabled]="!isFormValid" (click)="saveProfile()">
+            Speichern
+          </ion-button>
+        </div>
+      </div>
     </ion-content>
   </ng-template>
 </ion-modal>
 
 <!-- KI-Verbindung Modal -->
-<ion-modal [isOpen]="aiOpen()" (ionModalDidDismiss)="aiOpen.set(false)">
+<ion-modal [isOpen]="aiOpen()" [handle]="true" (ionModalDidDismiss)="aiOpen.set(false)">
   <ng-template>
-    <ion-header class="ion-no-border">
-      <ion-toolbar>
-        <ion-title role="heading" aria-level="2">KI-Verbindung</ion-title>
-        <ion-buttons slot="end">
-          <ion-button (click)="aiOpen.set(false)">Schließen</ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-    </ion-header>
-    <ion-content class="ion-padding">
-      <p class="hint">
-        Die KI läuft über Google Gemini. Ohne Verbindung sind KI-Funktionen (Etikett-Scan, Rezept-Import per Link oder Foto, KI-Einkaufsliste) nicht verfügbar.
-        Aktuell: <strong>{{ aiStatus() }}</strong>.
-      </p>
-      <h2 class="nt-section-header">Option 1: KI-Server</h2>
-      <p class="hint">Empfohlen. Mit der Adresse des NutriTrack-KI-Servers ist kein eigener Schlüssel nötig.</p>
-      <ion-list class="nt-grouped">
-        <ion-item>
-          <ion-input label="Adresse des KI-Servers" labelPlacement="stacked" [(ngModel)]="ai.proxyUrl" inputmode="url" placeholder="https://…"></ion-input>
-        </ion-item>
-      </ion-list>
-      <h2 class="nt-section-header">Option 2: Eigener Gemini-Schlüssel</h2>
-      @if (ai.proxyUrl?.trim()) {
-        <p class="hint hint--warn" role="status">Inaktiv, solange eine Adresse des KI-Servers eingetragen ist. Entferne die Adresse oben, um den eigenen Schlüssel zu nutzen.</p>
-      } @else {
-        <p class="hint">Wird nur lokal auf diesem Gerät gespeichert.</p>
-      }
-      <ion-list class="nt-grouped" [class.is-inactive]="!!ai.proxyUrl?.trim()">
-        <ion-item [disabled]="!!ai.proxyUrl?.trim()">
-          <ion-input type="password" label="Gemini-Schlüssel (API-Key)" labelPlacement="stacked" [(ngModel)]="ai.apiKey" [clearOnEdit]="false" autocomplete="off" placeholder="Schlüssel einfügen"></ion-input>
-        </ion-item>
-      </ion-list>
-      <h2 class="nt-section-header">Erweitert</h2>
-      <ion-list class="nt-grouped">
-        <ion-item>
-          <ion-select label="Modell" [(ngModel)]="ai.model" interface="action-sheet" cancelText="Abbrechen">
+    <div class="nt-sheet-header">
+      <span class="nt-sheet-header__start"></span>
+      <h2 class="nt-sheet-header__title" role="heading" aria-level="2">KI-Verbindung</h2>
+      <span class="nt-sheet-header__end">
+        <ion-button fill="clear" (click)="aiOpen.set(false)">Schließen</ion-button>
+      </span>
+    </div>
+    <ion-content>
+      <div class="nt-page settings-sheet">
+        <p class="hint">
+          Die KI läuft über Google Gemini. Ohne Verbindung sind KI-Funktionen (Etikett-Scan, Rezept-Import per Link oder Foto, KI-Einkaufsliste) nicht verfügbar.
+          Aktuell (gespeichert): <strong>{{ aiStatus() }}</strong>.
+        </p>
+        <div class="form-actions form-actions--top">
+          <ion-button fill="outline" expand="block" [disabled]="aiTest().busy" (click)="testAi()">Verbindung testen</ion-button>
+        </div>
+        @if (aiTest().message; as msg) {
+          <p class="hint" role="status" [class.hint--warn]="aiTest().ok === false">{{ msg }}</p>
+        }
+
+        <h2 class="nt-section-header">Option 1: KI-Server</h2>
+        @if (ai.apiKey?.trim()) {
+          <p class="hint hint--warn" role="status">Inaktiv, solange ein eigener Schlüssel eingetragen ist. Entferne den Schlüssel unten, um den KI-Server zu nutzen.</p>
+        } @else {
+          <p class="hint">Empfohlen. Mit der Adresse des NutriTrack-KI-Servers ist kein eigener Schlüssel nötig.</p>
+        }
+        <div class="field-stack" [class.is-inactive]="!!ai.apiKey?.trim()">
+          <span class="field-label" id="ai-proxy-label">Adresse des KI-Servers</span>
+          <ion-input class="nt-field" aria-labelledby="ai-proxy-label" [(ngModel)]="ai.proxyUrl" inputmode="url" placeholder="https://…"></ion-input>
+        </div>
+
+        <h2 class="nt-section-header">Option 2: Eigener Gemini-Schlüssel</h2>
+        <p class="hint">Hat Vorrang vor dem KI-Server und wird nur lokal auf diesem Gerät gespeichert.</p>
+        <div class="field-stack">
+          <span class="field-label" id="ai-key-label">Gemini-Schlüssel (API-Key)</span>
+          <ion-input class="nt-field" type="password" aria-labelledby="ai-key-label" [(ngModel)]="ai.apiKey" [clearOnEdit]="false" autocomplete="off" placeholder="Schlüssel einfügen"></ion-input>
+        </div>
+
+        <h2 class="nt-section-header">Erweitert</h2>
+        <div class="field-stack">
+          <span class="field-label" id="ai-model-label">Modell</span>
+          <ion-select class="nt-field" aria-labelledby="ai-model-label" [(ngModel)]="ai.model" interface="action-sheet" cancelText="Abbrechen">
             @for (m of modelChoices; track m.value) {
               <ion-select-option [value]="m.value">{{ m.label }}</ion-select-option>
             }
           </ion-select>
-        </ion-item>
-        <ion-item>
-          <ion-input label="Eigene Adresse der Gemini-Schnittstelle (optional)" labelPlacement="stacked" [(ngModel)]="ai.endpoint" placeholder="https://…"></ion-input>
-        </ion-item>
-      </ion-list>
-      <ion-button expand="block" class="ion-margin-horizontal" (click)="saveAi()">
-        Speichern
-      </ion-button>
+        </div>
+        <div class="field-stack">
+          <span class="field-label" id="ai-endpoint-label">Eigene Adresse der Gemini-Schnittstelle (optional)</span>
+          <ion-input class="nt-field" aria-labelledby="ai-endpoint-label" [(ngModel)]="ai.endpoint" placeholder="https://…"></ion-input>
+        </div>
+
+        <div class="form-actions">
+          <ion-button expand="block" (click)="saveAi()">
+            Speichern
+          </ion-button>
+        </div>
+      </div>
     </ion-content>
   </ng-template>
 </ion-modal>
 
 <!-- Info-Modals (Anleitung / Datenschutz / AGB / Hilfe) -->
-<ion-modal [isOpen]="infoSection() !== null" (ionModalDidDismiss)="infoSection.set(null)">
+<ion-modal [isOpen]="infoSection() !== null" [handle]="true" (ionModalDidDismiss)="infoSection.set(null)">
   <ng-template>
-    <ion-header class="ion-no-border">
-      <ion-toolbar>
-        <ion-title role="heading" aria-level="2">
-          @switch (infoSection()) {
-            @case ('anleitung') { Anleitung }
-            @case ('datenschutz') { Datenschutzerklärung }
-            @case ('agb') { Nutzungsbedingungen }
-            @case ('hilfe') { Hilfe & Kontakt }
+    <div class="nt-sheet-header">
+      <span class="nt-sheet-header__start"></span>
+      <h2 class="nt-sheet-header__title" role="heading" aria-level="2">
+        @switch (infoSection()) {
+          @case ('anleitung') { Anleitung }
+          @case ('datenschutz') { Datenschutzerklärung }
+          @case ('agb') { Nutzungsbedingungen }
+          @case ('hilfe') { Hilfe & Kontakt }
+        }
+      </h2>
+      <span class="nt-sheet-header__end">
+        <ion-button fill="clear" (click)="infoSection.set(null)">Schließen</ion-button>
+      </span>
+    </div>
+    <ion-content>
+      <div class="nt-page settings-sheet settings-info">
+        @switch (infoSection()) {
+          @case ('anleitung') {
+            <h3>So funktioniert NutriTrack</h3>
+            <p>1. <strong>Mein Profil einrichten</strong> — trage Gewicht, Größe, Alter und Ziel ein, um deinen persönlichen Tagesbedarf zu berechnen.</p>
+            <p>2. <strong>Tagebuch führen</strong> — trage täglich gegessene Lebensmittel und Mahlzeiten über die Suche oder den Barcode-Scanner ein. Das Etikett per Kamera lesen geht nur <button type="button" class="link-btn" (click)="openAiFromGuide()">(mit KI-Verbindung)</button>.</p>
+            <p>3. <strong>Rezepte anlegen</strong> — füge Rezepte als Text ein oder erfasse sie manuell. Import per Link oder Foto geht nur <button type="button" class="link-btn" (click)="openAiFromGuide()">(mit KI-Verbindung)</button>. Koche direkt aus der App mit dem Kochmodus.</p>
+            <p>4. <strong>Einkauf planen</strong> — eine Einkaufsliste auf Basis deiner Rezepte erstellt die KI <button type="button" class="link-btn" (click)="openAiFromGuide()">(mit KI-Verbindung)</button>.</p>
+            <p>5. <strong>Fortschritt beobachten</strong> — das Dashboard zeigt täglich, wie viel Energie und Makros du noch zur Verfügung hast.</p>
           }
-        </ion-title>
-        <ion-buttons slot="end">
-          <ion-button (click)="infoSection.set(null)">Schließen</ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-    </ion-header>
-    <ion-content class="ion-padding">
-      @switch (infoSection()) {
-        @case ('anleitung') {
-          <h3>So funktioniert NutriTrack</h3>
-          <p>1. <strong>Mein Profil einrichten</strong> — trage Gewicht, Größe, Alter und Ziel ein, um deinen persönlichen Tagesbedarf zu berechnen.</p>
-          <p>2. <strong>Tagebuch führen</strong> — trage täglich gegessene Lebensmittel und Mahlzeiten über die Suche oder den Barcode-Scanner ein. Das Etikett per Kamera lesen geht nur <button type="button" class="link-btn" (click)="openAiFromGuide()">(mit KI-Verbindung)</button>.</p>
-          <p>3. <strong>Rezepte anlegen</strong> — füge Rezepte als Text ein oder erfasse sie manuell. Import per Link oder Foto geht nur <button type="button" class="link-btn" (click)="openAiFromGuide()">(mit KI-Verbindung)</button>. Koche direkt aus der App mit dem Kochmodus.</p>
-          <p>4. <strong>Einkauf planen</strong> — eine Einkaufsliste auf Basis deiner Rezepte erstellt die KI <button type="button" class="link-btn" (click)="openAiFromGuide()">(mit KI-Verbindung)</button>.</p>
-          <p>5. <strong>Fortschritt beobachten</strong> — das Dashboard zeigt täglich, wie viel Energie und Makros du noch zur Verfügung hast.</p>
+          @case ('datenschutz') {
+            <h3>Datenschutzerklärung</h3>
+            <p><strong>Verantwortlich:</strong> Jakob Baumgartner, baumgartner.jakob12&#64;gmail.com</p>
+            <p><strong>Lokal gespeichert:</strong> Profil (Gewicht, Größe, Alter, Ziel), Tagebuch, Rezepte und Einstellungen liegen <strong>nur auf deinem Gerät</strong> (Browser-Speicher). Wir haben keinen Zugriff darauf. „Alle lokalen Daten zurücksetzen“ löscht alles auf diesem Gerät, auch gespeicherte Mahlzeiten und eigene Lebensmittel.</p>
+            <p><strong>Lebensmittelsuche:</strong> Dein Suchbegriff geht über unseren Proxy (Cloudflare Worker, Cloudflare Inc. als Auftragsverarbeiter, USA) an Open Food Facts. Dabei werden technisch deine IP-Adresse und der Suchbegriff verarbeitet. Suchergebnisse werden bis zu 1 Stunde zwischengespeichert, ohne Bezug zu deiner Person. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Bereitstellung der Funktion).</p>
+            <p><strong>Barcode &amp; Preise:</strong> Barcode-Abfragen gehen direkt an Open Food Facts bzw. Open Prices (openfoodfacts.org, gemeinnützig, Frankreich). Dabei wird deine IP-Adresse übertragen.</p>
+            <p><strong>KI-Funktionen (optional):</strong> Nur wenn du sie nutzt, werden die jeweiligen Inhalte (Rezepttext oder -link, Etikett- oder Rezeptfoto, Einkaufs- und Fastfood-Wünsche) über den Proxy an Google Gemini (Google LLC) gesendet; beim Fastfood-Helfer wird zusätzlich das verbleibende Kalorien-Budget übertragen. Nutzt du „Gemini direkt“ mit eigenem Key, gehen diese Inhalte ohne Proxy direkt von deinem Gerät an Google. Google und Cloudflare sitzen in den USA, es kann also eine Übermittlung in ein Drittland stattfinden. Gesundheitsdaten wie Gewicht oder Größe werden dabei <strong>nicht</strong> übertragen. KI-Ergebnisse sind automatisch erzeugt und können falsch sein — bitte prüfen.</p>
+            <p><strong>Hosting:</strong> Die Web-App wird über GitHub Pages (GitHub Inc.) ausgeliefert. Dabei fallen Server-Logs mit IP-Adressen an.</p>
+            <p><strong>Deine Rechte:</strong> Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch und Datenübertragbarkeit (Art. 15–21 DSGVO). Kontakt per E-Mail. Beschwerden kannst du bei der österreichischen Datenschutzbehörde (dsb.gv.at) einreichen.</p>
+          }
+          @case ('agb') {
+            <h3>Nutzungsbedingungen</h3>
+            <p>NutriTrack ist ein persönliches Ernährungstagebuch und dient ausschließlich zur Information. Es ist <strong>kein Medizinprodukt</strong> und ersetzt keine professionelle Ernährungs-, Gesundheits- oder ärztliche Beratung.</p>
+            <p>Die berechneten Kalorienbedarfe sind Schätzwerte auf Basis anerkannter Formeln (Mifflin-St Jeor). Individuelle Abweichungen sind möglich.</p>
+            <p>Nährwertdaten stammen von <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (Lizenz: Open Database License, ODbL; Produktfotos: CC BY-SA). Sie werden von Freiwilligen gepflegt und können unvollständig oder fehlerhaft sein.</p>
+            <p>Die App wird ohne Gewähr bereitgestellt. Die Haftung für leichte Fahrlässigkeit ist ausgeschlossen, soweit gesetzlich zulässig.</p>
+          }
+          @case ('hilfe') {
+            <h3>Hilfe &amp; Kontakt</h3>
+            <p>Bei Fragen oder Problemen wende dich an:</p>
+            <p><strong>E-Mail:</strong> <a href="mailto:baumgartner.jakob12&#64;gmail.com">baumgartner.jakob12&#64;gmail.com</a></p>
+            <p>Für Fehlerberichte und Wünsche schreib einfach an diese Adresse.</p>
+            <h4>Häufige Fragen</h4>
+            <p><strong>Barcode wird nicht erkannt?</strong> Stelle sicher, dass genügend Licht vorhanden ist. Alternativ kannst du den Barcode manuell eingeben.</p>
+            <p><strong>KI funktioniert nicht?</strong> Prüfe unter „KI-Verbindung“, ob die Adresse des KI-Servers oder ein gültiger eigener Key eingetragen ist.</p>
+            <p><strong>Daten verloren?</strong> Alle Daten werden lokal gespeichert. Wenn du die App deinstallierst, werden sie gelöscht. Speichere regelmäßig ein Backup über „Backup exportieren“ und stelle es mit „Backup importieren“ wieder her.</p>
+          }
         }
-        @case ('datenschutz') {
-          <h3>Datenschutzerklärung</h3>
-          <p><strong>Verantwortlich:</strong> Jakob Baumgartner, baumgartner.jakob12&#64;gmail.com</p>
-          <p><strong>Lokal gespeichert:</strong> Profil (Gewicht, Größe, Alter, Ziel), Tagebuch, Rezepte und Einstellungen liegen <strong>nur auf deinem Gerät</strong> (Browser-Speicher). Wir haben keinen Zugriff darauf. „Alle lokalen Daten zurücksetzen“ löscht alles auf diesem Gerät, auch gespeicherte Mahlzeiten und eigene Lebensmittel.</p>
-          <p><strong>Lebensmittelsuche:</strong> Dein Suchbegriff geht über unseren Proxy (Cloudflare Worker, Cloudflare Inc. als Auftragsverarbeiter, USA) an Open Food Facts. Dabei werden technisch deine IP-Adresse und der Suchbegriff verarbeitet. Suchergebnisse werden bis zu 1 Stunde zwischengespeichert, ohne Bezug zu deiner Person. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Bereitstellung der Funktion).</p>
-          <p><strong>Barcode &amp; Preise:</strong> Barcode-Abfragen gehen direkt an Open Food Facts bzw. Open Prices (openfoodfacts.org, gemeinnützig, Frankreich). Dabei wird deine IP-Adresse übertragen.</p>
-          <p><strong>KI-Funktionen (optional):</strong> Nur wenn du sie nutzt, werden die jeweiligen Inhalte (Rezepttext oder -link, Etikett- oder Rezeptfoto, Einkaufs- und Fastfood-Wünsche) über den Proxy an Google Gemini (Google LLC) gesendet; beim Fastfood-Helfer wird zusätzlich das verbleibende Kalorien-Budget übertragen. Nutzt du „Gemini direkt“ mit eigenem Key, gehen diese Inhalte ohne Proxy direkt von deinem Gerät an Google. Google und Cloudflare sitzen in den USA, es kann also eine Übermittlung in ein Drittland stattfinden. Gesundheitsdaten wie Gewicht oder Größe werden dabei <strong>nicht</strong> übertragen. KI-Ergebnisse sind automatisch erzeugt und können falsch sein — bitte prüfen.</p>
-          <p><strong>Hosting:</strong> Die Web-App wird über GitHub Pages (GitHub Inc.) ausgeliefert. Dabei fallen Server-Logs mit IP-Adressen an.</p>
-          <p><strong>Deine Rechte:</strong> Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch und Datenübertragbarkeit (Art. 15–21 DSGVO). Kontakt per E-Mail. Beschwerden kannst du bei der österreichischen Datenschutzbehörde (dsb.gv.at) einreichen.</p>
-        }
-        @case ('agb') {
-          <h3>Nutzungsbedingungen</h3>
-          <p>NutriTrack ist ein persönliches Ernährungstagebuch und dient ausschließlich zur Information. Es ist <strong>kein Medizinprodukt</strong> und ersetzt keine professionelle Ernährungs-, Gesundheits- oder ärztliche Beratung.</p>
-          <p>Die berechneten Kalorienbedarfe sind Schätzwerte auf Basis anerkannter Formeln (Mifflin-St Jeor). Individuelle Abweichungen sind möglich.</p>
-          <p>Nährwertdaten stammen von <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (Lizenz: Open Database License, ODbL; Produktfotos: CC BY-SA). Sie werden von Freiwilligen gepflegt und können unvollständig oder fehlerhaft sein.</p>
-          <p>Die App wird ohne Gewähr bereitgestellt. Die Haftung für leichte Fahrlässigkeit ist ausgeschlossen, soweit gesetzlich zulässig.</p>
-        }
-        @case ('hilfe') {
-          <h3>Hilfe &amp; Kontakt</h3>
-          <p>Bei Fragen oder Problemen wende dich an:</p>
-          <p><strong>E-Mail:</strong> <a href="mailto:baumgartner.jakob12&#64;gmail.com">baumgartner.jakob12&#64;gmail.com</a></p>
-          <p>Für Fehlerberichte und Wünsche schreib einfach an diese Adresse.</p>
-          <h4>Häufige Fragen</h4>
-          <p><strong>Barcode wird nicht erkannt?</strong> Stelle sicher, dass genügend Licht vorhanden ist. Alternativ kannst du den Barcode manuell eingeben.</p>
-          <p><strong>KI funktioniert nicht?</strong> Prüfe unter „KI-Verbindung“, ob die Adresse des KI-Servers oder ein gültiger eigener Key eingetragen ist.</p>
-          <p><strong>Daten verloren?</strong> Alle Daten werden lokal gespeichert. Wenn du die App deinstallierst, werden sie gelöscht. Speichere regelmäßig ein Backup über „Backup exportieren“ und stelle es mit „Backup importieren“ wieder her.</p>
-        }
-      }
+      </div>
     </ion-content>
   </ng-template>
 </ion-modal>

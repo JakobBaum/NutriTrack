@@ -10,7 +10,7 @@ async function openManual(page) {
   await go(page, 'diary');
   await page.locator('.page-head__add').click();
   const modal = topModal(page);
-  await modal.locator('.source-btn', { hasText: 'Manuell' }).click();
+  await modal.locator('.nt-source-btn', { hasText: 'Manuell' }).click();
   await ionInput(modal, 'Name').waitFor();
   return modal;
 }
