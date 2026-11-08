@@ -1,7 +1,6 @@
 import { Injectable, computed, inject } from '@angular/core';
-import { effectiveProxyUrl } from '../../ai/ai-endpoint';
+import { defaultAiProxyUrl } from '../../ai/ai-endpoint';
 import { RecipeSearchConfig, RecipeSearchConfigStore } from '../../state/recipe-search-config.store';
-import { SettingsStore } from '../../state/settings.store';
 
 /** Zugangsart zur Rezept-Suche: eigener Schlüssel (direkt), globaler Worker oder nichts. */
 export type RecipeSearchMode = 'ownKey' | 'worker' | 'none';
@@ -34,7 +33,6 @@ export function resolveRecipeSearchAccess(
 @Injectable({ providedIn: 'root' })
 export class RecipeSearchAccessService {
   private readonly config = inject(RecipeSearchConfigStore);
-  private readonly settings = inject(SettingsStore);
 
   /** Aktueller Zugang (reagiert auf Änderungen der Einstellungen). */
   readonly access = computed(() => this.resolve());
@@ -47,6 +45,6 @@ export class RecipeSearchAccessService {
   /** Zugang mit optional überschriebener Konfiguration (z. B. ungespeicherter Key beim Verbindungstest). */
   resolve(override?: Partial<RecipeSearchConfig>): RecipeSearchAccess {
     const cfg = { ...this.config.config(), ...override };
-    return resolveRecipeSearchAccess(cfg, effectiveProxyUrl(this.settings.ai()));
+    return resolveRecipeSearchAccess(cfg, defaultAiProxyUrl());
   }
 }

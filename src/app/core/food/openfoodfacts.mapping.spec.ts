@@ -106,9 +106,9 @@ describe('OpenFoodFactsProvider — Mapping', () => {
     expect((await mapProduct({ ...base, serving_quantity: 0 }))?.servingG).toBeUndefined();
   });
 
-  it('bevorzugt das kleine Bild', async () => {
-    expect((await mapProduct({ ...base, image_url: 'big', image_small_url: 'small' }))?.imageUrl).toBe('small');
-    expect((await mapProduct({ ...base, image_url: 'big', image_small_url: '' }))?.imageUrl).toBe('big');
+  it('liefert keine Produktbilder', async () => {
+    const item = await mapProduct({ ...base, image_url: 'big', image_small_url: 'small' } as Parameters<typeof mapProduct>[0]);
+    expect(item).not.toHaveProperty('imageUrl');
   });
 });
 

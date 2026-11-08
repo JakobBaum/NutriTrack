@@ -61,4 +61,4 @@ Lokale Tests: `node --test worker.test.mjs`
 - "Die KI antwortet gerade nicht" - Zeitlimit; erneut versuchen, ggf. `/health` pruefen.
 - Browser meldet CORS-Fehler - Origin der App fehlt in `ALLOWED_ORIGINS` bzw. `DEFAULT_ORIGINS` in `worker.js`.
 - 429 "Tageslimit" - globaler Deckel `DAILY_AI_CAP` erreicht; setzt sich um 00:00 UTC zurueck oder Wert erhoehen.
-- Einzelne Nutzer koennen unter Profil > KI-Verbindung > Erweitert einen eigenen Schluessel oder Server eintragen.
+- Die KI-Verbindung ist nur global: Nutzer koennen keinen eigenen Gemini-Schluessel und keine eigene Server-Adresse eintragen. Profil > KI-Verbindung zeigt nur den Status (erreichbar / nicht erreichbar). Alte lokal gespeicherte Werte (`ai-config`) werden beim Start geloescht und nie ins Backup exportiert oder daraus importiert. Ohne konfigurierte `aiProxyUrl` nutzt die App den Mock. Ausnahme: der eigene spoonacular-Schluessel (Rezept-Suche) bleibt moeglich.

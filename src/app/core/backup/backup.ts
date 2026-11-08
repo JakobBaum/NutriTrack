@@ -18,7 +18,9 @@ const KEY_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const ARRAY_KEYS = ['diary', 'recipes', 'savedMeals', 'customFoods', 'favorites', 'weight'] as const;
 const NULLABLE_OBJECT_KEYS = ['profile', 'shopping'] as const;
+/** Frühere KI-Verbindung (eigener Key, Server-Adresse): wird weder exportiert noch importiert. */
 const AI_KEY = 'ai-config';
+const NEVER_BACKED_UP_KEYS: ReadonlySet<string> = new Set([LAST_BACKUP_KEY, AI_KEY]);
 const RECIPE_SEARCH_KEY = 'recipe-search-config';
 
 /** Gespeicherte Daten: Schlüssel (ohne Präfix) → bereits geparster JSON-Wert. */
@@ -78,12 +80,12 @@ function withoutSecrets(data: BackupData): BackupData {
     const entry = d[key];
     return isPlainObject(entry) && 'apiKey' in entry ? { ...d, [key]: { ...entry, apiKey: '' } } : d;
   };
-  return blank(blank(data, AI_KEY), RECIPE_SEARCH_KEY);
+  return blank(data, RECIPE_SEARCH_KEY);
 }
 
-/** Erstellt das Backup-Objekt aus den gespeicherten Daten (ohne Meta-Schlüssel und Secrets). */
+/** Erstellt das Backup-Objekt aus den gespeicherten Daten (ohne Meta-Schlüssel, KI-Verbindung und Secrets). */
 export function buildBackup(data: BackupData, now: Date): BackupFile {
-  const entries = Object.entries(data).filter(([key]) => key !== LAST_BACKUP_KEY);
+  const entries = Object.entries(data).filter(([key]) => !NEVER_BACKED_UP_KEYS.has(key));
   return {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
@@ -113,8 +115,7 @@ function isValidIsoDate(value: unknown): value is string {
 function validateKnownKeys(data: Record<string, unknown>): boolean {
   const arraysOk = ARRAY_KEYS.every((k) => !(k in data) || (Array.isArray(data[k]) && (data[k] as unknown[]).every(isPlainObject)));
   const objectsOk = NULLABLE_OBJECT_KEYS.every((k) => !(k in data) || data[k] === null || isPlainObject(data[k]));
-  const aiOk = !(AI_KEY in data) || isPlainObject(data[AI_KEY]);
-  return arraysOk && objectsOk && aiOk;
+  return arraysOk && objectsOk;
 }
 
 function validateData(data: unknown): data is Record<string, unknown> {
@@ -202,7 +203,6 @@ function keepLocalKey(restored: BackupData, current: BackupData, key: string): B
 
 /** Felder mit Zieladressen: Sie dürfen nie aus einem Backup kommen (sonst ginge der lokale Key an einen fremden Host). */
 const ENDPOINT_FIELDS: Readonly<Record<string, readonly string[]>> = {
-  [AI_KEY]: ['endpoint', 'proxyUrl'],
   [RECIPE_SEARCH_KEY]: ['baseUrl'],
 };
 
@@ -219,12 +219,12 @@ function dropEndpoints(restored: BackupData, current: BackupData): BackupData {
 }
 
 /**
- * Daten, die beim Import geschrieben werden: Backup-Inhalt, aber der lokale API-Key
+ * Daten, die beim Import geschrieben werden: Backup-Inhalt ohne KI-Verbindung, der lokale Rezept-Suche-Key
  * bleibt erhalten, wenn das Backup (wie beim Export üblich) keinen enthält.
  */
 export function prepareRestore(backup: BackupData, current: BackupData): BackupData {
-  const restored = Object.fromEntries(Object.entries(backup).filter(([key]) => key !== LAST_BACKUP_KEY));
-  return dropEndpoints(keepLocalKey(keepLocalKey(restored, current, AI_KEY), current, RECIPE_SEARCH_KEY), current);
+  const restored = Object.fromEntries(Object.entries(backup).filter(([key]) => !NEVER_BACKED_UP_KEYS.has(key)));
+  return dropEndpoints(keepLocalKey(restored, current, RECIPE_SEARCH_KEY), current);
 }
 
 /** Formatiert ein ISO-Datum als "06.11.2026, 14:05" (lokal); `null` bei ungültiger Eingabe. */

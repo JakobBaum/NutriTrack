@@ -13,6 +13,22 @@
 
 <ng-content></ng-content>
 
+<ng-template #rows let-items>
+  <ion-list class="results" [class.results--stale]="search.searching()" lines="none" [attr.aria-busy]="search.searching()">
+    @for (item of items; track item.id) {
+      <ion-item button detail="false" lines="none" (click)="pick(item)">
+        <nt-food-row [item]="item"></nt-food-row>
+        <span slot="end" class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
+      </ion-item>
+    }
+  </ion-list>
+</ng-template>
+
+@if (!search.query.trim() && showRecentCustom() && recentCustom().length) {
+  <h3 class="nt-section-header">Eigene Lebensmittel</h3>
+  <ng-container [ngTemplateOutlet]="rows" [ngTemplateOutletContext]="{ $implicit: recentCustom() }"></ng-container>
+}
+
 @if (search.query.trim()) {
   @if (search.searching()) {
     <p class="scan-hint" role="status"><ion-spinner name="dots"></ion-spinner> Suche läuft…</p>
@@ -26,14 +42,9 @@
   }
   @if (search.results().length) {
     <h3 class="nt-section-header">Treffer</h3>
-    <ion-list class="results" [class.results--stale]="search.searching()" lines="none" [attr.aria-busy]="search.searching()">
-      @for (item of search.results(); track item.id) {
-        <ion-item button detail="false" lines="none" (click)="pick(item)">
-          <nt-food-row [item]="item"></nt-food-row>
-          <span slot="end" class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
-        </ion-item>
-      }
-    </ion-list>
-    <p class="data-credit">Daten: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL)</p>
+    <ng-container [ngTemplateOutlet]="rows" [ngTemplateOutletContext]="{ $implicit: search.results() }"></ng-container>
+    @if (hasOnlineResults()) {
+      <p class="data-credit">Daten: <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL)</p>
+    }
   }
 }

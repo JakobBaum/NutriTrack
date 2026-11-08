@@ -6,11 +6,12 @@ import { FoodItem } from '../../core/models';
 
 const item: FoodItem = {
   id: '1', source: 'openfoodfacts', name: 'Nutella', brand: 'Ferrero', quantity: '400 g',
-  nutriscore: 'e', imageUrl: 'https://img/x.jpg',
+  nutriscore: 'e',
   facts: { kcal: 539.4, proteinG: 6, carbsG: 57, fatG: 31, fiberG: 0, sugarG: 56, saltG: 0, basis: 'per100g' },
 };
 
 function render(it: FoodItem): HTMLElement {
+  TestBed.resetTestingModule();
   TestBed.configureTestingModule({ declarations: [NtFoodRowComponent], schemas: [CUSTOM_ELEMENTS_SCHEMA] });
   const f = TestBed.createComponent(NtFoodRowComponent);
   f.componentRef.setInput('item', it);
@@ -19,26 +20,40 @@ function render(it: FoodItem): HTMLElement {
 }
 
 describe('NtFoodRowComponent', () => {
-  it('zeigt Name, Marke, Menge, kcal und Nutri-Score', () => {
+  it('zeigt Name, Marke mit Packungsgröße, kcal, Eiweiß und Nutri-Score', () => {
     const el = render(item);
     expect(el.querySelector('.name')?.textContent).toContain('Nutella');
-    expect(el.querySelector('.brand')?.textContent).toContain('Ferrero');
-    expect(el.querySelector('.meta')?.textContent).toContain('400 g · 539 kcal · 6 g Eiweiß / 100 g');
+    expect(el.querySelector('.sub')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Ferrero · 400 g');
+    expect(el.querySelector('.meta')?.textContent).toBe('539 kcal · 6 g Eiweiß / 100 g');
     expect(el.querySelector('.score')?.getAttribute('aria-label')).toBe('Nutri-Score E');
-    expect(el.querySelector('img')?.getAttribute('loading')).toBe('lazy');
+    expect(el.querySelector('.own-tag')).toBeNull();
   });
 
-  it('zeigt Eiweiß je Portion ohne 100-g-Zusatz', () => {
-    const el = render({ ...item, quantity: undefined, facts: { ...item.facts, basis: 'perPortion', proteinG: 12.4 } });
-    expect(el.querySelector('.meta')?.textContent?.trim()).toBe('539 kcal · 12 g Eiweiß');
-  });
-
-  it('blendet Marke, Score aus und zeigt Fallback-Icon ohne Bild', () => {
-    const el = render({ ...item, brand: undefined, nutriscore: undefined, imageUrl: undefined, quantity: undefined });
-    expect(el.querySelector('.brand')).toBeNull();
-    expect(el.querySelector('.score')).toBeNull();
+  it('zeigt keine Bilder und keine Platzhalter-Icons', () => {
+    const el = render({ ...item, imageUrl: 'https://img/x.jpg' } as FoodItem);
     expect(el.querySelector('img')).toBeNull();
-    expect(el.querySelector('ion-icon')).not.toBeNull();
-    expect(el.querySelector('.meta')?.textContent?.trim()).toBe('539 kcal · 6 g Eiweiß / 100 g');
+    expect(el.querySelector('ion-icon')).toBeNull();
+    expect(el.querySelector('.thumb')).toBeNull();
+  });
+
+  it('blendet Untertitel und Score aus, wenn Marke, Größe und Nutri-Score fehlen', () => {
+    const el = render({ ...item, brand: undefined, nutriscore: undefined, quantity: undefined });
+    expect(el.querySelector('.sub')).toBeNull();
+    expect(el.querySelector('.score')).toBeNull();
+    expect(el.querySelector('.meta')?.textContent).toBe('539 kcal · 6 g Eiweiß / 100 g');
+  });
+
+  it('zeigt bei nur einer Angabe ohne Trennzeichen', () => {
+    expect(render({ ...item, quantity: undefined }).querySelector('.sub')?.textContent?.trim()).toBe('Ferrero');
+    expect(render({ ...item, brand: undefined }).querySelector('.sub')?.textContent?.trim()).toBe('400 g');
+  });
+
+  it('kennzeichnet eigene Lebensmittel mit „Eigen“ und nennt die Portionsbasis', () => {
+    const el = render({
+      id: 'custom:1', source: 'custom', name: 'Haferbrei',
+      facts: { kcal: 250, proteinG: 12.4, carbsG: 30, fatG: 5, basis: 'perPortion' },
+    });
+    expect(el.querySelector('.own-tag')?.textContent).toBe('Eigen');
+    expect(el.querySelector('.meta')?.textContent).toBe('250 kcal · 12 g Eiweiß / Portion');
   });
 });

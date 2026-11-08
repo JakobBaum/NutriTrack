@@ -5,6 +5,7 @@ import { NumPipe } from '../shared/num.pipe';
 import { MealType, NutritionFacts, Recipe, SavedMeal, SavedMealEntry } from '../core/models';
 import { DiaryStore } from '../core/state/diary.store';
 import { MealsStore } from '../core/state/meals.store';
+import { CustomFoodStore } from '../core/state/custom-food.store';
 import { RecipeStore } from '../core/state/recipe.store';
 import { FoodSourceResult } from '../shared/food-sources/food-sources.component';
 import { formatDecimal, parseDecimal } from '../core/util/number-input';
@@ -46,6 +47,7 @@ function emptyManual(): ManualDraft {
 })
 export class MealsListComponent implements OnDestroy {
   private readonly store = inject(MealsStore);
+  private readonly customFoods = inject(CustomFoodStore);
   private readonly diary = inject(DiaryStore);
   private readonly recipeStore = inject(RecipeStore);
   private readonly actionSheets = inject(ActionSheetController);
@@ -209,6 +211,7 @@ export class MealsListComponent implements OnDestroy {
       basis: 'perPortion',
     };
     this.draftEntries = [...this.draftEntries, { label: m.name.trim(), facts, ref: { kind: 'manual' } }];
+    this.customFoods.save(m.name, facts);
     this.closePicker();
   }
 

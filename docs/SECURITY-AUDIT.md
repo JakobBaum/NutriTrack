@@ -37,8 +37,8 @@ Alle Fixes sind mit Tests abgedeckt: `npm run test:worker` (20 Tests) und `ng te
 3. **Rate-Limit-Binding prüfen.** Nach dem nächsten Worker-Deploy unter Cloudflare → Worker → Settings →
    Bindings nachsehen, ob `AI_LIMITER` existiert. Fehlt es (ältere Wrangler-Version im Build), läuft der
    Worker ohne Limit weiter.
-4. **Eigener API-Key im Client** (Modus „Gemini direkt“): liegt im Klartext in `localStorage`. Für dich
-   persönlich ok. Für andere Nutzer nur den Proxy-Modus anbieten.
+4. **Eigener Gemini-Key im Client**: erledigt. Die KI-Verbindung ist nur noch global (Worker); ein Key wird
+   nicht mehr gespeichert, alte Werte werden beim Start gelöscht.
 
 ## Geprüft, kein Fund
 

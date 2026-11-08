@@ -41,7 +41,6 @@ const sampleData = {
   ],
   profile: { weightKg: 80 },
   shopping: { id: 's', items: [{ name: 'Milch', amount: 1, unit: 'l', checked: false }] },
-  'ai-config': { provider: 'gemini', apiKey: 'geheim', proxyUrl: '' },
 };
 
 describe('backupFileName', () => {
@@ -64,11 +63,16 @@ describe('buildBackup', () => {
     expect(Object.keys(backup.data)).toEqual(['diary']);
   });
 
-  it('blanks the API key without mutating the input', () => {
-    const input = { 'ai-config': { provider: 'gemini', apiKey: 'geheim' } };
+  it('exportiert keine KI-Verbindungsfelder (ai-config)', () => {
+    const backup = buildBackup({ diary: [], 'ai-config': { provider: 'gemini', apiKey: 'geheim' } }, NOW);
+    expect(Object.keys(backup.data)).toEqual(['diary']);
+  });
+
+  it('blanks the recipe search API key without mutating the input', () => {
+    const input = { 'recipe-search-config': { apiKey: 'geheim', baseUrl: '' } };
     const backup = buildBackup(input, NOW);
-    expect(backup.data['ai-config']).toEqual({ provider: 'gemini', apiKey: '' });
-    expect(input['ai-config'].apiKey).toBe('geheim');
+    expect(backup.data['recipe-search-config']).toEqual({ apiKey: '', baseUrl: '' });
+    expect(input['recipe-search-config'].apiKey).toBe('geheim');
   });
 
   it('round-trips through serialize and parse', () => {
@@ -131,9 +135,13 @@ describe('validateBackup', () => {
       { recipes: 'x' },
       { profile: [] },
       { shopping: 'x' },
-      { 'ai-config': null },
+
     ];
     bad.forEach((data) => expect(validateBackup(validFile(data)).ok).toBe(false));
+  });
+
+  it('akzeptiert alte Backups mit ai-config (wird beim Import ignoriert)', () => {
+    expect(validateBackup(validFile({ 'ai-config': { provider: 'gemini', apiKey: 'x' } })).ok).toBe(true);
   });
 
   it('accepts null profile and shopping list', () => {
@@ -246,33 +254,31 @@ describe('Gewicht und Favoriten im Backup', () => {
 });
 
 describe('prepareRestore', () => {
-  it('keeps the local API key when the backup has none', () => {
-    const restored = prepareRestore({ 'ai-config': { provider: 'gemini', apiKey: '' } }, { 'ai-config': { apiKey: 'lokal' } });
-    expect(restored['ai-config']).toEqual({ provider: 'gemini', apiKey: 'lokal' });
+  it('ignoriert ai-config aus dem Backup vollständig', () => {
+    const restored = prepareRestore({ diary: [], 'ai-config': { provider: 'gemini', apiKey: 'fremd', proxyUrl: 'https://evil.example' } }, { 'ai-config': { apiKey: 'lokal' } });
+    expect(restored).toEqual({ diary: [] });
   });
 
-  it('prefers an API key contained in the backup', () => {
-    const restored = prepareRestore({ 'ai-config': { apiKey: 'backup' } }, { 'ai-config': { apiKey: 'lokal' } });
-    expect(restored['ai-config']).toEqual({ apiKey: 'backup' });
+  it('keeps the local recipe search key when the backup has none', () => {
+    const restored = prepareRestore({ 'recipe-search-config': { apiKey: '' } }, { 'recipe-search-config': { apiKey: 'lokal' } });
+    expect(restored['recipe-search-config']).toEqual({ apiKey: 'lokal' });
   });
 
-  it('verwirft endpoint und proxyUrl aus dem Backup und behält die lokalen (SEC-01)', () => {
+  it('verwirft baseUrl aus dem Backup und behält die lokale (SEC-01)', () => {
     const restored = prepareRestore(
-      { 'ai-config': { provider: 'gemini', apiKey: '', endpoint: 'https://evil.example', proxyUrl: 'https://evil.example' } },
-      { 'ai-config': { apiKey: 'lokal', endpoint: '', proxyUrl: 'https://mein-worker.example' } },
+      { 'recipe-search-config': { apiKey: '', baseUrl: 'https://evil.example' } },
+      { 'recipe-search-config': { apiKey: 'lokal', baseUrl: 'https://mein.example' } },
     );
-    expect(restored['ai-config']).toEqual({ provider: 'gemini', apiKey: 'lokal', endpoint: '', proxyUrl: 'https://mein-worker.example' });
+    expect(restored['recipe-search-config']).toEqual({ apiKey: 'lokal', baseUrl: 'https://mein.example' });
   });
 
-  it('entfernt endpoint, proxyUrl und baseUrl ganz, wenn lokal keine existieren (SEC-01)', () => {
+  it('entfernt baseUrl ganz, wenn lokal keine existiert (SEC-01)', () => {
     const restored = prepareRestore(
       {
-        'ai-config': { provider: 'gemini', apiKey: 'k', endpoint: 'https://evil.example', proxyUrl: 'https://evil.example' },
         'recipe-search-config': { apiKey: 'k', baseUrl: 'https://evil.example' },
       },
       {},
     );
-    expect(restored['ai-config']).toEqual({ provider: 'gemini', apiKey: 'k' });
     expect(restored['recipe-search-config']).toEqual({ apiKey: 'k' });
   });
 

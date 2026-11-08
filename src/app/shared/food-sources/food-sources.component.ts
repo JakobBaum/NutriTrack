@@ -53,6 +53,8 @@ export class NtFoodSourcesComponent {
   private readonly labelOcr = inject(LabelOcrService);
 
   readonly placeholder = input('Lebensmittel suchen…');
+  /** Ohne Suchbegriff die zuletzt genutzten eigenen Lebensmittel zeigen. */
+  readonly showRecentCustom = input(false);
   /** Ein Lebensmittel wurde per Suche, Barcode oder Etikett ermittelt. */
   readonly result = output<FoodSourceResult>();
   /** „Manuell“ gewählt; Wert = aktueller Suchbegriff. */

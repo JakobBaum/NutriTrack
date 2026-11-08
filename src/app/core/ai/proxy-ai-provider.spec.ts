@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ProxyAiProvider } from './proxy-ai-provider';
-import { SettingsStore } from '../state/settings.store';
+import { environment } from '../../../environments/environment';
 import { DebugLogService } from '../debug/debug-log.service';
 
 const PROXY = 'https://proxy.test/ai';
@@ -15,7 +15,7 @@ let provider: ProxyAiProvider;
 let log: DebugLogService;
 
 function setProxy(proxyUrl: string): void {
-  TestBed.inject(SettingsStore).setAi({ provider: 'gemini', proxyUrl });
+  environment.aiProxyUrl = proxyUrl;
 }
 
 beforeEach(() => {

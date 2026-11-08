@@ -6,7 +6,6 @@ import { makeId } from '../util/id';
 import { parseDecimal } from '../util/number-input';
 import { FoodProvider } from './food-provider';
 import { FOOD_TIMEOUT_MS, toFoodLookupError } from './food-errors';
-import { SettingsStore } from '../state/settings.store';
 import { environment } from '../../../environments/environment';
 import { DebugLogService } from '../debug/debug-log.service';
 import {
@@ -14,11 +13,11 @@ import {
 } from './food-search-clean';
 
 // Freitextsuche: dev → Angular-Dev-Proxy; prod → NutriTrack-Worker (search.openfoodfacts.org
-// sendet keine CORS-Header). Eine eigene proxyUrl in den Einstellungen hat Vorrang.
+// sendet keine CORS-Header). Die Adresse steht fest in der Umgebung.
 const SEARCH_URL_DEFAULT = environment.offSearchUrl;
 // Barcode exakt über Product Opener v3 (hat CORS *).
 const PRODUCT_V3_URL = 'https://world.openfoodfacts.org/api/v3/product';
-const FIELDS = 'code,product_name,brands,image_url,image_small_url,nutriments,serving_quantity,quantity,nutriscore_grade,categories_tags';
+const FIELDS = 'code,product_name,brands,nutriments,serving_quantity,quantity,nutriscore_grade,categories_tags';
 const SEARCH_FIELDS = `${FIELDS},lang,countries_tags`;
 const LANGS = 'de,en';
 // Mehr Kandidaten holen, damit nach dem DACH-Ranking genug passende übrig bleiben.
@@ -39,8 +38,6 @@ interface OffProduct {
   code?: string;
   product_name?: string;
   brands?: string | string[];
-  image_url?: string;
-  image_small_url?: string;
   serving_quantity?: number | string;
   quantity?: string;
   nutriscore_grade?: string;
@@ -78,12 +75,10 @@ function localeScore(p: OffProduct): number {
 @Injectable({ providedIn: 'root' })
 export class OpenFoodFactsProvider implements FoodProvider {
   private readonly http = inject(HttpClient);
-  private readonly settings = inject(SettingsStore);
   private readonly log = inject(DebugLogService);
 
   private searchUrl(): string {
-    const proxy = this.settings.ai().proxyUrl?.trim();
-    return proxy ? `${proxy.replace(/\/+$/, '')}/off-search` : SEARCH_URL_DEFAULT;
+    return SEARCH_URL_DEFAULT;
   }
 
   async searchByText(query: string, limit = 12): Promise<FoodItem[]> {
@@ -191,7 +186,6 @@ export class OpenFoodFactsProvider implements FoodProvider {
       barcode: p.code,
       facts,
       servingG: p.serving_quantity ? this.num(p.serving_quantity) : undefined,
-      imageUrl: p.image_small_url || p.image_url,
       quantity,
       nutriscore,
     };

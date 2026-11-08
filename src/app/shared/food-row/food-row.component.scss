@@ -1,33 +1,12 @@
-// Zeile: [Bild 44] [Text, flexibel] [Nutri-Score, feste Spalte 28 px]. Mindesthoehe 64 px.
+// Zeile ohne Bild: [Text, flexibel] [Nutri-Score-Textmarke, nur wenn vorhanden]. Mindesthoehe 64 px.
 :host {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 28px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--nt-space-3);
   min-width: 0;
   min-height: 64px;
-}
-
-.thumb {
-  flex: none;
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  overflow: hidden;
-  background: var(--nt-accent-tint);
-  color: var(--nt-accent);
-  display: grid;
-  place-items: center;
-
-  img {
-    width: 44px;
-    height: 44px;
-    object-fit: cover;
-  }
-
-  ion-icon {
-    font-size: 22px;
-  }
+  padding: var(--nt-space-2) 0;
 }
 
 .text {
@@ -49,34 +28,40 @@
   overflow-wrap: anywhere;
 }
 
-.brand {
-  font-size: 12px;
-  color: var(--nt-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.meta {
+.sub {
   display: flex;
   align-items: center;
   gap: var(--nt-space-2);
   min-width: 0;
   font-size: var(--nt-fs-caption);
   color: var(--nt-secondary);
+}
+
+.sub__text {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-// Feste rechte Spalte: Scores stehen unabhaengig von der Textlaenge buendig untereinander.
-.side {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
+// Eigene Lebensmittel: Textmarke in Akzent-Tint (Text 5,4:1 auf Tint).
+.own-tag {
+  flex: none;
+  padding: 1px var(--nt-space-2);
+  border-radius: var(--nt-radius-pill);
+  background: var(--nt-accent-tint);
+  color: var(--nt-accent-on-tint);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.meta {
+  font-size: var(--nt-fs-caption);
+  color: var(--nt-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .score {

@@ -51,7 +51,7 @@ der Blick auf „Heute" zeigt sofort, was vom Tagesbedarf noch übrig ist.
   Gerät nicht).
 - Lebensmittel: Open Food Facts (Suche über Cloudflare-Worker-Proxy, Barcode direkt), Nährwerte
   je 100 g oder je Portion.
-- KI über Cloudflare-Worker zu Google Gemini (oder eigener Key „Gemini direkt"); rate-limitiert.
+- KI nur über den globalen Cloudflare-Worker zu Google Gemini (kein eigener Key, keine eigene Adresse einstellbar; Profil zeigt nur den Status); rate-limitiert.
 - Speicherung: localStorage über `StorageService`; Backup-Export und -Import liegen im Profil.
 - Kein Medizinprodukt: keine Therapie- oder Diagnose-Aussagen.
 - Offen: App-Store-Veröffentlichung, Konten/Cloud-Sync (würde Art. 9 DSGVO auslösen),

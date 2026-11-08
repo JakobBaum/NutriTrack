@@ -141,7 +141,7 @@ Hängt an den Entscheidungen E3 und E4.
 | SEC-01 | Backup-Import übernimmt `endpoint`/`proxyUrl`/`baseUrl`; lokaler Key geht an fremden Host | Beim Import verwerfen oder Allowlist | S |
 | SEC-03 | Keine CSP | Meta-CSP mit `connect-src` auf Worker, Gemini, Spoonacular, OFF | S |
 | SEC-04 / SEC-05 / SEC-08 | Interne Fehlertexte an Client; SSRF ("localhost.", Ports, DNS-Rebinding); Freitext in Prompts, Body ungedeckelt | Generische Meldungen, Trailing-Dot und Ports, Längenprüfung | S |
-| SEC-06 / SEC-07 / SEC-09 | Keys im Klartext (localStorage), `zod`/Router-Advisories, Bilder von Drittservern | Secure Storage nativ, `npm audit fix`, optional Bild-Proxy | S bis M |
+| SEC-06 / SEC-07 / SEC-09 | Keys im Klartext (localStorage), `zod`/Router-Advisories, Bilder von Drittservern (SEC-09 erledigt: Produktbilder entfernt) | Secure Storage nativ, `npm audit fix` | S bis M |
 
 ### T10. Datenschutz und Recht
 | ID | Problem | Vorschlag | Aufw. |

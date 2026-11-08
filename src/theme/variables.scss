@@ -17,6 +17,7 @@
   --p-gray-900: #1c1c1e;  // Tinte, 16.8:1 auf #fff
   --p-teal-600: #0f7a6b;  // Akzent/kcal/Eiweiss: 5.2:1 auf #fff, 4.8:1 auf #f7f5f1, 4.1:1 auf Spur
   --p-teal-100: #e1f0ec;  // Akzent-Tint; Text darauf: --ion-color-primary-shade #0d6b5e (5.4:1)
+  --p-teal-700: #0d6b5e;  // Text auf Akzent-Tint: 5.4:1 auf #e1f0ec (Eigen-Marke)
   --p-blue-600: #2563c9;  // Kohlenhydrate: 5.7:1 auf #fff, 4.4:1 auf Spur
   --p-amber-700: #a15c07; // Fett: 5.2:1 auf #fff, 4.0:1 auf Spur
   --p-olive-700: #4c7a1e; // Ballaststoffe: 5.1:1 auf #fff, 4.0:1 auf Spur (gruener, heller als die Hauptmakros)
@@ -37,6 +38,7 @@
   --nt-tab-inactive: var(--p-gray-700);
   --nt-accent: var(--p-teal-600);
   --nt-accent-tint: var(--p-teal-100);
+  --nt-accent-on-tint: var(--p-teal-700);
   --nt-on-accent: #ffffff;
   --nt-danger: var(--p-red-700);
   --nt-warning: var(--p-orange-800);

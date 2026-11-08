@@ -5,7 +5,6 @@ import {
   FastFoodRequest,
   FastFoodSuggestion,
 } from '../models';
-import { SettingsStore } from '../state/settings.store';
 import {
   AiProvider,
   LabelResult,
@@ -16,7 +15,7 @@ import {
 } from './ai-provider';
 import { DebugLogService } from '../debug/debug-log.service';
 import { AI_ERROR_MESSAGES, AI_TIMEOUT_MS, friendlyAiErrorMessage, isTimeoutError, mapTimeoutError } from './ai-errors';
-import { effectiveProxyUrl } from './ai-endpoint';
+import { defaultAiProxyUrl } from './ai-endpoint';
 import { normalizeRecipeImport } from './recipe-import-normalize';
 
 const PING_FN = 'ping';
@@ -26,17 +25,16 @@ const UNKNOWN_FUNCTION_PATTERN = /^Unbekannte Funktion/;
  * KI-Anbieter über den **internen Proxy** (Cloudflare-Worker `worker.js`).
  *
  * Alle Nutzer teilen sich EINEN serverseitigen Gemini-Key; die App sendet
- * nur `{ fn, payload }` an die effektive Proxy-URL (eigene Adresse oder Standard) und erhält das fertig
+ * nur `{ fn, payload }` an die globale Proxy-URL (environment.aiProxyUrl) und erhält das fertig
  * gemappte Ergebnis zurück. Kein Key im Client, fixe Prompts serverseitig.
  */
 @Injectable({ providedIn: 'root' })
 export class ProxyAiProvider implements AiProvider {
   private readonly http = inject(HttpClient);
-  private readonly settings = inject(SettingsStore);
   private readonly log = inject(DebugLogService);
 
   private async call<T>(fn: string, payload: unknown): Promise<T> {
-    const url = effectiveProxyUrl(this.settings.ai());
+    const url = defaultAiProxyUrl();
     if (!url) throw new Error('Keine KI-Proxy-URL konfiguriert.');
     this.log.info(`→ ${fn}`);
     try {
@@ -80,7 +78,7 @@ export class ProxyAiProvider implements AiProvider {
    * Diese Antwort zählt als erreichbar (auch bei einem älteren Worker ohne neue Routen).
    */
   async ping(): Promise<void> {
-    const url = effectiveProxyUrl(this.settings.ai());
+    const url = defaultAiProxyUrl();
     if (!url) throw new Error('Keine KI-Proxy-URL konfiguriert.');
     try {
       await firstValueFrom(

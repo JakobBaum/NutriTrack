@@ -475,7 +475,7 @@
       </div>
     </ion-header>
     <ion-content>
-      <nt-food-sources placeholder="Zutat suchen…" (result)="pickSource($event)" (manual)="addManualFromSearch($event)"></nt-food-sources>
+      <nt-food-sources placeholder="Zutat suchen…" [showRecentCustom]="true" (result)="pickSource($event)" (manual)="addManualFromSearch($event)"></nt-food-sources>
     </ion-content>
   </ng-template>
 </ion-modal>

@@ -8,7 +8,6 @@ import {
 } from '@angular/common/http/testing';
 import { OpenFoodFactsProvider } from './openfoodfacts.provider';
 import { FoodLookupError, foodErrorMessage } from './food-errors';
-import { SettingsStore } from '../state/settings.store';
 import { environment } from '../../../environments/environment';
 
 const SEARCH_URL = environment.offSearchUrl;
@@ -92,20 +91,6 @@ describe('OpenFoodFactsProvider — Suche (search-a-licious)', () => {
     expect(req.request.headers.has('User-Agent')).toBe(false);
     req.flush({ hits: [] });
     await promise;
-  });
-
-  it('nutzt die Proxy-URL aus den Einstellungen ohne doppelten Slash', async () => {
-    // Arrange
-    const settings = TestBed.inject(SettingsStore);
-    settings.setAi({ ...settings.ai(), proxyUrl: 'https://proxy.example/' });
-
-    // Act
-    const promise = provider.searchByText('reis');
-    const req = http.expectOne((r) => r.url === 'https://proxy.example/off-search');
-
-    // Assert
-    req.flush({ hits: [] });
-    await expect(promise).resolves.toEqual([]);
   });
 
   it('holt mehr Kandidaten und liefert höchstens limit Treffer', async () => {

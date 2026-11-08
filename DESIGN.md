@@ -53,7 +53,7 @@ Typo: Systemschrift, tabular-nums; 13 / 15 / 17 / 22 / 34, Hero-Zahlen 48 (kcal 
 - `.nt-add-btn`: einziger Sekundaer-Stil fuer "Hinzufuegen" (Pille, Akzent-Tint, 44 px), als `button` oder `ion-button`.
 - Tab-Bar-Freiraum: `ion-tabs ion-content` nutzt `--nt-tabbar-clearance`; fuer andere Scroll-Container `.nt-tab-clearance`.
 - `.nt-fab-offset` (auf `ion-fab`): FAB 16 px ueber der Tab-Bar.
-- Komponenten: `nt-stepper` (Zeile 56, Buttons 36 mit 44 px Tippflaeche), `nt-food-row` (Zeile 64, feste Score-Spalte, Platzhalter-Icon), `nt-food-sources` (vier gleiche Spalten, "Manuell" immer sichtbar), `nt-amount-row` (Feld wie `.nt-field`).
+- Komponenten: `nt-stepper` (Zeile 56, Buttons 36 mit 44 px Tippflaeche), `nt-food-row` (nur Text, keine Produktbilder: Name fett, darunter Marke · Packungsgroesse, kcal und Eiweiss je 100 g bzw. je Portion, Nutri-Score als kleine Textmarke A-E nur wenn vorhanden; eigene Lebensmittel tragen das Kennzeichen "Eigen" in `--nt-accent-on-tint` auf `--nt-accent-tint`, 5,4:1), `nt-food-sources` (vier gleiche Spalten, "Manuell" immer sichtbar), `nt-amount-row` (Feld wie `.nt-field`).
 
 ## Regeln
 - Touch-Ziele >= 44 px; Fokusringe sichtbar (2px Akzent); `prefers-reduced-motion` wird respektiert.

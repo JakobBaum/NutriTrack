@@ -4,7 +4,6 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { SpoonacularProvider } from './spoonacular.provider';
 import { RecipeSearchConfigStore } from '../../state/recipe-search-config.store';
-import { SettingsStore } from '../../state/settings.store';
 import { AI_TIMEOUT_MS } from '../../ai/ai-errors';
 import { environment } from '../../../../environments/environment';
 import { EMPTY_FILTERS } from './spoonacular.query';
@@ -14,7 +13,6 @@ const WORKER = 'https://nutritrack.example.workers.dev';
 let http: HttpTestingController;
 let provider: SpoonacularProvider;
 let store: RecipeSearchConfigStore;
-let settings: SettingsStore;
 
 beforeEach(() => {
   localStorage.clear();
@@ -24,7 +22,6 @@ beforeEach(() => {
   http = TestBed.inject(HttpTestingController);
   provider = TestBed.inject(SpoonacularProvider);
   store = TestBed.inject(RecipeSearchConfigStore);
-  settings = TestBed.inject(SettingsStore);
 });
 afterEach(() => http.verify());
 
@@ -69,10 +66,8 @@ describe('SpoonacularProvider (own key)', () => {
 });
 
 describe('SpoonacularProvider (worker mode, no own key)', () => {
-  const aiWith = (proxyUrl: string) => ({ ...settings.ai(), proxyUrl });
-
   it('calls the worker route without x-api-key and keeps all query params', async () => {
-    settings.setAi(aiWith(WORKER + '/'));
+    environment.aiProxyUrl = WORKER + '/';
     const promise = provider.search({ ...EMPTY_FILTERS, query: 'soup', maxCalories: 400 });
     const req = http.expectOne((r) => r.url === `${WORKER}/recipes/complexSearch`);
     expect(req.request.headers.has('x-api-key')).toBe(false);
@@ -93,7 +88,7 @@ describe('SpoonacularProvider (worker mode, no own key)', () => {
   });
 
   it('prefers an own key over the worker', async () => {
-    settings.setAi(aiWith(WORKER));
+    environment.aiProxyUrl = WORKER;
     store.setApiKey('mine');
     const promise = provider.search(EMPTY_FILTERS);
     const req = http.expectOne((r) => r.url === 'https://api.spoonacular.com/recipes/complexSearch');
@@ -103,7 +98,7 @@ describe('SpoonacularProvider (worker mode, no own key)', () => {
   });
 
   it('maps a worker 503 "nicht eingerichtet" to no-key and makes no second request', async () => {
-    settings.setAi(aiWith(WORKER));
+    environment.aiProxyUrl = WORKER;
     const promise = provider.search(EMPTY_FILTERS);
     http.expectOne(() => true).flush(
       { error: 'Rezept-Suche nicht eingerichtet.' },
@@ -114,7 +109,7 @@ describe('SpoonacularProvider (worker mode, no own key)', () => {
   });
 
   it('maps a worker 429 to rate-limit', async () => {
-    settings.setAi(aiWith(WORKER));
+    environment.aiProxyUrl = WORKER;
     const promise = provider.search(EMPTY_FILTERS);
     http.expectOne(() => true).flush({ error: 'x' }, { status: 429, statusText: 'Too Many Requests' });
     await expect(promise).rejects.toMatchObject({ reason: 'rate-limit' });
@@ -123,7 +118,7 @@ describe('SpoonacularProvider (worker mode, no own key)', () => {
   it('turns a client timeout into a readable timeout error', async () => {
     vi.useFakeTimers();
     try {
-      settings.setAi(aiWith(WORKER));
+      environment.aiProxyUrl = WORKER;
       const promise = provider.search(EMPTY_FILTERS);
       const assertion = expect(promise).rejects.toMatchObject({ reason: 'timeout' });
       await vi.advanceTimersByTimeAsync(AI_TIMEOUT_MS + 1);

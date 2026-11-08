@@ -2,7 +2,7 @@ import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { AlertController } from '@ionic/angular';
-import { ActivityLevel, AiConfig, Goal, Sex, UserProfile } from '../core/models';
+import { ActivityLevel, Goal, Sex, UserProfile } from '../core/models';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { RecipeStore } from '../core/state/recipe.store';
@@ -11,8 +11,7 @@ import { formatDecimal } from '../core/util/number-input';
 import { StorageService } from '../core/storage/storage.service';
 import { NutritionCalcService } from '../core/nutrition/nutrition-calc.service';
 import { ProfileNote, profileNotes } from '../core/nutrition/profile-plausibility';
-import { effectiveProxyUrl, defaultAiProxyUrl } from '../core/ai/ai-endpoint';
-import { aiConnection, aiStatusLabel, modelOptions } from './ai-status';
+import { defaultAiProxyUrl } from '../core/ai/ai-endpoint';
 import { AiService } from '../core/ai/ai.service';
 import { CustomFoodStore } from '../core/state/custom-food.store';
 import { SettingsStore } from '../core/state/settings.store';
@@ -81,8 +80,6 @@ export class SettingsPage implements OnInit {
 
   readonly profileOpen = signal(false);
   readonly aiOpen = signal(false);
-  /** Standard-Adresse des globalen KI-Servers (Platzhalter im Erweitert-Block). */
-  readonly defaultProxyUrl = defaultAiProxyUrl();
   readonly logOpen = signal(false);
   readonly infoSection = signal<'anleitung' | 'datenschutz' | 'agb' | 'hilfe' | null>(null);
 
@@ -113,19 +110,12 @@ export class SettingsPage implements OnInit {
         : nearestRate(this.existing.rateKgPerWeek))
     : DEFAULT_RATE;
   readonly rateChoices = RATE_CHOICES;
-  readonly modelChoices = modelOptions(this.settingsStore.ai().model);
 
-  /** Aktive KI-Verbindung (gespeicherter Stand) und ihre Beschriftung für die Zeile. */
-  readonly aiState = computed(() => aiConnection(this.settingsStore.ai()));
-  readonly aiStatus = computed(() => aiStatusLabel(this.aiState()));
   private readonly aiService = inject(AiService);
-  /** Ergebnis des Verbindungstests (prüft die gespeicherte Konfiguration). */
+  /** Erreichbarkeit des globalen KI-Dienstes (read-only Status). */
   readonly aiTest = signal<{ busy: boolean; ok: boolean | null; message: string | null }>({
     busy: false, ok: null, message: null,
   });
-
-  // --- KI-Konfiguration (Kopie zum Bearbeiten) ---
-  ai: AiConfig = { ...this.settingsStore.ai() };
 
   readonly sexes: { value: Sex; label: string }[] = [
     { value: 'male', label: 'Männlich' },
@@ -223,7 +213,13 @@ export class SettingsPage implements OnInit {
   /** Aus der Anleitung direkt zur KI-Verbindung wechseln. */
   openAiFromGuide(): void {
     this.infoSection.set(null);
+    this.openAi();
+  }
+
+  /** Öffnet den KI-Status und prüft die Erreichbarkeit des globalen Dienstes. */
+  openAi(): void {
     this.aiOpen.set(true);
+    void this.testAi();
   }
 
   setRate(rate: number): void {
@@ -317,21 +313,7 @@ export class SettingsPage implements OnInit {
     this.savedToast.set('Profil gespeichert — Tagesbedarf aktualisiert.');
   }
 
-  saveAi(): void {
-    const apiKey = this.ai.apiKey?.trim() ?? '';
-    // Anbieter ergibt sich aus der Eingabe: eigener Schlüssel -> Gemini, sonst keiner.
-    this.settingsStore.setAi({
-      ...this.ai,
-      proxyUrl: this.ai.proxyUrl?.trim() ?? '',
-      apiKey,
-      provider: apiKey ? 'gemini' : 'none',
-    });
-    this.aiTest.set({ busy: false, ok: null, message: null });
-    this.aiOpen.set(false);
-    this.savedToast.set('KI-Einstellungen gespeichert.');
-  }
-
-  /** Prüft den aktiven Weg der gespeicherten Konfiguration ohne KI-Kosten. */
+  /** Prüft ohne KI-Kosten, ob der globale KI-Dienst erreichbar ist. */
   async testAi(): Promise<void> {
     this.aiTest.set({ busy: true, ok: null, message: 'Prüfe Verbindung…' });
     const result = await this.aiService.testConnection();
@@ -364,7 +346,6 @@ export class SettingsPage implements OnInit {
     this.favoriteStore.clear();
     this.settingsStore.clear();
     this.storage.clearAll();
-    this.ai = { ...this.settingsStore.ai() };
     this.savedToast.set('Alle Daten wurden zurückgesetzt.');
   }
 
@@ -433,7 +414,7 @@ export class SettingsPage implements OnInit {
   }
 
   async testConnection(): Promise<void> {
-    const url = effectiveProxyUrl(this.settingsStore.ai());
+    const url = defaultAiProxyUrl();
     if (!url) { this.debugLog.error('Keine Proxy-URL konfiguriert.'); return; }
     this.debugLog.info(`Teste ${url} ...`);
     this.logOpen.set(true);

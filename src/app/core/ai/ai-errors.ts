@@ -10,7 +10,7 @@ export const AI_ERROR_MESSAGES = {
   generic: 'Die KI-Anfrage ist fehlgeschlagen. Bitte erneut versuchen.',
 } as const;
 
-/** Client-seitiges Zeitlimit für einen KI-Aufruf (Proxy und Gemini direkt). */
+/** Client-seitiges Zeitlimit für einen KI-Aufruf (globaler Worker). */
 export const AI_TIMEOUT_MS = 30000;
 
 /** Bildet einen HTTP-Status (0 = Netzwerkfehler) auf eine deutsche Meldung ab. */
