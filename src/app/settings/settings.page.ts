@@ -10,6 +10,7 @@ import { MealsStore } from '../core/state/meals.store';
 import { formatDecimal } from '../core/util/number-input';
 import { StorageService } from '../core/storage/storage.service';
 import { MAX_RATE_KG_PER_WEEK, NutritionCalcService } from '../core/nutrition/nutrition-calc.service';
+import { effectiveProxyUrl, defaultAiProxyUrl } from '../core/ai/ai-endpoint';
 import { aiConnection, aiStatusLabel, modelOptions } from './ai-status';
 import { AiService } from '../core/ai/ai.service';
 import { CustomFoodStore } from '../core/state/custom-food.store';
@@ -72,6 +73,8 @@ export class SettingsPage implements OnInit {
 
   readonly profileOpen = signal(false);
   readonly aiOpen = signal(false);
+  /** Standard-Adresse des globalen KI-Servers (Platzhalter im Erweitert-Block). */
+  readonly defaultProxyUrl = defaultAiProxyUrl();
   readonly logOpen = signal(false);
   readonly infoSection = signal<'anleitung' | 'datenschutz' | 'agb' | 'hilfe' | null>(null);
 
@@ -378,7 +381,7 @@ export class SettingsPage implements OnInit {
   }
 
   async testConnection(): Promise<void> {
-    const url = this.settingsStore.ai().proxyUrl?.trim().replace(/\/$/, '');
+    const url = effectiveProxyUrl(this.settingsStore.ai());
     if (!url) { this.debugLog.error('Keine Proxy-URL konfiguriert.'); return; }
     this.debugLog.info(`Teste ${url} ...`);
     this.logOpen.set(true);

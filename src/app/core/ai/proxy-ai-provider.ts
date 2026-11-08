@@ -1,6 +1,6 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import {
   DailyTarget,
   FastFoodRequest,
@@ -17,7 +17,8 @@ import {
   ShoppingPlanResult,
 } from './ai-provider';
 import { DebugLogService } from '../debug/debug-log.service';
-import { friendlyAiErrorMessage } from './ai-errors';
+import { AI_ERROR_MESSAGES, AI_TIMEOUT_MS, friendlyAiErrorMessage, isTimeoutError, mapTimeoutError } from './ai-errors';
+import { effectiveProxyUrl } from './ai-endpoint';
 import { normalizeRecipeImport } from './recipe-import-normalize';
 
 const PING_FN = 'ping';
@@ -27,7 +28,7 @@ const UNKNOWN_FUNCTION_PATTERN = /^Unbekannte Funktion/;
  * KI-Anbieter über den **internen Proxy** (Cloudflare-Worker `worker.js`).
  *
  * Alle Nutzer teilen sich EINEN serverseitigen Gemini-Key; die App sendet
- * nur `{ fn, payload }` an die konfigurierte Proxy-URL und erhält das fertig
+ * nur `{ fn, payload }` an die effektive Proxy-URL (eigene Adresse oder Standard) und erhält das fertig
  * gemappte Ergebnis zurück. Kein Key im Client, fixe Prompts serverseitig.
  */
 @Injectable({ providedIn: 'root' })
@@ -37,12 +38,13 @@ export class ProxyAiProvider implements AiProvider {
   private readonly log = inject(DebugLogService);
 
   private async call<T>(fn: string, payload: unknown): Promise<T> {
-    const url = this.settings.ai().proxyUrl?.trim();
+    const url = effectiveProxyUrl(this.settings.ai());
     if (!url) throw new Error('Keine KI-Proxy-URL konfiguriert.');
     this.log.info(`→ ${fn}`);
     try {
       const result = await firstValueFrom(
-        this.http.post<T>(url, { fn, payload }, { headers: { 'content-type': 'application/json' } }),
+        this.http.post<T>(url, { fn, payload }, { headers: { 'content-type': 'application/json' } })
+          .pipe(timeout(AI_TIMEOUT_MS)),
       );
       this.log.success(`✓ ${fn} OK`);
       return result;
@@ -53,7 +55,7 @@ export class ProxyAiProvider implements AiProvider {
         throw new Error(msg);
       }
       this.log.error(`✗ ${fn}: ${(err as Error).message}`);
-      throw err;
+      throw mapTimeoutError(err);
     }
   }
 
@@ -84,14 +86,16 @@ export class ProxyAiProvider implements AiProvider {
    * Diese Antwort zählt als erreichbar (auch bei einem älteren Worker ohne neue Routen).
    */
   async ping(): Promise<void> {
-    const url = this.settings.ai().proxyUrl?.trim();
+    const url = effectiveProxyUrl(this.settings.ai());
     if (!url) throw new Error('Keine KI-Proxy-URL konfiguriert.');
     try {
       await firstValueFrom(
-        this.http.post(url, { fn: PING_FN, payload: {} }, { headers: { 'content-type': 'application/json' } }),
+        this.http.post(url, { fn: PING_FN, payload: {} }, { headers: { 'content-type': 'application/json' } })
+          .pipe(timeout(AI_TIMEOUT_MS)),
       );
     } catch (err: unknown) {
       if (isUnknownFunctionResponse(err)) return;
+      if (isTimeoutError(err)) throw new Error(AI_ERROR_MESSAGES.timeout);
       const status = err instanceof HttpErrorResponse ? err.status : 0;
       throw new Error(friendlyAiErrorMessage(status));
     }

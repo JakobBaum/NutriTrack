@@ -1,6 +1,6 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import {
   DailyTarget,
   FastFoodRequest,
@@ -17,12 +17,12 @@ import {
   ShoppingPlanResult,
 } from './ai-provider';
 import { SHOPPING_CATEGORIES, categorizeName, normalizeCategory } from '../shopping/shopping-category';
-import { friendlyAiErrorMessage } from './ai-errors';
+import { AI_ERROR_MESSAGES, AI_TIMEOUT_MS, friendlyAiErrorMessage, isTimeoutError, mapTimeoutError } from './ai-errors';
 import { normalizeRecipeImport } from './recipe-import-normalize';
 
 const DEFAULT_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-// Ein Modell für alles — Gemini 3.8 Flash ist multimodal (Text + Vision).
-const MODEL_DEFAULT = 'gemini-3.8-flash';
+// Ein Modell für alles — Gemini 3.6 Flash ist multimodal (Text + Vision).
+const MODEL_DEFAULT = 'gemini-3.6-flash';
 
 interface GeminiPart {
   text?: string;
@@ -193,9 +193,11 @@ export class GeminiAiProvider implements AiProvider {
     const base = cfg.endpoint?.trim() || DEFAULT_BASE;
     try {
       await firstValueFrom(
-        this.http.get(`${base}?pageSize=1`, { headers: { 'x-goog-api-key': cfg.apiKey.trim() } }),
+        this.http.get(`${base}?pageSize=1`, { headers: { 'x-goog-api-key': cfg.apiKey.trim() } })
+          .pipe(timeout(AI_TIMEOUT_MS)),
       );
     } catch (e: unknown) {
+      if (isTimeoutError(e)) throw new Error(AI_ERROR_MESSAGES.timeout);
       const status = e instanceof HttpErrorResponse ? e.status : 0;
       // Google antwortet auf einen ungültigen Schlüssel mit 400 (API_KEY_INVALID).
       throw new Error(friendlyAiErrorMessage(status === 400 ? 401 : status));
@@ -262,7 +264,7 @@ export class GeminiAiProvider implements AiProvider {
     let lastErr: unknown;
     for (let i = 0; i < attempts; i++) {
       try {
-        return await firstValueFrom(this.http.post<GeminiResponse>(url, body, { headers }));
+        return await firstValueFrom(this.http.post<GeminiResponse>(url, body, { headers }).pipe(timeout(AI_TIMEOUT_MS)));
       } catch (e: unknown) {
         lastErr = e;
         const status = e instanceof HttpErrorResponse ? e.status : 0;
@@ -272,7 +274,7 @@ export class GeminiAiProvider implements AiProvider {
       }
     }
     if (lastErr instanceof HttpErrorResponse) throw new Error(friendlyAiErrorMessage(lastErr.status));
-    throw lastErr;
+    throw mapTimeoutError(lastErr);
   }
 
   /** Extrahiert das erste JSON-Objekt/-Array robust aus einer Modellantwort. */

@@ -236,19 +236,19 @@ describe('POST / — Gemini überlastet (Retry, Fallback, 503)', () => {
 
   it('wiederholt ein 503 und liefert danach das Ergebnis', async () => {
     let n = 0;
-    mockFetch(() => (++n < 3 ? errReply(503) : geminiReply(OK)));
+    mockFetch(() => (++n < 2 ? errReply(503) : geminiReply(OK)));
     const res = await run();
     assert.equal(res.status, 200);
-    assert.equal(upstream.length, 3);
-    assert.ok(upstream.every((u) => u.url.includes('gemini-3.8-flash:')));
+    assert.equal(upstream.length, 2);
+    assert.ok(upstream.every((u) => u.url.includes('gemini-3.6-flash:')));
   });
 
   it('fällt nach erschöpften Retries auf das Fallback-Modell zurück', async () => {
     mockFetch((url) => (url.includes('flash-lite') ? geminiReply(OK) : errReply(503)));
     const res = await run();
     assert.equal(res.status, 200);
-    assert.equal(upstream.length, 4);
-    assert.ok(upstream[3].url.includes('gemini-3.8-flash-lite:'));
+    assert.equal(upstream.length, 3);
+    assert.ok(upstream[2].url.includes('gemini-3.5-flash-lite:'));
   });
 
   it('antwortet 503 mit deutscher Meldung und Retry-After, wenn alles überlastet ist', async () => {
@@ -257,7 +257,7 @@ describe('POST / — Gemini überlastet (Retry, Fallback, 503)', () => {
     assert.equal(res.status, 503);
     assert.equal(res.headers.get('Retry-After'), '60');
     assert.match((await res.json()).error, /überlastet/);
-    assert.equal(upstream.length, 6);
+    assert.equal(upstream.length, 4);
   });
 
   it('wiederholt 429 und 500 ebenfalls', async () => {
@@ -308,5 +308,43 @@ describe('importRecipe — SSRF-Schutz und Seitentext', () => {
     assert.match(prompt, /Linsensuppe/);
     assert.match(prompt, /200 g Linsen/);
     assert.doesNotMatch(prompt, /MUELL/);
+  });
+});
+
+describe('GET /health und Modellwechsel', () => {
+  const OK = { kcal: 2000, proteinG: 150, carbsG: 200, fatG: 60, fiberG: 30, sugarG: 40 };
+  const run = () => worker.fetch(post({ fn: 'computeTargets', payload: PROFILE }), ENV);
+
+  it('meldet Status ohne Key-Wert', async () => {
+    const res = await worker.fetch(get('/health'), ENV);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('Access-Control-Allow-Origin'), APP_ORIGIN);
+    const body = await res.json();
+    assert.deepEqual(body, { ok: true, hasKey: true, model: 'gemini-3.6-flash', fallbackModel: 'gemini-3.5-flash-lite' });
+    assert.ok(!JSON.stringify(body).includes('test-key'));
+  });
+
+  it('meldet hasKey=false ohne Secret und respektiert Modell-Overrides', async () => {
+    const res = await worker.fetch(get('/health'), { GEMINI_MODEL: 'm1', GEMINI_FALLBACK_MODEL: 'm2' });
+    assert.deepEqual(await res.json(), { ok: true, hasKey: false, model: 'm1', fallbackModel: 'm2' });
+  });
+
+  it('wechselt bei 404 (Modell unbekannt) sofort auf das Fallback-Modell', async () => {
+    mockFetch((url) => (url.includes('flash-lite')
+      ? geminiReply(OK)
+      : new Response(JSON.stringify({ error: { message: 'model not found' } }), { status: 404 })));
+    const res = await run();
+    assert.equal(res.status, 200);
+    assert.equal(upstream.length, 2);
+    assert.ok(upstream[1].url.includes('gemini-3.5-flash-lite:'));
+  });
+
+  it('wechselt bei 400 mit "model" im Text auf das Fallback-Modell', async () => {
+    mockFetch((url) => (url.includes('flash-lite')
+      ? geminiReply(OK)
+      : new Response(JSON.stringify({ error: { message: 'Invalid model name' } }), { status: 400 })));
+    const res = await run();
+    assert.equal(res.status, 200);
+    assert.equal(upstream.length, 2);
   });
 });

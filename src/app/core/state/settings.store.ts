@@ -5,16 +5,19 @@ import { RecipeSearchConfigStore } from './recipe-search-config.store';
 
 const KEY_AI = 'ai-config';
 
+/** Frühere (ungültige) Modellnamen: werden beim Laden auf den Standard (leer) migriert. */
+const LEGACY_MODELS: readonly string[] = ['gemini-3.8-flash', 'gemini-3.8-pro'];
+
 const DEFAULT_AI: AiConfig = {
   // Gemini ist der Standard-Anbieter: Die Anbindung ist fest verdrahtet und
   // aktiviert sich automatisch, sobald ein API-Key hinterlegt ist. Ohne Key
   // routet der AiService sauber auf den kostenlosen Mock (siehe AiService.isLive).
   provider: 'gemini',
   endpoint: '',
-  // Interner KI-Proxy (ein Server-Key für alle Nutzer). Leer = nicht gesetzt;
-  // dann greift ein optionaler eigener Key, sonst der Mock.
+  // Optionale eigene Server-Adresse. Leer = globaler KI-Server aus der Umgebung
+  // (environment.aiProxyUrl, ein Server-Key für alle Nutzer).
   proxyUrl: '',
-  // Leer lassen: Der GeminiAiProvider nutzt dann automatisch gemini-3.8-flash.
+  // Leer lassen: Der GeminiAiProvider nutzt dann automatisch gemini-3.6-flash.
   // Ein hier gesetzter Wert überschreibt das Modell für ALLE Calls.
   model: '',
   apiKey: '',
@@ -30,7 +33,7 @@ export class SettingsStore {
   private readonly recipeSearch = inject(RecipeSearchConfigStore);
 
   private readonly _ai = signal<AiConfig>(
-    this.storage.get<AiConfig>(KEY_AI, DEFAULT_AI),
+    migrateAiConfig(this.storage.get<AiConfig>(KEY_AI, DEFAULT_AI)),
   );
 
   /** Aktuelle KI-Konfiguration. */
@@ -48,4 +51,10 @@ export class SettingsStore {
     this.storage.remove(KEY_AI);
     this.recipeSearch.clear();
   }
+}
+
+/** Ersetzt veraltete Modellnamen durch den Standard (leerer String). */
+function migrateAiConfig(cfg: AiConfig): AiConfig {
+  const model = cfg.model?.trim() ?? '';
+  return LEGACY_MODELS.includes(model) ? { ...cfg, model: '' } : cfg;
 }

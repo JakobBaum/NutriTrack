@@ -3,6 +3,8 @@
 // The list of file replacements can be found in `angular.json`.
 
 export const environment = {
+  // Globaler KI-Server (Cloudflare-Worker, Secret GEMINI_API_KEY): POST auf '/'.
+  aiProxyUrl: 'https://nutritrack.baumgartner-jakob12.workers.dev',
   production: false,
   // Angular dev proxy forwards /off-search → https://search.openfoodfacts.org/search
   offSearchUrl: '/off-search',

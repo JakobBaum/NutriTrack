@@ -270,3 +270,15 @@ ion-item {
     word-break: break-all;
   }
 }
+
+// Eingeklappter Erweitert-Block im KI-Sheet
+.ai-advanced {
+  margin-top: var(--nt-space-4);
+
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--nt-secondary);
+    padding: var(--nt-space-2) 0;
+  }
+}

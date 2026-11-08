@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { AI_ERROR_MESSAGES } from './ai-errors';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
@@ -90,6 +90,21 @@ describe('ProxyAiProvider', () => {
       const p = provider.computeTargets(profile);
       http.expectOne(PROXY).flush({ error: 'Gemini 503' }, { status, statusText: 'x' });
       await expect(p).rejects.toThrow(message);
+    }
+  });
+});
+
+describe('ProxyAiProvider Zeitlimit', () => {
+  it('meldet nach 30 s eine klare deutsche Meldung', async () => {
+    vi.useFakeTimers();
+    try {
+      const p = provider.computeTargets(profile);
+      const assertion = expect(p).rejects.toThrow(AI_ERROR_MESSAGES.timeout);
+      http.expectOne(PROXY);
+      await vi.advanceTimersByTimeAsync(30001);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
     }
   });
 });

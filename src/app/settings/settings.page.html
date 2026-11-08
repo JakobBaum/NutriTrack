@@ -250,8 +250,8 @@
     <ion-content>
       <div class="nt-page settings-sheet">
         <p class="hint">
-          Die KI läuft über Google Gemini. Ohne Verbindung sind KI-Funktionen (Etikett-Scan, Rezept-Import per Link oder Foto, KI-Einkaufsliste) nicht verfügbar.
-          Aktuell (gespeichert): <strong>{{ aiStatus() }}</strong>.
+          Die KI läuft über Google Gemini auf einem globalen Server von NutriTrack - du musst nichts eintragen.
+          Status: <strong>{{ aiStatus() }}</strong>.
         </p>
         <div class="form-actions form-actions--top">
           <ion-button fill="outline" expand="block" [disabled]="aiTest().busy" (click)="testAi()">Verbindung testen</ion-button>
@@ -260,37 +260,30 @@
           <p class="hint" role="status" [class.hint--warn]="aiTest().ok === false">{{ msg }}</p>
         }
 
-        <h2 class="nt-section-header">Option 1: KI-Server</h2>
-        @if (ai.apiKey?.trim()) {
-          <p class="hint hint--warn" role="status">Inaktiv, solange ein eigener Schlüssel eingetragen ist. Entferne den Schlüssel unten, um den KI-Server zu nutzen.</p>
-        } @else {
-          <p class="hint">Empfohlen. Mit der Adresse des NutriTrack-KI-Servers ist kein eigener Schlüssel nötig.</p>
-        }
-        <div class="field-stack" [class.is-inactive]="!!ai.apiKey?.trim()">
-          <span class="field-label" id="ai-proxy-label">Adresse des KI-Servers</span>
-          <ion-input class="nt-field" aria-labelledby="ai-proxy-label" [(ngModel)]="ai.proxyUrl" inputmode="url" placeholder="https://…"></ion-input>
-        </div>
-
-        <h2 class="nt-section-header">Option 2: Eigener Gemini-Schlüssel</h2>
-        <p class="hint">Hat Vorrang vor dem KI-Server und wird nur lokal auf diesem Gerät gespeichert.</p>
-        <div class="field-stack">
-          <span class="field-label" id="ai-key-label">Gemini-Schlüssel (API-Key)</span>
-          <ion-input class="nt-field" type="password" aria-labelledby="ai-key-label" [(ngModel)]="ai.apiKey" [clearOnEdit]="false" autocomplete="off" placeholder="Schlüssel einfügen"></ion-input>
-        </div>
-
-        <h2 class="nt-section-header">Erweitert</h2>
-        <div class="field-stack">
-          <span class="field-label" id="ai-model-label">Modell</span>
-          <ion-select class="nt-field" aria-labelledby="ai-model-label" [(ngModel)]="ai.model" interface="action-sheet" cancelText="Abbrechen">
-            @for (m of modelChoices; track m.value) {
-              <ion-select-option [value]="m.value">{{ m.label }}</ion-select-option>
-            }
-          </ion-select>
-        </div>
-        <div class="field-stack">
-          <span class="field-label" id="ai-endpoint-label">Eigene Adresse der Gemini-Schnittstelle (optional)</span>
-          <ion-input class="nt-field" aria-labelledby="ai-endpoint-label" [(ngModel)]="ai.endpoint" placeholder="https://…"></ion-input>
-        </div>
+        <details class="ai-advanced">
+          <summary>Erweitert</summary>
+          <p class="hint">Nur nötig, wenn du einen eigenen Server oder deinen eigenen Gemini-Schlüssel nutzen willst. Der Schlüssel hat Vorrang und wird nur lokal auf diesem Gerät gespeichert.</p>
+          <div class="field-stack">
+            <span class="field-label" id="ai-proxy-label">Eigene Server-Adresse (optional)</span>
+            <ion-input class="nt-field" aria-labelledby="ai-proxy-label" [(ngModel)]="ai.proxyUrl" inputmode="url" [placeholder]="defaultProxyUrl"></ion-input>
+          </div>
+          <div class="field-stack">
+            <span class="field-label" id="ai-key-label">Eigener Gemini-Schlüssel (optional)</span>
+            <ion-input class="nt-field" type="password" aria-labelledby="ai-key-label" [(ngModel)]="ai.apiKey" [clearOnEdit]="false" autocomplete="off" placeholder="Schlüssel einfügen"></ion-input>
+          </div>
+          <div class="field-stack">
+            <span class="field-label" id="ai-model-label">Modell</span>
+            <ion-select class="nt-field" aria-labelledby="ai-model-label" [(ngModel)]="ai.model" interface="action-sheet" cancelText="Abbrechen">
+              @for (m of modelChoices; track m.value) {
+                <ion-select-option [value]="m.value">{{ m.label }}</ion-select-option>
+              }
+            </ion-select>
+          </div>
+          <div class="field-stack">
+            <span class="field-label" id="ai-endpoint-label">Eigene Adresse der Gemini-Schnittstelle (optional)</span>
+            <ion-input class="nt-field" aria-labelledby="ai-endpoint-label" [(ngModel)]="ai.endpoint" placeholder="https://…"></ion-input>
+          </div>
+        </details>
 
         <div class="form-actions">
           <ion-button expand="block" (click)="saveAi()">
@@ -354,7 +347,7 @@
             <p>Für Fehlerberichte und Wünsche schreib einfach an diese Adresse.</p>
             <h4>Häufige Fragen</h4>
             <p><strong>Barcode wird nicht erkannt?</strong> Stelle sicher, dass genügend Licht vorhanden ist. Alternativ kannst du den Barcode manuell eingeben.</p>
-            <p><strong>KI funktioniert nicht?</strong> Prüfe unter „KI-Verbindung“, ob die Adresse des KI-Servers oder ein gültiger eigener Key eingetragen ist.</p>
+            <p><strong>KI funktioniert nicht?</strong> Tippe unter „KI-Verbindung“ auf „Verbindung testen“. Bleibt es dabei, versuche es später erneut oder trage unter „Erweitert“ einen eigenen Gemini-Schlüssel ein.</p>
             <p><strong>Daten verloren?</strong> Alle Daten werden lokal gespeichert. Wenn du die App deinstallierst, werden sie gelöscht. Speichere regelmäßig ein Backup über „Backup exportieren“ und stelle es mit „Backup importieren“ wieder her.</p>
           }
         }

@@ -6,8 +6,8 @@ export type AiConnection = 'none' | 'server' | 'ownKey';
 /** Bekannte Gemini-Modelle; leerer Wert = automatisch (App wählt). */
 export const KNOWN_MODELS: readonly { value: string; label: string }[] = [
   { value: '', label: 'Automatisch (empfohlen)' },
-  { value: 'gemini-3.8-flash', label: 'gemini-3.8-flash (schnell)' },
-  { value: 'gemini-3.8-pro', label: 'gemini-3.8-pro (gründlicher)' },
+  { value: 'gemini-3.6-flash', label: 'gemini-3.6-flash (schnell)' },
+  { value: 'gemini-3.5-flash-lite', label: 'gemini-3.5-flash-lite (günstig)' },
 ];
 
 /** Aktiver Weg: eigener Schlüssel (Gemini direkt) vor KI-Server; sonst nicht verbunden. */
@@ -20,8 +20,8 @@ export function aiConnection(cfg: Partial<Pick<AiConfig, 'provider' | 'proxyUrl'
 
 export function aiStatusLabel(connection: AiConnection): string {
   switch (connection) {
-    case 'ownKey': return 'Aktiv: eigener Schlüssel (Gemini direkt)';
-    case 'server': return 'Aktiv: KI-Server (Worker)';
+    case 'ownKey': return 'Eigener Schlüssel aktiv';
+    case 'server': return 'Globaler KI-Server aktiv';
     default: return 'Nicht verbunden';
   }
 }
