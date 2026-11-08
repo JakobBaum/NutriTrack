@@ -28,4 +28,15 @@ describe('toOnlineSearchError', () => {
     expect(toOnlineSearchError(own, false)).toBe(own);
     expect(toOnlineSearchError(new Error('boom'), false).reason).toBe('server');
   });
+
+  it('maps a worker 503 "nicht eingerichtet" to no-key and other 503 to server', () => {
+    const notConfigured = new HttpErrorResponse({ status: 503, error: { error: 'Rezept-Suche nicht eingerichtet.' } });
+    expect(toOnlineSearchError(notConfigured, false).reason).toBe('no-key');
+    expect(toOnlineSearchError(new HttpErrorResponse({ status: 503, error: { error: 'x' } }), false).reason).toBe('server');
+  });
+
+  it('maps an rxjs TimeoutError to timeout', () => {
+    const timeoutError = Object.assign(new Error('Timeout has occurred'), { name: 'TimeoutError' });
+    expect(toOnlineSearchError(timeoutError, false).reason).toBe('timeout');
+  });
 });

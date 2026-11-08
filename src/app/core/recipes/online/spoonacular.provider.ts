@@ -1,7 +1,9 @@
 import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
-import { RecipeSearchConfig, RecipeSearchConfigStore } from '../../state/recipe-search-config.store';
+import { firstValueFrom, timeout } from 'rxjs';
+import { AI_TIMEOUT_MS } from '../../ai/ai-errors';
+import { RecipeSearchConfig } from '../../state/recipe-search-config.store';
+import { RecipeSearchAccessService } from './recipe-search-access';
 import { OnlineRecipe, OnlineSearchPage } from './online-recipe.model';
 import { OnlineSearchError, ONLINE_SEARCH_MESSAGES, toOnlineSearchError } from './spoonacular.errors';
 import { mapSpoonRecipe } from './spoonacular.mapper';
@@ -18,14 +20,14 @@ const SEARCH_PATH = '/recipes/complexSearch';
 const QUOTA_HEADER = 'X-Api-Quota-Left';
 
 /**
- * Online-Rezeptdatenbank **spoonacular** (GET complexSearch, Auth per Header `x-api-key`).
- * Basis-URL und Key kommen aus {@link RecipeSearchConfigStore} und sind austauschbar
- * (geplant: Worker-Route mit serverseitigem Key). Der Key wird nie geloggt.
+ * Online-Rezeptdatenbank **spoonacular** (GET complexSearch). Mit eigenem Schlüssel direkt gegen
+ * spoonacular (Header `x-api-key`), sonst über die globale Worker-Route ohne Schlüssel im Client.
+ * Der Key wird nie geloggt; bei Worker-Fehlern gibt es keinen Rückfall auf einen fehlenden Key.
  */
 @Injectable({ providedIn: 'root' })
 export class SpoonacularProvider {
   private readonly http = inject(HttpClient);
-  private readonly configStore = inject(RecipeSearchConfigStore);
+  private readonly accessService = inject(RecipeSearchAccessService);
 
   private readonly _quotaLeft = signal<number | null>(null);
   /** Zuletzt gemeldete Restpunkte des Tages (null = unbekannt). */
@@ -50,17 +52,15 @@ export class SpoonacularProvider {
     params: Record<string, string>,
     override?: Partial<RecipeSearchConfig>,
   ): Promise<HttpResponse<SpoonSearchResponse>> {
-    const cfg = { ...this.configStore.config(), ...override };
-    const apiKey = cfg.apiKey.trim();
-    if (!apiKey) throw new OnlineSearchError('no-key', ONLINE_SEARCH_MESSAGES['no-key']);
-    const base = cfg.baseUrl.replace(/\/+$/, '');
+    const access = this.accessService.resolve(override);
+    if (access.mode === 'none') throw new OnlineSearchError('no-key', ONLINE_SEARCH_MESSAGES['no-key']);
     try {
       const res = await firstValueFrom(
-        this.http.get<SpoonSearchResponse>(`${base}${SEARCH_PATH}`, {
+        this.http.get<SpoonSearchResponse>(`${access.baseUrl}${SEARCH_PATH}`, {
           params: new HttpParams({ fromObject: params }),
-          headers: { 'x-api-key': apiKey },
+          headers: access.mode === 'ownKey' ? { 'x-api-key': access.apiKey } : {},
           observe: 'response',
-        }),
+        }).pipe(timeout(AI_TIMEOUT_MS)),
       );
       const quota = parseQuotaLeft(res.headers.get(QUOTA_HEADER));
       if (quota !== null) this._quotaLeft.set(quota);

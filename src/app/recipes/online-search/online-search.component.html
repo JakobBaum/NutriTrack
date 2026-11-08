@@ -15,7 +15,7 @@
 </ion-header>
 
 <ion-content>
-  @if (!hasKey()) {
+  @if (needsSetup()) {
     <div class="os-empty" data-testid="os-no-key">
       <ion-icon name="globe-outline" class="os-empty__icon" aria-hidden="true"></ion-icon>
       <h3 class="os-empty__title">Rezept-Suche einrichten</h3>

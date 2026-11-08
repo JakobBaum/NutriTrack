@@ -1,9 +1,10 @@
 /**
  * NutriTrack Cloudflare Worker
  * - GET  /off-search  → OpenFoodFacts-Suche (CORS-Proxy, 1 h gecacht)
+ * - GET  /recipes/complexSearch → spoonacular-Rezeptsuche (Key nur als Secret SPOONACULAR_API_KEY)
  * - POST /            → KI-Proxy für Gemini (fn + payload)
  *
- * - GET  /health      → Statusprüfung {ok, hasKey, model, fallbackModel} (kein Key-Wert)
+ * - GET  /health      → Statusprüfung {ok, hasKey, hasRecipeKey, model, fallbackModel} (kein Key-Wert)
  *
  * Deploy (im Projektordner):
  *   npx wrangler login
@@ -13,10 +14,11 @@
  *
  * Secrets (über Wrangler/Dashboard setzen):
  *   wrangler secret put GEMINI_API_KEY
+ *   wrangler secret put SPOONACULAR_API_KEY  (Rezept-Suche)
  * Optional: GEMINI_MODEL, GEMINI_FALLBACK_MODEL (Modellnamen überschreiben)
  * Optional:
  *   ALLOWED_ORIGINS  kommagetrennte Browser-Origins (ersetzt DEFAULT_ORIGINS)
- *   AI_LIMITER       Rate-Limiting-Binding (wrangler.toml [[ratelimits]]) für POST /
+ *   AI_LIMITER       Rate-Limiting-Binding (wrangler.toml [[ratelimits]]) für POST / und die Rezept-Suche
  *
  * Sicherheit: Origin-Allowlist, Payload-Validierung + Größenlimits, Rate-Limit,
  * SSRF-Schutz beim Rezept-Import, Key nur als Header. Der Proxy ist trotzdem
@@ -50,7 +52,20 @@ const DEFAULT_ORIGINS = [
   'http://localhost:8100',
 ];
 
-const SEARCH_PARAMS = ['q', 'page', 'page_size', 'fields', 'langs', 'sort_by'];
+const SPOONACULAR_URL = 'https://api.spoonacular.com/recipes/complexSearch';
+// Erlaubte Parameter = die aus buildSearchParams (spoonacular.query.ts); apiKey wird nie durchgereicht.
+const RECIPE_PARAMS = [
+  'number', 'offset', 'query', 'maxCalories', 'maxReadyTime', 'diet',
+  'addRecipeNutrition', 'addRecipeInstructions', 'fillIngredients', 'instructionsRequired',
+];
+const RECIPE_MAX_NUMBER = 20;
+const RECIPE_DEFAULT_NUMBER = 10;
+const RECIPE_TIMEOUT_MS = 12000;
+const RECIPE_PASSTHROUGH_HEADERS = ['Content-Type', 'X-Api-Quota-Left', 'Retry-After'];
+const RECIPE_NOT_CONFIGURED = 'Rezept-Suche nicht eingerichtet.';
+const RECIPE_UNAVAILABLE = 'Rezept-Suche ist serverseitig gerade nicht verfügbar.';
+const RECIPE_TIMEOUT_MESSAGE = 'Die Rezept-Suche antwortet gerade nicht.';
+const SEARCH_PARAMS =['q', 'page', 'page_size', 'fields', 'langs', 'sort_by'];
 const MAX_QUERY_CHARS = 200;
 const MAX_PAGE_SIZE = 50;
 const SEARCH_CACHE_TTL_S = 3600;
@@ -100,10 +115,14 @@ export default {
       if (request.method === 'GET' && url.pathname === '/off-search') {
         return await offSearch(url, cors);
       }
+      if (request.method === 'GET' && url.pathname === '/recipes/complexSearch') {
+        return await recipeSearch(request, url, env, cors);
+      }
       if (request.method === 'GET' && url.pathname === '/health') {
         return json({
           ok: true,
           hasKey: Boolean(env.GEMINI_API_KEY),
+          hasRecipeKey: Boolean(env.SPOONACULAR_API_KEY),
           model: env.GEMINI_MODEL || GEMINI_MODEL,
           fallbackModel: env.GEMINI_FALLBACK_MODEL || GEMINI_FALLBACK_MODEL,
         }, 200, cors);
@@ -137,6 +156,7 @@ function corsHeaders(origin) {
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     // User-Agent zulassen: ältere App-Versionen senden ihn, Safari/Firefox fragen dafür per Preflight.
     'Access-Control-Allow-Headers': 'Content-Type, User-Agent',
+    'Access-Control-Expose-Headers': 'X-Api-Quota-Left, Retry-After',
     'Access-Control-Max-Age': String(PREFLIGHT_MAX_AGE_S),
     Vary: 'Origin',
   };
@@ -197,6 +217,53 @@ function withHeaders(response, extra) {
   const headers = new Headers(response.headers);
   for (const [k, v] of Object.entries(extra)) headers.set(k, v);
   return new Response(response.body, { status: response.status, headers });
+}
+
+// ── spoonacular-Proxy ──────────────────────────────────────────────────
+
+function buildRecipeUrl(url) {
+  const target = new URL(SPOONACULAR_URL);
+  for (const key of RECIPE_PARAMS) {
+    const value = url.searchParams.get(key);
+    if (value !== null) target.searchParams.set(key, value.slice(0, MAX_QUERY_CHARS));
+  }
+  const requested = Math.round(Number(target.searchParams.get('number') ?? RECIPE_DEFAULT_NUMBER));
+  const number = Number.isFinite(requested) ? Math.min(Math.max(1, requested), RECIPE_MAX_NUMBER) : RECIPE_DEFAULT_NUMBER;
+  target.searchParams.set('number', String(number));
+  return target;
+}
+
+function recipeResponseHeaders(resp, cors) {
+  const headers = { ...cors };
+  for (const name of RECIPE_PASSTHROUGH_HEADERS) {
+    const value = resp.headers.get(name);
+    if (value) headers[name] = value;
+  }
+  return headers;
+}
+
+async function recipeSearch(request, url, env, cors) {
+  if (!env.SPOONACULAR_API_KEY) return json({ error: RECIPE_NOT_CONFIGURED }, 503, cors);
+  if (await isRateLimited(env, request)) {
+    return json({ error: 'Zu viele Anfragen — bitte kurz warten.' }, 429, { ...cors, 'Retry-After': '60' });
+  }
+  const target = buildRecipeUrl(url);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), RECIPE_TIMEOUT_MS);
+  try {
+    const resp = await fetch(target.toString(), {
+      headers: { 'x-api-key': env.SPOONACULAR_API_KEY, Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    // Ungültiger/gesperrter Server-Key ist kein Fehler des Nutzers.
+    if (resp.status === 401 || resp.status === 403) return json({ error: RECIPE_UNAVAILABLE }, 502, cors);
+    return new Response(await resp.text(), { status: resp.status, headers: recipeResponseHeaders(resp, cors) });
+  } catch (e) {
+    if (e?.name === 'AbortError') return json({ error: RECIPE_TIMEOUT_MESSAGE }, 504, cors);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // ── KI-Proxy ───────────────────────────────────────────────────────────
