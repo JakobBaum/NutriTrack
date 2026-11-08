@@ -56,6 +56,15 @@ describe('ProgressRingComponent', () => {
     expect(ring.isOver()).toBe(true);
   });
 
+  it('färbt bei Überschreitung nicht rot, wenn warn aus ist (z. B. Eiweiß)', () => {
+    fixture.componentRef.setInput('color', 'purple');
+    fixture.componentRef.setInput('warn', false);
+    set(150, 100);
+    expect(ring.dashOffset()).toBe(0);
+    expect(ring.isOver()).toBe(false);
+    expect(ring.strokeColor()).toBe('purple');
+  });
+
   it('nutzt die Eingabefarbe ohne Überschreitung und rendert die Attribute', () => {
     fixture.componentRef.setInput('color', 'red');
     fixture.componentRef.setInput('size', 100);

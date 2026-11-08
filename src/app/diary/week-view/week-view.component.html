@@ -1,0 +1,63 @@
+<section class="week" data-testid="week-view" aria-label="Die letzten 7 Tage">
+  <div class="week__stats nt-card">
+    <div class="stat">
+      <span class="stat__value stat__value--kcal" data-testid="week-avg-kcal">{{ summary().loggedDays ? (summary().avgKcal | ntNum:0) : '–' }}</span>
+      <span class="stat__label">Ø kcal pro Tag</span>
+    </div>
+    <div class="stat">
+      <span class="stat__value stat__value--protein" data-testid="week-avg-protein">{{ summary().loggedDays ? (summary().avgProteinG | ntNum:0) : '–' }}</span>
+      <span class="stat__label">Ø g Eiweiß pro Tag</span>
+    </div>
+    <div class="stat">
+      <span class="stat__value" data-testid="week-in-goal">{{ hasTarget() ? summary().daysInGoal + ' von 7' : '–' }}</span>
+      <span class="stat__label">Tage im Ziel</span>
+    </div>
+    <div class="stat">
+      <span class="stat__value" data-testid="week-streak">{{ hasTarget() ? streak() + ' ' + daysWord(streak()) : '–' }}</span>
+      <span class="stat__label">Serie im Ziel</span>
+    </div>
+  </div>
+  <p class="week__note">
+    Mittel über {{ summary().loggedDays }} {{ summary().loggedDays === 1 ? 'Tag' : 'Tage' }} mit Einträgen.
+    @if (!hasTarget()) { Lege im Profil dein Ziel fest, um Tage im Ziel zu sehen. }
+  </p>
+
+  <h2 class="nt-section-header">Kalorien pro Tag</h2>
+  <div class="week__chart nt-card" data-testid="week-kcal-chart">
+    <div class="bars" role="img" [attr.aria-label]="'Kalorien: ' + kcalChart().description">
+      @if (kcalChart().targetPct !== null) {
+        <span class="bars__target" [style.bottom.%]="kcalChart().targetPct" aria-hidden="true"></span>
+      }
+      @for (b of kcalChart().bars; track b.dateISO) {
+        <span class="bars__col" [class.bars__col--today]="b.isToday">
+          <span class="bars__bar bars__bar--kcal" [class.bars__bar--over]="b.isOver" [class.bars__bar--empty]="!b.logged" [style.height.%]="b.logged ? b.heightPct : 2"></span>
+        </span>
+      }
+    </div>
+    <div class="bars__labels" aria-hidden="true">
+      @for (b of kcalChart().bars; track b.dateISO) {
+        <span [class.bars__label--today]="b.isToday">{{ b.label }}</span>
+      }
+    </div>
+  </div>
+
+  <h2 class="nt-section-header">Eiweiß pro Tag</h2>
+  <div class="week__chart nt-card" data-testid="week-protein-chart">
+    <div class="bars" role="img" [attr.aria-label]="'Eiweiß: ' + proteinChart().description">
+      @if (proteinChart().targetPct !== null) {
+        <span class="bars__target" [style.bottom.%]="proteinChart().targetPct" aria-hidden="true"></span>
+      }
+      @for (b of proteinChart().bars; track b.dateISO) {
+        <span class="bars__col" [class.bars__col--today]="b.isToday">
+          <span class="bars__bar bars__bar--protein" [class.bars__bar--empty]="!b.logged" [style.height.%]="b.logged ? b.heightPct : 2"></span>
+        </span>
+      }
+    </div>
+    <div class="bars__labels" aria-hidden="true">
+      @for (b of proteinChart().bars; track b.dateISO) {
+        <span [class.bars__label--today]="b.isToday">{{ b.label }}</span>
+      }
+    </div>
+  </div>
+  <p class="week__note">Gestrichelte Linie: dein Tagesziel. Im Ziel heißt: Eiweiß mindestens {{ proteinSharePct }} % des Ziels und Kalorien zwischen {{ kcalMinPct }} und {{ kcalMaxPct }} % des Ziels.</p>
+</section>

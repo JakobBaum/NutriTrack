@@ -1,0 +1,59 @@
+# Codemagic CI/CD fuer NutriTrack (iOS -> TestFlight).
+# KEINE Secrets in dieser Datei. Alles Sensible kommt aus Codemagic:
+#   - Integration "app_store_connect" (API-Key: Issuer-ID, Key-ID, .p8) -> Teams > Integrations
+#   - Code signing identities (iOS Distribution Zertifikat + App-Store-Profil)
+# Einrichtung Schritt fuer Schritt: docs/RELEASE.md
+workflows:
+  ios-testflight:
+    name: iOS TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 45
+    integrations:
+      # Name der App-Store-Connect-Integration in Codemagic (Platzhalter, ggf. anpassen)
+      app_store_connect: NutriTrack-ASC
+    environment:
+      node: 22
+      xcode: latest
+      vars:
+        BUNDLE_ID: com.nutritrack.app
+        XCODE_PROJECT: ios/App/App.xcodeproj
+        XCODE_SCHEME: App
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.nutritrack.app
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: 'v*'
+          include: true
+    scripts:
+      - name: Dependencies installieren
+        script: npm ci
+      - name: Typecheck
+        script: npx tsc -p tsconfig.app.json --noEmit
+      - name: Unit-Tests
+        script: npx ng test --watch=false
+      - name: Worker-Tests
+        script: node --test worker.test.mjs
+      - name: Web-Build (www/)
+        script: npm run build
+      - name: Capacitor sync
+        script: npx cap sync ios
+      - name: Version synchronisieren (package.json + Build-Nummer)
+        script: node scripts/sync-version.mjs --build="$PROJECT_BUILD_NUMBER"
+      - name: Signing-Profile in Xcode-Projekt eintragen
+        script: xcode-project use-profiles
+      - name: IPA bauen
+        script: |
+          xcode-project build-ipa \
+            --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        # beta_groups: [Intern]   # optional: Namen interner Testgruppen aus App Store Connect

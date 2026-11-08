@@ -1,34 +1,19 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { environment } from '../../../environments/environment';
-import { defaultAiProxyUrl, effectiveProxyUrl } from './ai-endpoint';
-import { resolveAiRoutes } from './ai-route';
+import { defaultAiProxyUrl } from './ai-endpoint';
 
-const GLOBAL = 'https://global.test/';
+afterEach(() => {
+  environment.aiProxyUrl = '';
+});
 
-describe('ai-endpoint', () => {
-  const original = environment.aiProxyUrl;
-  afterEach(() => { environment.aiProxyUrl = original; });
-
-  it('nutzt den globalen Standard, wenn keine eigene Adresse gesetzt ist', () => {
-    environment.aiProxyUrl = GLOBAL;
-    expect(defaultAiProxyUrl()).toBe('https://global.test');
-    expect(effectiveProxyUrl({})).toBe('https://global.test');
-    expect(effectiveProxyUrl({ proxyUrl: '  ' })).toBe('https://global.test');
+describe('defaultAiProxyUrl', () => {
+  it('liefert die Umgebungs-Adresse ohne Leerzeichen und Schrägstrich', () => {
+    environment.aiProxyUrl = ' https://w.test// ';
+    expect(defaultAiProxyUrl()).toBe('https://w.test');
   });
 
-  it('bevorzugt die eigene Adresse und entfernt den Schrägstrich', () => {
-    environment.aiProxyUrl = GLOBAL;
-    expect(effectiveProxyUrl({ proxyUrl: ' https://own.test// ' })).toBe('https://own.test');
-  });
-
-  it('liefert den Worker-Weg ohne Einstellungen, eigener Key kommt zuerst', () => {
-    environment.aiProxyUrl = GLOBAL;
-    expect(resolveAiRoutes({})).toEqual(['proxy']);
-    expect(resolveAiRoutes({ provider: 'gemini', apiKey: 'k' })).toEqual(['ownKey', 'proxy']);
-  });
-
-  it('ist leer (Mock), wenn gar kein Standard konfiguriert ist', () => {
+  it('liefert leer, wenn kein globaler Server konfiguriert ist', () => {
     environment.aiProxyUrl = '';
-    expect(resolveAiRoutes({})).toEqual([]);
+    expect(defaultAiProxyUrl()).toBe('');
   });
 });

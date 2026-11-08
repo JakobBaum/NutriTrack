@@ -41,4 +41,17 @@ export const SHOPPING = {
   ],
 };
 
+/** Datum `daysAgo` Tage vor heute (ISO yyyy-mm-dd, lokale Zeit). */
+export const daysAgoISO = (daysAgo) => {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysAgo);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+/** Gewichtsverlauf über 15 Tage, fallend von 80,0 auf 78,6 kg. */
+export const WEIGHT_HISTORY = [14, 10, 7, 3, 0].map((ago, i) => ({ dateISO: daysAgoISO(ago), kg: Math.round((80 - i * 0.35) * 10) / 10 }));
+
+/** Eintrag an einem beliebigen Tag (für die Wochenansicht). */
+export const entryOn = (dateISO, id, label, f) =>
+  ({ id, dateISO, meal: 'lunch', label, ref: { kind: 'manual' }, facts: f, createdAt: ISO, servings: 1 });
+
 export const seed = (overrides = {}) => ({ profile: PROFILE, diary: [], recipes: [], ...overrides });

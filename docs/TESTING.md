@@ -1,78 +1,67 @@
-# Testing & Dev-Prozess
+# Testing und Dev-Prozess
 
-Ein echter App-Entwicklungs-Zyklus für NutriTrack — in dieser Reihenfolge.
+Reihenfolge fuer jeden Baustein. Stand: Welle 6 (2026-11-08).
 
-## 1. Entwickeln (Code)
-- Neue Logik in Services unter `src/app/core/**` (pur, ohne UI-Abhängigkeit → gut testbar).
-- UI in `src/app/features/**` bzw. aktuell `src/app/home/`.
-- Angular-Konventionen: standalone-Components wo möglich, `inject()`, Signals, OnPush.
+## 1. Entwickeln
+- Reine Logik in `src/app/core/**` (ohne UI-Abhaengigkeit, gut testbar).
+- UI je Feature-Ordner unter `src/app/` (`dashboard`, `diary`, `meals`, `recipes`, `shopping`, `settings`, `tabs`, `shared`).
+- Angular-Konventionen: Signals, `inject()`, OnPush, `track` in jedem `@for`.
 
-## 2. Unit-Tests (Vitest) — RED → GREEN → REFACTOR
-Testdateien liegen neben dem Code als `*.spec.ts`.
+## 2. Unit-Tests (Vitest ueber `ng test`)
+Testdateien liegen neben dem Code als `*.spec.ts`. Test-Setup: `src/test-setup.ts`.
 ```bash
-# Alle Tests einmal ausführen
-npx vitest run
-
-# Nur einen Pfad/Ordner
-npx vitest run src/app/core/nutrition
-
-# Watch-Modus während der Entwicklung
-npx vitest
+npx ng test --watch=false      # alle Tests einmal (wie in CI)
+npx ng test                    # Watch-Modus waehrend der Entwicklung
 ```
-Richtwert: ≥80 % Abdeckung der Kernlogik (Rechnen, Mapping, Validierung).
-Beispiel vorhanden: `src/app/core/nutrition/nutrition-calc.service.spec.ts` (9 Tests, grün).
+Richtwert: mindestens 80 % Abdeckung der Kernlogik (Rechnen, Mapping, Validierung, Stores).
+Beispiel: `src/app/core/nutrition/nutrition-calc.service.spec.ts`.
 
-## 3. Build-Verifikation
+## 3. Worker- und Skript-Tests (Node)
 ```bash
-npm run build          # Production-Build; muss fehlerfrei nach www/ bauen
+node --test worker.test.mjs                 # = npm run test:worker
+node --test scripts/sync-version.test.mjs   # = npm run test:scripts
 ```
-Immer vor Commit/Merge grün halten.
 
-## 4. App lokal starten (Browser)
+## 4. Typecheck und Build
 ```bash
-npm start              # Dev-Server auf http://localhost:4200
+npx tsc -p tsconfig.app.json --noEmit   # Typfehler ohne Build
+npm run build                           # Capacitor-Build nach www/
+npm run build:pages                     # Pages-Build nach dist/pages/browser (base-href /NutriTrack/)
 ```
-Im Browser manuell testen (DevTools → Gerät emulieren für mobile Ansicht).
-Aktuell sichtbar: **Bedarfsrechner** — Werte eingeben → „Bedarf berechnen" → kcal + Makros.
+`www/` ist das `webDir` von Capacitor (`npx cap sync`). Der Pages-Build schreibt bewusst woanders hin.
 
-## 5. Manuelle Test-Checkliste (MVP, wächst mit)
-- [x] Profil (Tab „Profil"): eingeben → „Bedarf berechnen" → plausibles Tagesziel
-- [x] Ziel „Abnehmen/Zunehmen" → Tempo-Feld erscheint, Defizit/Überschuss wirkt
-- [x] Dashboard: Kalorienring + Makro-Grid füllen sich nach Einträgen; Datum wechseln
-- [x] Tagebuch: Eintrag per „+"/Modal erfassen → Tagessumme steigt; löschen funktioniert
-- [x] Rezepte: anlegen → „Tagebuch" loggt eine Portion; bearbeiten/löschen
-- [x] Einkauf: „Liste generieren" → Positionen; abhaken/ergänzen/löschen
-- [ ] (später) Mahlzeit per Food-Textsuche/Barcode/Etikett-Scan eintragen
-- [ ] (später) Rezept-Import (URL/TikTok/Foto) → Rezept in Liste
-
-## 6. KI-Flows ohne Kosten testen
-`MockAiProvider` liefert deterministische Antworten (kein Key, keine Netzwerkkosten).
-Für End-to-End mit echter KI: Key/Endpoint in den App-Einstellungen hinterlegen
-(`ClaudeAiProvider`). Niemals Keys committen.
-
-## 7. Native Builds (später, Capacitor)
+## 5. Lokal starten
 ```bash
-npx cap add android
-npx cap add ios
-npm run build && npx cap sync
-npx cap run android      # bzw. ios (macOS/Xcode nötig)
+npm start      # Dev-Server, http://localhost:4200
 ```
-Kamera-/Scanner-Permissions in den nativen Projekten deklarieren.
+Im Browser manuell pruefen (DevTools, Geraet emulieren). Visuelle Checks bei 320 / 375 / 768 / 1024 px.
 
-## 8. E2E / Smoke (Playwright)
-Ein Browser-Smoke-Test prüft die Kern-Flows gegen den laufenden Dev-Server
-(Tab-Navigation, Profil speichern, Dashboard-Ringe, Tagebuch-Eintrag, Einkaufsliste)
-und erfasst Konsolen-/Laufzeitfehler + Screenshots.
+## 6. E2E (Playwright-Harness in `e2e/`)
+Erwartet einen laufenden Dev-Server (`E2E_BASE_URL`, Standard `http://localhost:4300`).
 ```bash
-npm start                      # Dev-Server starten
-npx playwright install chromium
-# Smoke-Skript gegen http://127.0.0.1:8100 laufen lassen (siehe Projekt-Memory)
+npm start -- --port 4300
+node e2e/run.mjs            # alle Specs (app, diary, recipes, weekplan)
+node e2e/run.mjs diary      # nur Tests, deren Name "diary" enthaelt
 ```
-Visuelle Checks an Breakpoints 320/375/768/1024.
+Screenshots und `results.json` landen in `e2e/artifacts/`. E2E laeuft nicht in CI.
 
-## 9. Abschluss je Baustein
+## 7. Manuelle Checkliste (vor Release)
+- Profil speichern, Tagesziel plausibel; Abnehmen/Zunehmen blendet Tempo ein.
+- Heute: Ringe fuellen sich nach Eintraegen; Datum wechseln.
+- Tagebuch: Eintrag per Suche/Barcode/Mahlzeit; Loeschen und Rueckgaengig.
+- Rezepte/Wochenplan: anlegen, in Tagebuch loggen, Wochenplan erzeugen.
+- Einkauf: Liste aus Plan, abhaken, ergaenzen.
+- Backup exportieren und wieder importieren.
+- Native: Kamera/Barcode und Etikett-Scan auf echtem Geraet (iOS und Android).
+
+## 8. KI-Flows ohne Kosten
+`MockAiProvider` liefert deterministische Antworten (kein Key, keine Netzwerkkosten) und verweigert Foto- und Link-Import ehrlich. Fuer echte KI laeuft alles ueber den Worker (`docs/KI-WORKER.md`). Keys nie committen.
+
+## 9. CI (GitHub Actions)
+`.github/workflows/deploy-pages.yml`: Job `ci` (tsc, `ng test --watch=false`, Worker-Tests, Skript-Tests, Versions-Check) laeuft bei jedem Push und Pull Request. Der Pages-Deploy folgt nur bei gruenem CI und nur auf `main`. Release und TestFlight: `docs/RELEASE.md`.
+
+## 10. Abschluss je Baustein
 ```bash
-npx vitest run && npm run build      # beide grün?
-git add -A && git commit -m "feat: <was>"
+npx tsc -p tsconfig.app.json --noEmit && npx ng test --watch=false && node --test worker.test.mjs && npm run build
 ```
-Danach `docs/ROADMAP.md` abhaken und `memory\projects\nutritrack.md` aktualisieren.
+Dann `docs/ROADMAP.md` abhaken und das Projekt-Memory aktualisieren.

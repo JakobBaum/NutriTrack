@@ -3,12 +3,13 @@
   <ng-template>
     <div class="sheet-grabber" aria-hidden="true"></div>
     <ion-header class="ion-no-border sheet-header">
-      <ion-toolbar>
-        <ion-title role="heading" aria-level="2">Fastfood-Helfer</ion-title>
-        <ion-buttons slot="end">
-          <ion-button (click)="closeFastfood()">Abbrechen</ion-button>
-        </ion-buttons>
-      </ion-toolbar>
+      <div class="nt-sheet-header">
+        <div class="nt-sheet-header__start"></div>
+        <h2 class="nt-sheet-header__title" role="heading" aria-level="2">Fastfood-Helfer</h2>
+        <div class="nt-sheet-header__end">
+          <ion-button fill="clear" (click)="closeFastfood()">Abbrechen</ion-button>
+        </div>
+      </div>
     </ion-header>
     <ion-content class="sheet-content">
       @if (targetKcal() > 0) {

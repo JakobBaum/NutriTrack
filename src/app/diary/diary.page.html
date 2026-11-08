@@ -5,15 +5,23 @@
 <ion-content>
   <div class="page-head">
     <h1 class="nt-large-title">Tagebuch</h1>
-    <button type="button" class="nt-pill page-head__add" (click)="openAdd()" aria-label="Eintragen: neuen Eintrag hinzufügen">
+    <button type="button" class="nt-pill page-head__add" (click)="openAdd()" aria-label="Neuen Eintrag eintragen">
       <ion-icon name="add" aria-hidden="true"></ion-icon> Eintragen
     </button>
   </div>
 
+  <ion-segment class="view-switch" [value]="view()" aria-label="Ansicht" (ionChange)="setView($any($event).detail.value)">
+    <ion-segment-button value="day"><ion-label>Tag</ion-label></ion-segment-button>
+    <ion-segment-button value="week"><ion-label>Woche</ion-label></ion-segment-button>
+  </ion-segment>
+
+  @if (view() === 'week') {
+    <app-week-view></app-week-view>
+  } @else {
   <nt-date-nav [date]="selectedDate()" (dateChange)="setDate($event)"></nt-date-nav>
   @if (daySources().length) {
     <div class="day-actions">
-      <button type="button" class="nt-pill nt-pill--secondary day-actions__copy" (click)="copyDay()" [attr.aria-label]="'Tag kopieren: einen früheren Tag zu ' + dateLabel() + ' hinzufügen'">
+      <button type="button" class="nt-pill nt-pill--secondary day-actions__copy" (click)="copyDay()" [attr.aria-label]="'Tag kopieren: einen früheren Tag in ' + dateLabel() + ' eintragen'">
         <ion-icon name="copy-outline" aria-hidden="true"></ion-icon> Tag kopieren
       </button>
     </div>
@@ -46,16 +54,16 @@
         <ion-icon [name]="group.icon" class="meal__icon" aria-hidden="true"></ion-icon>
         <h2 class="meal__label nt-section-header">{{ group.label }}</h2>
         <span class="meal__kcal">{{ group.kcal | ntNum:0 }} kcal</span>
-        <ion-button fill="clear" class="touch-btn meal__add" (click)="openAdd(group.type)" [attr.aria-label]="'Zu ' + group.label + ' hinzufügen'">
+        <ion-button fill="clear" class="touch-btn meal__add" (click)="openAdd(group.type)" [attr.aria-label]="'In ' + group.label + ' eintragen'">
           <ion-icon slot="icon-only" name="add-circle-outline"></ion-icon>
         </ion-button>
       </div>
 
       @if (group.entries.length === 0) {
         <div class="diary-list meal__empty-card">
-          <p class="meal__empty">Noch nichts erfasst.</p>
+          <p class="meal__empty">Noch nichts eingetragen.</p>
           <button type="button" class="meal__empty-add" (click)="openAdd(group.type)">
-            <ion-icon name="add" aria-hidden="true"></ion-icon> Zu {{ group.label }} hinzufügen
+            <ion-icon name="add" aria-hidden="true"></ion-icon> In {{ group.label }} eintragen
           </button>
           @if (group.copySource; as src) {
             <button type="button" class="meal__empty-add meal__empty-copy" (click)="copyMeal(group)" [attr.aria-label]="group.label + ' ' + copyFromButtonText(src.dateISO).toLowerCase() + ' übernehmen: ' + src.entries.length + ' Einträge'">
@@ -103,6 +111,7 @@
   }
 
   <p class="macro-legend">E = Eiweiß · KH = Kohlenhydrate · F = Fett</p>
+  }
 
   <div class="content-spacer"></div>
 </ion-content>
@@ -118,15 +127,15 @@
   <ng-template>
     <div class="sheet-grabber" aria-hidden="true"></div>
     <ion-header class="ion-no-border sheet-header">
-      <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-button (click)="requestCloseEdit()">Abbrechen</ion-button>
-        </ion-buttons>
-        <ion-title role="heading" aria-level="2">Eintrag bearbeiten</ion-title>
-        <ion-buttons slot="end">
-          <ion-button class="sheet-header__save" (click)="saveEdit()">Speichern</ion-button>
-        </ion-buttons>
-      </ion-toolbar>
+      <div class="nt-sheet-header">
+        <div class="nt-sheet-header__start">
+          <ion-button fill="clear" (click)="requestCloseEdit()">Abbrechen</ion-button>
+        </div>
+        <h2 class="nt-sheet-header__title" role="heading" aria-level="2">Eintrag bearbeiten</h2>
+        <div class="nt-sheet-header__end">
+          <ion-button fill="clear" class="sheet-header__save" (click)="saveEdit()">Speichern</ion-button>
+        </div>
+      </div>
     </ion-header>
     <ion-content class="sheet-content">
       @if (editError) {
@@ -143,11 +152,14 @@
             <app-amount-chips [chips]="editChips" [unit]="editUnit" (pick)="pickEditAmount($event)"></app-amount-chips>
           </app-amount-row>
         }
-        <ion-item button detail="true" lines="none" (click)="pickEditMeal()" [attr.aria-label]="'Mahlzeit wählen, aktuell ' + mealLabelOf(editForm.meal)">
-          <ion-label>Mahlzeit</ion-label>
+        <ion-item button detail="true" lines="none" (click)="pickEditMeal()" [attr.aria-label]="'Essenszeit wählen, aktuell ' + mealLabelOf(editForm.meal)">
+          <ion-label>Essenszeit</ion-label>
           <ion-note slot="end">{{ mealLabelOf(editForm.meal) }}</ion-note>
         </ion-item>
       </ion-list>
+      <button type="button" class="edit-fav" data-testid="edit-favorite" (click)="toggleEditFavorite()" [attr.aria-pressed]="isEditFavorite()">
+        <ion-icon [name]="isEditFavorite() ? 'star' : 'star-outline'" aria-hidden="true"></ion-icon> {{ isEditFavorite() ? 'Favorit entfernen' : 'Als Favorit merken' }}
+      </button>
       <button type="button" class="edit-delete" (click)="deleteFromEdit()">
         <ion-icon name="trash-outline" aria-hidden="true"></ion-icon> Eintrag löschen
       </button>

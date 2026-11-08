@@ -1,4 +1,4 @@
-<nt-food-search [placeholder]="placeholder()" (picked)="onPicked($event)" (manualEntry)="onManual()">
+<nt-food-search [placeholder]="placeholder()" [showRecentCustom]="showRecentCustom()" (picked)="onPicked($event)" (manualEntry)="onManual()">
   <div class="nt-sources" role="group" aria-label="Quellen">
     <button type="button" class="nt-source-btn" (click)="openBarcode()">
       <ion-icon name="barcode-outline" aria-hidden="true"></ion-icon> <span>Barcode</span>

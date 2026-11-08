@@ -30,10 +30,12 @@ describe('sumItems / mergeKept — Randfälle', () => {
     expect(sumItems([item('a', 0.1), item('b', 0.2)]).total).toBe(0.3);
   });
 
-  it('verwirft unabgehakte bepreiste Positionen, übernimmt Duplikate nur einmal und den generierten Preis', () => {
+  it('verwirft unabgehakte bepreiste Positionen, addiert manuelle Duplikate und skaliert den generierten Preis auf die Menge', () => {
     const prev = [item('Milch', 1), item('Brot', undefined), item('brot', undefined)];
     const generated = [item('Brot', 2)];
-    expect(mergeKept(prev, generated).map((i) => i.estPrice)).toEqual([2]);
+    const merged = mergeKept(prev, generated);
+    expect(merged.map((i) => i.amount)).toEqual([2]);
+    expect(merged.map((i) => i.estPrice)).toEqual([4]);
   });
 
   it('liefert generierte Positionen bei leerer Vorliste unverändert', () => {

@@ -27,3 +27,15 @@ export function dayLabel(dateISO: string): string {
   const wd = ['So.', 'Mo.', 'Di.', 'Mi.', 'Do.', 'Fr.', 'Sa.'][dt.getDay()];
   return `${wd}, ${`${d}`.padStart(2, '0')}.${`${m}`.padStart(2, '0')}.`;
 }
+
+/**
+ * Tageswechsel (z. B. nach Mitternacht): Stand der Nutzer auf "Heute" (`shownToday`),
+ * springt die Auswahl auf den neuen Tag mit; ein bewusst gewählter anderer Tag bleibt.
+ */
+export function rollDate(
+  selected: string,
+  shownToday: string,
+  nowToday: string,
+): { selected: string; today: string } {
+  return { selected: selected === shownToday ? nowToday : selected, today: nowToday };
+}

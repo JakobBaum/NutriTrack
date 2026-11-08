@@ -46,7 +46,7 @@
       }
       @if (canTranslate) {
         <ion-toggle class="os-toggle" [checked]="translateOn()" (ionChange)="setTranslate($event.detail.checked)" justify="space-between">Ins Deutsche übersetzen</ion-toggle>
-        @if (translating()) { <p class="os-note" role="status"><ion-spinner name="dots"></ion-spinner> Übersetze …</p> }
+        @if (translating()) { <p class="os-note" role="status"><ion-spinner name="dots"></ion-spinner> Übersetze…</p> }
       }
       <button type="button" class="nt-pill os-save" [disabled]="isSaved() || translating()" (click)="save()">
         <ion-icon [name]="isSaved() ? 'checkmark' : 'bookmark-outline'" aria-hidden="true"></ion-icon>
@@ -126,7 +126,7 @@
       @if (error(); as message) { <p class="os-error" role="alert">{{ message }}</p> }
 
       @if (loading()) {
-        <p class="os-note os-center" role="status"><ion-spinner name="dots"></ion-spinner> Suche läuft …</p>
+        <p class="os-note os-center" role="status"><ion-spinner name="dots"></ion-spinner> Suche läuft…</p>
       } @else if (searched() && results().length === 0 && !error()) {
         <p class="os-note os-center">Keine Rezepte gefunden. Lockere die Filter oder suche auf Englisch.</p>
       }
@@ -150,7 +150,7 @@
 
       @if (hasMore() && !loading()) {
         <button type="button" class="nt-pill nt-pill--secondary os-more" [disabled]="loadingMore()" (click)="loadMore()">
-          {{ loadingMore() ? 'Lädt …' : 'Mehr laden' }}
+          {{ loadingMore() ? 'Lädt…' : 'Mehr laden' }}
         </button>
       }
 

@@ -114,7 +114,7 @@ describe('RecipeStore', () => {
 });
 
 describe('ShoppingStore', () => {
-  it('generiert eine Liste aus den vorhandenen Rezepten', () => {
+  it('generiert eine Liste aus den vorhandenen Rezepten', async () => {
     const recipes = TestBed.inject(RecipeStore);
     recipes.add({
       title: 'Pasta',
@@ -124,9 +124,9 @@ describe('ShoppingStore', () => {
       origin: 'own',
     });
     const shopping = TestBed.inject(ShoppingStore);
-    const list = shopping.generate(1, 4);
+    const list = await shopping.generatePlan({ persons: 4, days: 1, meals: ['dinner'] });
     expect(list.suggestedDishes).toEqual(['Pasta']);
-    expect(list.items[0]).toMatchObject({ name: 'Nudeln', amount: 400 });
+    expect(list.items[0]).toMatchObject({ name: 'Nudeln' });
   });
 
   it('hakt Positionen ab und entfernt sie', () => {

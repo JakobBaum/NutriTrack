@@ -14,6 +14,7 @@ import { ActionSheetController, ToastController } from '@ionic/angular';
 import { AmountUnit, DiaryEntry, FoodItem, MealType, NutritionFacts, Recipe, SavedMeal } from '../../core/models';
 import { OpenPricesProvider } from '../../core/price/open-prices.provider';
 import { DiaryStore, NewDiaryEntry } from '../../core/state/diary.store';
+import { FavoriteFood, FavoriteStore, newEntryFromFavorite } from '../../core/state/favorite.store';
 import { CustomFood, CustomFoodStore } from '../../core/state/custom-food.store';
 import { MealsStore } from '../../core/state/meals.store';
 import { RecipeStore } from '../../core/state/recipe.store';
@@ -42,6 +43,7 @@ import {
   perServingFacts,
   rebaseTo100,
   scaleFacts,
+  shouldRememberAsCustomFood,
   toBaseAmount,
   toNumberOrNull,
   unitForName,
@@ -111,6 +113,7 @@ export class AddEntrySheetComponent implements OnChanges {
   private readonly recipeStore = inject(RecipeStore);
   private readonly customFoods = inject(CustomFoodStore);
   private readonly mealsStore = inject(MealsStore);
+  private readonly favoriteStore = inject(FavoriteStore);
   private readonly prices = inject(OpenPricesProvider);
   private readonly toastCtrl = inject(ToastController);
   private readonly sheetCtrl = inject(ActionSheetController);
@@ -207,8 +210,12 @@ export class AddEntrySheetComponent implements OnChanges {
     if (changes['isOpen']?.currentValue === true) this.startEntry(this.meal());
   }
 
+  /** Sperrt „Eintragen“ nach dem ersten Klick (kein doppelter Eintrag durch Doppeltippen). */
+  private isSaving = false;
+
   /** Setzt Formular und Zustand für einen neuen Eintrag zurück. */
   private startEntry(meal: MealType): void {
+    this.isSaving = false;
     this.addDirty = false;
     this.kcalManual = false;
     this.form = { ...EMPTY_FORM, meal };
@@ -484,6 +491,26 @@ export class AddEntrySheetComponent implements OnChanges {
     });
   }
 
+  // --- Favoriten ---
+  readonly favoriteList = this.favoriteStore.favorites;
+
+  isFavorite(entry: DiaryEntry): boolean {
+    return this.favoriteStore.isFavorite(entry);
+  }
+
+  toggleRecentFavorite(entry: DiaryEntry): void {
+    this.favoriteStore.toggle(entry);
+  }
+
+  removeFavorite(id: string): void {
+    this.favoriteStore.remove(id);
+  }
+
+  /** Loggt einen Favoriten sofort mit seiner gemerkten Menge. */
+  quickAddFavorite(fav: FavoriteFood): void {
+    this.addAndConfirm([newEntryFromFavorite(fav, this.date(), this.form.meal)]);
+  }
+
   // --- Schnell-Loggen (ein Tipp) ---
   /** Loggt einen zuletzt benutzten Eintrag sofort mit seiner letzten Menge. */
   quickAddRecent(entry: DiaryEntry): void {
@@ -541,6 +568,8 @@ export class AddEntrySheetComponent implements OnChanges {
   }
 
   private addAndConfirm(inputs: NewDiaryEntry[]): void {
+    if (this.isSaving) return;
+    this.isSaving = true;
     lightHaptic();
     const added = inputs.map((input) => this.diary.add(input));
     this.closeAdd();
@@ -571,6 +600,7 @@ export class AddEntrySheetComponent implements OnChanges {
 
   // --- Speichern ---
   save(): void {
+    if (this.isSaving) return;
     const label = this.form.label.trim();
     if (!label) {
       this.error.set('Der Name fehlt — gib ein, was du gegessen hast.');
@@ -596,6 +626,7 @@ export class AddEntrySheetComponent implements OnChanges {
       return;
     }
 
+    this.isSaving = true;
     const isPortion = base?.unit === 'portion';
     const recipeId = this.pickedRecipeId;
     const entry = this.diary.add({
@@ -612,7 +643,8 @@ export class AddEntrySheetComponent implements OnChanges {
       isPartial: this.isPartialSource || undefined,
       unit: this.baseAmount ? this.amountUnit : undefined,
     });
-    if (!recipeId && base?.unit !== 'g') this.customFoods.save(label, facts);
+    const remember = shouldRememberAsCustomFood({ recipeId, baseUnit: base?.unit, isEstimate: this.isAiEstimate() });
+    if (remember) this.customFoods.save(label, facts);
 
     lightHaptic();
     this.closeAdd();

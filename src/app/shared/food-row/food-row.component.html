@@ -1,23 +1,14 @@
-<div class="thumb" aria-hidden="true">
-  @if (item().imageUrl && !imageFailed()) {
-    <img [src]="item().imageUrl" width="44" height="44" loading="lazy" alt=""
-         (error)="imageFailed.set(true)" />
-  } @else {
-    <ion-icon name="nutrition-outline"></ion-icon>
-  }
-</div>
 <div class="text">
   <span class="name">{{ item().name }}</span>
-  @if (item().brand) {
-    <span class="brand">{{ item().brand }}</span>
+  @if (isCustom() || subline()) {
+    <span class="sub">
+      @if (isCustom()) { <span class="own-tag">Eigen</span> }
+      @if (subline()) { <span class="sub__text">{{ subline() }}</span> }
+    </span>
   }
-  <span class="meta">
-    <span>{{ meta() }}</span>
-  </span>
+  <span class="meta">{{ meta() }}</span>
 </div>
-<div class="side">
-  @if (scoreLabel(); as label) {
-    <span class="score" [class]="'score s-' + item().nutriscore" [attr.aria-label]="label"
-          role="img">{{ item().nutriscore!.toUpperCase() }}</span>
-  }
-</div>
+@if (scoreLabel(); as label) {
+  <span class="score" [class]="'score s-' + item().nutriscore" [attr.aria-label]="label"
+        role="img">{{ item().nutriscore!.toUpperCase() }}</span>
+}

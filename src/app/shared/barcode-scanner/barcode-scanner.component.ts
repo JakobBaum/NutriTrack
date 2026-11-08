@@ -7,6 +7,9 @@ import { FOOD_PROVIDER } from '../../core/food/food-provider';
 import { foodErrorMessage } from '../../core/food/food-errors';
 import { BarcodeScannerService } from '../../core/scan/barcode-scanner.service';
 
+/** Pause vor dem erneuten Scan nach Fehlschlag, damit derselbe Code nicht sofort wieder abgefragt wird. */
+export const RESCAN_DELAY_MS = 1500;
+
 /** Ein Treffer des Barcode-Scanners: Produkt samt gelesenem Code. */
 export interface BarcodeHit {
   item: FoodItem;
@@ -39,6 +42,8 @@ export class NtBarcodeScannerComponent implements OnDestroy {
   protected manualCode = '';
 
   private controls?: IScannerControls;
+  private presented = false;
+  private rescanTimer?: ReturnType<typeof setTimeout>;
 
   @ViewChild('barcodeVideo') private video?: ElementRef<HTMLVideoElement>;
 
@@ -57,6 +62,11 @@ export class NtBarcodeScannerComponent implements OnDestroy {
 
   /** ion-modal didPresent → Live-Scan starten, sofern der Browser es kann. */
   protected async onPresent(): Promise<void> {
+    this.presented = true;
+    await this.startScan();
+  }
+
+  private async startScan(): Promise<void> {
     const video =
       this.video?.nativeElement ?? (document.querySelector('video#ntBarcodeVideo') as HTMLVideoElement | null);
     if (!video || !this.scanner.isSupported()) {
@@ -76,6 +86,7 @@ export class NtBarcodeScannerComponent implements OnDestroy {
 
   /** ion-modal didDismiss → Kamera freigeben und Schließen melden. */
   protected onDismiss(): void {
+    this.presented = false;
     this.stop();
     this.closed.emit();
   }
@@ -96,8 +107,15 @@ export class NtBarcodeScannerComponent implements OnDestroy {
   }
 
   private stop(): void {
+    clearTimeout(this.rescanTimer);
     this.controls?.stop();
     this.controls = undefined;
+  }
+
+  /** Nach Fehlschlag (nicht gefunden / Fehler) die Kamera wieder starten, solange der Scanner offen ist. */
+  private scheduleRescan(): void {
+    if (!this.presented || this.noCamera()) return;
+    this.rescanTimer = setTimeout(() => void this.startScan(), RESCAN_DELAY_MS);
   }
 
   private async lookup(code: string): Promise<void> {
@@ -109,11 +127,13 @@ export class NtBarcodeScannerComponent implements OnDestroy {
       const item = await this.food.lookupByBarcode(code);
       if (!item) {
         this.error.set(`Kein Produkt zu Barcode ${code} gefunden — prüfe die Ziffern oder suche per Name.`);
+        this.scheduleRescan();
         return;
       }
       this.found.emit({ item, code });
     } catch (e: unknown) {
       this.error.set(foodErrorMessage(e));
+      this.scheduleRescan();
     } finally {
       this.looking.set(false);
     }

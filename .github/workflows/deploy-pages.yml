@@ -1,24 +1,25 @@
-name: Deploy to GitHub Pages
+name: CI und Deploy (GitHub Pages)
 
-# Baut die App und veröffentlicht sie unter
-# https://jakobbaum.github.io/NutriTrack/ — bei jedem Push auf main.
+# CI laeuft bei jedem Push und Pull Request. Der Pages-Deploy laeuft nur
+# nach gruenem CI und nur fuer main -> https://jakobbaum.github.io/NutriTrack/
+# Der Pages-Build geht nach dist/pages/browser, damit www/ (Capacitor webDir)
+# davon unberuehrt bleibt.
 
 on:
   push:
-    branches: [main]
+    branches: [main, weekly-recipes]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
+  ci:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,23 +32,58 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build (base-href für Project Pages)
-        run: npm run build -- --base-href /NutriTrack/
+      - name: Typecheck (tsc)
+        run: npx tsc -p tsconfig.app.json --noEmit
 
-      - name: SPA-Fallback (404 = index.html für Client-Routing)
-        run: cp www/index.html www/404.html
+      - name: Unit-Tests (ng test)
+        run: npx ng test --watch=false
 
-      - name: Jekyll aus (lässt _-Dateien zu)
-        run: touch www/.nojekyll
+      - name: Worker-Tests
+        run: node --test worker.test.mjs
+
+      - name: Skript-Tests und Versions-Check
+        run: |
+          node --test scripts/sync-version.test.mjs
+          node scripts/sync-version.mjs --check
+
+  build:
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (base-href fuer Project Pages, eigener Output-Pfad)
+        run: npm run build:pages
+
+      - name: SPA-Fallback (404 = index.html fuer Client-Routing)
+        run: cp dist/pages/browser/index.html dist/pages/browser/404.html
+
+      - name: Jekyll aus (laesst _-Dateien zu)
+        run: touch dist/pages/browser/.nojekyll
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: www
+          path: dist/pages/browser
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

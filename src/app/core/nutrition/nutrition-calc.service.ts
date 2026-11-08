@@ -12,8 +12,8 @@ const KCAL_PER_G = { protein: 4, carbs: 4, fat: 9 } as const;
 /** 1 kg Körperfett ≈ 7700 kcal. */
 const KCAL_PER_KG = 7700;
 
-/** Größtes empfohlenes Tempo (kg/Woche); darüber wird gedeckelt. */
-export const MAX_RATE_KG_PER_WEEK = 0.75;
+/** Größtes empfohlenes Tempo: Anteil des Körpergewichts pro Woche (1 %); darüber wird gedeckelt. */
+export const MAX_RATE_FRACTION_PER_WEEK = 0.01;
 
 /** PAL-Faktoren je Aktivitätslevel. */
 const ACTIVITY_FACTORS: Record<ActivityLevel, number> = {
@@ -24,14 +24,23 @@ const ACTIVITY_FACTORS: Record<ActivityLevel, number> = {
   veryActive: 1.9,
 };
 
-/** Untergrenzen für die Zufuhr, um unsichere Defizite zu vermeiden. */
+/** Untergrenzen für die Zufuhr beim Abnehmen, um unsichere Defizite zu vermeiden. */
 const MIN_KCAL: Record<string, number> = { male: 1500, female: 1200, diverse: 1350 };
 
-/** Protein-Zielwerte in g pro kg Körpergewicht je Ziel. */
+/** Protein-Zielwerte in g pro kg Referenzgewicht je Ziel. */
 const PROTEIN_G_PER_KG = { lose: 1.8, maintain: 1.6, gain: 2.0 } as const;
 
-/** Fettanteil an der Gesamtenergie. */
-const FAT_ENERGY_RATIO = 0.27;
+/** Obergrenze für das Eiweißziel in g pro kg Referenzgewicht. */
+const MAX_PROTEIN_G_PER_KG = 2.2;
+
+/** Ab diesem BMI wird das Eiweißziel nicht mehr aus dem Ist-Gewicht gerechnet. */
+const REFERENCE_WEIGHT_BMI_THRESHOLD = 30;
+
+/** BMI, bei dem das Referenzgewicht liegt, wenn kein Zielgewicht vorhanden ist. */
+const REFERENCE_BMI = 25;
+
+/** Fettanteil an der Gesamtenergie (DGE-Richtwert 30 bis 40 %, untere Grenze). */
+const FAT_ENERGY_RATIO = 0.3;
 
 /** Ballaststoffe: 14 g je 1000 kcal (DGE/US-Richtwert). */
 const FIBER_G_PER_1000_KCAL = 14;
@@ -70,18 +79,35 @@ export class NutritionCalcService {
     return this.basalMetabolicRate(p) * ACTIVITY_FACTORS[p.activityLevel];
   }
 
+  /** Größtes Tempo (kg/Woche) für ein Körpergewicht: 1 % pro Woche. */
+  maxRateKgPerWeek(weightKg: number): number {
+    return Number.isFinite(weightKg) && weightKg > 0 ? weightKg * MAX_RATE_FRACTION_PER_WEEK : 0;
+  }
+
+  /**
+   * Gewicht, auf das sich das Eiweißziel bezieht: das tatsächliche Gewicht, bei BMI über 30
+   * das Zielgewicht (falls plausibel) oder das Gewicht bei BMI 25.
+   */
+  proteinReferenceWeightKg(p: UserProfile): number {
+    const weightKg = Number.isFinite(p.weightKg) && p.weightKg > 0 ? p.weightKg : 0;
+    const heightM = p.heightCm / 100;
+    if (weightKg === 0 || !Number.isFinite(heightM) || heightM <= 0) return weightKg;
+    if (weightKg / (heightM * heightM) <= REFERENCE_WEIGHT_BMI_THRESHOLD) return weightKg;
+    const target = p.targetWeightKg;
+    if (target !== undefined && Number.isFinite(target) && target > 0 && target < weightKg) return target;
+    return REFERENCE_BMI * heightM * heightM;
+  }
+
   /**
    * Tagesziel inkl. Ziel-Anpassung (Defizit/Überschuss) und Makro-Split.
-   * Deckelt das Ergebnis auf eine sichere Untergrenze.
+   * Beim Abnehmen wird das Ergebnis auf eine sichere Untergrenze angehoben.
    */
   dailyTarget(p: UserProfile): DailyTarget {
     const uncapped = this.uncappedKcal(p);
-    const kcal = Math.round(
-      Number.isFinite(uncapped) ? Math.max(uncapped, this.minKcal(p)) : this.minKcal(p),
-    );
+    const kcal = Math.round(this.applyMinKcal(p, uncapped));
 
-    const weightKg = Number.isFinite(p.weightKg) ? p.weightKg : 0;
-    const proteinG = Math.round(PROTEIN_G_PER_KG[p.goal] * weightKg);
+    const perKg = Math.min(PROTEIN_G_PER_KG[p.goal], MAX_PROTEIN_G_PER_KG);
+    const proteinG = Math.round(perKg * this.proteinReferenceWeightKg(p));
     const fatG = Math.round((kcal * FAT_ENERGY_RATIO) / KCAL_PER_G.fat);
     const proteinKcal = proteinG * KCAL_PER_G.protein;
     const fatKcal = fatG * KCAL_PER_G.fat;
@@ -95,15 +121,16 @@ export class NutritionCalcService {
     return { kcal, proteinG, carbsG, fatG, fiberG, sugarG };
   }
 
-  /** `true`, wenn die Mindestzufuhr das rechnerische Ziel anhebt (Formel liegt darunter). */
+  /** `true`, wenn die Mindestzufuhr das rechnerische Ziel anhebt (nur beim Abnehmen, Formel liegt darunter). */
   isMinKcalApplied(p: UserProfile): boolean {
     const uncapped = this.uncappedKcal(p);
-    return !Number.isFinite(uncapped) || uncapped < this.minKcal(p);
+    if (!Number.isFinite(uncapped)) return true;
+    return p.goal === 'lose' && uncapped < this.minKcal(p);
   }
 
-  /** Tägliches Defizit/Überschuss (kcal) für ein Tempo in kg/Woche (auf {@link MAX_RATE_KG_PER_WEEK} begrenzt). */
-  dailyDeltaKcal(rateKgPerWeek: number): number {
-    const rate = Math.min(Math.abs(rateKgPerWeek), MAX_RATE_KG_PER_WEEK);
+  /** Tägliches Defizit/Überschuss (kcal) für ein Tempo in kg/Woche (auf 1 % des Körpergewichts begrenzt). */
+  dailyDeltaKcal(rateKgPerWeek: number, weightKg: number): number {
+    const rate = Math.min(Math.abs(rateKgPerWeek), this.maxRateKgPerWeek(weightKg));
     return Math.round((rate * KCAL_PER_KG) / 7);
   }
 
@@ -113,7 +140,7 @@ export class NutritionCalcService {
    */
   achievedRateKgPerWeek(p: UserProfile): number {
     if (p.goal === 'maintain') return 0;
-    const wished = Math.min(Math.abs(p.rateKgPerWeek ?? 0.5), MAX_RATE_KG_PER_WEEK);
+    const wished = Math.min(Math.abs(p.rateKgPerWeek ?? 0.5), this.maxRateKgPerWeek(p.weightKg));
     const actualDelta = Math.abs(this.totalDailyEnergy(p) - this.dailyTarget(p).kcal);
     return Math.min(wished, (actualDelta * 7) / KCAL_PER_KG);
   }
@@ -122,10 +149,16 @@ export class NutritionCalcService {
   private uncappedKcal(p: UserProfile): number {
     const tdee = this.totalDailyEnergy(p);
     const rate = p.goal === 'maintain' ? 0 : Math.abs(p.rateKgPerWeek ?? 0.5);
-    const dailyDelta = this.dailyDeltaKcal(rate);
+    const dailyDelta = this.dailyDeltaKcal(rate, p.weightKg);
     if (p.goal === 'lose') return tdee - dailyDelta;
     if (p.goal === 'gain') return tdee + dailyDelta;
     return tdee;
+  }
+
+  /** Hebt das Ziel beim Abnehmen auf die Mindestzufuhr an; ohne gültigen Wert gilt die Mindestzufuhr. */
+  private applyMinKcal(p: UserProfile, kcal: number): number {
+    if (!Number.isFinite(kcal)) return this.minKcal(p);
+    return p.goal === 'lose' ? Math.max(kcal, this.minKcal(p)) : kcal;
   }
 
   private minKcal(p: UserProfile): number {

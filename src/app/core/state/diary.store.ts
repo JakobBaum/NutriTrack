@@ -37,6 +37,42 @@ export function copyEntriesTo(
   return entries.map((e) => ({ ...e, id: newId(), dateISO, createdAt: nowISO }));
 }
 
+const isPositiveNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0;
+const validAmountOrUndefined = (v: number | undefined): number | undefined => (isPositiveNumber(v) ? v : undefined);
+const safeNonNegative = (v: number): number => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0);
+const safeOptional = (v: number | undefined): number | undefined =>
+  typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined;
+
+/** Ersetzt nicht endliche/negative Nährwerte (Pflichtfelder 0, optionale weggelassen). */
+function sanitizeFacts(f: NutritionFacts): NutritionFacts {
+  return {
+    ...f,
+    kcal: safeNonNegative(f.kcal),
+    proteinG: safeNonNegative(f.proteinG),
+    carbsG: safeNonNegative(f.carbsG),
+    fatG: safeNonNegative(f.fatG),
+    fiberG: safeOptional(f.fiberG),
+    sugarG: safeOptional(f.sugarG),
+    saltG: safeOptional(f.saltG),
+  };
+}
+
+const entrySignature = (e: DiaryEntry): string =>
+  [e.meal, e.label.trim().toLowerCase(), e.amountG ?? '', e.servings ?? '', e.unit ?? '', Math.round(e.facts.kcal)].join('|');
+
+/** Quell-Einträge, die am Ziel noch nicht (in gleicher Anzahl) vorhanden sind (Schutz vor doppeltem Kopieren). */
+function withoutExisting(source: readonly DiaryEntry[], existing: readonly DiaryEntry[]): DiaryEntry[] {
+  const counts = new Map<string, number>();
+  existing.forEach((e) => counts.set(entrySignature(e), (counts.get(entrySignature(e)) ?? 0) + 1));
+  return source.filter((e) => {
+    const sig = entrySignature(e);
+    const left = counts.get(sig) ?? 0;
+    if (left <= 0) return true;
+    counts.set(sig, left - 1);
+    return false;
+  });
+}
+
 /** Eingabe-DTO zum Anlegen eines Tagebuch-Eintrags. */
 export interface NewDiaryEntry {
   dateISO: string;
@@ -71,7 +107,7 @@ export class DiaryStore {
   /** Alle Einträge (unsortiert). */
   readonly entries = this._entries.asReadonly();
 
-  /** Legt einen neuen Eintrag an und persistiert ihn. */
+  /** Legt einen neuen Eintrag an und persistiert ihn. Ungültige Mengen und Nährwerte werden bereinigt. */
   add(input: NewDiaryEntry): DiaryEntry {
     const entry: DiaryEntry = {
       id: makeId('diary'),
@@ -80,9 +116,9 @@ export class DiaryStore {
       label: input.label,
       brand: input.brand,
       ref: input.ref ?? { kind: 'manual' },
-      amountG: input.amountG,
-      servings: input.servings,
-      facts: input.facts,
+      amountG: validAmountOrUndefined(input.amountG),
+      servings: validAmountOrUndefined(input.servings),
+      facts: sanitizeFacts(input.facts),
       baseFacts: input.baseFacts,
       isEstimate: input.isEstimate,
       isPartial: input.isPartial,
@@ -105,13 +141,18 @@ export class DiaryStore {
     facts?: NutritionFacts;
     /** Neue Bezugswerte pro 100 g/ml (z. B. für manuelle Einträge, die bisher keine hatten). */
     baseFacts?: NutritionFacts;
+    /** Entfernt die (rein informative) Menge samt Einheit; Nährwerte bleiben unverändert. */
+    clearAmount?: boolean;
   }): void {
     // Leere/0/negative Menge nie übernehmen (würde alte oder negative Werte erzeugen).
-    const { amountG, baseFacts: patchBase, ...rest } = patch;
+    const { amountG, baseFacts: patchBase, label, clearAmount, ...rest } = patch;
+    const cleanLabel = label?.trim();
     const hasValidAmount = typeof amountG === 'number' && Number.isFinite(amountG) && amountG > 0;
     const validBase = patchBase?.basis === 'per100g' ? patchBase : undefined;
     const safePatch = {
       ...rest,
+      ...(cleanLabel ? { label: cleanLabel } : {}),
+      ...(clearAmount && !hasValidAmount ? { amountG: undefined, unit: undefined } : {}),
       ...(hasValidAmount ? { amountG } : {}),
       ...(validBase ? { baseFacts: validBase } : {}),
     };
@@ -131,6 +172,7 @@ export class DiaryStore {
             fatG: Math.round(base.fatG * factor * 10) / 10,
             fiberG: base.fiberG != null ? Math.round(base.fiberG * factor * 10) / 10 : undefined,
             sugarG: base.sugarG != null ? Math.round(base.sugarG * factor * 10) / 10 : undefined,
+            saltG: base.saltG != null ? Math.round(base.saltG * factor * 100) / 100 : undefined,
             basis: 'perPortion',
           };
         }
@@ -140,10 +182,29 @@ export class DiaryStore {
     this.persist();
   }
 
+  /** Listenposition eines Eintrags (-1, wenn unbekannt); für Rückgängig nach dem Löschen. */
+  indexOf(id: string): number {
+    return this._entries().findIndex((e) => e.id === id);
+  }
+
   /** Entfernt einen Eintrag. */
   remove(id: string): void {
     this._entries.update((list) => list.filter((e) => e.id !== id));
     this.persist();
+  }
+
+  /**
+   * Legt einen gelöschten Eintrag mit alter Id und (wenn bekannt) an alter Listenposition wieder an.
+   * Liefert false, wenn die Id schon existiert (z. B. doppeltes Rückgängig).
+   */
+  restore(entry: DiaryEntry, index?: number): boolean {
+    if (this._entries().some((e) => e.id === entry.id)) return false;
+    this._entries.update((list) => {
+      const at = index === undefined ? list.length : Math.min(Math.max(0, index), list.length);
+      return [...list.slice(0, at), entry, ...list.slice(at)];
+    });
+    this.persist();
+    return true;
   }
 
   /**
@@ -152,7 +213,8 @@ export class DiaryStore {
    */
   copyEntries(entries: readonly DiaryEntry[], dateISO: string): DiaryEntry[] {
     if (!ISO_DATE_RE.test(dateISO) || entries.length === 0) return [];
-    const copies = copyEntriesTo(entries, dateISO);
+    const copies = copyEntriesTo(withoutExisting(entries, this.entriesForDate(dateISO)), dateISO);
+    if (copies.length === 0) return [];
     this._entries.update((list) => [...list, ...copies]);
     this.persist();
     return copies;

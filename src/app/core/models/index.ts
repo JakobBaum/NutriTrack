@@ -28,6 +28,8 @@ export interface UserProfile {
   goal: Goal;
   /** Gewünschte Rate (kg/Woche) für lose/gain; 0 bei maintain. */
   rateKgPerWeek?: number;
+  /** Optionales Zielgewicht (kg); ersetzt bei BMI über 30 das Referenzgewicht der Eiweißberechnung. */
+  targetWeightKg?: number;
   updatedAt: string;
 }
 
@@ -68,7 +70,6 @@ export interface FoodItem {
   facts: NutritionFacts;
   /** Standard-Portion in g (optional). */
   servingG?: number;
-  imageUrl?: string;
   /** Packungsgröße als Anzeigetext, z.B. "400 g" (nur Anzeige). */
   quantity?: string;
   /** Nutri-Score A-E (nur Anzeige). */
@@ -210,15 +211,4 @@ export interface SavedMeal {
   name: string;
   entries: SavedMealEntry[];
   createdAt: string;
-}
-
-/** Konfiguration eines KI-Anbieters (lokal gespeichert). */
-export interface AiConfig {
-  provider: 'gemini' | 'mock' | string;
-  apiKey?: string;
-  endpoint?: string;
-  model?: string;
-  /** URL des internen KI-Proxys (ein geteilter Server-Key für alle Nutzer).
-   *  Ist sie gesetzt, nutzt die App den Proxy statt eines eigenen Keys. */
-  proxyUrl?: string;
 }

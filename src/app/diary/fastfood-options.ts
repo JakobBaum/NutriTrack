@@ -23,7 +23,7 @@ export interface PreferenceOption {
 }
 
 export const PREFERENCE_OPTIONS: readonly PreferenceOption[] = [
-  { label: 'Viel Protein', value: 'viel Protein' },
+  { label: 'Viel Eiweiß', value: 'viel Protein' },
   { label: 'Wenig Kalorien', value: 'wenig Kalorien' },
   { label: 'Wenig Zucker', value: 'wenig Zucker' },
   { label: 'Vegetarisch', value: 'vegetarisch' },

@@ -1,12 +1,11 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import { FoodItem, NutritionFacts } from '../models';
 import { makeId } from '../util/id';
 import { parseDecimal } from '../util/number-input';
 import { FoodProvider } from './food-provider';
-import { toFoodLookupError } from './food-errors';
-import { SettingsStore } from '../state/settings.store';
+import { FOOD_TIMEOUT_MS, toFoodLookupError } from './food-errors';
 import { environment } from '../../../environments/environment';
 import { DebugLogService } from '../debug/debug-log.service';
 import {
@@ -14,11 +13,11 @@ import {
 } from './food-search-clean';
 
 // Freitextsuche: dev → Angular-Dev-Proxy; prod → NutriTrack-Worker (search.openfoodfacts.org
-// sendet keine CORS-Header). Eine eigene proxyUrl in den Einstellungen hat Vorrang.
+// sendet keine CORS-Header). Die Adresse steht fest in der Umgebung.
 const SEARCH_URL_DEFAULT = environment.offSearchUrl;
 // Barcode exakt über Product Opener v3 (hat CORS *).
 const PRODUCT_V3_URL = 'https://world.openfoodfacts.org/api/v3/product';
-const FIELDS = 'code,product_name,brands,image_url,image_small_url,nutriments,serving_quantity,quantity,nutriscore_grade,categories_tags';
+const FIELDS = 'code,product_name,brands,nutriments,serving_quantity,quantity,nutriscore_grade,categories_tags';
 const SEARCH_FIELDS = `${FIELDS},lang,countries_tags`;
 const LANGS = 'de,en';
 // Mehr Kandidaten holen, damit nach dem DACH-Ranking genug passende übrig bleiben.
@@ -39,8 +38,6 @@ interface OffProduct {
   code?: string;
   product_name?: string;
   brands?: string | string[];
-  image_url?: string;
-  image_small_url?: string;
   serving_quantity?: number | string;
   quantity?: string;
   nutriscore_grade?: string;
@@ -78,12 +75,10 @@ function localeScore(p: OffProduct): number {
 @Injectable({ providedIn: 'root' })
 export class OpenFoodFactsProvider implements FoodProvider {
   private readonly http = inject(HttpClient);
-  private readonly settings = inject(SettingsStore);
   private readonly log = inject(DebugLogService);
 
   private searchUrl(): string {
-    const proxy = this.settings.ai().proxyUrl?.trim();
-    return proxy ? `${proxy.replace(/\/+$/, '')}/off-search` : SEARCH_URL_DEFAULT;
+    return SEARCH_URL_DEFAULT;
   }
 
   async searchByText(query: string, limit = 12): Promise<FoodItem[]> {
@@ -100,7 +95,7 @@ export class OpenFoodFactsProvider implements FoodProvider {
             fields: SEARCH_FIELDS,
             langs: LANGS,
           },
-        }),
+        }).pipe(timeout(FOOD_TIMEOUT_MS)),
       );
       const entries = (res.hits ?? []).flatMap((p): RankEntry[] => {
         const item = this.toFoodItem(p);
@@ -130,7 +125,7 @@ export class OpenFoodFactsProvider implements FoodProvider {
         this.http.get<ProductV3Response>(
           `${PRODUCT_V3_URL}/${encodeURIComponent(code)}.json`,
           { params: { fields: FIELDS } },
-        ),
+        ).pipe(timeout(FOOD_TIMEOUT_MS)),
       );
       if (!res.product || res.status === 'failure') return null;
       return this.toFoodItem(res.product);
@@ -145,6 +140,12 @@ export class OpenFoodFactsProvider implements FoodProvider {
   private num(v: number | string | undefined): number {
     const n = parseDecimal(v);
     return n !== null ? Math.max(0, n) : 0;
+  }
+
+  /** Optionaler Nährwert: undefined statt 0, wenn OFF ihn nicht liefert (kein erfundenes "0 g Salz"). */
+  private optionalNum(v: number | string | undefined): number | undefined {
+    const n = parseDecimal(v);
+    return n !== null ? Math.max(0, n) : undefined;
   }
 
   /** kcal je 100 g; fehlt der Wert, wird aus kJ umgerechnet. null = keine Naehrwerte (nie still 0 kcal). */
@@ -172,9 +173,9 @@ export class OpenFoodFactsProvider implements FoodProvider {
       proteinG: this.num(n['proteins_100g']),
       carbsG: this.num(n['carbohydrates_100g']),
       fatG: this.num(n['fat_100g']),
-      fiberG: this.num(n['fiber_100g']),
-      sugarG: this.num(n['sugars_100g']),
-      saltG: this.num(n['salt_100g']),
+      fiberG: this.optionalNum(n['fiber_100g']),
+      sugarG: this.optionalNum(n['sugars_100g']),
+      saltG: this.optionalNum(n['salt_100g']),
       basis: 'per100g',
     };
     return {
@@ -185,7 +186,6 @@ export class OpenFoodFactsProvider implements FoodProvider {
       barcode: p.code,
       facts,
       servingG: p.serving_quantity ? this.num(p.serving_quantity) : undefined,
-      imageUrl: p.image_small_url || p.image_url,
       quantity,
       nutriscore,
     };

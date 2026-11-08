@@ -17,11 +17,11 @@ export async function confirmDiscardSheet(sheets: ActionSheetController): Promis
   return role === 'destructive';
 }
 
-/** Mahlzeit per Action-Sheet wählen; null bei Abbruch. */
+/** Essenszeit per Action-Sheet wählen; null bei Abbruch. */
 export async function pickMealSheet(sheets: ActionSheetController, current: MealType): Promise<MealType | null> {
   let picked: MealType | null = null;
   const sheet = await sheets.create({
-    header: 'Mahlzeit',
+    header: 'Essenszeit',
     buttons: [
       ...MEAL_DEFS.map((m) => ({
         text: m.label,

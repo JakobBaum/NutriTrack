@@ -11,3 +11,22 @@ namespace_id = "1001"
   [ratelimits.simple]
   limit = 20
   period = 60
+
+# Optional: eigenes Limit fuer /off-search (sonst gilt AI_LIMITER). Eindeutige namespace_id waehlen.
+# [[ratelimits]]
+# name = "OFF_LIMITER"
+# namespace_id = "1002"
+#
+#   [ratelimits.simple]
+#   limit = 60
+#   period = 60
+
+# Globaler Tagesdeckel fuer KI-Aufrufe (WRK-01). Ohne dieses Binding laeuft der Worker OHNE Deckel
+# weiter (fail-open, /health zeigt hasDailyCap=false). Einrichten:
+#   npx wrangler kv namespace create DAILY_KV     -> gibt eine id aus, hier eintragen, Block einkommentieren
+# [[kv_namespaces]]
+# binding = "DAILY_KV"
+# id = "<KV-NAMESPACE-ID>"
+
+# [vars]
+# DAILY_AI_CAP = "2000"   # max. KI-Aufrufe pro UTC-Tag (Standard 2000)

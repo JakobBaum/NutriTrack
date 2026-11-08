@@ -38,7 +38,7 @@ export function register({ test }) {
 
     await go(page, 'dashboard');
     await page.locator('.hero').waitFor();
-    assert.equal(toInt(await page.locator('.hero__meta div', { hasText: 'Ziel' }).innerText()), kcal);
+    assert.equal(toInt(await page.locator('.hero__item:not(.hero__item--protein) .hero__target').innerText()), kcal);
   });
 
   test('shopping: Artikel mit Enter hinzufügen', seed({ shopping: SHOPPING }), async (page) => {
@@ -66,33 +66,33 @@ export function register({ test }) {
 
   test('dashboard: Summen gegessen/übrig', seed({ diary: DIARY_NORMAL }), async (page) => {
     await go(page, 'dashboard');
-    const eaten = toInt(await page.locator('.hero__meta div', { hasText: 'gegessen' }).innerText());
-    const target = toInt(await page.locator('.hero__meta div', { hasText: 'Ziel' }).innerText());
+    const eaten = toInt(await page.locator('.hero__item:not(.hero__item--protein) .hero__eaten').innerText());
+    const target = toInt(await page.locator('.hero__item:not(.hero__item--protein) .hero__target').innerText());
     assert.equal(eaten, sumKcal(DIARY_NORMAL));
-    assert.match(await page.locator('.hero__unit').innerText(), /kcal übrig/);
-    assert.equal(toInt(await page.locator('.hero__big').innerText()), target - eaten);
-    assert.equal(await page.locator('.hero--over').count(), 0);
+    assert.match(await page.locator('.hero__item:not(.hero__item--protein) .hero__unit').innerText(), /kcal übrig/);
+    assert.equal(toInt(await page.locator('.hero__item:not(.hero__item--protein) .hero__big').innerText()), target - eaten);
+    assert.equal(await page.locator('.hero__item--over').count(), 0);
     const lunch = page.locator('.row__btn', { hasText: 'Mittagessen' });
     assert.equal(toInt(await lunch.locator('.row__note').innerText()), 520);
   });
 
   test('dashboard: Über-Ziel-Zustand', seed({ diary: DIARY_OVER }), async (page) => {
     await go(page, 'dashboard');
-    const eaten = toInt(await page.locator('.hero__meta div', { hasText: 'gegessen' }).innerText());
-    const target = toInt(await page.locator('.hero__meta div', { hasText: 'Ziel' }).innerText());
+    const eaten = toInt(await page.locator('.hero__item:not(.hero__item--protein) .hero__eaten').innerText());
+    const target = toInt(await page.locator('.hero__item:not(.hero__item--protein) .hero__target').innerText());
     assert.equal(eaten, sumKcal(DIARY_OVER));
     assert.ok(eaten > target, `Seed muss über Ziel liegen (${eaten} vs ${target})`);
-    await page.locator('section.hero.hero--over').waitFor();
-    assert.match(await page.locator('.hero__unit').innerText(), /kcal über Ziel/);
-    assert.equal(toInt(await page.locator('.hero__big').innerText()), eaten - target);
+    await page.locator('section.hero .hero__item--over').waitFor();
+    assert.match(await page.locator('.hero__item:not(.hero__item--protein) .hero__unit').innerText(), /kcal über Ziel/);
+    assert.equal(toInt(await page.locator('.hero__item:not(.hero__item--protein) .hero__big').innerText()), eaten - target);
     assert.match(await page.locator('.row__btn', { hasText: 'Fastfood-Helfer' }).innerText(), /Ziel überschritten/, 'Fastfood-Zeile soll Überschreitung nennen');
-    const label = await page.locator('.hero__main').getAttribute('aria-label');
+    const label = await page.locator('.hero__item:not(.hero__item--protein) .hero__main').getAttribute('aria-label');
     assert.match(label ?? '', /über/i, 'aria-label sollte Über-Ziel nennen');
   });
 
   test('dashboard: Mahlzeit trägt direkt auf Heute ein', seed({ diary: DIARY_NORMAL }), async (page) => {
     await go(page, 'dashboard');
-    const eatenText = () => page.locator('.hero__meta div', { hasText: 'gegessen' }).innerText();
+    const eatenText = () => page.locator('.hero__item:not(.hero__item--protein) .hero__eaten').innerText();
     const before = toInt(await eatenText());
     await page.locator('.row__btn', { hasText: 'Mittagessen' }).click();
     const modal = topModal(page);
@@ -114,7 +114,7 @@ export function register({ test }) {
     await go(page, 'dashboard');
     await page.locator('.row__btn', { hasText: 'Fastfood-Helfer' }).click();
     const modal = topModal(page);
-    await modal.locator('ion-title', { hasText: 'Fastfood-Helfer' }).waitFor();
+    await modal.locator('.nt-sheet-header__title', { hasText: 'Fastfood-Helfer' }).waitFor();
     assert.ok(!page.url().includes('/diary'), 'Fastfood-Helfer darf nicht zum Tagebuch navigieren');
     await modal.locator('ion-button', { hasText: 'Abbrechen' }).click();
     await settle(page);

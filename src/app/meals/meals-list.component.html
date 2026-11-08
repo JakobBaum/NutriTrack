@@ -158,7 +158,7 @@
     </ion-header>
     <ion-content>
       @if (pickerView() === 'sources') {
-        <nt-food-sources (result)="pickSource($event)" (manual)="openManual($event)"></nt-food-sources>
+        <nt-food-sources [showRecentCustom]="true" (result)="pickSource($event)" (manual)="openManual($event)"></nt-food-sources>
       } @else {
         <label class="field-label nt-section-header" for="manual-name">Name</label>
         <ion-input id="manual-name" class="nt-field" aria-label="Name" placeholder="z. B. Haferflocken" enterkeyhint="next" [(ngModel)]="manual.name"></ion-input>

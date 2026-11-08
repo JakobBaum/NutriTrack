@@ -5,6 +5,17 @@ import { makeId } from '../util/id';
 
 const KEY_RECIPES = 'recipes';
 
+/** Zutatenmengen: negative oder nicht endliche Werte werden 0 (= ohne Menge). */
+function withSafeAmounts(draft: RecipeDraft): RecipeDraft {
+  return {
+    ...draft,
+    ingredients: draft.ingredients.map((i) => ({
+      ...i,
+      amount: typeof i.amount === 'number' && Number.isFinite(i.amount) && i.amount > 0 ? i.amount : 0,
+    })),
+  };
+}
+
 /** Felder zum Anlegen/Bearbeiten eines Rezepts (ohne System-Felder). */
 export type RecipeDraft = Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>;
 
@@ -36,7 +47,7 @@ export class RecipeStore {
   /** Legt ein neues Rezept an. */
   add(draft: RecipeDraft): Recipe {
     const now = new Date().toISOString();
-    const recipe: Recipe = { ...draft, id: makeId('recipe'), createdAt: now, updatedAt: now };
+    const recipe: Recipe = { ...withSafeAmounts(draft), id: makeId('recipe'), createdAt: now, updatedAt: now };
     this._recipes.update((list) => [recipe, ...list]);
     this.persist();
     return recipe;
@@ -46,7 +57,7 @@ export class RecipeStore {
   update(id: string, draft: RecipeDraft): void {
     this._recipes.update((list) =>
       list.map((r) =>
-        r.id === id ? { ...r, ...draft, updatedAt: new Date().toISOString() } : r,
+        r.id === id ? { ...r, ...withSafeAmounts(draft), updatedAt: new Date().toISOString() } : r,
       ),
     );
     this.persist();

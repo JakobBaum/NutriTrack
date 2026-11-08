@@ -86,11 +86,19 @@ ion-content {
 
 /* --- Hero: kcal übrig, ohne Karte auf dem Grund --- */
 .hero {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
   gap: var(--nt-space-3);
   padding: var(--nt-space-2) 4px var(--nt-space-4);
+
+  &__item {
+    min-width: 0;
+  }
+
+  &__plus {
+    color: var(--nt-secondary);
+  }
 
   &__main {
     display: flex;
@@ -112,12 +120,16 @@ ion-content {
   }
 
   &__big {
-    font-size: 60px;
+    font-size: 48px;
     font-weight: 700;
     line-height: 1;
     letter-spacing: -1.5px;
     font-variant-numeric: tabular-nums;
     color: var(--nt-ink);
+
+    &--protein {
+      color: var(--nt-protein);
+    }
   }
 
   &__chip {
@@ -140,9 +152,9 @@ ion-content {
   }
 
   &__meta {
-    text-align: right;
-    font-size: var(--nt-fs-body);
-    line-height: 22px;
+    margin-top: var(--nt-space-1);
+    font-size: var(--nt-fs-caption);
+    line-height: 18px;
     color: var(--nt-secondary);
     font-variant-numeric: tabular-nums;
 
@@ -165,13 +177,32 @@ ion-content {
   }
 }
 
-/* --- Nährwertringe: 3 x 2 Raster in einer weissen Karte --- */
+/* --- Nährwertringe: Eiweiß und Kalorien groß, vier kleine darunter, in einer weissen Karte --- */
 .macros {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--nt-space-4) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nt-space-4);
   margin: 0;
   padding: var(--nt-space-4) var(--nt-space-1);
+
+  &__primary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  &__secondary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  &__share {
+    margin: 0;
+    padding: 0 var(--nt-space-3);
+    text-align: center;
+    font-size: var(--nt-fs-caption);
+    line-height: 18px;
+    color: var(--nt-secondary);
+  }
 
   &__col {
     min-width: 0;
@@ -199,6 +230,17 @@ ion-content {
     font-variant-numeric: tabular-nums;
   }
 
+  &__col--small &__num {
+    font-size: var(--nt-fs-caption);
+  }
+
+  &__col--small &__label {
+    max-width: 100%;
+    text-align: center;
+    hyphens: manual;
+    white-space: normal;
+  }
+
   &__text {
     display: flex;
     flex-direction: column;
@@ -216,7 +258,6 @@ ion-content {
   }
 
   &__hint {
-    grid-column: 1 / -1;
     margin: 0;
     text-align: center;
     font-size: var(--nt-fs-body);

@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 
 /**
  * Einfache, synchron lesbare Key-Value-Persistenz für das MVP-Gerüst.
@@ -22,12 +22,18 @@ export class StorageService {
     }
   }
 
-  /** Schreibt einen JSON-Wert. Fehler werden geschluckt (z.B. privater Modus). */
-  set<T>(key: string, value: T): void {
+  private readonly _writeFailures = signal(0);
+  /** Zähler fehlgeschlagener Schreibzugriffe (Speicher voll/gesperrt); die App meldet jeden neuen Fehler. */
+  readonly writeFailures = this._writeFailures.asReadonly();
+
+  /** Schreibt einen JSON-Wert. Liefert false und zählt den Fehler, wenn das Schreiben scheitert. */
+  set<T>(key: string, value: T): boolean {
     try {
       this.backend()?.setItem(this.prefix + key, JSON.stringify(value));
+      return true;
     } catch {
-      /* Speicher nicht verfügbar — im MVP bewusst tolerant. */
+      this._writeFailures.update((n) => n + 1);
+      return false;
     }
   }
 

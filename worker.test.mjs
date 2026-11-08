@@ -38,10 +38,7 @@ function get(path, { origin = APP_ORIGIN } = {}) {
   return new Request(`${BASE}${path}`, { headers: origin ? { Origin: origin } : {} });
 }
 
-const PROFILE = {
-  weightKg: 80, heightCm: 180, age: 30, sex: 'male',
-  activityLevel: 'moderate', goal: 'lose', rateKgPerWeek: 0.5,
-};
+const FASTFOOD = { restaurant: 'Burger', kcalBudget: 600 };
 
 beforeEach(() => {
   upstream = [];
@@ -172,7 +169,7 @@ describe('POST / (KI-Proxy)', () => {
     mockFetch(() => geminiReply({}));
 
     // Act
-    const res = await worker.fetch(post({ fn: 'computeTargets', payload: { ...PROFILE, weightKg: -5 } }), ENV);
+    const res = await worker.fetch(post({ fn: 'suggestFastfood', payload: { ...FASTFOOD, kcalBudget: -5 } }), ENV);
 
     // Assert
     assert.equal(res.status, 400);
@@ -184,7 +181,7 @@ describe('POST / (KI-Proxy)', () => {
     mockFetch(() => geminiReply({}));
 
     // Act
-    const res = await worker.fetch(post({ fn: 'computeTargets', payload: PROFILE }), {});
+    const res = await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), {});
 
     // Assert
     assert.equal(res.status, 503);
@@ -197,7 +194,7 @@ describe('POST / (KI-Proxy)', () => {
     const env = { ...ENV, AI_LIMITER: { limit: async () => ({ success: false }) } };
 
     // Act
-    const res = await worker.fetch(post({ fn: 'computeTargets', payload: PROFILE }), env);
+    const res = await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), env);
 
     // Assert
     assert.equal(res.status, 429);
@@ -209,7 +206,7 @@ describe('POST / (KI-Proxy)', () => {
     mockFetch(() => geminiReply({ kcal: 2200, proteinG: 160, carbsG: 220, fatG: 70, fiberG: 30, sugarG: 50 }));
 
     // Act
-    const res = await worker.fetch(post({ fn: 'computeTargets', payload: PROFILE }), ENV);
+    const res = await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), ENV);
 
     // Assert
     assert.equal(res.status, 200);
@@ -223,7 +220,7 @@ describe('POST / — Gemini überlastet (Retry, Fallback, 503)', () => {
   const realSetTimeout = globalThis.setTimeout;
   const errReply = (status) =>
     new Response(JSON.stringify({ error: { message: 'overloaded' } }), { status });
-  const run = () => worker.fetch(post({ fn: 'computeTargets', payload: PROFILE }), ENV);
+  const run = () => worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), ENV);
   const OK = { kcal: 2000, proteinG: 150, carbsG: 200, fatG: 60, fiberG: 30, sugarG: 40 };
 
   beforeEach(() => {
@@ -273,10 +270,21 @@ describe('POST / — Gemini überlastet (Retry, Fallback, 503)', () => {
     assert.equal(res.status, 500);
     assert.equal(upstream.length, 1);
   });
+
+  it('gibt keine Upstream-Details an den Client (SEC-04)', async () => {
+    mockFetch(() => new Response(JSON.stringify({ error: { message: 'API key abc-SECRET invalid' } }), { status: 400 }));
+    const res = await run();
+    const text = await res.text();
+    assert.equal(res.status, 500);
+    assert.doesNotMatch(text, /SECRET|Gemini 400/);
+  });
 });
 
 describe('importRecipe — SSRF-Schutz und Seitentext', () => {
-  for (const url of ['http://localhost/admin', 'http://127.0.0.1:8080/', 'http://10.0.0.5/', 'http://169.254.169.254/latest', 'file:///etc/passwd', 'http://[::1]/']) {
+  for (const url of ['http://localhost/admin', 'http://127.0.0.1:8080/', 'http://10.0.0.5/', 'http://169.254.169.254/latest', 'file:///etc/passwd', 'http://[::1]/',
+    'http://localhost./admin', 'http://127.0.0.1./', 'http://foo.localhost./', 'http://[::ffff:127.0.0.1]/',
+    'http://[fd00::1]/', 'http://2130706433/', 'http://0x7f.0.0.1/', 'http://example.com:8080/', 'http://example.com:22/',
+    'http://192.168.1.1:443/', 'http://198.18.0.1/']) {
     it(`blockiert interne/unsichere URL ${url}`, async () => {
       // Arrange
       mockFetch(() => geminiReply({}));
@@ -313,20 +321,28 @@ describe('importRecipe — SSRF-Schutz und Seitentext', () => {
 
 describe('GET /health und Modellwechsel', () => {
   const OK = { kcal: 2000, proteinG: 150, carbsG: 200, fatG: 60, fiberG: 30, sugarG: 40 };
-  const run = () => worker.fetch(post({ fn: 'computeTargets', payload: PROFILE }), ENV);
+  const run = () => worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), ENV);
 
   it('meldet Status ohne Key-Wert', async () => {
     const res = await worker.fetch(get('/health'), ENV);
     assert.equal(res.status, 200);
     assert.equal(res.headers.get('Access-Control-Allow-Origin'), APP_ORIGIN);
     const body = await res.json();
-    assert.deepEqual(body, { ok: true, hasKey: true, hasRecipeKey: false, model: 'gemini-3.6-flash', fallbackModel: 'gemini-3.5-flash-lite' });
+    assert.deepEqual(body, {
+      ok: true, hasKey: true, hasRecipeKey: false, hasRateLimiter: false, hasDailyCap: false,
+      warning: 'Kein Tageslimit aktiv (KV-Binding DAILY_KV fehlt).',
+      model: 'gemini-3.6-flash', fallbackModel: 'gemini-3.5-flash-lite',
+    });
     assert.ok(!JSON.stringify(body).includes('test-key'));
   });
 
   it('meldet hasKey=false ohne Secret und respektiert Modell-Overrides', async () => {
     const res = await worker.fetch(get('/health'), { GEMINI_MODEL: 'm1', GEMINI_FALLBACK_MODEL: 'm2' });
-    assert.deepEqual(await res.json(), { ok: true, hasKey: false, hasRecipeKey: false, model: 'm1', fallbackModel: 'm2' });
+    assert.deepEqual(await res.json(), {
+      ok: true, hasKey: false, hasRecipeKey: false, hasRateLimiter: false, hasDailyCap: false,
+      warning: 'Kein Tageslimit aktiv (KV-Binding DAILY_KV fehlt).',
+      model: 'm1', fallbackModel: 'm2',
+    });
   });
 
   it('wechselt bei 404 (Modell unbekannt) sofort auf das Fallback-Modell', async () => {
@@ -393,15 +409,36 @@ describe('GET /recipes/complexSearch (spoonacular)', () => {
     mockFetch(okReply);
 
     // Act
-    await worker.fetch(get('/recipes/complexSearch?query=soup&apiKey=fremd&evil=1&sort=random&diet=vegan'), RECIPE_ENV);
+    await worker.fetch(get('/recipes/complexSearch?query=soup&apiKey=fremd&evil=1&sort=random&sortDirection=sideways&diet=vegan'), RECIPE_ENV);
 
     // Assert
     const params = new URL(upstream[0].url).searchParams;
     assert.equal(params.get('apiKey'), null);
     assert.equal(params.get('evil'), null);
-    assert.equal(params.get('sort'), null);
+    assert.equal(params.get('sort'), 'random');
+    assert.equal(params.get('sortDirection'), null);
     assert.equal(params.get('diet'), 'vegan');
     assert.ok(!upstream[0].url.includes('spoon-secret'));
+  });
+
+  it('reicht type, sort, sortDirection und minProtein nur mit erlaubten Werten durch', async () => {
+    // Arrange
+    mockFetch(okReply);
+
+    // Act
+    await worker.fetch(get('/recipes/complexSearch?type=main%20course&sort=healthiness&sortDirection=desc&minProtein=30'), RECIPE_ENV);
+    await worker.fetch(get('/recipes/complexSearch?type=evil&sort=price&sortDirection=up'), RECIPE_ENV);
+
+    // Assert
+    const first = new URL(upstream[0].url).searchParams;
+    assert.equal(first.get('type'), 'main course');
+    assert.equal(first.get('sort'), 'healthiness');
+    assert.equal(first.get('sortDirection'), 'desc');
+    assert.equal(first.get('minProtein'), '30');
+    const second = new URL(upstream[1].url).searchParams;
+    assert.equal(second.get('type'), null);
+    assert.equal(second.get('sort'), null);
+    assert.equal(second.get('sortDirection'), null);
   });
 
   it('begrenzt number auf 20 und setzt einen Standard bei ungültigem Wert', async () => {
@@ -460,5 +497,173 @@ describe('GET /recipes/complexSearch (spoonacular)', () => {
     const body = await res.json();
     assert.equal(body.hasRecipeKey, true);
     assert.ok(!JSON.stringify(body).includes('spoon-secret'));
+  });
+});
+
+describe('Tageszähler (WRK-01/SEC-02)', () => {
+  function fakeKv(initial = {}) {
+    const store = { ...initial };
+    return {
+      store,
+      get: async (k) => store[k] ?? null,
+      put: async (k, v) => { store[k] = v; },
+    };
+  }
+  const today = () => `cap:${new Date().toISOString().slice(0, 10)}`;
+
+  it('blockt mit Binding hart, sobald der Deckel erreicht ist, ohne Upstream-Call', async () => {
+    mockFetch(() => geminiReply({}));
+    const kv = fakeKv({ [today()]: '5' });
+    const res = await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), { ...ENV, DAILY_KV: kv, DAILY_AI_CAP: '5' });
+    assert.equal(res.status, 429);
+    assert.equal(upstream.length, 0);
+    assert.match((await res.json()).error, /Tageslimit/);
+  });
+
+  it('zählt Anfragen hoch', async () => {
+    mockFetch(() => geminiReply({}));
+    const kv = fakeKv();
+    const env = { ...ENV, DAILY_KV: kv, DAILY_AI_CAP: '5' };
+    await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), env);
+    await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), env);
+    assert.equal(kv.store[today()], '2');
+  });
+
+  it('nutzt den Standarddeckel 2000, wenn DAILY_AI_CAP fehlt', async () => {
+    mockFetch(() => geminiReply({}));
+    const kv = fakeKv({ [today()]: '1999' });
+    const env = { ...ENV, DAILY_KV: kv };
+    assert.equal((await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), env)).status, 200);
+    assert.equal((await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), env)).status, 429);
+  });
+
+  it('läuft ohne Binding fail-open und meldet das in /health', async () => {
+    mockFetch(() => geminiReply({}));
+    const res = await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), ENV);
+    assert.equal(res.status, 200);
+    const health = await (await worker.fetch(get('/health'), ENV)).json();
+    assert.equal(health.hasDailyCap, false);
+    assert.match(health.warning, /Tageslimit/);
+  });
+
+  it('meldet hasDailyCap und hasRateLimiter mit Bindings', async () => {
+    const env = { ...ENV, DAILY_KV: fakeKv(), AI_LIMITER: { limit: async () => ({ success: true }) } };
+    const health = await (await worker.fetch(get('/health'), env)).json();
+    assert.equal(health.hasDailyCap, true);
+    assert.equal(health.hasRateLimiter, true);
+    assert.equal(health.warning, undefined);
+  });
+
+  it('läuft bei KV-Fehler weiter (fail-open) statt 500', async () => {
+    mockFetch(() => geminiReply({}));
+    const kv = { get: async () => { throw new Error('kv down'); }, put: async () => {} };
+    const res = await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), { ...ENV, DAILY_KV: kv });
+    assert.equal(res.status, 200);
+  });
+});
+
+describe('Gemini-Konfiguration und Fehlerklassen', () => {
+  it('setzt maxOutputTokens und temperature 0 für strukturierte Aufgaben', async () => {
+    mockFetch(() => geminiReply({ name: 'x', facts: {} }));
+    await worker.fetch(post({ fn: 'recognizeLabel', payload: { imageBase64: 'QUJD' } }), ENV);
+    const cfg = JSON.parse(upstream[0].init.body).generationConfig;
+    assert.equal(cfg.temperature, 0);
+    assert.ok(cfg.maxOutputTokens > 0 && cfg.maxOutputTokens <= 8192);
+    assert.equal(cfg.responseMimeType, 'application/json');
+  });
+
+  it('meldet blockierte Antworten als 422, nicht als überlastet', async () => {
+    mockFetch(() => new Response(JSON.stringify({ promptFeedback: { blockReason: 'SAFETY' } }), { status: 200 }));
+    const res = await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), ENV);
+    assert.equal(res.status, 422);
+    assert.doesNotMatch((await res.json()).error, /überlastet/);
+  });
+
+  it('meldet leere Antworten (finishReason) als 422', async () => {
+    mockFetch(() => new Response(JSON.stringify({ candidates: [{ finishReason: 'MAX_TOKENS' }] }), { status: 200 }));
+    const res = await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), ENV);
+    assert.equal(res.status, 422);
+    assert.doesNotMatch((await res.json()).error, /überlastet/);
+  });
+
+  it('meldet nicht lesbare Antworten ohne Rohtext an den Client', async () => {
+    mockFetch(() => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'GEHEIMER Freitext' }] } }] }), { status: 200 }));
+    const res = await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), ENV);
+    assert.equal(res.status, 422);
+    assert.doesNotMatch(await res.text(), /GEHEIMER/);
+  });
+
+  it('kennt computeTargets nicht mehr', async () => {
+    const res = await worker.fetch(post({ fn: 'computeTargets', payload: {} }), ENV);
+    assert.equal(res.status, 400);
+  });
+});
+
+describe('Größenlimits (SEC-08/WRK-09)', () => {
+  it('lehnt Fotos über dem Limit mit 413 ab', async () => {
+    const big = 'A'.repeat(5 * 1024 * 1024);
+    const res = await worker.fetch(post({ fn: 'recognizeLabel', payload: { imageBase64: big } }), ENV);
+    assert.equal(res.status, 413);
+    assert.equal(upstream.length, 0);
+  });
+
+  it('lehnt zu große Bodies ab (auch ohne Content-Length)', async () => {
+    const res = await worker.fetch(post({ fn: 'importRecipe', payload: { text: 'x'.repeat(6 * 1024 * 1024) } }), ENV);
+    assert.equal(res.status, 413);
+  });
+
+  it('lehnt einen Nicht-Objekt-Payload ab', async () => {
+    const res = await worker.fetch(post({ fn: 'suggestFastfood', payload: 'text' }), ENV);
+    assert.equal(res.status, 400);
+  });
+});
+
+describe('/off-search Rate-Limit (FDB-02/WRK-07)', () => {
+  it('antwortet 429 bei Cache-Miss, wenn OFF_LIMITER greift', async () => {
+    mockFetch(() => new Response('{"hits":[]}'));
+    const env = { ...ENV, OFF_LIMITER: { limit: async () => ({ success: false }) } };
+    const res = await worker.fetch(get('/off-search?q=milch'), env);
+    assert.equal(res.status, 429);
+    assert.equal(upstream.length, 0);
+  });
+
+  it('fällt ohne OFF_LIMITER auf AI_LIMITER zurück', async () => {
+    mockFetch(() => new Response('{"hits":[]}'));
+    const env = { ...ENV, AI_LIMITER: { limit: async () => ({ success: false }) } };
+    const res = await worker.fetch(get('/off-search?q=milch'), env);
+    assert.equal(res.status, 429);
+  });
+});
+
+describe('spoonacular-Cache (WRK-03)', () => {
+  const realCaches = globalThis.caches;
+  const RECIPE_ENV = { ...ENV, SPOONACULAR_API_KEY: 'spoon-secret' };
+  beforeEach(() => {
+    const map = new Map();
+    globalThis.caches = {
+      default: {
+        match: async (req) => map.get(req.url)?.clone(),
+        put: async (req, res) => { map.set(req.url, res); },
+      },
+    };
+  });
+  afterEach(() => { globalThis.caches = realCaches; });
+
+  it('liefert die zweite gleiche Suche aus dem Cache inkl. Quota-Header ohne Upstream-Call', async () => {
+    mockFetch(() => new Response('{"results":[]}', { status: 200, headers: { 'Content-Type': 'application/json', 'X-Api-Quota-Left': '40' } }));
+    const first = await worker.fetch(get('/recipes/complexSearch?query=soup'), RECIPE_ENV);
+    const second = await worker.fetch(get('/recipes/complexSearch?query=soup'), RECIPE_ENV);
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 200);
+    assert.equal(second.headers.get('X-Api-Quota-Left'), '40');
+    assert.equal(second.headers.get('Access-Control-Allow-Origin'), APP_ORIGIN);
+    assert.equal(upstream.length, 1);
+  });
+
+  it('cached keine Fehlerantworten', async () => {
+    mockFetch(() => new Response('{"message":"limit"}', { status: 402 }));
+    await worker.fetch(get('/recipes/complexSearch?query=soup'), RECIPE_ENV);
+    await worker.fetch(get('/recipes/complexSearch?query=soup'), RECIPE_ENV);
+    assert.equal(upstream.length, 2);
   });
 });

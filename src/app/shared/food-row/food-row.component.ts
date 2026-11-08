@@ -1,9 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { FoodItem } from '../../core/models';
+import { isCustomFoodItem } from '../../core/food/custom-food-search';
 
 /**
- * Suchtreffer-Zeile (nur Darstellung, kein Klick-Handler; die Eltern-Zeile ist klickbar):
- * Vorschaubild, Name, Marke, "400 g · 539 kcal / 100 g" und Nutri-Score-Badge.
+ * Suchtreffer-Zeile (nur Darstellung, kein Klick-Handler; die Eltern-Zeile ist klickbar), ohne Bild:
+ * Name (fett), darunter „Marke · Packungsgröße“ (bei eigenen Lebensmitteln mit der Textmarke „Eigen“),
+ * danach „539 kcal · 6 g Eiweiß / 100 g“ und rechts der Nutri-Score als kleine Textmarke.
  */
 @Component({
   selector: 'nt-food-row',
@@ -15,14 +17,19 @@ import { FoodItem } from '../../core/models';
 export class NtFoodRowComponent {
   readonly item = input.required<FoodItem>();
 
-  /** Bild konnte nicht geladen werden -> neutrales Icon. */
-  protected readonly imageFailed = signal(false);
+  protected readonly isCustom = computed(() => isCustomFoodItem(this.item()));
+
+  /** „Marke · Packungsgröße“; leer, wenn beides fehlt. */
+  protected readonly subline = computed(() => {
+    const it = this.item();
+    return [it.brand, it.quantity].filter((part): part is string => !!part).join(' · ');
+  });
 
   protected readonly meta = computed(() => {
     const it = this.item();
-    const per100 = it.facts.basis === 'per100g' ? ' / 100 g' : '';
-    const kcal = `${Math.round(it.facts.kcal)} kcal${per100}`;
-    return it.quantity ? `${it.quantity} · ${kcal}` : kcal;
+    const base = it.facts.basis === 'per100g' ? ' / 100 g' : ' / Portion';
+    const protein = Number.isFinite(it.facts.proteinG) ? ` · ${Math.round(it.facts.proteinG)} g Eiweiß` : '';
+    return `${Math.round(it.facts.kcal)} kcal${protein}${base}`;
   });
 
   protected readonly scoreLabel = computed(() => {

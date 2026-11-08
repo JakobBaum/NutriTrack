@@ -36,6 +36,12 @@ describe('parseDecimal', () => {
     expect(parseDecimal('1.0001')).toBe(1.0001);
   });
 
+  it('liest "0.500" als Dezimal 0,5 und nicht als Tausender (QAE-06)', () => {
+    expect(parseDecimal('0.500')).toBe(0.5);
+    expect(parseDecimal('0.001')).toBe(0.001);
+    expect(parseDecimal('-0.250')).toBe(-0.25);
+  });
+
   it('liefert null für Whitespace (Tab/Zeilenumbruch)', () => {
     expect(parseDecimal('\t\n ')).toBeNull();
   });

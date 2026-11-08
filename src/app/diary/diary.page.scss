@@ -273,6 +273,33 @@ ion-content {
   font-weight: 600;
 }
 
+.view-switch {
+  margin: var(--nt-space-3) var(--nt-space-4) 0;
+  width: auto;
+}
+
+.edit-fav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nt-space-1);
+  min-height: var(--nt-touch);
+  margin: var(--nt-space-4) auto 0;
+  padding: 0 var(--nt-space-4);
+  background: transparent;
+  border: 0;
+  color: var(--nt-accent);
+  font: inherit;
+  font-size: var(--nt-fs-headline);
+  font-weight: 600;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--nt-focus);
+    outline-offset: 2px;
+  }
+}
+
 .edit-delete {
   display: flex;
   align-items: center;

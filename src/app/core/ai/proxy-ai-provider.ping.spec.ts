@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ProxyAiProvider } from './proxy-ai-provider';
-import { SettingsStore } from '../state/settings.store';
+import { environment } from '../../../environments/environment';
 import { AI_ERROR_MESSAGES } from './ai-errors';
 
 const PROXY = 'https://proxy.test/ai';
@@ -17,10 +17,13 @@ beforeEach(() => {
   TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
   http = TestBed.inject(HttpTestingController);
   provider = TestBed.inject(ProxyAiProvider);
-  TestBed.inject(SettingsStore).setAi({ provider: 'gemini', proxyUrl: PROXY });
+  environment.aiProxyUrl = PROXY;
 });
 
-afterEach(() => http.verify());
+afterEach(() => {
+  http.verify();
+  environment.aiProxyUrl = '';
+});
 
 describe('ProxyAiProvider.ping', () => {
   it('sendet fn "ping" ohne Payload an die Proxy-URL', async () => {
@@ -56,7 +59,7 @@ describe('ProxyAiProvider.ping', () => {
   });
 
   it('wirft ohne Proxy-URL', async () => {
-    TestBed.inject(SettingsStore).setAi({ provider: 'gemini', proxyUrl: '  ' });
+    environment.aiProxyUrl = '  ';
     await expect(provider.ping()).rejects.toThrow('Keine KI-Proxy-URL konfiguriert.');
   });
 });

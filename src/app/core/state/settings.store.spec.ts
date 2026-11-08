@@ -2,23 +2,26 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { SettingsStore } from './settings.store';
 
-function loadWithStored(model: string): SettingsStore {
-  localStorage.clear();
-  localStorage.setItem('nutritrack:ai-config', JSON.stringify({ provider: 'gemini', model, apiKey: 'k' }));
-  TestBed.resetTestingModule();
-  return TestBed.inject(SettingsStore);
-}
+const LEGACY = 'nutritrack:ai-config';
 
-describe('SettingsStore Modell-Migration', () => {
-  beforeEach(() => localStorage.clear());
-
-  it.each(['gemini-3.8-flash', 'gemini-3.8-pro'])('setzt %s auf den Standard zurück', (legacy) => {
-    expect(loadWithStored(legacy).ai().model).toBe('');
+describe('SettingsStore Migration der KI-Verbindung', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.resetTestingModule();
   });
 
-  it('lässt gültige Modelle und den Key unberührt', () => {
-    const store = loadWithStored('gemini-3.5-flash-lite');
-    expect(store.ai().model).toBe('gemini-3.5-flash-lite');
-    expect(store.ai().apiKey).toBe('k');
+  it('löscht beim Start einen gespeicherten eigenen Gemini-Key und die Server-Adresse', () => {
+    // Arrange
+    localStorage.setItem(LEGACY, JSON.stringify({ provider: 'gemini', apiKey: 'geheim', proxyUrl: 'https://x.test' }));
+    // Act
+    TestBed.inject(SettingsStore);
+    // Assert
+    expect(localStorage.getItem(LEGACY)).toBeNull();
+  });
+
+  it('lässt den eigenen Spoonacular-Key unberührt', () => {
+    localStorage.setItem('nutritrack:recipe-search-config', JSON.stringify({ apiKey: 'sp', baseUrl: '' }));
+    TestBed.inject(SettingsStore);
+    expect(localStorage.getItem('nutritrack:recipe-search-config')).toContain('sp');
   });
 });

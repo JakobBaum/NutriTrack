@@ -2,7 +2,7 @@
 const MAX_DISPLAY_DECIMALS = 4;
 
 /** Deutsche Tausender-Schreibweise mit Punkt, z. B. "1.000" oder "12.500.000". */
-const THOUSANDS_PATTERN = /^[+-]?\d{1,3}(\.\d{3})+$/;
+const THOUSANDS_PATTERN = /^[+-]?[1-9]\d{0,2}(\.\d{3})+$/;
 
 /**
  * Parst eine Zahleneingabe aus einem Textfeld. Akzeptiert Dezimalkomma

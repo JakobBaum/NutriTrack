@@ -1,15 +1,18 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { MealType, NutritionFacts } from '../core/models';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { formatNum } from '../shared/num.pipe';
-import { dayLabel, toDateISO } from '../core/util/date';
+import { dayLabel, rollDate, toDateISO } from '../core/util/date';
 import { MEAL_DEFS, mealForHour, mealLabel } from '../diary/diary-helpers';
+import { isWarnMacro, macroEnergyShares, proteinHint, proteinOfEntries, softHyphenLabel } from './dashboard-math';
 
 interface MacroView {
   key: 'kcal' | 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar';
   label: string;
+  /** Label mit weichen Trennstellen für schmale Kacheln. */
+  displayLabel: string;
   unit: string;
   color: string;
   track: string;
@@ -17,6 +20,8 @@ interface MacroView {
   target: number;
   /** Überschreitung in Einheiten (0, solange das Ziel nicht überschritten ist). */
   overBy: number;
+  /** True, wenn eine Überschreitung rot gezeigt wird (nur kcal und Zucker). */
+  warn: boolean;
 }
 
 interface DrillItem {
@@ -29,6 +34,9 @@ interface DrillData {
   label: string;
   unit: string;
   total: number;
+  /** Tagesziel dieses Werts und Anteil der Tagessumme daran (Prozent, 0 ohne Ziel). */
+  target: number;
+  targetPercent: number;
   color: string;
   /** True, wenn das Ziel dieses Werts deutlich überschritten ist (Warnfarbe). */
   over: boolean;
@@ -40,6 +48,7 @@ interface MealView {
   label: string;
   icon: string;
   kcal: number;
+  proteinG: number;
   count: number;
 }
 
@@ -60,8 +69,10 @@ export class DashboardPage {
   private readonly router = inject(Router);
 
   readonly selectedDate = signal(toDateISO());
+  /** Der Tag, den die Seite zuletzt als "heute" kannte (für den Tageswechsel). */
+  private readonly today = signal(toDateISO());
   readonly dateLabel = computed(() => dayLabel(this.selectedDate()));
-  readonly isToday = computed(() => this.selectedDate() === toDateISO());
+  readonly isToday = computed(() => this.selectedDate() === this.today());
 
   readonly hasProfile = this.profileStore.hasProfile;
   readonly target = this.profileStore.target;
@@ -74,6 +85,25 @@ export class DashboardPage {
   );
   /** kcal über dem Tagesziel (0, solange das Ziel nicht überschritten ist). */
   readonly kcalOverBy = computed(() => Math.max(0, this.kcalEaten() - this.kcalTarget()));
+
+  readonly proteinTarget = computed(() => this.target()?.proteinG ?? 0);
+  readonly proteinEaten = computed(() => Math.round(this.totals().proteinG));
+  readonly proteinRemaining = computed(() => Math.max(0, this.proteinTarget() - this.proteinEaten()));
+  /** Eiweiß über dem Ziel (neutral dargestellt, kein Fehler). */
+  readonly proteinOverBy = computed(() => Math.max(0, this.proteinEaten() - this.proteinTarget()));
+  readonly proteinReached = computed(() => this.proteinTarget() > 0 && this.proteinRemaining() === 0);
+
+  /** Screenreader-Name des Eiweiß-Heros. */
+  readonly proteinHeroLabel = computed(() => {
+    if (this.proteinReached()) return `Eiweißziel erreicht, ${formatNum(this.proteinEaten(), 0)} von ${formatNum(this.proteinTarget(), 0)} g, Details anzeigen`;
+    return `Noch ${formatNum(this.proteinRemaining(), 0)} g Eiweiß, Details anzeigen`;
+  });
+
+  /** Anteil von Eiweiß, Kohlenhydraten und Fett an der gegessenen Energie (null ohne Einträge). */
+  readonly energyShares = computed(() => macroEnergyShares(this.totals()));
+
+  /** Hinweis am Fastfood-Helfer: Restprotein, solange es klein ist. */
+  readonly fastfoodProteinHint = computed(() => proteinHint(this.proteinRemaining()));
 
   /** Screenreader-Name des Heros inkl. Zahl und Ueberschreitung. */
   readonly heroLabel = computed(() => {
@@ -89,8 +119,8 @@ export class DashboardPage {
     const mk = (
       key: MacroView['key'], label: string, unit: string, color: string, eaten: number, target: number,
     ): MacroView => ({
-      key, label, unit, color, track: 'var(--nt-track)', eaten, target,
-      overBy: Math.max(0, eaten - target),
+      key, label, displayLabel: softHyphenLabel(label), unit, color, track: 'var(--nt-track)', eaten, target,
+      overBy: Math.max(0, eaten - target), warn: isWarnMacro(key),
     });
     return [
       mk('kcal', 'Kalorien', 'kcal', 'var(--nt-kcal)', Math.round(e.kcal), t.kcal),
@@ -102,11 +132,16 @@ export class DashboardPage {
     ];
   });
 
+  /** Eiweiß und Kalorien sind die Hauptwerte (große Ringe), der Rest ist kleiner. */
+  readonly primaryMacros = computed(() => this.macros().filter((m) => m.key === 'kcal' || m.key === 'protein'));
+  readonly secondaryMacros = computed(() => this.macros().filter((m) => m.key !== 'kcal' && m.key !== 'protein'));
+
   readonly meals = computed<MealView[]>(() => {
     const date = this.selectedDate();
     return MEAL_DEFS.map((d) => ({
       ...d,
       kcal: Math.round(this.diary.kcalForMeal(date, d.type)),
+      proteinG: proteinOfEntries(this.diary.entriesForMeal(date, d.type)),
       count: this.diary.entriesForMeal(date, d.type).length,
     }));
   });
@@ -131,14 +166,16 @@ export class DashboardPage {
     const label = key === 'kcal' ? 'Kalorien' : (this.macros().find(m => m.key === key)?.label ?? key);
     const unit = key === 'kcal' ? 'kcal' : 'g';
     const macro = this.macros().find(m => m.key === key);
-    const over = !!macro && macro.overBy > 0;
+    const over = !!macro && macro.warn && macro.overBy > 0;
     const items = entries
       .map(e => ({ label: e.label, value: this.factValue(e.facts, key) }))
       .filter(d => d.value > 0)
       .sort((a, b) => b.value - a.value);
     const total = items.reduce((s, i) => s + i.value, 0);
+    const target = macro?.target ?? 0;
     return {
-      label, unit, color, over,
+      label, unit, color, over, target,
+      targetPercent: target > 0 ? Math.round((total / target) * 100) : 0,
       total: Math.round(total * 10) / 10,
       items: items.map(i => ({
         ...i,
@@ -162,6 +199,22 @@ export class DashboardPage {
   openDrill(key: string): void { this.drillMacro.set(key); }
   closeDrill(): void { this.drillMacro.set(null); }
 
+  /** Beim Betreten der Seite und beim Zurückkehren in die App: nach Mitternacht auf den neuen Tag springen. */
+  ionViewWillEnter(): void {
+    this.refreshToday();
+  }
+
+  @HostListener('document:visibilitychange')
+  onVisibilityChange(): void {
+    if (document.visibilityState === 'visible') this.refreshToday();
+  }
+
+  private refreshToday(): void {
+    const next = rollDate(this.selectedDate(), this.today(), toDateISO());
+    this.today.set(next.today);
+    this.selectedDate.set(next.selected);
+  }
+
   setDate(dateISO: string): void {
     this.selectedDate.set(dateISO);
   }
@@ -176,9 +229,10 @@ export class DashboardPage {
     this.addOpen.set(true);
   }
 
-  /** Text unter der Mahlzeit, z.B. "2 Einträge". */
-  entryCountLabel(count: number): string {
-    return count === 1 ? '1 Eintrag' : `${count} Einträge`;
+  /** Text unter der Mahlzeit, z.B. "2 Einträge · 31 g Eiweiß". */
+  mealSubLabel(meal: MealView): string {
+    const count = meal.count === 1 ? '1 Eintrag' : `${meal.count} Einträge`;
+    return `${count} · ${formatNum(meal.proteinG, 0)} g Eiweiß`;
   }
 
   /** Mahlzeit, die zur aktuellen Uhrzeit passt (Ziel des FAB). */

@@ -1,3 +1,5 @@
+import { hasValidRecords } from './backup-records';
+
 /**
  * Reine Funktionen für Daten-Backups (Export/Import aller `nutritrack:`-Schlüssel).
  * Keine Abhängigkeit zu Angular oder Browser-APIs, damit alles unit-testbar bleibt.
@@ -14,9 +16,11 @@ export const MAX_BACKUP_BYTES = 20 * 1024 * 1024;
 
 const KEY_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
-const ARRAY_KEYS = ['diary', 'recipes', 'savedMeals', 'customFoods'] as const;
+const ARRAY_KEYS = ['diary', 'recipes', 'savedMeals', 'customFoods', 'favorites', 'weight'] as const;
 const NULLABLE_OBJECT_KEYS = ['profile', 'shopping'] as const;
+/** Frühere KI-Verbindung (eigener Key, Server-Adresse): wird weder exportiert noch importiert. */
 const AI_KEY = 'ai-config';
+const NEVER_BACKED_UP_KEYS: ReadonlySet<string> = new Set([LAST_BACKUP_KEY, AI_KEY]);
 const RECIPE_SEARCH_KEY = 'recipe-search-config';
 
 /** Gespeicherte Daten: Schlüssel (ohne Präfix) → bereits geparster JSON-Wert. */
@@ -43,6 +47,8 @@ export interface BackupCounts {
   readonly customFoods: number;
   readonly shoppingItems: number;
   readonly hasProfile: boolean;
+  readonly weightEntries: number;
+  readonly favorites: number;
 }
 
 export const BACKUP_ERRORS = {
@@ -52,6 +58,7 @@ export const BACKUP_ERRORS = {
   badVersion: 'Die Backup-Version wird nicht unterstützt.',
   badDate: 'Das Backup ist beschädigt: Das Exportdatum fehlt oder ist ungültig.',
   badData: 'Das Backup ist beschädigt: Der Datenbereich fehlt oder ist ungültig.',
+  badContent: 'Das Backup ist beschädigt: Einträge sind unvollständig oder fehlerhaft.',
   tooLarge: 'Die Datei ist zu groß für ein NutriTrack-Backup.',
   empty: 'Die Datei ist leer.',
 } as const;
@@ -73,12 +80,12 @@ function withoutSecrets(data: BackupData): BackupData {
     const entry = d[key];
     return isPlainObject(entry) && 'apiKey' in entry ? { ...d, [key]: { ...entry, apiKey: '' } } : d;
   };
-  return blank(blank(data, AI_KEY), RECIPE_SEARCH_KEY);
+  return blank(data, RECIPE_SEARCH_KEY);
 }
 
-/** Erstellt das Backup-Objekt aus den gespeicherten Daten (ohne Meta-Schlüssel und Secrets). */
+/** Erstellt das Backup-Objekt aus den gespeicherten Daten (ohne Meta-Schlüssel, KI-Verbindung und Secrets). */
 export function buildBackup(data: BackupData, now: Date): BackupFile {
-  const entries = Object.entries(data).filter(([key]) => key !== LAST_BACKUP_KEY);
+  const entries = Object.entries(data).filter(([key]) => !NEVER_BACKED_UP_KEYS.has(key));
   return {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
@@ -108,8 +115,7 @@ function isValidIsoDate(value: unknown): value is string {
 function validateKnownKeys(data: Record<string, unknown>): boolean {
   const arraysOk = ARRAY_KEYS.every((k) => !(k in data) || (Array.isArray(data[k]) && (data[k] as unknown[]).every(isPlainObject)));
   const objectsOk = NULLABLE_OBJECT_KEYS.every((k) => !(k in data) || data[k] === null || isPlainObject(data[k]));
-  const aiOk = !(AI_KEY in data) || isPlainObject(data[AI_KEY]);
-  return arraysOk && objectsOk && aiOk;
+  return arraysOk && objectsOk;
 }
 
 function validateData(data: unknown): data is Record<string, unknown> {
@@ -128,6 +134,7 @@ export function validateBackup(value: unknown): BackupParseResult {
   if (!isValidIsoDate(value['exportedAt'])) return { ok: false, error: BACKUP_ERRORS.badDate };
   const data = value['data'];
   if (!validateData(data)) return { ok: false, error: BACKUP_ERRORS.badData };
+  if (!hasValidRecords(data)) return { ok: false, error: BACKUP_ERRORS.badContent };
   const backup: BackupFile = {
     format: BACKUP_FORMAT,
     version: value['version'] as number,
@@ -161,6 +168,8 @@ export function countBackup(data: BackupData): BackupCounts {
     customFoods: lengthOf(data['customFoods']),
     shoppingItems: isPlainObject(shopping) ? lengthOf(shopping['items']) : 0,
     hasProfile: isPlainObject(data['profile']),
+    weightEntries: lengthOf(data['weight']),
+    favorites: lengthOf(data['favorites']),
   };
 }
 
@@ -174,6 +183,8 @@ export function describeCounts(c: BackupCounts): string {
     plural(c.savedMeals, 'gespeicherte Mahlzeit', 'gespeicherte Mahlzeiten'),
     plural(c.customFoods, 'eigenes Lebensmittel', 'eigene Lebensmittel'),
     ...(c.shoppingItems > 0 ? [plural(c.shoppingItems, 'Einkaufsposition', 'Einkaufspositionen')] : []),
+    ...(c.weightEntries > 0 ? [plural(c.weightEntries, 'Gewichtseintrag', 'Gewichtseinträge')] : []),
+    ...(c.favorites > 0 ? [plural(c.favorites, 'Favorit', 'Favoriten')] : []),
     ...(c.hasProfile ? ['Profil'] : []),
   ];
   return parts.join(', ');
@@ -190,13 +201,30 @@ function keepLocalKey(restored: BackupData, current: BackupData, key: string): B
   return { ...restored, [key]: { ...entry, apiKey: localKey } };
 }
 
+/** Felder mit Zieladressen: Sie dürfen nie aus einem Backup kommen (sonst ginge der lokale Key an einen fremden Host). */
+const ENDPOINT_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  [RECIPE_SEARCH_KEY]: ['baseUrl'],
+};
+
+/** Ersetzt Zieladressen des Backups durch die lokalen (oder entfernt sie, wenn lokal keine gesetzt sind). */
+function dropEndpoints(restored: BackupData, current: BackupData): BackupData {
+  return Object.entries(ENDPOINT_FIELDS).reduce<BackupData>((acc, [key, fields]) => {
+    const entry = acc[key];
+    if (!isPlainObject(entry)) return acc;
+    const local = isPlainObject(current[key]) ? (current[key] as Record<string, unknown>) : {};
+    const cleaned = Object.fromEntries(Object.entries(entry).filter(([k]) => !fields.includes(k)));
+    const kept = Object.fromEntries(fields.filter((k) => k in local).map((k) => [k, local[k]]));
+    return { ...acc, [key]: { ...cleaned, ...kept } };
+  }, restored);
+}
+
 /**
- * Daten, die beim Import geschrieben werden: Backup-Inhalt, aber der lokale API-Key
+ * Daten, die beim Import geschrieben werden: Backup-Inhalt ohne KI-Verbindung, der lokale Rezept-Suche-Key
  * bleibt erhalten, wenn das Backup (wie beim Export üblich) keinen enthält.
  */
 export function prepareRestore(backup: BackupData, current: BackupData): BackupData {
-  const restored = Object.fromEntries(Object.entries(backup).filter(([key]) => key !== LAST_BACKUP_KEY));
-  return keepLocalKey(keepLocalKey(restored, current, AI_KEY), current, RECIPE_SEARCH_KEY);
+  const restored = Object.fromEntries(Object.entries(backup).filter(([key]) => !NEVER_BACKED_UP_KEYS.has(key)));
+  return dropEndpoints(keepLocalKey(restored, current, RECIPE_SEARCH_KEY), current);
 }
 
 /** Formatiert ein ISO-Datum als "06.11.2026, 14:05" (lokal); `null` bei ungültiger Eingabe. */

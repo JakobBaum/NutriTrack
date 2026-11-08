@@ -4,7 +4,8 @@
  * - GET  /recipes/complexSearch → spoonacular-Rezeptsuche (Key nur als Secret SPOONACULAR_API_KEY)
  * - POST /            → KI-Proxy für Gemini (fn + payload)
  *
- * - GET  /health      → Statusprüfung {ok, hasKey, hasRecipeKey, model, fallbackModel} (kein Key-Wert)
+ * - GET  /health      → Statusprüfung {ok, hasKey, hasRecipeKey, hasRateLimiter, hasDailyCap, model,
+ *                       fallbackModel, warning?} (kein Key-Wert)
  *
  * Deploy (im Projektordner):
  *   npx wrangler login
@@ -19,11 +20,16 @@
  * Optional:
  *   ALLOWED_ORIGINS  kommagetrennte Browser-Origins (ersetzt DEFAULT_ORIGINS)
  *   AI_LIMITER       Rate-Limiting-Binding (wrangler.toml [[ratelimits]]) für POST / und die Rezept-Suche
+ *   OFF_LIMITER      eigenes Rate-Limiting-Binding für /off-search (Fallback: AI_LIMITER)
+ *   DAILY_KV         KV-Namespace-Binding für den globalen Tageszähler der KI-Aufrufe
+ *                    (ohne Binding: kein Deckel, /health meldet hasDailyCap=false + warning)
+ *   DAILY_AI_CAP     Deckel pro UTC-Tag (Standard 2000)
  *
- * Sicherheit: Origin-Allowlist, Payload-Validierung + Größenlimits, Rate-Limit,
- * SSRF-Schutz beim Rezept-Import, Key nur als Header. Der Proxy ist trotzdem
+ * Sicherheit: Origin-Allowlist, Payload-Validierung + Größenlimits, Rate-Limit pro IP,
+ * globaler Tagesdeckel, SSRF-Schutz beim Rezept-Import, Key nur als Header,
+ * generische Fehlermeldungen an den Client (Details nur im Log). Der Proxy ist
  * öffentlich erreichbar (Origin lässt sich außerhalb von Browsern fälschen) —
- * das Rate-Limit ist der eigentliche Kostenschutz.
+ * Rate-Limit und Tagesdeckel sind der eigentliche Kostenschutz.
  */
 
 const GEMINI_MODEL = 'gemini-3.6-flash';
@@ -55,9 +61,18 @@ const DEFAULT_ORIGINS = [
 const SPOONACULAR_URL = 'https://api.spoonacular.com/recipes/complexSearch';
 // Erlaubte Parameter = die aus buildSearchParams (spoonacular.query.ts); apiKey wird nie durchgereicht.
 const RECIPE_PARAMS = [
-  'number', 'offset', 'query', 'maxCalories', 'maxReadyTime', 'diet',
+  'number', 'offset', 'query', 'maxCalories', 'maxReadyTime', 'minProtein', 'diet',
   'addRecipeNutrition', 'addRecipeInstructions', 'fillIngredients', 'instructionsRequired',
 ];
+// Parameter mit festem Wertebereich: andere Werte werden verworfen (Spiegel: spoonacular.query.ts).
+const RECIPE_ENUM_PARAMS = {
+  type: [
+    'main course', 'side dish', 'dessert', 'appetizer', 'salad', 'bread', 'breakfast',
+    'soup', 'beverage', 'sauce', 'marinade', 'fingerfood', 'snack', 'drink',
+  ],
+  sort: ['healthiness', 'popularity', 'random'],
+  sortDirection: ['asc', 'desc'],
+};
 const RECIPE_MAX_NUMBER = 20;
 const RECIPE_DEFAULT_NUMBER = 10;
 const RECIPE_TIMEOUT_MS = 12000;
@@ -70,9 +85,29 @@ const MAX_QUERY_CHARS = 200;
 const MAX_PAGE_SIZE = 50;
 const SEARCH_CACHE_TTL_S = 3600;
 const PREFLIGHT_MAX_AGE_S = 86400;
+const RECIPE_CACHE_TTL_S = 6 * 3600;
+const RECIPE_CACHED_HEADERS = ['Content-Type', 'X-Api-Quota-Left'];
 
-const MAX_BODY_BYTES = 10 * 1024 * 1024;
-const MAX_IMAGE_CHARS = 9 * 1024 * 1024; // Base64 eines ~6-MB-Fotos
+const DEFAULT_DAILY_CAP = 2000;
+const DAILY_KEY_TTL_S = 2 * 86400;
+const DAILY_LIMIT_MESSAGE = 'Das Tageslimit für KI-Anfragen ist erreicht — bitte morgen erneut versuchen.';
+const NO_DAILY_CAP_WARNING = 'Kein Tageslimit aktiv (KV-Binding DAILY_KV fehlt).';
+const RATE_LIMIT_RETRY_AFTER_S = '60';
+const GENERIC_ERROR_MESSAGE = 'Interner Fehler.';
+const BLOCKED_MESSAGE = 'Die KI hat diese Anfrage aus Sicherheitsgründen abgelehnt.';
+const EMPTY_ANSWER_MESSAGE = 'Die KI hat keine verwertbare Antwort geliefert — bitte erneut versuchen.';
+const BLOCKING_FINISH_REASONS = new Set(['SAFETY', 'RECITATION', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII']);
+
+// Foto-Obergrenze: die App skaliert auf ~1600 px; 4 Mio. Base64-Zeichen ≈ 3 MB Bild.
+const MAX_BODY_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGE_CHARS = 4 * 1024 * 1024;
+const ALLOWED_PORTS = new Set(['80', '443']);
+
+// Strukturierte Aufgaben: deterministisch (temperature 0) und mit Ausgabe-Obergrenze (Kostenschutz).
+const TOKENS_LABEL = 1024;
+const TOKENS_LIST = 4096;
+const TOKENS_FASTFOOD = 2048;
+const TOKENS_IMPORT = 8192;
 const MAX_TEXT_CHARS = 20000;
 const MAX_PAGE_BYTES = 1024 * 1024;
 const MAX_PROMPT_PAGE_CHARS = 12000;
@@ -84,7 +119,6 @@ const AI_FUNCTIONS = {
   recognizeLabel: { validate: validateLabelRequest, run: recognizeLabel },
   suggestFastfood: { validate: validateFastfoodRequest, run: suggestFastfood },
   importRecipe: { validate: validateImportRequest, run: importRecipe },
-  computeTargets: { validate: validateProfile, run: computeTargets },
 };
 
 /** Fehler, die als 4xx an den Client gehen (Eingabe ist schuld, nicht der Server). */
@@ -113,19 +147,13 @@ export default {
     const url = new URL(request.url);
     try {
       if (request.method === 'GET' && url.pathname === '/off-search') {
-        return await offSearch(url, cors);
+        return await offSearch(request, url, env, cors);
       }
       if (request.method === 'GET' && url.pathname === '/recipes/complexSearch') {
         return await recipeSearch(request, url, env, cors);
       }
       if (request.method === 'GET' && url.pathname === '/health') {
-        return json({
-          ok: true,
-          hasKey: Boolean(env.GEMINI_API_KEY),
-          hasRecipeKey: Boolean(env.SPOONACULAR_API_KEY),
-          model: env.GEMINI_MODEL || GEMINI_MODEL,
-          fallbackModel: env.GEMINI_FALLBACK_MODEL || GEMINI_FALLBACK_MODEL,
-        }, 200, cors);
+        return json(healthStatus(env), 200, cors);
       }
       if (request.method === 'POST' && url.pathname === '/') {
         return await aiProxy(request, env, cors);
@@ -136,11 +164,30 @@ export default {
         return json({ error: OVERLOADED_MESSAGE }, 503, { ...cors, 'Retry-After': String(GEMINI_RETRY_AFTER_S) });
       }
       if (e instanceof ClientError) return json({ error: e.message }, e.status, cors);
+      // Details nur ins Log: Upstream-Meldungen können interne Hinweise enthalten.
       console.error('Worker-Fehler:', e);
-      return json({ error: e?.message ?? 'Interner Fehler.' }, 500, cors);
+      return json({ error: GENERIC_ERROR_MESSAGE }, 500, cors);
     }
   },
 };
+
+function hasBinding(binding, method) {
+  return typeof binding?.[method] === 'function';
+}
+
+function healthStatus(env) {
+  const hasDailyCap = hasBinding(env.DAILY_KV, 'get');
+  return {
+    ok: true,
+    hasKey: Boolean(env.GEMINI_API_KEY),
+    hasRecipeKey: Boolean(env.SPOONACULAR_API_KEY),
+    hasRateLimiter: hasBinding(env.AI_LIMITER, 'limit'),
+    hasDailyCap,
+    ...(hasDailyCap ? {} : { warning: NO_DAILY_CAP_WARNING }),
+    model: env.GEMINI_MODEL || GEMINI_MODEL,
+    fallbackModel: env.GEMINI_FALLBACK_MODEL || GEMINI_FALLBACK_MODEL,
+  };
+}
 
 // ── CORS ───────────────────────────────────────────────────────────────
 
@@ -187,12 +234,16 @@ function buildSearchUrl(url) {
   return target;
 }
 
-async function offSearch(url, cors) {
+async function offSearch(request, url, env, cors) {
   const target = buildSearchUrl(url);
   const cache = globalThis.caches?.default;
   const cacheKey = new Request(target.toString());
   const cached = cache ? await cache.match(cacheKey) : undefined;
   if (cached) return withHeaders(cached, cors);
+  // Nur Cache-Misses kosten Upstream-Aufrufe → nur sie werden begrenzt.
+  if (await isRateLimited(env.OFF_LIMITER ?? env.AI_LIMITER, request)) {
+    return rateLimitedResponse('Zu viele Suchanfragen — bitte kurz warten.', cors);
+  }
 
   const resp = await fetch(target.toString(), {
     headers: { 'User-Agent': OFF_USER_AGENT, Accept: 'application/json' },
@@ -227,6 +278,10 @@ function buildRecipeUrl(url) {
     const value = url.searchParams.get(key);
     if (value !== null) target.searchParams.set(key, value.slice(0, MAX_QUERY_CHARS));
   }
+  for (const [key, allowed] of Object.entries(RECIPE_ENUM_PARAMS)) {
+    const value = (url.searchParams.get(key) ?? '').trim().toLowerCase();
+    if (allowed.includes(value)) target.searchParams.set(key, value);
+  }
   const requested = Math.round(Number(target.searchParams.get('number') ?? RECIPE_DEFAULT_NUMBER));
   const number = Number.isFinite(requested) ? Math.min(Math.max(1, requested), RECIPE_MAX_NUMBER) : RECIPE_DEFAULT_NUMBER;
   target.searchParams.set('number', String(number));
@@ -242,12 +297,30 @@ function recipeResponseHeaders(resp, cors) {
   return headers;
 }
 
+async function cacheRecipeResponse(cache, cacheKey, body, resp) {
+  const headers = { 'Cache-Control': `public, max-age=${RECIPE_CACHE_TTL_S}` };
+  for (const name of RECIPE_CACHED_HEADERS) {
+    const value = resp.headers.get(name);
+    if (value) headers[name] = value;
+  }
+  try {
+    await cache.put(cacheKey, new Response(body, { status: 200, headers }));
+  } catch (e) {
+    console.warn('Rezept-Cache nicht beschreibbar:', e);
+  }
+}
+
 async function recipeSearch(request, url, env, cors) {
   if (!env.SPOONACULAR_API_KEY) return json({ error: RECIPE_NOT_CONFIGURED }, 503, cors);
-  if (await isRateLimited(env, request)) {
-    return json({ error: 'Zu viele Anfragen — bitte kurz warten.' }, 429, { ...cors, 'Retry-After': '60' });
-  }
   const target = buildRecipeUrl(url);
+  // Der API-Key steht im Header, nicht in der URL → die URL ist ein sicherer Cache-Key.
+  const cache = globalThis.caches?.default;
+  const cacheKey = new Request(target.toString());
+  const cached = cache ? await cache.match(cacheKey) : undefined;
+  if (cached) return withHeaders(cached, cors);
+  if (await isRateLimited(env.AI_LIMITER, request)) {
+    return rateLimitedResponse('Zu viele Anfragen — bitte kurz warten.', cors);
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), RECIPE_TIMEOUT_MS);
   try {
@@ -257,7 +330,9 @@ async function recipeSearch(request, url, env, cors) {
     });
     // Ungültiger/gesperrter Server-Key ist kein Fehler des Nutzers.
     if (resp.status === 401 || resp.status === 403) return json({ error: RECIPE_UNAVAILABLE }, 502, cors);
-    return new Response(await resp.text(), { status: resp.status, headers: recipeResponseHeaders(resp, cors) });
+    const body = await resp.text();
+    if (resp.ok && cache) await cacheRecipeResponse(cache, cacheKey, body, resp);
+    return new Response(body, { status: resp.status, headers: recipeResponseHeaders(resp, cors) });
   } catch (e) {
     if (e?.name === 'AbortError') return json({ error: RECIPE_TIMEOUT_MESSAGE }, 504, cors);
     throw e;
@@ -269,10 +344,7 @@ async function recipeSearch(request, url, env, cors) {
 // ── KI-Proxy ───────────────────────────────────────────────────────────
 
 async function aiProxy(request, env, cors) {
-  const declared = Number(request.headers.get('Content-Length') ?? 0);
-  if (declared > MAX_BODY_BYTES) throw new ClientError(413, 'Anfrage zu groß.');
-  const raw = await request.text();
-  if (raw.length > MAX_BODY_BYTES) throw new ClientError(413, 'Anfrage zu groß.');
+  const raw = await readBodyCapped(request, MAX_BODY_BYTES);
 
   let body;
   try {
@@ -280,22 +352,78 @@ async function aiProxy(request, env, cors) {
   } catch {
     throw new ClientError(400, 'Ungültiger JSON-Body.');
   }
-  const handler = Object.hasOwn(AI_FUNCTIONS, body?.fn) ? AI_FUNCTIONS[body.fn] : null;
-  if (!handler) throw new ClientError(400, `Unbekannte Funktion: ${String(body?.fn).slice(0, 40)}`);
-  const payload = handler.validate(body.payload ?? {});
+  const handler = typeof body?.fn === 'string' && Object.hasOwn(AI_FUNCTIONS, body.fn) ? AI_FUNCTIONS[body.fn] : null;
+  if (!handler) throw new ClientError(400, 'Unbekannte Funktion.');
+  const rawPayload = body.payload ?? {};
+  if (typeof rawPayload !== 'object' || Array.isArray(rawPayload)) throw new ClientError(400, 'Payload ungültig.');
+  const payload = handler.validate(rawPayload);
 
   if (!env.GEMINI_API_KEY) throw new ClientError(503, 'KI ist auf dem Server nicht konfiguriert.');
-  if (await isRateLimited(env, request)) {
-    return json({ error: 'Zu viele KI-Anfragen — bitte kurz warten.' }, 429, { ...cors, 'Retry-After': '60' });
+  if (await isRateLimited(env.AI_LIMITER, request)) {
+    return rateLimitedResponse('Zu viele KI-Anfragen — bitte kurz warten.', cors);
+  }
+  if (!(await takeDailySlot(env))) {
+    return json({ error: DAILY_LIMIT_MESSAGE }, 429, { ...cors, 'Retry-After': '3600' });
   }
   return json(await handler.run(payload, env), 200, cors);
 }
 
-async function isRateLimited(env, request) {
-  if (typeof env.AI_LIMITER?.limit !== 'function') return false;
+/** Liest den Body mit hartem Byte-Limit (auch ohne/mit falschem Content-Length). */
+async function readBodyCapped(request, maxBytes) {
+  const declared = Number(request.headers.get('Content-Length') ?? 0);
+  if (declared > maxBytes) throw new ClientError(413, 'Anfrage zu groß.');
+  const reader = request.body?.getReader();
+  if (!reader) return '';
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      throw new ClientError(413, 'Anfrage zu groß.');
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    all.set(c, offset);
+    offset += c.byteLength;
+  }
+  return new TextDecoder().decode(all);
+}
+
+async function isRateLimited(limiter, request) {
+  if (!hasBinding(limiter, 'limit')) return false;
   const key = request.headers.get('CF-Connecting-IP') ?? 'unknown';
-  const { success } = await env.AI_LIMITER.limit({ key });
+  const { success } = await limiter.limit({ key });
   return !success;
+}
+
+function rateLimitedResponse(message, cors) {
+  return json({ error: message }, 429, { ...cors, 'Retry-After': RATE_LIMIT_RETRY_AFTER_S });
+}
+
+/**
+ * Globaler Tageszähler (UTC) über KV. Gibt false zurück, wenn der Deckel erreicht ist.
+ * Ohne Binding oder bei KV-Fehlern fail-open (Warnung im Log / in /health) — KV ist nicht atomar,
+ * bei gleichzeitigen Anfragen kann der Deckel daher knapp überschritten werden.
+ */
+async function takeDailySlot(env) {
+  if (!hasBinding(env.DAILY_KV, 'get')) return true;
+  const parsedCap = Number.parseInt(env.DAILY_AI_CAP ?? '', 10);
+  const cap = Number.isFinite(parsedCap) && parsedCap > 0 ? parsedCap : DEFAULT_DAILY_CAP;
+  const key = `cap:${new Date().toISOString().slice(0, 10)}`;
+  try {
+    const used = Number(await env.DAILY_KV.get(key)) || 0;
+    if (used >= cap) return false;
+    await env.DAILY_KV.put(key, String(used + 1), { expirationTtl: DAILY_KEY_TTL_S });
+  } catch (e) {
+    console.warn('Tageszähler (KV) nicht verfügbar — Aufruf wird durchgelassen:', e);
+  }
+  return true;
 }
 
 // ── Eingabe-Validierung ────────────────────────────────────────────────
@@ -370,18 +498,6 @@ function validateImportRequest(p) {
   return { text: recipeText };
 }
 
-function validateProfile(p) {
-  return {
-    weightKg: num(p.weightKg, 25, 350, 'Gewicht'),
-    heightCm: num(p.heightCm, 100, 250, 'Größe'),
-    age: num(p.age, 12, 110, 'Alter'),
-    sex: oneOf(p.sex, ['male', 'female', 'diverse'], 'Geschlecht'),
-    activityLevel: text(p.activityLevel, 30),
-    goal: oneOf(p.goal, ['lose', 'maintain', 'gain'], 'Ziel'),
-    rateKgPerWeek: optNum(p.rateKgPerWeek, 0, 1.5, 'Tempo') ?? 0.5,
-  };
-}
-
 // ── SSRF-Schutz + Seitentext ───────────────────────────────────────────
 
 function isPrivateIPv4(host) {
@@ -390,6 +506,7 @@ function isPrivateIPv4(host) {
     || (a === 100 && b >= 64 && b <= 127)
     || (a === 169 && b === 254)
     || (a === 172 && b >= 16 && b <= 31)
+    || (a === 198 && (b === 18 || b === 19))
     || (a === 192 && b === 168);
 }
 
@@ -403,9 +520,13 @@ function isPublicHttpUrl(raw) {
   }
   if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
   if (u.username || u.password) return false;
-  const host = u.hostname.toLowerCase();
+  if (u.port && !ALLOWED_PORTS.has(u.port)) return false; // keine Dienste auf Nicht-Standard-Ports
+  // Trailing Dot ("localhost.", "127.0.0.1.") ist ein gültiger FQDN und würde sonst den Filter umgehen.
+  const host = u.hostname.toLowerCase().replace(/\.+$/, '');
+  if (!host) return false;
   if (host === 'localhost' || /\.(localhost|local|internal|lan|home)$/.test(host)) return false;
-  if (host.startsWith('[') || host.includes(':')) return false; // IPv6-Literale
+  if (host.startsWith('[') || host.includes(':')) return false; // alle IPv6-Literale (inkl. IPv4-mapped)
+  // Die URL-Klasse normalisiert Dezimal-/Hex-/Oktal-IPs (2130706433, 0x7f.1) zu Dotted-Quad.
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return !isPrivateIPv4(host);
   return host.includes('.');
 }
@@ -562,16 +683,36 @@ async function geminiWithFallback(body, env) {
   throw lastError ?? new Error('Gemini nicht erreichbar.');
 }
 
-async function gemini(prompt, env, imageBase64 = null) {
+/**
+ * Unterscheidet blockierte, leere und nicht lesbare Antworten von "überlastet":
+ * das sind Eingabe-/Antwortprobleme (422), kein Serverausfall (503).
+ */
+function extractAnswer(data) {
+  const candidate = data?.candidates?.[0];
+  const blocked = data?.promptFeedback?.blockReason || BLOCKING_FINISH_REASONS.has(candidate?.finishReason);
+  const answer = candidate?.content?.parts?.[0]?.text ?? '';
+  if (blocked && !answer) {
+    console.warn('Gemini-Antwort blockiert:', data?.promptFeedback?.blockReason ?? candidate?.finishReason);
+    throw new ClientError(422, BLOCKED_MESSAGE);
+  }
+  if (!answer) {
+    console.warn('Gemini-Antwort leer, finishReason:', candidate?.finishReason);
+    throw new ClientError(422, EMPTY_ANSWER_MESSAGE);
+  }
+  return answer;
+}
+
+async function gemini(prompt, env, imageBase64 = null, { maxOutputTokens = TOKENS_LIST, temperature = 0 } = {}) {
   const parts = imageBase64
     ? [{ inlineData: { mimeType: 'image/jpeg', data: imageBase64 } }, { text: prompt }]
     : [{ text: prompt }];
-  const body = JSON.stringify({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json' } });
+  const body = JSON.stringify({
+    contents: [{ parts }],
+    generationConfig: { responseMimeType: 'application/json', temperature, maxOutputTokens },
+  });
   const resp = await geminiWithFallback(body, env);
 
-  const data = await resp.json();
-  const answer = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  if (!answer) throw new Error('Gemini hat leere Antwort zurückgegeben.');
+  const answer = extractAnswer(await resp.json());
 
   const match = answer.match(/```json\s*([\s\S]*?)```/) ?? answer.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
   if (match) {
@@ -584,7 +725,8 @@ async function gemini(prompt, env, imageBase64 = null) {
   try {
     return JSON.parse(answer);
   } catch {
-    throw new Error(`Gemini-Antwort kein JSON: ${answer.slice(0, 200)}`);
+    console.warn('Gemini-Antwort kein JSON:', answer.slice(0, 200));
+    throw new ClientError(422, EMPTY_ANSWER_MESSAGE);
   }
 }
 
@@ -604,7 +746,7 @@ Antworte NUR mit gültigem JSON (kein Markdown):
   "estTotal": number,
   "note": "string oder null"
 }`;
-  return gemini(prompt, env);
+  return gemini(prompt, env, null, { maxOutputTokens: TOKENS_LIST });
 }
 
 async function recognizeLabel(req, env) {
@@ -624,7 +766,7 @@ Antworte NUR mit gültigem JSON:
     "portionG": number oder null
   }
 }`;
-  return gemini(prompt, env, req.imageBase64);
+  return gemini(prompt, env, req.imageBase64, { maxOutputTokens: TOKENS_LABEL });
 }
 
 async function suggestFastfood(req, env) {
@@ -642,7 +784,7 @@ Antworte NUR mit gültigem JSON-Array:
   "rationale": "string",
   "estPrice": number
 }]`;
-  return gemini(prompt, env);
+  return gemini(prompt, env, null, { maxOutputTokens: TOKENS_FASTFOOD });
 }
 
 const IMPORT_SCHEMA = `Antworte NUR mit gültigem JSON:
@@ -672,16 +814,5 @@ async function importRecipe(req, env) {
   } else {
     prompt = `Extrahiere das Rezept aus folgendem Text:\n\n${req.text}`;
   }
-  return gemini(`${prompt}\n\n${IMPORT_SCHEMA}`, env, req.imageBase64 ?? null);
-}
-
-async function computeTargets(profile, env) {
-  const prompt = `Berechne den täglichen Kalorienbedarf und Makros für:
-Gewicht: ${profile.weightKg} kg, Größe: ${profile.heightCm} cm, Alter: ${profile.age}, Geschlecht: ${profile.sex}.
-Aktivität: ${profile.activityLevel}, Ziel: ${profile.goal}, Tempo: ${profile.rateKgPerWeek} kg/Woche.
-Verwende die Mifflin-St-Jeor-Formel.
-
-Antworte NUR mit gültigem JSON:
-{"kcal":number,"proteinG":number,"carbsG":number,"fatG":number,"fiberG":number,"sugarG":number}`;
-  return gemini(prompt, env);
+  return gemini(`${prompt}\n\n${IMPORT_SCHEMA}`, env, req.imageBase64 ?? null, { maxOutputTokens: TOKENS_IMPORT });
 }

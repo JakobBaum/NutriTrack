@@ -590,7 +590,7 @@ export class RecipesPage implements OnDestroy {
   }
 
   private toNum(v: number | null): number {
-    return typeof v === 'number' && Number.isFinite(v) ? v : 0;
+    return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0;
   }
 
   // --- Speichern ---
@@ -648,7 +648,7 @@ export class RecipesPage implements OnDestroy {
    */
   async logToDiary(recipe: Recipe): Promise<void> {
     const sheet = await this.actionSheets.create({
-      header: 'Als welche Mahlzeit eintragen?',
+      header: 'Als welche Essenszeit eintragen?',
       buttons: [
         ...this.mealOptions.map((m) => ({ text: m.label, data: m.value })),
         { text: 'Abbrechen', role: 'cancel' },
@@ -742,28 +742,15 @@ export class RecipesPage implements OnDestroy {
 
   // --- Kochmodus ---
   readonly cookRecipe = signal<Recipe | null>(null);
-  readonly cookStep = signal(0);
 
   startCook(recipe: Recipe): void {
     // Offene Hinweise würden „Weiter“ verdecken.
     this.toastMessage.set(null);
     this.detailRecipe.set(null);
     this.cookRecipe.set(recipe);
-    this.cookStep.set(0);
   }
 
   closeCook(): void {
     this.cookRecipe.set(null);
-    this.cookStep.set(0);
-  }
-
-  cookNext(): void {
-    const r = this.cookRecipe();
-    if (!r || !r.steps?.length) return;
-    this.cookStep.update(s => Math.min(s + 1, r.steps.length - 1));
-  }
-
-  cookPrev(): void {
-    this.cookStep.update(s => Math.max(s - 1, 0));
   }
 }

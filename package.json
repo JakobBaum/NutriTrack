@@ -1,6 +1,6 @@
 {
   "name": "nutritrack",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
@@ -8,7 +8,10 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "lint": "ng lint",
-    "test:worker": "node --test worker.test.mjs"
+    "test:worker": "node --test worker.test.mjs",
+    "test:scripts": "node --test scripts/sync-version.test.mjs",
+    "sync-version": "node scripts/sync-version.mjs",
+    "build:pages": "ng build --output-path dist/pages --base-href /NutriTrack/"
   },
   "private": true,
   "dependencies": {

@@ -1,14 +1,10 @@
 import { Recipe, ShoppingItem } from '../models';
 import { withCategories } from './shopping-category';
+import { itemKey, normalizeUnit } from './shopping-units';
 
 /** Rundet eine Menge auf max. 2 Nachkommastellen (hübsche Anzeige). */
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
-}
-
-/** Normalisiert einen Zutat-Namen für das Zusammenführen (Merge-Key). */
-function mergeKey(name: string, unit: string): string {
-  return `${name.trim().toLowerCase()}|${unit.trim().toLowerCase()}`;
 }
 
 /** Ganze Zahl >= 1; nicht endliche Werte (NaN, Infinity) zählen als 1. */
@@ -19,6 +15,29 @@ function safeCount(n: number): number {
 /** Gültige Portionenzahl eines Rezepts (auch 0,5 / 2,5); sonst 1. */
 function safeServings(servings: number): number {
   return Number.isFinite(servings) && servings > 0 ? servings : 1;
+}
+
+/**
+ * Summiert die Zutaten der Rezepte auf `persons` skaliert. Gleiche Ware (Name +
+ * normalisierte Einheit: g/kg, ml/l, Stk/Stück) wird zu einer Position addiert.
+ */
+function mergeIngredients(recipes: readonly Recipe[], persons: number): ShoppingItem[] {
+  const merged = new Map<string, ShoppingItem>();
+  for (const recipe of recipes) {
+    const factor = persons / safeServings(recipe.servings);
+    for (const ing of recipe.ingredients) {
+      const key = itemKey(ing.name, ing.unit);
+      const norm = normalizeUnit(ing.amount * factor, ing.unit);
+      const existing = merged.get(key);
+      merged.set(
+        key,
+        existing
+          ? { ...existing, amount: round2(existing.amount + norm.amount) }
+          : { name: ing.name.trim(), amount: round2(norm.amount), unit: norm.unit, checked: false },
+      );
+    }
+  }
+  return [...merged.values()];
 }
 
 /**
@@ -35,35 +54,11 @@ export function buildShoppingList(
   dishes: number,
   persons: number,
 ): { items: ShoppingItem[]; suggestedDishes: string[] } {
-  const safeDishes = safeCount(dishes);
-  const safePersons = safeCount(persons);
-
   if (recipes.length === 0) return { items: [], suggestedDishes: [] };
 
-  const chosen = recipes.slice(0, safeDishes);
-  const merged = new Map<string, ShoppingItem>();
-
-  for (const recipe of chosen) {
-    const factor = safePersons / safeServings(recipe.servings);
-    for (const ing of recipe.ingredients) {
-      const key = mergeKey(ing.name, ing.unit);
-      const scaled = round2(ing.amount * factor);
-      const existing = merged.get(key);
-      if (existing) {
-        merged.set(key, { ...existing, amount: round2(existing.amount + scaled) });
-      } else {
-        merged.set(key, {
-          name: ing.name.trim(),
-          amount: scaled,
-          unit: ing.unit.trim(),
-          checked: false,
-        });
-      }
-    }
-  }
-
+  const chosen = recipes.slice(0, safeCount(dishes));
   return {
-    items: withCategories([...merged.values()]),
+    items: withCategories(mergeIngredients(chosen, safeCount(persons))),
     suggestedDishes: chosen.map((r) => r.title),
   };
 }
@@ -78,9 +73,7 @@ export function buildWeekPlan(
   days: number,
   mealsPerDay: number,
 ): { items: ShoppingItem[]; suggestedDishes: string[] } {
-  const safePersons = safeCount(persons);
-  const safeDays = Math.max(1, Math.floor(days));
-  const slots = safeDays * Math.max(1, Math.floor(mealsPerDay));
+  const slots = Math.max(1, Math.floor(days)) * Math.max(1, Math.floor(mealsPerDay));
 
   // Ohne Rezepte gibt es nichts zu planen (keine erfundene Standardliste).
   if (recipes.length === 0) return { items: [], suggestedDishes: [] };
@@ -88,26 +81,6 @@ export function buildWeekPlan(
   const chosen: Recipe[] = [];
   for (let i = 0; i < slots; i++) chosen.push(recipes[i % recipes.length]);
 
-  const merged = new Map<string, ShoppingItem>();
-  for (const recipe of chosen) {
-    const factor = safePersons / safeServings(recipe.servings);
-    for (const ing of recipe.ingredients) {
-      const key = mergeKey(ing.name, ing.unit);
-      const scaled = round2(ing.amount * factor);
-      const existing = merged.get(key);
-      if (existing) {
-        merged.set(key, { ...existing, amount: round2(existing.amount + scaled) });
-      } else {
-        merged.set(key, {
-          name: ing.name.trim(),
-          amount: scaled,
-          unit: ing.unit.trim(),
-          checked: false,
-        });
-      }
-    }
-  }
-
   const titles = [...new Set(chosen.map((r) => r.title))];
-  return { items: withCategories([...merged.values()]), suggestedDishes: titles };
+  return { items: withCategories(mergeIngredients(chosen, safeCount(persons))), suggestedDishes: titles };
 }

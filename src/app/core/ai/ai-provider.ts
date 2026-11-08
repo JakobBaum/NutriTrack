@@ -1,13 +1,11 @@
 import { InjectionToken } from '@angular/core';
 import {
-  DailyTarget,
   FastFoodRequest,
   FastFoodSuggestion,
   MealType,
   NutritionFacts,
   Recipe,
   ShoppingItem,
-  UserProfile,
 } from '../models';
 
 /** Anfrage für die (Wochen-)Einkaufslisten-Generierung. */
@@ -75,9 +73,6 @@ export interface RecipeImportResult {
  * UI/Logik hängen ausschließlich an diesem Interface, nie am konkreten Anbieter.
  */
 export interface AiProvider {
-  /** Berechnet/empfiehlt das Tagesziel (KI darf Fallback-Formel überschreiben). */
-  computeTargets(profile: UserProfile): Promise<DailyTarget>;
-
   /** Erzeugt eine Einkaufsliste (Personen × Tage × Mahlzeiten × Budget). */
   generateShoppingList(req: ShoppingPlanRequest): Promise<ShoppingPlanResult>;
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { addDaysISO, dayLabel, toDateISO } from './date';
+import { addDaysISO, dayLabel, rollDate, toDateISO } from './date';
 import { makeId } from './id';
 
 describe('date-Helfer', () => {
@@ -37,5 +37,19 @@ describe('makeId', () => {
     expect(a.startsWith('food_')).toBe(true);
     expect(a).not.toBe(b);
     expect(makeId().startsWith('id_')).toBe(true);
+  });
+});
+
+describe('rollDate (QAD-02)', () => {
+  it('springt mit, wenn der Nutzer auf "Heute" stand und der Tag wechselt', () => {
+    expect(rollDate('2026-11-08', '2026-11-08', '2026-11-09')).toEqual({ selected: '2026-11-09', today: '2026-11-09' });
+  });
+
+  it('lässt einen bewusst gewählten anderen Tag stehen', () => {
+    expect(rollDate('2026-11-01', '2026-11-08', '2026-11-09')).toEqual({ selected: '2026-11-01', today: '2026-11-09' });
+  });
+
+  it('ändert nichts, solange derselbe Tag gilt', () => {
+    expect(rollDate('2026-11-08', '2026-11-08', '2026-11-08')).toEqual({ selected: '2026-11-08', today: '2026-11-08' });
   });
 });

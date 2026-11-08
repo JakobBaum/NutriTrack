@@ -35,13 +35,12 @@ ion-modal ion-content {
   cursor: pointer;
 }
 
-// 320 px: Import nur als Icon, damit "Neu" nicht abgeschnitten wird
 @media (max-width: 359px) {
   .page-head__import-label { display: none; }
   .page-head__import { justify-content: center; width: var(--nt-touch); padding: 0; }
 }
 
-// Schmale Phones (375 px): „Online suchen“ und „Import“ nur als Icon, damit der Titel nicht umbricht
+// Schmale Phones: „Online suchen“ und „Import“ nur als Icon
 @media (max-width: 429px) {
   .page-head__import-label { display: none; }
   .page-head__import { justify-content: center; width: var(--nt-touch); padding: 0; }
@@ -134,11 +133,11 @@ ion-modal ion-content {
   font-size: 12px;
   color: var(--nt-muted);
   cursor: pointer;
-  &--missing { color: #9a5b00; font-weight: 600; }
+  &--missing { color: var(--nt-warning); font-weight: 600; }
   ion-icon { font-size: 14px; }
 }
 
-.unit-warn { @extend %row; gap: 4px; font-size: 12px; color: #9a5b00; }
+.unit-warn { @extend %row; gap: 4px; font-size: 12px; color: var(--nt-warning); }
 
 .ing-detail {
   margin: 0 12px 10px;
@@ -154,7 +153,7 @@ ion-modal ion-content {
     span { font-size: 11px; color: var(--nt-muted); }
   }
   &__note { @extend %hint; margin: 10px 0 6px; font-size: 11px; }
-  &__hint { @extend %hint; @extend %row; align-items: flex-start; margin: 0 0 10px; font-size: 13px; ion-icon { font-size: 18px; flex-shrink: 0; color: #9a5b00; } }
+  &__hint { @extend %hint; @extend %row; align-items: flex-start; margin: 0 0 10px; font-size: 13px; ion-icon { font-size: 18px; flex-shrink: 0; color: var(--nt-warning); } }
   &__inputs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 }
 
@@ -206,8 +205,6 @@ ion-modal ion-content {
 
 .ai-needed { @extend %hint; margin: 8px 0 12px; font-size: 13px; }
 .block-reason { text-align: center; }
-// Sheet-Kopf: Seitenspalten mind. 80 px, damit der Titel nie unter "Schließen"/"Abbrechen" liegt
-ion-modal .nt-sheet-header { grid-template-columns: auto minmax(0, 1fr) auto; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .save-btn { margin-top: var(--nt-space-4); }
 .auto-weight-hint { @extend %hint; margin: 4px var(--nt-space-1) 0; }
@@ -231,8 +228,4 @@ ion-modal .nt-sheet-header { grid-template-columns: auto minmax(0, 1fr) auto; }
 .detail-list { padding: 0; list-style: none; li { @extend %row; justify-content: space-between; gap: var(--nt-space-3); padding: 8px 0; border-bottom: 0.5px solid var(--nt-separator); } }
 .detail-steps { padding: 0 0 0 var(--nt-space-4); li { padding: 4px 0; } }
 
-// Kochmodus: Lesebreite begrenzen, Schritttext groesser
-.cook { max-width: 680px; margin-inline: auto; }
-.cook__step-text { font-size: 28px; line-height: 1.4; }
-.cook__close { @extend %tap-44; }
 

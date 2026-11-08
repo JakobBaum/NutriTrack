@@ -83,7 +83,7 @@ export function register({ test }) {
     await go(page, 'diary');
     await diaryEntry(page, SCALABLE_ENTRY.label).click();
     const modal = topModal(page);
-    await modal.locator('ion-title', { hasText: 'Eintrag bearbeiten' }).waitFor();
+    await modal.locator('.nt-sheet-header__title', { hasText: 'Eintrag bearbeiten' }).waitFor();
     await ionInput(modal, 'Name').fill('Haferflocken kernig');
     await amountInput(modal, 'Menge').fill('150');
     await modal.locator('.sheet-header__save').click();

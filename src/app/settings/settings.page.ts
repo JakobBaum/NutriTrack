@@ -2,32 +2,36 @@ import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { AlertController } from '@ionic/angular';
-import { ActivityLevel, AiConfig, Goal, Sex, UserProfile } from '../core/models';
+import { ActivityLevel, Goal, Sex, UserProfile } from '../core/models';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { RecipeStore } from '../core/state/recipe.store';
 import { MealsStore } from '../core/state/meals.store';
 import { formatDecimal } from '../core/util/number-input';
 import { StorageService } from '../core/storage/storage.service';
-import { MAX_RATE_KG_PER_WEEK, NutritionCalcService } from '../core/nutrition/nutrition-calc.service';
-import { effectiveProxyUrl, defaultAiProxyUrl } from '../core/ai/ai-endpoint';
-import { aiConnection, aiStatusLabel, modelOptions } from './ai-status';
+import { NutritionCalcService } from '../core/nutrition/nutrition-calc.service';
+import { ProfileNote, profileNotes } from '../core/nutrition/profile-plausibility';
+import { defaultAiProxyUrl } from '../core/ai/ai-endpoint';
 import { AiService } from '../core/ai/ai.service';
 import { CustomFoodStore } from '../core/state/custom-food.store';
 import { SettingsStore } from '../core/state/settings.store';
+import { WeekPlanStore } from '../core/state/week-plan.store';
 import { ShoppingStore } from '../core/state/shopping.store';
+import { WeightStore } from '../core/state/weight.store';
+import { FavoriteStore } from '../core/state/favorite.store';
 import { DebugLogService } from '../core/debug/debug-log.service';
 import { resolveDebugMode, safeLocalStorage } from './debug-flag';
 import { BackupService } from '../core/backup/backup.service';
-import { PROFILE_FIELD_ORDER, ProfileField, ProfileFieldErrors, validateProfileForm } from './profile-form';
+import { PROFILE_FIELD_ORDER, ProfileField, ProfileFieldErrors, targetWeightError, validateProfileForm } from './profile-form';
 import { BackupFile, countBackup, describeCounts, formatBackupDate } from '../core/backup/backup';
 
 /**
  * Einstellungen: Profil erfassen → Tagesbedarf berechnen (deterministisch),
  * KI-Anbieter konfigurieren (lokal gespeichert) und Daten zurücksetzen.
  */
-/** Wählbare Tempi (kg/Woche); das größte entspricht dem Deckel der Berechnung. */
-const RATE_CHOICES: readonly number[] = [0.25, 0.5, MAX_RATE_KG_PER_WEEK];
+/** Wählbare Tempi (kg/Woche). Die Berechnung deckelt zusätzlich bei 1 % des Körpergewichts pro Woche. */
+const MAX_RATE_CHOICE = 0.75;
+const RATE_CHOICES: readonly number[] = [0.25, 0.5, MAX_RATE_CHOICE];
 const DEFAULT_RATE = 0.5;
 /** Kleinste Schrittweite beim Angebot „niedrigeres Tempo“. */
 const RATE_OFFER_STEP = 0.05;
@@ -53,7 +57,10 @@ export class SettingsPage implements OnInit {
   private readonly recipes = inject(RecipeStore);
   private readonly customFoods = inject(CustomFoodStore);
   private readonly shopping = inject(ShoppingStore);
+  private readonly weekPlan = inject(WeekPlanStore);
   private readonly savedMeals = inject(MealsStore);
+  private readonly weightStore = inject(WeightStore);
+  private readonly favoriteStore = inject(FavoriteStore);
   private readonly storage = inject(StorageService);
   readonly formatDecimal = formatDecimal;
   private readonly calc = inject(NutritionCalcService);
@@ -73,8 +80,6 @@ export class SettingsPage implements OnInit {
 
   readonly profileOpen = signal(false);
   readonly aiOpen = signal(false);
-  /** Standard-Adresse des globalen KI-Servers (Platzhalter im Erweitert-Block). */
-  readonly defaultProxyUrl = defaultAiProxyUrl();
   readonly logOpen = signal(false);
   readonly infoSection = signal<'anleitung' | 'datenschutz' | 'agb' | 'hilfe' | null>(null);
 
@@ -97,25 +102,20 @@ export class SettingsPage implements OnInit {
   sex: Sex = this.existing?.sex ?? 'male';
   activityLevel: ActivityLevel = this.existing?.activityLevel ?? 'moderate';
   goal: Goal = this.existing?.goal ?? 'maintain';
+  /** Optionales Zielgewicht; null = nicht gesetzt. */
+  targetWeightKg: number | null = this.existing?.targetWeightKg ?? null;
   rateKgPerWeek: number | null = this.existing?.goal && this.existing.goal !== 'maintain'
-    ? (this.existing.rateKgPerWeek !== undefined && this.existing.rateKgPerWeek <= MAX_RATE_KG_PER_WEEK && this.existing.rateKgPerWeek >= MIN_RATE
+    ? (this.existing.rateKgPerWeek !== undefined && this.existing.rateKgPerWeek <= MAX_RATE_CHOICE && this.existing.rateKgPerWeek >= MIN_RATE
         ? this.existing.rateKgPerWeek
         : nearestRate(this.existing.rateKgPerWeek))
     : DEFAULT_RATE;
   readonly rateChoices = RATE_CHOICES;
-  readonly modelChoices = modelOptions(this.settingsStore.ai().model);
 
-  /** Aktive KI-Verbindung (gespeicherter Stand) und ihre Beschriftung für die Zeile. */
-  readonly aiState = computed(() => aiConnection(this.settingsStore.ai()));
-  readonly aiStatus = computed(() => aiStatusLabel(this.aiState()));
   private readonly aiService = inject(AiService);
-  /** Ergebnis des Verbindungstests (prüft die gespeicherte Konfiguration). */
+  /** Erreichbarkeit des globalen KI-Dienstes (read-only Status). */
   readonly aiTest = signal<{ busy: boolean; ok: boolean | null; message: string | null }>({
     busy: false, ok: null, message: null,
   });
-
-  // --- KI-Konfiguration (Kopie zum Bearbeiten) ---
-  ai: AiConfig = { ...this.settingsStore.ai() };
 
   readonly sexes: { value: Sex; label: string }[] = [
     { value: 'male', label: 'Männlich' },
@@ -173,8 +173,26 @@ export class SettingsPage implements OnInit {
 
   /** Tägliches Defizit/Überschuss zum gewählten Tempo, z. B. „≈ −550 kcal/Tag“. */
   get rateDeltaLabel(): string {
-    const kcal = this.calc.dailyDeltaKcal(Number(this.rateKgPerWeek) || 0);
+    const kcal = this.calc.dailyDeltaKcal(Number(this.rateKgPerWeek) || 0, Number(this.weightKg) || 0);
     return `≈ ${this.goal === 'lose' ? '−' : '+'}${kcal} kcal/Tag`;
+  }
+
+  /** Größtes Tempo für das eingegebene Gewicht (1 % pro Woche), z. B. „0,8“; leer ohne Gewicht. */
+  get maxRateText(): string {
+    const max = this.calc.maxRateKgPerWeek(Number(this.weightKg) || 0);
+    return max > 0 ? formatDecimal(Math.round(max * 100) / 100) : '';
+  }
+
+  /** True, wenn das gewählte Tempo über 1 % des Körpergewichts liegt und gedeckelt wird. */
+  get rateIsCapped(): boolean {
+    const max = this.calc.maxRateKgPerWeek(Number(this.weightKg) || 0);
+    return max > 0 && (Number(this.rateKgPerWeek) || 0) > max;
+  }
+
+  /** Hinweise zu Alter und BMI der Formulareingabe (leer, solange Werte fehlen oder unauffällig sind). */
+  get plausibilityNotes(): ProfileNote[] {
+    if (this.weightKg === null || this.heightCm === null || this.age === null) return [];
+    return profileNotes({ weightKg: this.weightKg, heightCm: this.heightCm, age: this.age, goal: this.goal });
   }
 
   /** Erreichtes Tempo bei aktiver Mindestzufuhr, z. B. „0,3“ (kg/Woche). */
@@ -195,7 +213,13 @@ export class SettingsPage implements OnInit {
   /** Aus der Anleitung direkt zur KI-Verbindung wechseln. */
   openAiFromGuide(): void {
     this.infoSection.set(null);
+    this.openAi();
+  }
+
+  /** Öffnet den KI-Status und prüft die Erreichbarkeit des globalen Dienstes. */
+  openAi(): void {
     this.aiOpen.set(true);
+    void this.testAi();
   }
 
   setRate(rate: number): void {
@@ -218,7 +242,27 @@ export class SettingsPage implements OnInit {
   }
 
   get isFormValid(): boolean {
-    return Object.keys(this.fieldErrors).length === 0;
+    return Object.keys(this.fieldErrors).length === 0 && this.targetError === null;
+  }
+
+  /** Fehler des optionalen Zielgewichts (null = in Ordnung oder leer). */
+  get targetError(): string | null {
+    return targetWeightError(this.targetWeightKg, this.weightKg, this.goal, this.heightCm);
+  }
+
+  setTargetWeight(value: number): void {
+    this.targetWeightKg = value;
+  }
+
+  clearTargetWeight(): void {
+    this.targetWeightKg = null;
+  }
+
+  /** Hinweis "Ziel neu berechnen": Profil mit dem zuletzt gewogenen Gewicht öffnen (nichts wird automatisch gespeichert). */
+  recalculateWithWeight(kg: number): void {
+    this.weightKg = kg;
+    this.markTouched('weightKg');
+    this.profileOpen.set(true);
   }
 
   /** Fehlertext nur für Felder, die schon besucht wurden. */
@@ -246,7 +290,7 @@ export class SettingsPage implements OnInit {
   saveProfile(): void {
     const errors = this.fieldErrors;
     const { weightKg, heightCm, age, rateKgPerWeek } = this;
-    if (Object.keys(errors).length > 0 || weightKg === null || heightCm === null || age === null) {
+    if (Object.keys(errors).length > 0 || this.targetError !== null || weightKg === null || heightCm === null || age === null) {
       this.touched = { weightKg: true, heightCm: true, age: true, rateKgPerWeek: true };
       this.focusFirstInvalid(errors);
       return;
@@ -261,6 +305,7 @@ export class SettingsPage implements OnInit {
       activityLevel: this.activityLevel,
       goal: this.goal,
       rateKgPerWeek: rate,
+      ...(this.targetWeightKg !== null ? { targetWeightKg: this.targetWeightKg } : {}),
       updatedAt: new Date().toISOString(),
     };
     this.profileStore.setProfile(profile);
@@ -268,23 +313,9 @@ export class SettingsPage implements OnInit {
     this.savedToast.set('Profil gespeichert — Tagesbedarf aktualisiert.');
   }
 
-  saveAi(): void {
-    const apiKey = this.ai.apiKey?.trim() ?? '';
-    // Anbieter ergibt sich aus der Eingabe: eigener Schlüssel -> Gemini, sonst keiner.
-    this.settingsStore.setAi({
-      ...this.ai,
-      proxyUrl: this.ai.proxyUrl?.trim() ?? '',
-      apiKey,
-      provider: apiKey ? 'gemini' : 'none',
-    });
-    this.aiTest.set({ busy: false, ok: null, message: null });
-    this.aiOpen.set(false);
-    this.savedToast.set('KI-Einstellungen gespeichert.');
-  }
-
-  /** Prüft den aktiven Weg der gespeicherten Konfiguration ohne KI-Kosten. */
+  /** Prüft ohne KI-Kosten, ob der globale KI-Dienst erreichbar ist. */
   async testAi(): Promise<void> {
-    this.aiTest.set({ busy: true, ok: null, message: 'Prüfe Verbindung …' });
+    this.aiTest.set({ busy: true, ok: null, message: 'Prüfe Verbindung…' });
     const result = await this.aiService.testConnection();
     this.aiTest.set({ busy: false, ok: result.ok, message: result.message });
   }
@@ -294,7 +325,7 @@ export class SettingsPage implements OnInit {
     const alert = await this.alertCtrl.create({
       header: 'Alle Daten löschen?',
       message:
-        'Profil, Tagebuch, Rezepte, gespeicherte Mahlzeiten, eigene Lebensmittel, Einkaufsliste und Einstellungen werden von diesem Gerät gelöscht. Das lässt sich nicht rückgängig machen.',
+        'Profil, Tagebuch, Gewichtsverlauf, Favoriten, Rezepte, gespeicherte Mahlzeiten, eigene Lebensmittel, Einkaufsliste und Einstellungen werden von diesem Gerät gelöscht. Das lässt sich nicht rückgängig machen.',
       buttons: [
         { text: 'Abbrechen', role: 'cancel' },
         { text: 'Löschen', role: 'destructive', handler: () => this.resetData() },
@@ -310,9 +341,11 @@ export class SettingsPage implements OnInit {
     this.customFoods.clear();
     this.savedMeals.clear();
     this.shopping.clear();
+    this.weekPlan.clear();
+    this.weightStore.clear();
+    this.favoriteStore.clear();
     this.settingsStore.clear();
     this.storage.clearAll();
-    this.ai = { ...this.settingsStore.ai() };
     this.savedToast.set('Alle Daten wurden zurückgesetzt.');
   }
 
@@ -381,7 +414,7 @@ export class SettingsPage implements OnInit {
   }
 
   async testConnection(): Promise<void> {
-    const url = effectiveProxyUrl(this.settingsStore.ai());
+    const url = defaultAiProxyUrl();
     if (!url) { this.debugLog.error('Keine Proxy-URL konfiguriert.'); return; }
     this.debugLog.info(`Teste ${url} ...`);
     this.logOpen.set(true);

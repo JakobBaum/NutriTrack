@@ -32,3 +32,32 @@ describe('RecipeStore.update', () => {
     expect(saved?.createdAt).toBe(created.createdAt);
   });
 });
+
+describe('RecipeStore Zutatenmengen (QAE-07)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.resetTestingModule();
+  });
+
+  const withAmounts = (...amounts: number[]): RecipeDraft => ({
+    ...draft('R'),
+    ingredients: amounts.map((amount, i) => ({ name: `Z${i}`, amount, unit: 'g' })),
+  });
+
+  it('setzt negative und nicht endliche Mengen beim Anlegen auf 0', () => {
+    const store = TestBed.inject(RecipeStore);
+
+    const recipe = store.add(withAmounts(-5, NaN, Infinity, 20));
+
+    expect(recipe.ingredients.map((i) => i.amount)).toEqual([0, 0, 0, 20]);
+  });
+
+  it('bereinigt Mengen auch beim Aktualisieren', () => {
+    const store = TestBed.inject(RecipeStore);
+    const recipe = store.add(draft('R'));
+
+    store.update(recipe.id, withAmounts(-1, 3));
+
+    expect(store.get(recipe.id)?.ingredients.map((i) => i.amount)).toEqual([0, 3]);
+  });
+});

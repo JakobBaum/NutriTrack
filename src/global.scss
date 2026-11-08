@@ -265,15 +265,15 @@ input[type='number'] {
 
 // Browser-Oberflächen in der App-Farbe statt Browser-Standard.
 ::selection {
-  background: rgba(15, 122, 107, 0.22);
+  background: color-mix(in srgb, var(--nt-accent) 22%, transparent);
 }
 
-// Platzhalter klar von eingegebenen Werten unterscheiden: iOS-Platzhaltergrau (#8E8E93).
-// Bewusst heller als Text; jedes Feld hat ein sichtbares Label darueber, der Platzhalter ist nur Beispiel.
+// Platzhalter: Sekundaerfarbe (5.5:1 auf Grund).
+// Jedes Feld hat ein sichtbares Label darueber, der Platzhalter ist nur Beispiel.
 // :root erhoeht die Spezifitaet ueber Ionics Host-Klasse (.sc-ion-input-*-h setzt --placeholder-color: initial).
 :root ion-input,
 ion-textarea {
-  --placeholder-color: #8e8e93;
+  --placeholder-color: var(--nt-secondary);
   --placeholder-opacity: 1;
 }
 
@@ -313,7 +313,7 @@ ion-button:not([fill='outline']):not([fill='clear']):not(ion-buttons ion-button)
   --background-activated: var(--ion-color-primary-shade);
   --background-hover: var(--ion-color-primary-shade);
   --background-focused: var(--ion-color-primary-shade);
-  --color: #ffffff;
+  --color: var(--nt-on-accent);
   --box-shadow: none;
   font-weight: 600;
 
@@ -565,19 +565,19 @@ ion-modal:not(.barcode-fullscreen-modal):not(.cook-fullscreen-modal) {
     height: 5px;
     margin-top: 6px;
     border-radius: 3px;
-    background: #c7c7cc;
+    background: var(--nt-grabber);
     opacity: 1;
   }
 }
 
-// Segment (iOS): graue Spur, Radius 9, aktiver Reiter weiss (Radius 7, kleiner Schatten), 44 px, keine Grossbuchstaben.
-// Reiter 4 px kleiner als die Spur (2 px Padding oben/unten), damit die Gesamthoehe genau 44 px bleibt.
+// Segment (iOS): graue Spur, Radius 9, aktiver Reiter weiss (Radius 7, kleiner Schatten), keine Grossbuchstaben.
+// Reiter 44 px (Touch-Ziel), Spur 48 px (2 px Padding oben/unten).
 ion-segment {
   --background: rgba(118, 118, 128, 0.12);
   box-sizing: border-box;
   display: flex;
   width: 100%;
-  min-height: var(--nt-touch);
+  min-height: calc(var(--nt-touch) + 4px);
   padding: 2px;
   border-radius: 9px;
 }
@@ -585,15 +585,15 @@ ion-segment {
 ion-segment-button {
   --color: var(--nt-ink);
   --color-checked: var(--nt-ink);
-  --indicator-color: #ffffff;
+  --indicator-color: var(--nt-card);
   --indicator-box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 0.5px 1px rgba(0, 0, 0, 0.08);
   --border-radius: 7px;
   --padding-start: var(--nt-space-2);
   --padding-end: var(--nt-space-2);
   flex: 1 1 auto;
   min-width: 0;
-  height: calc(var(--nt-touch) - 4px);
-  min-height: calc(var(--nt-touch) - 4px);
+  height: var(--nt-touch);
+  min-height: var(--nt-touch);
   font-size: var(--nt-fs-body);
   font-weight: 500;
   text-transform: none;
@@ -653,7 +653,7 @@ ion-toast {
 
 // Aktion ("Rueckgaengig"): auf dem dunklen Material-Toast weiss + fett, auf dem hellen iOS-Toast Akzent.
 ion-toast.md {
-  --button-color: #ffffff;
+  --button-color: var(--nt-on-accent);
 }
 
 ion-toast::part(button) {
@@ -777,7 +777,7 @@ ion-item {
   }
 
   .nt-hover-delete:hover {
-    background: rgba(198, 40, 57, 0.1);
+    background: color-mix(in srgb, var(--nt-danger) 10%, transparent);
   }
 }
 
@@ -968,7 +968,8 @@ ion-select::after {
 .nt-sheet-header {
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  // Seitenspalten gleich breit (Titel exakt mittig), mind. 88 px fuer "Abbrechen"/"Speichern".
+  grid-template-columns: minmax(88px, 1fr) auto minmax(88px, 1fr);
   align-items: center;
   gap: var(--nt-space-2);
   min-height: var(--nt-touch);
@@ -1090,4 +1091,9 @@ ion-alert input.alert-input:focus {
 // Zwei Hinzufuegen-Pillen untereinander (Zutat / manuelle Zutat) brauchen Luft, sonst kleben sie zusammen.
 ion-modal .nt-add-btn + .nt-add-btn {
   margin-top: var(--nt-space-2);
+}
+
+// Eiweiß hat überall dieselbe Farbe (--nt-protein): Ring, Balken, Zahlen in Kacheln.
+.nt-macro--protein dd {
+  color: var(--nt-protein) !important; // schlaegt die komponentengebundene dd-Farbe der Kacheln
 }

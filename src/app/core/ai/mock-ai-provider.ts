@@ -1,11 +1,8 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import {
-  DailyTarget,
   FastFoodRequest,
   FastFoodSuggestion,
-  UserProfile,
 } from '../models';
-import { NutritionCalcService } from '../nutrition/nutrition-calc.service';
 import { estimateIngredientFacts } from '../nutrition/ingredient-estimate';
 import { buildWeekPlan } from '../shopping/shopping-generator';
 import {
@@ -45,13 +42,6 @@ export function canonicalUnit(raw: string): string {
  */
 @Injectable({ providedIn: 'root' })
 export class MockAiProvider implements AiProvider {
-  private readonly calc = inject(NutritionCalcService);
-
-  async computeTargets(profile: UserProfile): Promise<DailyTarget> {
-    // Mock = deterministische Fallback-Formel.
-    return this.calc.dailyTarget(profile);
-  }
-
   async generateShoppingList(req: ShoppingPlanRequest): Promise<ShoppingPlanResult> {
     const plan = buildWeekPlan(req.recipes, req.persons, req.days, req.meals.length);
     // Ehrlich ohne KI: nur Mengen, keine erfundenen Preise.
@@ -85,21 +75,21 @@ export class MockAiProvider implements AiProvider {
         restaurant: r,
         itemName: 'Grilled Chicken (ohne Mayo)',
         facts: { kcal: 350, proteinG: 37, carbsG: 30, fatG: 8, basis: 'perPortion' },
-        rationale: 'Sehr proteinreich bei moderaten Kalorien — bestes Verhältnis.',
+        rationale: 'Sehr eiweißreich bei moderaten Kalorien — bestes Verhältnis.',
         estPrice: 6.5,
       },
       {
         restaurant: r,
         itemName: 'Doppel-Hamburger',
         facts: { kcal: 440, proteinG: 25, carbsG: 34, fatG: 23, basis: 'perPortion' },
-        rationale: 'Viel Protein fürs Geld, passt meist ins kcal-Budget.',
+        rationale: 'Viel Eiweiß fürs Geld, passt meist ins kcal-Budget.',
         estPrice: 4.0,
       },
       {
         restaurant: r,
         itemName: 'Hähnchen-Wrap',
         facts: { kcal: 300, proteinG: 20, carbsG: 28, fatG: 10, basis: 'perPortion' },
-        rationale: 'Leichter Snack mit solidem Proteinanteil.',
+        rationale: 'Leichter Snack mit solidem Eiweißanteil.',
         estPrice: 3.5,
       },
     ];

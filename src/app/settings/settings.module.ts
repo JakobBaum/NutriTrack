@@ -5,9 +5,10 @@ import { NumPipe } from '../shared/num.pipe';
 import { SettingsPage } from './settings.page';
 import { RecipeSearchSettingsComponent } from './recipe-search-settings/recipe-search-settings.component';
 import { SettingsPageRoutingModule } from './settings-routing.module';
+import { WeightModule } from '../weight/weight.module';
 
 @NgModule({
-  imports: [SharedModule, NumPipe, SettingsPageRoutingModule],
+  imports: [SharedModule, NumPipe, WeightModule, SettingsPageRoutingModule],
   declarations: [SettingsPage, RecipeSearchSettingsComponent],
 })
 export class SettingsPageModule {}

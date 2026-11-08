@@ -48,7 +48,7 @@ ion-searchbar.nt-searchbar {
 
   &--on {
     background: var(--nt-accent);
-    color: #fff;
+    color: var(--nt-on-accent);
   }
 
   &:focus-visible {
@@ -141,7 +141,7 @@ ion-searchbar.nt-searchbar {
   --padding-start: var(--nt-space-4);
   --padding-end: var(--nt-space-4);
   --padding-top: var(--nt-space-2);
-  --padding-bottom: var(--nt-space-2);
+  --padding-bottom: calc(var(--nt-space-2) + env(safe-area-inset-bottom, 0px));
 }
 
 .add-footer__save {

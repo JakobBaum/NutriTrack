@@ -12,8 +12,9 @@
             <span class="num">{{ t.kcal | ntNum:0 }}</span><span class="unit">kcal / Tag</span>
           </div>
           @if (savedMinKcalApplied) {
-            <p class="target-card__note">Mindestzufuhr aktiv: Die Formel läge darunter, das Ziel wurde auf den Mindestwert angehoben.</p>
+            <p class="target-card__note">Mindestzufuhr aktiv (nur beim Abnehmen): Die Formel läge darunter, das Ziel wurde auf den Mindestwert angehoben.</p>
           }
+          <p class="target-card__note target-card__note--disclaimer">Schätzung nach Formel (Mifflin-St Jeor), keine medizinische Beratung.</p>
           <div class="target-card__macros">
             <span><strong>{{ t.proteinG | ntNum:0 }}</strong> g Eiweiß</span>
             <span><strong>{{ t.carbsG | ntNum:0 }}</strong> g Kohlenhydrate</span>
@@ -25,6 +26,8 @@
       </ion-card>
     }
 
+    <app-weight-card (recalculate)="recalculateWithWeight($event)"></app-weight-card>
+
     <h2 class="nt-section-header">Ziele &amp; KI</h2>
     <ion-list class="nt-grouped" lines="full">
       <ion-item button detail="true" (click)="profileOpen.set(true)">
@@ -35,10 +38,10 @@
         </ion-label>
         <ion-note slot="end" class="row-note">{{ target() ? (target()!.kcal | ntNum:0) + ' kcal/Tag' : 'Einrichten' }}</ion-note>
       </ion-item>
-      <ion-item button detail="true" (click)="aiOpen.set(true)">
+      <ion-item button detail="true" (click)="openAi()">
         <ion-icon slot="start" name="sparkles-outline"></ion-icon>
         <ion-label>KI-Verbindung</ion-label>
-        <ion-note slot="end" class="row-note" [class.row-note--on]="aiState() !== 'none'">{{ aiStatus() }}</ion-note>
+        <ion-note slot="end" class="row-note">Globaler Dienst</ion-note>
       </ion-item>
     </ion-list>
 
@@ -184,7 +187,7 @@
           @if (sex === 'diverse') {
             <ion-item lines="none" class="form-row">
               <ion-icon slot="start" name="information-circle-outline" color="warning"></ion-icon>
-              <ion-label class="ion-text-wrap" style="font-size:12px;color:var(--ion-color-warning)">
+              <ion-label class="ion-text-wrap" style="font-size:12px;color:var(--nt-warning)">
                 Hinweis: Für „Divers“ verwenden wir den Durchschnittswert aus männlichen und weiblichen Referenzwerten. Das Ergebnis ist eine Näherung – individuelle Abweichungen sind möglich.
               </ion-label>
             </ion-item>
@@ -205,6 +208,21 @@
           </ion-item>
         </ion-list>
 
+        <h2 class="nt-section-header">Zielgewicht (optional)</h2>
+        <ion-list class="nt-grouped settings-form">
+          <ion-item class="form-row" lines="none">
+            <ion-label>
+              Zielgewicht
+              @if (targetWeightKg === null) { <p class="row-sub">Nicht gesetzt</p> }
+              @if (targetError; as err) { <p class="row-error" role="alert">{{ err }}</p> }
+            </ion-label>
+            <nt-stepper slot="end" data-field="targetWeightKg" label="Zielgewicht" unit="kg" [value]="targetWeightKg" [min]="30" [max]="300" [step]="0.5" [decimals]="1" [start]="weightKg ?? 75" (valueChange)="setTargetWeight($event)"></nt-stepper>
+          </ion-item>
+        </ion-list>
+        @if (targetWeightKg !== null) {
+          <ion-button fill="clear" size="small" (click)="clearTargetWeight()">Zielgewicht entfernen</ion-button>
+        }
+
         @if (showRate) {
           <h2 class="nt-section-header">Tempo (kg pro Woche)</h2>
           <div class="rate-chips" role="group" aria-label="Tempo in Kilogramm pro Woche">
@@ -212,7 +230,13 @@
               <button type="button" class="rate-chip" [class.rate-chip--on]="rateKgPerWeek === r" [attr.aria-pressed]="rateKgPerWeek === r" (click)="setRate(r)">{{ r | ntNum:2 }}</button>
             }
           </div>
-          <p class="hint" role="status">{{ rateDeltaLabel }} · höchstens 0,75 kg pro Woche, mehr wird nicht empfohlen.</p>
+          <p class="hint" role="status">
+            {{ rateDeltaLabel }}@if (maxRateText) { · höchstens {{ maxRateText }} kg pro Woche (1 % deines Gewichts), mehr wird nicht empfohlen.}
+            @if (rateIsCapped) { Dein gewähltes Tempo wird darauf begrenzt. }
+          </p>
+        }
+        @for (note of plausibilityNotes; track note.code) {
+          <p class="hint hint--warn" role="status">{{ note.text }}</p>
         }
         @if (formMinKcalApplied) {
           <p class="hint hint--warn" role="status">
@@ -250,45 +274,13 @@
     <ion-content>
       <div class="nt-page settings-sheet">
         <p class="hint">
-          Die KI läuft über Google Gemini auf einem globalen Server von NutriTrack - du musst nichts eintragen.
-          Status: <strong>{{ aiStatus() }}</strong>.
+          Die KI läuft über Google Gemini auf einem globalen Server von NutriTrack. Es gibt nichts einzustellen.
         </p>
-        <div class="form-actions form-actions--top">
-          <ion-button fill="outline" expand="block" [disabled]="aiTest().busy" (click)="testAi()">Verbindung testen</ion-button>
-        </div>
         @if (aiTest().message; as msg) {
           <p class="hint" role="status" [class.hint--warn]="aiTest().ok === false">{{ msg }}</p>
         }
-
-        <details class="ai-advanced">
-          <summary>Erweitert</summary>
-          <p class="hint">Nur nötig, wenn du einen eigenen Server oder deinen eigenen Gemini-Schlüssel nutzen willst. Der Schlüssel hat Vorrang und wird nur lokal auf diesem Gerät gespeichert.</p>
-          <div class="field-stack">
-            <span class="field-label" id="ai-proxy-label">Eigene Server-Adresse (optional)</span>
-            <ion-input class="nt-field" aria-labelledby="ai-proxy-label" [(ngModel)]="ai.proxyUrl" inputmode="url" [placeholder]="defaultProxyUrl"></ion-input>
-          </div>
-          <div class="field-stack">
-            <span class="field-label" id="ai-key-label">Eigener Gemini-Schlüssel (optional)</span>
-            <ion-input class="nt-field" type="password" aria-labelledby="ai-key-label" [(ngModel)]="ai.apiKey" [clearOnEdit]="false" autocomplete="off" placeholder="Schlüssel einfügen"></ion-input>
-          </div>
-          <div class="field-stack">
-            <span class="field-label" id="ai-model-label">Modell</span>
-            <ion-select class="nt-field" aria-labelledby="ai-model-label" [(ngModel)]="ai.model" interface="action-sheet" cancelText="Abbrechen">
-              @for (m of modelChoices; track m.value) {
-                <ion-select-option [value]="m.value">{{ m.label }}</ion-select-option>
-              }
-            </ion-select>
-          </div>
-          <div class="field-stack">
-            <span class="field-label" id="ai-endpoint-label">Eigene Adresse der Gemini-Schnittstelle (optional)</span>
-            <ion-input class="nt-field" aria-labelledby="ai-endpoint-label" [(ngModel)]="ai.endpoint" placeholder="https://…"></ion-input>
-          </div>
-        </details>
-
-        <div class="form-actions">
-          <ion-button expand="block" (click)="saveAi()">
-            Speichern
-          </ion-button>
+        <div class="form-actions form-actions--top">
+          <ion-button fill="outline" expand="block" [disabled]="aiTest().busy" (click)="testAi()">Verbindung prüfen</ion-button>
         </div>
       </div>
     </ion-content>
@@ -318,8 +310,8 @@
           @case ('anleitung') {
             <h3>So funktioniert NutriTrack</h3>
             <p>1. <strong>Mein Profil einrichten</strong> — trage Gewicht, Größe, Alter und Ziel ein, um deinen persönlichen Tagesbedarf zu berechnen.</p>
-            <p>2. <strong>Tagebuch führen</strong> — trage täglich gegessene Lebensmittel und Mahlzeiten über die Suche oder den Barcode-Scanner ein. Das Etikett per Kamera lesen geht nur <button type="button" class="link-btn" (click)="openAiFromGuide()">(mit KI-Verbindung)</button>.</p>
-            <p>3. <strong>Rezepte anlegen</strong> — füge Rezepte als Text ein oder erfasse sie manuell. Import per Link oder Foto geht nur <button type="button" class="link-btn" (click)="openAiFromGuide()">(mit KI-Verbindung)</button>. Koche direkt aus der App mit dem Kochmodus.</p>
+            <p>2. <strong>Tagebuch führen</strong> — trage täglich gegessene Lebensmittel und gespeicherte Mahlzeiten über die Suche oder den Barcode-Scanner ein. Das Etikett per Kamera lesen geht nur <button type="button" class="link-btn" (click)="openAiFromGuide()">(mit KI-Verbindung)</button>.</p>
+            <p>3. <strong>Rezepte anlegen</strong> — füge Rezepte als Text ein oder lege sie manuell an. Import per Link oder Foto geht nur <button type="button" class="link-btn" (click)="openAiFromGuide()">(mit KI-Verbindung)</button>. Koche direkt aus der App mit dem Kochmodus.</p>
             <p>4. <strong>Einkauf planen</strong> — eine Einkaufsliste auf Basis deiner Rezepte erstellt die KI <button type="button" class="link-btn" (click)="openAiFromGuide()">(mit KI-Verbindung)</button>.</p>
             <p>5. <strong>Fortschritt beobachten</strong> — das Dashboard zeigt täglich, wie viel Energie und Makros du noch zur Verfügung hast.</p>
           }
@@ -329,7 +321,8 @@
             <p><strong>Lokal gespeichert:</strong> Profil (Gewicht, Größe, Alter, Ziel), Tagebuch, Rezepte und Einstellungen liegen <strong>nur auf deinem Gerät</strong> (Browser-Speicher). Wir haben keinen Zugriff darauf. „Alle lokalen Daten zurücksetzen“ löscht alles auf diesem Gerät, auch gespeicherte Mahlzeiten und eigene Lebensmittel.</p>
             <p><strong>Lebensmittelsuche:</strong> Dein Suchbegriff geht über unseren Proxy (Cloudflare Worker, Cloudflare Inc. als Auftragsverarbeiter, USA) an Open Food Facts. Dabei werden technisch deine IP-Adresse und der Suchbegriff verarbeitet. Suchergebnisse werden bis zu 1 Stunde zwischengespeichert, ohne Bezug zu deiner Person. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Bereitstellung der Funktion).</p>
             <p><strong>Barcode &amp; Preise:</strong> Barcode-Abfragen gehen direkt an Open Food Facts bzw. Open Prices (openfoodfacts.org, gemeinnützig, Frankreich). Dabei wird deine IP-Adresse übertragen.</p>
-            <p><strong>KI-Funktionen (optional):</strong> Nur wenn du sie nutzt, werden die jeweiligen Inhalte (Rezepttext oder -link, Etikett- oder Rezeptfoto, Einkaufs- und Fastfood-Wünsche) über den Proxy an Google Gemini (Google LLC) gesendet; beim Fastfood-Helfer wird zusätzlich das verbleibende Kalorien-Budget übertragen. Nutzt du „Gemini direkt“ mit eigenem Key, gehen diese Inhalte ohne Proxy direkt von deinem Gerät an Google. Google und Cloudflare sitzen in den USA, es kann also eine Übermittlung in ein Drittland stattfinden. Gesundheitsdaten wie Gewicht oder Größe werden dabei <strong>nicht</strong> übertragen. KI-Ergebnisse sind automatisch erzeugt und können falsch sein — bitte prüfen.</p>
+            <p><strong>Rezeptsuche (spoonacular) &amp; Wochenplan:</strong> Dein Suchbegriff und die gewählten Filter (z. B. Kalorien, Diät, Zubereitungszeit, Mindest-Eiweiß, ggf. aus deinem Eiweißziel abgeleitet) gehen über unseren Proxy (Cloudflare Worker) an spoonacular (spoonacular API). Dabei werden technisch deine IP-Adresse und diese Suchparameter verarbeitet; Antworten werden bis zu 6 Stunden ohne Bezug zu deiner Person zwischengespeichert. Hinterlegst du einen eigenen spoonacular-Key, geht die Anfrage direkt von deinem Gerät an spoonacular. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO.</p>
+            <p><strong>KI-Funktionen (optional):</strong> Nur wenn du sie nutzt, werden die jeweiligen Inhalte (Rezepttext oder -link, Etikett- oder Rezeptfoto, Einkaufs- und Fastfood-Wünsche) über den Proxy an Google Gemini (Google LLC, Gemini API) gesendet; im kostenlosen Kontingent darf Google diese Eingaben laut seinen Bedingungen zur Produktverbesserung nutzen; beim Fastfood-Helfer wird zusätzlich das verbleibende Kalorien-Budget übertragen. Google und Cloudflare sitzen in den USA, es kann also eine Übermittlung in ein Drittland stattfinden. Gesundheitsdaten wie Gewicht oder Größe werden dabei <strong>nicht</strong> übertragen. KI-Ergebnisse sind automatisch erzeugt und können falsch sein — bitte prüfen.</p>
             <p><strong>Hosting:</strong> Die Web-App wird über GitHub Pages (GitHub Inc.) ausgeliefert. Dabei fallen Server-Logs mit IP-Adressen an.</p>
             <p><strong>Deine Rechte:</strong> Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch und Datenübertragbarkeit (Art. 15–21 DSGVO). Kontakt per E-Mail. Beschwerden kannst du bei der österreichischen Datenschutzbehörde (dsb.gv.at) einreichen.</p>
           }
@@ -347,7 +340,7 @@
             <p>Für Fehlerberichte und Wünsche schreib einfach an diese Adresse.</p>
             <h4>Häufige Fragen</h4>
             <p><strong>Barcode wird nicht erkannt?</strong> Stelle sicher, dass genügend Licht vorhanden ist. Alternativ kannst du den Barcode manuell eingeben.</p>
-            <p><strong>KI funktioniert nicht?</strong> Tippe unter „KI-Verbindung“ auf „Verbindung testen“. Bleibt es dabei, versuche es später erneut oder trage unter „Erweitert“ einen eigenen Gemini-Schlüssel ein.</p>
+            <p><strong>KI funktioniert nicht?</strong> Tippe unter „KI-Verbindung“ auf „Verbindung prüfen“. Ist der Dienst nicht erreichbar, versuche es später erneut.</p>
             <p><strong>Daten verloren?</strong> Alle Daten werden lokal gespeichert. Wenn du die App deinstallierst, werden sie gelöscht. Speichere regelmäßig ein Backup über „Backup exportieren“ und stelle es mit „Backup importieren“ wieder her.</p>
           }
         }

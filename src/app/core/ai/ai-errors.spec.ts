@@ -15,6 +15,9 @@ describe('friendlyAiErrorMessage', () => {
     expect(friendlyAiErrorMessage(401)).toBe(AI_ERROR_MESSAGES.unauthorized);
     expect(friendlyAiErrorMessage(403)).toBe(AI_ERROR_MESSAGES.unauthorized);
   });
+  it('maps 422 to the unreadable-answer message', () => {
+    expect(friendlyAiErrorMessage(422)).toBe(AI_ERROR_MESSAGES.unreadable);
+  });
   it('falls back to the generic message', () => {
     expect(friendlyAiErrorMessage(418)).toBe(AI_ERROR_MESSAGES.generic);
   });

@@ -11,7 +11,7 @@
   </div>
   <div class="nt-page view-switch">
     <ion-segment [value]="view()" (ionChange)="onViewChange($any($event).detail.value)" aria-label="Ansicht wählen">
-      <ion-segment-button value="recipes" class="view-segment__btn"><ion-label>Rezepte</ion-label></ion-segment-button>
+      <ion-segment-button value="recipes" class="view-segment__btn"><ion-label>Wochenplan</ion-label></ion-segment-button>
       <ion-segment-button value="list" class="view-segment__btn"><ion-label>Liste</ion-label></ion-segment-button>
     </ion-segment>
   </div>
@@ -20,98 +20,123 @@
 <ion-content>
   <div class="nt-page">
   @if (showGenerator()) {
-    <ion-card class="generator">
-      <ion-card-content>
-        @if (list() === null) {
-          <p class="generator__intro" role="status">Noch keine Liste. Wähle Personen und Rezepte, dann entsteht dein Wocheneinkauf.</p>
-        }
-        @if (live()) {
-          <p class="generator__mode" role="note">Mit KI-Verbindung: Preise werden geschätzt.</p>
-        } @else {
-          <p class="generator__mode" role="note">
-            Ohne KI: Mengen-Liste ohne echte Preise.
-            <a routerLink="/settings">Profil › KI-Verbindung</a>
-          </p>
-        }
-        @if (noRecipesBlock()) {
-          <div class="generator__empty" role="status">
-            <p>Lege zuerst Rezepte an, daraus entsteht die Einkaufsliste.</p>
-            <ion-button fill="outline" size="small" routerLink="/recipes">Zu den Rezepten</ion-button>
-          </div>
-        }
-
-        <div class="generator__field">
-          <span class="generator__sub" id="persons-label">Personen</span>
-          <nt-stepper label="Personen" [value]="persons" [min]="personsMin" [max]="personsMax" [step]="1" (valueChange)="setPersons($event)"></nt-stepper>
+    @if (weekPlan(); as wp) {
+      @if (!showForm()) {
+        <div class="summary plan-summary">
+          <span class="summary__text">
+            Wochenplan für {{ wp.persons }} {{ wp.persons === 1 ? 'Person' : 'Personen' }} · {{ wp.days }} {{ wp.days === 1 ? 'Tag' : 'Tage' }} · {{ wp.recipes.length }} Rezepte
+          </span>
+          <ion-button class="nt-add-btn summary__btn" data-testid="new-plan-btn" (click)="expandGenerator()">
+            <ion-icon slot="start" name="refresh-outline"></ion-icon>
+            Neuen Wochenplan erstellen
+          </ion-button>
         </div>
+      }
+    }
 
-        <div class="generator__field">
-          <span class="generator__sub" id="days-label">Tage</span>
-          <ion-segment [value]="dayPresets.includes(days) ? days : null" (ionChange)="setDays(+($any($event).detail.value))" aria-labelledby="days-label">
-            @for (d of dayPresets; track d) {
-              <ion-segment-button [value]="d"><ion-label>{{ d }}</ion-label></ion-segment-button>
-            }
-          </ion-segment>
-          <div class="generator__custom">
-            <span class="generator__hint">Anderer Wert (1–14)</span>
-            <nt-stepper label="Tage" [value]="days" [min]="daysMin" [max]="daysMax" [step]="1" (valueChange)="setDays($event)"></nt-stepper>
+    @if (showForm()) {
+      <ion-card class="generator">
+        <ion-card-content>
+          @if (weekPlan() === null) {
+            <p class="generator__intro" role="status">Noch kein Wochenplan. Die App sucht gesunde eiweißreiche Rezepte, zeigt sie hier mit Anleitung und legt alle Zutaten in die Einkaufsliste.</p>
+          }
+          @if (!onlineAvailable()) {
+            <p class="generator__mode" role="note">
+              Die Online-Rezeptsuche ist nicht eingerichtet.
+              <a routerLink="/settings">Profil › Rezept-Suche</a>
+            </p>
+          }
+
+          <div class="generator__field">
+            <span class="generator__sub" id="persons-label">Personen</span>
+            <nt-stepper label="Personen" [value]="persons" [min]="personsMin" [max]="personsMax" [step]="1" (valueChange)="setPersons($event)"></nt-stepper>
           </div>
-        </div>
 
-        <div class="generator__meals" role="group" aria-labelledby="meals-label">
-          <span class="generator__sub" id="meals-label">Mahlzeiten</span>
-          <div class="chips">
-            @for (m of mealToggles(); track m.value) {
-              <button
-                type="button"
-                class="meal-chip"
-                role="checkbox"
-                tabindex="0"
-                [attr.aria-checked]="m.checked"
-                [class.on]="m.checked"
-                (click)="toggleMeal(m.value)"
-              >
-                <ion-icon [name]="m.checked ? 'checkmark-circle' : 'ellipse-outline'" aria-hidden="true"></ion-icon>
-                {{ m.label }}
-              </button>
-            }
+          <div class="generator__field">
+            <span class="generator__sub" id="days-label">Tage</span>
+            <ion-segment [value]="dayPresets.includes(days) ? days : null" (ionChange)="setDays(+($any($event).detail.value))" aria-labelledby="days-label">
+              @for (d of dayPresets; track d) {
+                <ion-segment-button [value]="d"><ion-label>{{ d }}</ion-label></ion-segment-button>
+              }
+            </ion-segment>
+            <div class="generator__custom">
+              <span class="generator__hint">Anderer Wert (1–14)</span>
+              <nt-stepper label="Tage" [value]="days" [min]="daysMin" [max]="daysMax" [step]="1" (valueChange)="setDays($event)"></nt-stepper>
+            </div>
           </div>
-        </div>
 
-        @if (live()) {
-          <div class="generator__field" role="group" aria-labelledby="budget-label">
-            <span class="generator__sub" id="budget-label">Budget pro Woche</span>
+          <div class="generator__meals" role="group" aria-labelledby="meals-label">
+            <span class="generator__sub" id="meals-label">Essenszeiten</span>
             <div class="chips">
-              <button type="button" class="meal-chip" role="radio" [attr.aria-checked]="budget === null" [class.on]="budget === null" (click)="setBudget(null)">egal</button>
-              @for (b of budgetPresets; track b) {
-                <button type="button" class="meal-chip" role="radio" [attr.aria-checked]="budget === b" [class.on]="budget === b" (click)="setBudget(b)">{{ b }} €</button>
+              @for (m of mealToggles(); track m.value) {
+                <button
+                  type="button"
+                  class="meal-chip"
+                  role="checkbox"
+                  tabindex="0"
+                  [attr.aria-checked]="m.checked"
+                  [class.on]="m.checked"
+                  (click)="toggleMeal(m.value)"
+                >
+                  <ion-icon [name]="m.checked ? 'checkmark-circle' : 'ellipse-outline'" aria-hidden="true"></ion-icon>
+                  {{ m.label }}
+                </button>
               }
             </div>
           </div>
-          <div class="generator__field">
-            <ion-select class="nt-field" label="Markt" labelPlacement="stacked" [(ngModel)]="storeName" interface="action-sheet" cancelText="Abbrechen">
-              @for (s of stores; track s) {
-                <ion-select-option [value]="s">{{ s || 'egal' }}</ion-select-option>
-              }
-            </ion-select>
-          </div>
-        }
 
-        <ion-button expand="block" class="generate-btn" (click)="generate()" [disabled]="loading() || noRecipesBlock()">
-          @if (loading()) {
-            <ion-spinner name="dots" slot="start"></ion-spinner> Generiere…
-          } @else {
-            <ion-icon slot="start" name="sparkles-outline"></ion-icon> Wocheneinkauf generieren
+          <ion-button expand="block" class="generate-btn" data-testid="week-plan-btn" (click)="generateWeekPlan()" [disabled]="loading() || !onlineAvailable()">
+            @if (loading()) {
+              <ion-spinner name="dots" slot="start"></ion-spinner> Erstelle…
+            } @else {
+              <ion-icon slot="start" name="sparkles-outline"></ion-icon> Wochenplan erstellen
+            }
+          </ion-button>
+          @if (weekPlan() !== null || list() !== null) {
+            <ion-button expand="block" fill="clear" class="cancel-btn" (click)="cancelGenerator()">Abbrechen</ion-button>
           }
-        </ion-button>
-        @if (list() !== null) {
-          <ion-button expand="block" fill="clear" class="cancel-btn" (click)="closeGenerator()">Abbrechen</ion-button>
-        }
-        @if (error()) {
-          <ion-text color="danger"><p class="form-error" role="alert">{{ error() }}</p></ion-text>
-        }
-      </ion-card-content>
-    </ion-card>
+          @if (error()) {
+            <ion-text color="danger"><p class="form-error" role="alert">{{ error() }}</p></ion-text>
+          }
+
+          <div class="generator__alt">
+            <span class="generator__sub">Aus meinen Rezepten planen</span>
+            @if (live()) {
+              <p class="generator__mode" role="note">Mit KI-Verbindung: Preise werden geschätzt.</p>
+              <div class="generator__field" role="group" aria-labelledby="budget-label">
+                <span class="generator__sub" id="budget-label">Budget pro Woche</span>
+                <div class="chips">
+                  <button type="button" class="meal-chip" role="radio" [attr.aria-checked]="budget === null" [class.on]="budget === null" (click)="setBudget(null)">egal</button>
+                  @for (b of budgetPresets; track b) {
+                    <button type="button" class="meal-chip" role="radio" [attr.aria-checked]="budget === b" [class.on]="budget === b" (click)="setBudget(b)">{{ b }} €</button>
+                  }
+                </div>
+              </div>
+              <div class="generator__field">
+                <ion-select class="nt-field" label="Markt" labelPlacement="stacked" [(ngModel)]="storeName" interface="action-sheet" cancelText="Abbrechen">
+                  @for (s of stores; track s) {
+                    <ion-select-option [value]="s">{{ s || 'egal' }}</ion-select-option>
+                  }
+                </ion-select>
+              </div>
+            } @else {
+              <p class="generator__mode" role="note">Ohne KI: Mengen-Liste ohne echte Preise.</p>
+            }
+            @if (noRecipesBlock()) {
+              <div class="generator__empty" role="status">
+                <p>Lege zuerst eigene Rezepte an, daraus entsteht dann die Einkaufsliste.</p>
+                <ion-button fill="outline" size="small" routerLink="/recipes">Zu den Rezepten</ion-button>
+              </div>
+            }
+            <ion-button expand="block" fill="outline" class="own-btn" data-testid="own-plan-btn" (click)="generate()" [disabled]="loading() || noRecipesBlock()">
+              <ion-icon slot="start" name="book-outline"></ion-icon> Aus meinen Rezepten planen
+            </ion-button>
+          </div>
+        </ion-card-content>
+      </ion-card>
+    }
+
+    <app-week-plan-cards></app-week-plan-cards>
   }
 
   @if (isListView()) {
@@ -254,7 +279,7 @@
     } @else {
       <div class="empty">
         <ion-icon name="cart-outline" class="empty__icon" aria-hidden="true"></ion-icon>
-        <p>Noch keine Liste. Tippe auf „+“, um Artikel von Hand hinzuzufügen, oder erstelle einen Wocheneinkauf aus deinen Rezepten.</p>
+        <p>Noch keine Liste. Tippe auf „+“, um Artikel von Hand hinzuzufügen, oder erstelle einen Wochenplan unter „Rezepte“.</p>
         <ion-button class="nt-add-btn empty__btn" (click)="setView('recipes')">Zu den Rezepten</ion-button>
       </div>
     }
@@ -267,6 +292,14 @@
     [buttons]="undoButtons"
     position="bottom"
     (didDismiss)="onUndoDismiss($any($event))"
+  ></ion-toast>
+  <ion-toast
+    [isOpen]="planToastOpen()"
+    [message]="planToastMessage()"
+    [duration]="planToastDuration"
+    [buttons]="planToastButtons"
+    position="bottom"
+    (didDismiss)="onPlanToastDismiss($any($event))"
   ></ion-toast>
   <ion-toast
     [isOpen]="shareToastOpen()"

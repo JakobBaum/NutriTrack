@@ -50,10 +50,17 @@ describe('OpenFoodFactsProvider — Mapping', () => {
     expect(item?.id.startsWith('off_')).toBe(true);
   });
 
-  it('setzt fehlende Makros auf 0', async () => {
+  it('setzt fehlende Hauptmakros auf 0, lässt fehlende Ballaststoffe/Zucker/Salz aber leer statt 0 (FDB-01)', async () => {
     const item = await mapProduct(base);
     expect(item?.facts.proteinG).toBe(0);
-    expect(item?.facts.saltG).toBe(0);
+    expect(item?.facts.fiberG).toBeUndefined();
+    expect(item?.facts.sugarG).toBeUndefined();
+    expect(item?.facts.saltG).toBeUndefined();
+  });
+
+  it('übernimmt vorhandene Salz-, Zucker- und Ballaststoffwerte, auch echte 0 (FDB-01)', async () => {
+    const item = await mapProduct({ ...base, nutriments: { 'energy-kcal_100g': 10, salt_100g: 0, sugars_100g: 1.5, fiber_100g: '2' } });
+    expect(item?.facts).toMatchObject({ saltG: 0, sugarG: 1.5, fiberG: 2 });
   });
 
   it('akzeptiert numerische Strings und klemmt negative Werte', async () => {
@@ -75,8 +82,7 @@ describe('OpenFoodFactsProvider — Mapping', () => {
     expect(await mapProduct({ ...base, nutriments: { energy_100g: 1046 } })).toBeNull();
   });
 
-  // Lücke: kJ-only-Produkte (in OFF häufig) werden verworfen statt umgerechnet.
-  // openfoodfacts.provider.ts:157 — Eingabe: energy-kj_100g 1046; erwartet: 250 kcal, tatsächlich: null.
+  // kJ-only-Produkte (in OFF häufig) werden umgerechnet statt verworfen (openfoodfacts.provider.ts, kcal-Ermittlung).
   it('rechnet kJ-only-Produkte in kcal um (1 kcal = 4,184 kJ)', async () => {
     const item = await mapProduct({ ...base, nutriments: { 'energy-kj_100g': 1046 } });
     expect(item?.facts.kcal).toBe(250);
@@ -100,9 +106,9 @@ describe('OpenFoodFactsProvider — Mapping', () => {
     expect((await mapProduct({ ...base, serving_quantity: 0 }))?.servingG).toBeUndefined();
   });
 
-  it('bevorzugt das kleine Bild', async () => {
-    expect((await mapProduct({ ...base, image_url: 'big', image_small_url: 'small' }))?.imageUrl).toBe('small');
-    expect((await mapProduct({ ...base, image_url: 'big', image_small_url: '' }))?.imageUrl).toBe('big');
+  it('liefert keine Produktbilder', async () => {
+    const item = await mapProduct({ ...base, image_url: 'big', image_small_url: 'small' } as Parameters<typeof mapProduct>[0]);
+    expect(item).not.toHaveProperty('imageUrl');
   });
 });
 
