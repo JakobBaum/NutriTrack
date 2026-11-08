@@ -33,6 +33,7 @@ import {
 import { toDateISO } from '../core/util/date';
 import { MealsListComponent } from '../meals/meals-list.component';
 import { UNDO_TOAST_BUTTONS, UNDO_TOAST_MS, UndoableDelete, settleUndoToast } from '../meals/undoable-delete';
+import { shrinkPhotoForUpload } from '../core/scan/label-image';
 import {
   APPROX_UNITS,
   EAT_PORTION_OPTIONS,
@@ -243,7 +244,7 @@ export class RecipesPage implements OnDestroy {
 
   private async runImportFromBase64(base64: string): Promise<void> {
     if (!this.isLive()) throw new Error('Foto-Import braucht eine KI-Verbindung.');
-    const res = await this.ai.importRecipe({ imageBase64: base64 });
+    const res = await this.ai.importRecipe({ imageBase64: await shrinkPhotoForUpload(base64) });
     if (res.ingredients.length === 0) throw new Error('Auf dem Foto wurden keine Zutaten erkannt.');
     this.form = {
       title: res.title,

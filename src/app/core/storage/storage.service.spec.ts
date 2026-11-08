@@ -58,23 +58,91 @@ describe('StorageService snapshot/replaceAll', () => {
 describe('StorageService Schreibfehler (QAE-02)', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('meldet false und zählt den Fehler, wenn der Speicher voll ist', () => {
+  it('zählt den Fehler beim Schreiben, wenn der Speicher voll ist', () => {
     vi.stubGlobal('localStorage', memoryStorage({}, 'nutritrack:diary'));
     const service = new StorageService();
 
-    const ok = service.set('diary', [{ id: 'd1' }]);
+    service.set('diary', [{ id: 'd1' }]);
+    service.flush();
 
-    expect(ok).toBe(false);
     expect(service.writeFailures()).toBe(1);
   });
 
-  it('meldet true und lässt den Zähler bei Erfolg unverändert', () => {
+  it('lässt den Zähler bei Erfolg unverändert', () => {
     vi.stubGlobal('localStorage', memoryStorage({}));
     const service = new StorageService();
 
-    const ok = service.set('diary', []);
+    service.set('diary', []);
+    service.flush();
 
-    expect(ok).toBe(true);
     expect(service.writeFailures()).toBe(0);
+  });
+});
+
+describe('StorageService gebündeltes Schreiben (PRF-09)', () => {
+  let store: Storage;
+  let setItem: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    store = memoryStorage({});
+    setItem = vi.spyOn(store, 'setItem');
+    vi.stubGlobal('localStorage', store);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('bündelt mehrere Schreibzugriffe auf einen localStorage-Zugriff', () => {
+    const service = new StorageService();
+    service.set('diary', [1]);
+    service.set('diary', [1, 2]);
+    service.set('diary', [1, 2, 3]);
+    expect(setItem).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(StorageService.WRITE_DELAY_MS);
+
+    expect(setItem).toHaveBeenCalledTimes(1);
+    expect(store.getItem('nutritrack:diary')).toBe('[1,2,3]');
+  });
+
+  it('liest sofort den neuesten, noch nicht geschriebenen Wert', () => {
+    const service = new StorageService();
+    service.set('diary', [{ id: 'a' }]);
+    expect(service.get('diary', [])).toEqual([{ id: 'a' }]);
+    expect(service.snapshot()).toEqual({ diary: [{ id: 'a' }] });
+  });
+
+  it.each(['pagehide', 'beforeunload'])('schreibt sofort bei %s (kein Datenverlust)', (eventName) => {
+    const service = new StorageService();
+    service.set('weight', [80]);
+    window.dispatchEvent(new Event(eventName));
+    expect(store.getItem('nutritrack:weight')).toBe('[80]');
+  });
+
+  it('schreibt sofort, wenn die Seite in den Hintergrund geht (visibilitychange)', () => {
+    const service = new StorageService();
+    service.set('weight', [81]);
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(store.getItem('nutritrack:weight')).toBe('[81]');
+  });
+
+  it('schreibt beim Zerstören des Dienstes', () => {
+    const service = new StorageService();
+    service.set('weight', [82]);
+    service.ngOnDestroy();
+    expect(store.getItem('nutritrack:weight')).toBe('[82]');
+  });
+
+  it('verwirft ausstehende Werte bei remove und clearAll', () => {
+    const service = new StorageService();
+    service.set('a', 1);
+    service.remove('a');
+    service.set('b', 2);
+    service.clearAll();
+    service.flush();
+    expect(store.getItem('nutritrack:a')).toBeNull();
+    expect(store.getItem('nutritrack:b')).toBeNull();
   });
 });

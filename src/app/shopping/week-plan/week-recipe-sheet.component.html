@@ -10,7 +10,7 @@
 
 <ion-content>
   <article class="wp-detail nt-page" data-testid="wp-detail">
-    @if (recipe.imageUrl) { <img class="wp-detail__img" [src]="recipe.imageUrl" alt="" /> }
+    @if (recipe.imageUrl) { <img class="wp-detail__img" [src]="recipe.imageUrl" alt="" width="556" height="370" loading="lazy" /> }
     <h3 class="wp-detail__title">{{ recipe.title }}</h3>
     <p class="wp-detail__meta">{{ meta() }}</p>
     @if (recipe.facts; as f) {

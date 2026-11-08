@@ -6,6 +6,7 @@ import { AiService } from '../../core/ai/ai.service';
 import { CameraService } from '../../core/scan/camera.service';
 import { LabelOcrService } from '../../core/scan/label-ocr.service';
 import { blankFieldsFor, readLabelOffline } from '../../core/scan/label-scan';
+import { shrinkPhotoForUpload } from '../../core/scan/label-image';
 import { NtFoodSearchComponent } from '../food-search/food-search.component';
 import type { BarcodeHit } from '../barcode-scanner/barcode-scanner.component';
 
@@ -131,7 +132,7 @@ export class NtFoodSourcesComponent {
   /** Etikett lesen: mit KI per Vision, sonst On-Device-OCR. */
   private async recognize(base64: string): Promise<void> {
     if (this.ai.isLive()) {
-      const res = await this.ai.recognizeLabel(base64, 'per100g');
+      const res = await this.ai.recognizeLabel(await shrinkPhotoForUpload(base64), 'per100g');
       this.result.emit({ source: 'label', name: res.name, facts: res.facts, isAi: true, hint: AI_LABEL_HINT });
       return;
     }

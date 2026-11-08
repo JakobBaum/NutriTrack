@@ -7,25 +7,25 @@ type DecodeCallback = (result: { getText(): string } | undefined, err: unknown) 
 describe('BarcodeScannerService.start', () => {
   let service: BarcodeScannerService;
   let callback: DecodeCallback;
+  let decodeFromConstraints: ReturnType<typeof vi.fn>;
   const controls = { stop: vi.fn() };
 
   beforeEach(() => {
     TestBed.configureTestingModule({});
     service = TestBed.inject(BarcodeScannerService);
-    const reader = (service as unknown as { reader: { decodeFromConstraints: unknown } }).reader;
-    vi.spyOn(reader as { decodeFromConstraints: (...a: unknown[]) => Promise<unknown> }, 'decodeFromConstraints')
-      .mockImplementation(async (_c: unknown, _v: unknown, cb: unknown) => {
-        callback = cb as DecodeCallback;
-        return controls;
-      });
+    decodeFromConstraints = vi.fn(async (_c: unknown, _v: unknown, cb: unknown) => {
+      callback = cb as DecodeCallback;
+      return controls;
+    });
+    vi.spyOn(service as unknown as { loadReader(): Promise<unknown> }, 'loadReader')
+      .mockResolvedValue({ decodeFromConstraints });
   });
 
   it('nutzt die Rückkamera und gibt die Controls zurück', async () => {
     const video = document.createElement('video');
     const res = await service.start(video, () => undefined);
     expect(res).toBe(controls);
-    const reader = (service as unknown as { reader: { decodeFromConstraints: ReturnType<typeof vi.fn> } }).reader;
-    expect(reader.decodeFromConstraints.mock.calls[0][0]).toEqual({ video: { facingMode: 'environment' } });
+    expect(decodeFromConstraints.mock.calls[0][0]).toEqual({ video: { facingMode: 'environment' } });
   });
 
   it('meldet erkannte Codes', async () => {

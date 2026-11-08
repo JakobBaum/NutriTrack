@@ -16,7 +16,7 @@ import { ProfileStore } from '../core/state/profile.store';
 import { FavoriteStore } from '../core/state/favorite.store';
 import { dayLabel, rollDate, toDateISO } from '../core/util/date';
 import { formatNum } from '../shared/num.pipe';
-import { MEAL_DEFS, mealForHour, mealLabel, isIsoDate, isMealType, isValidAmount, toBaseAmount, toNumberOrNull, inputTextFor, AMOUNT_UNITS, formatAmount, fromBaseAmount, convertAmount, lastAmountForLabel, editBaseFor } from './diary-helpers';
+import { MEAL_DEFS, mealForHour, mealLabel, isIsoDate, isMealType, isValidAmount, toBaseAmount, toNumberOrNull, inputTextFor, AMOUNT_UNITS, fromBaseAmount, convertAmount, lastAmountForLabel, editBaseFor } from './diary-helpers';
 import { confirmDiscardSheet, pickMealSheet } from './diary-sheets';
 import { lightHaptic } from './haptics';
 import { showEntryToast } from './entry-toast';
@@ -116,7 +116,6 @@ export class DiaryPage {
   readonly ffOpen = signal(false);
 
   /** Formatierung der Mengen in der Tagesliste. */
-  readonly formatAmount = formatAmount;
 
   // --- Edit-Modal ---
   readonly editOpen = signal(false);

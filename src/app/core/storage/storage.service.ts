@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, OnDestroy, signal } from '@angular/core';
 
 /**
  * Einfache, synchron lesbare Key-Value-Persistenz für das MVP-Gerüst.
@@ -8,11 +8,34 @@ import { Injectable, signal } from '@angular/core';
  * **Preferences** / SQLite ausgetauscht werden kann, ohne die Stores zu ändern.
  */
 @Injectable({ providedIn: 'root' })
-export class StorageService {
+export class StorageService implements OnDestroy {
   private readonly prefix = 'nutritrack:';
+  /** Schreibzugriffe werden gebündelt (siehe {@link set}); so lange verzögert sich ein Schreiben höchstens. */
+  static readonly WRITE_DELAY_MS = 250;
+  private readonly pending = new Map<string, unknown>();
+  private flushTimer?: ReturnType<typeof setTimeout>;
+  private readonly onHide = (): void => this.flush();
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pagehide', this.onHide);
+      window.addEventListener('beforeunload', this.onHide);
+    }
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', this.onHide);
+  }
+
+  ngOnDestroy(): void {
+    this.flush();
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('pagehide', this.onHide);
+      window.removeEventListener('beforeunload', this.onHide);
+    }
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', this.onHide);
+  }
 
   /** Liest einen JSON-Wert; gibt `fallback` zurück, wenn leer oder defekt. */
   get<T>(key: string, fallback: T): T {
+    if (this.pending.has(key)) return JSON.parse(JSON.stringify(this.pending.get(key))) as T;
     try {
       const raw = this.backend()?.getItem(this.prefix + key);
       if (raw == null) return fallback;
@@ -26,19 +49,38 @@ export class StorageService {
   /** Zähler fehlgeschlagener Schreibzugriffe (Speicher voll/gesperrt); die App meldet jeden neuen Fehler. */
   readonly writeFailures = this._writeFailures.asReadonly();
 
-  /** Schreibt einen JSON-Wert. Liefert false und zählt den Fehler, wenn das Schreiben scheitert. */
-  set<T>(key: string, value: T): boolean {
-    try {
-      this.backend()?.setItem(this.prefix + key, JSON.stringify(value));
-      return true;
-    } catch {
-      this._writeFailures.update((n) => n + 1);
-      return false;
+  /**
+   * Schreibt einen JSON-Wert gebündelt: Mehrfach-Schreibzugriffe auf denselben Schlüssel
+   * innerhalb von {@link WRITE_DELAY_MS} ergeben einen einzigen `localStorage`-Zugriff.
+   * Lesen (`get`, `snapshot`, …) sieht sofort den neuesten Wert; beim Verlassen der Seite
+   * (`pagehide`, `visibilitychange`, `beforeunload`) wird sofort geschrieben.
+   * Scheitert das Schreiben (Speicher voll/gesperrt), zählt `writeFailures` hoch.
+   */
+  set<T>(key: string, value: T): void {
+    this.pending.set(key, value);
+    this.flushTimer ??= setTimeout(() => this.flush(), StorageService.WRITE_DELAY_MS);
+  }
+
+  /** Schreibt alle gebündelten Werte sofort. */
+  flush(): void {
+    clearTimeout(this.flushTimer);
+    this.flushTimer = undefined;
+    if (this.pending.size === 0) return;
+    const entries = Array.from(this.pending);
+    this.pending.clear();
+    const backend = this.backend();
+    for (const [key, value] of entries) {
+      try {
+        backend?.setItem(this.prefix + key, JSON.stringify(value));
+      } catch {
+        this._writeFailures.update((n) => n + 1);
+      }
     }
   }
 
   /** Entfernt einen Schlüssel. */
   remove(key: string): void {
+    this.pending.delete(key);
     try {
       this.backend()?.removeItem(this.prefix + key);
     } catch {
@@ -48,6 +90,7 @@ export class StorageService {
 
   /** Löscht alle NutriTrack-Schlüssel (für "Daten zurücksetzen"). */
   clearAll(): void {
+    this.pending.clear();
     const b = this.backend();
     if (!b) return;
     try {
@@ -67,6 +110,7 @@ export class StorageService {
    * Nicht lesbare Einträge werden ausgelassen (sie wären auch für die Stores unbrauchbar).
    */
   snapshot(): Record<string, unknown> {
+    this.flush();
     return Object.fromEntries(
       Object.entries(this.rawEntries()).flatMap(([key, raw]) => {
         try {
@@ -84,6 +128,7 @@ export class StorageService {
    * @returns `true` bei Erfolg.
    */
   replaceAll(data: Readonly<Record<string, unknown>>): boolean {
+    this.pending.clear();
     const b = this.backend();
     if (!b) return false;
     const previous = this.rawEntries();

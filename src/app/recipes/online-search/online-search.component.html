@@ -33,7 +33,7 @@
     </div>
   } @else if (shown(); as r) {
     <article class="os-detail nt-page" data-testid="os-detail">
-      @if (r.imageUrl) { <img class="os-detail__img" [src]="r.imageUrl" alt="" loading="lazy" /> }
+      @if (r.imageUrl) { <img class="os-detail__img" [src]="r.imageUrl" alt="" width="556" height="370" loading="lazy" /> }
       <h3 class="os-detail__title">{{ r.title }}</h3>
       <p class="os-meta">{{ metaLine(r) }}</p>
       @if (r.facts; as f) {
@@ -136,7 +136,7 @@
           <li>
             <button type="button" class="os-card" (click)="open(r)" [attr.aria-label]="r.title + ' ansehen'">
               <span class="os-card__thumb">
-                @if (r.imageUrl) { <img [src]="r.imageUrl" alt="" loading="lazy" /> } @else { <ion-icon name="restaurant-outline" aria-hidden="true"></ion-icon> }
+                @if (r.imageUrl) { <img [src]="r.imageUrl" alt="" width="64" height="64" loading="lazy" /> } @else { <ion-icon name="restaurant-outline" aria-hidden="true"></ion-icon> }
               </span>
               <span class="os-card__text">
                 <span class="os-card__title">{{ r.title }}</span>
