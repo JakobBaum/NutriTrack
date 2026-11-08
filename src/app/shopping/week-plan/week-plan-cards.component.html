@@ -11,7 +11,7 @@
         <li>
           <button type="button" class="wp-card" (click)="open(r)" [attr.aria-label]="r.title + ' ansehen'">
             <span class="wp-card__thumb">
-              @if (r.imageUrl) { <img [src]="r.imageUrl" alt="" loading="lazy" /> } @else { <ion-icon name="restaurant-outline" aria-hidden="true"></ion-icon> }
+              @if (r.imageUrl) { <img [src]="r.imageUrl" alt="" width="64" height="64" loading="lazy" /> } @else { <ion-icon name="restaurant-outline" aria-hidden="true"></ion-icon> }
             </span>
             <span class="wp-card__text">
               <span class="wp-card__title">{{ r.title }}</span>

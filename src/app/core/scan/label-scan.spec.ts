@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseNutritionLabel } from './nutrition-label-parser';
-import { downscaleFactor } from './label-image';
+import { downscaleFactor, shrinkPhotoForUpload, type PhotoShrinkDeps } from './label-image';
 import { LABEL_FAILED_MESSAGE, LABEL_READ_HINT, blankFieldsFor, evaluateLabelParse } from './label-scan';
 
 describe('evaluateLabelParse', () => {
@@ -45,5 +45,35 @@ describe('downscaleFactor', () => {
   });
   it('is safe for empty sizes', () => {
     expect(downscaleFactor(0, 0)).toBe(1);
+  });
+});
+
+describe('shrinkPhotoForUpload', () => {
+  function deps(width: number, height: number): { deps: PhotoShrinkDeps; canvas: { width: number; height: number; toDataURL: () => string } } {
+    const canvas = { width: 0, height: 0, toDataURL: () => 'data:image/jpeg;base64,SMALL' };
+    return {
+      canvas,
+      deps: {
+        load: async () => ({ width, height, draw: () => undefined }),
+        createCanvas: () => canvas as unknown as HTMLCanvasElement,
+      },
+    };
+  }
+
+  it('returns photos within the limit unchanged', async () => {
+    const { deps: d } = deps(1200, 900);
+    expect(await shrinkPhotoForUpload('ORIGINAL', 1600, d)).toBe('ORIGINAL');
+  });
+
+  it('scales large photos to the max edge and returns the re-encoded JPEG', async () => {
+    const { deps: d, canvas } = deps(4000, 3000);
+    expect(await shrinkPhotoForUpload('ORIGINAL', 1600, d)).toBe('SMALL');
+    expect(canvas.width).toBe(1600);
+    expect(canvas.height).toBe(1200);
+  });
+
+  it('falls back to the original when the image cannot be processed', async () => {
+    const failing: PhotoShrinkDeps = { load: async () => { throw new Error('bad'); }, createCanvas: () => document.createElement('canvas') };
+    expect(await shrinkPhotoForUpload('ORIGINAL', 1600, failing)).toBe('ORIGINAL');
   });
 });

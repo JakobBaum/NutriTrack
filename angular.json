@@ -39,7 +39,7 @@
                 "output": "assets/tesseract"
               },
               {
-                "glob": "tesseract-core*-lstm.wasm.js",
+                "glob": "{tesseract-core-simd-lstm,tesseract-core-lstm}.wasm.js",
                 "input": "node_modules/tesseract.js-core",
                 "output": "assets/tesseract/core"
               },
@@ -63,7 +63,7 @@
                 {
                   "type": "initial",
                   "maximumWarning": "900kb",
-                  "maximumError": "1200kb"
+                  "maximumError": "1000kb"
                 },
                 {
                   "type": "anyComponentStyle",

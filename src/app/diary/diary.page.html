@@ -81,7 +81,7 @@
                 <ion-label>
                   <h3>{{ entry.label }}@if (entry.brand) { <span class="entry-brand"> · {{ entry.brand }}</span> }</h3>
                   <p>
-                    @if (entry.amountG) { {{ formatAmount(entry.amountG, entry.unit) }} · }
+                    @if (entry.amountG) { {{ entry.amountG | ntAmount:entry.unit }} · }
                     E {{ entry.facts.proteinG | ntNum }} g · KH {{ entry.facts.carbsG | ntNum }} g · F {{ entry.facts.fatG | ntNum }} g
                     @if (entry.isEstimate) { · @if (ffLive()) { <span class="ai-badge">KI-Schätzung</span> } }
                   </p>

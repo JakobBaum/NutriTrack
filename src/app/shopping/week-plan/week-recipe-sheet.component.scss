@@ -8,7 +8,7 @@ ion-content {
 }
 
 .wp-detail {
-  &__img { display: block; width: 100%; max-height: 220px; object-fit: cover; border-radius: var(--nt-radius-card); }
+  &__img { display: block; width: 100%; aspect-ratio: 3 / 2; max-height: 220px; object-fit: cover; border-radius: var(--nt-radius-card); }
   &__title { margin: var(--nt-space-3) 0 0; font-size: var(--nt-fs-large-title, 28px); line-height: 1.15; color: var(--nt-ink); overflow-wrap: anywhere; }
   &__meta { margin: var(--nt-space-1) 0 0; font-size: var(--nt-fs-body); color: var(--nt-secondary); }
 }

@@ -87,9 +87,9 @@ export async function go(page, route) {
 
 export const settle = (page, ms = SETTLE_MS) => page.waitForTimeout(ms);
 
-/** Liest einen gespeicherten Store-Wert (JSON) aus localStorage. */
+/** Liest einen gespeicherten Store-Wert (JSON) aus localStorage; erzwingt vorher das gebündelte Schreiben (pagehide). */
 export function readStore(page, key) {
-  return page.evaluate(([k]) => JSON.parse(localStorage.getItem(k) ?? 'null'), [STORAGE_PREFIX + key]);
+  return page.evaluate(([k]) => { window.dispatchEvent(new Event('pagehide')); return JSON.parse(localStorage.getItem(k) ?? 'null'); }, [STORAGE_PREFIX + key]);
 }
 
 /** Wartet, bis `fn` ohne Assertion-Fehler durchläuft (für asynchrone UI-Updates). */

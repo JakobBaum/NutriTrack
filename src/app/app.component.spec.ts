@@ -34,6 +34,7 @@ describe('AppComponent', () => {
     });
 
     storage.set('diary', []);
+    storage.flush();
     fixture.detectChanges();
     await fixture.whenStable();
     vi.unstubAllGlobals();

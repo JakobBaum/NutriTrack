@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
+import type { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
 
 /**
  * Browser-tauglicher Barcode-Scanner auf Basis von `@zxing/browser`.
@@ -10,7 +10,12 @@ import { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
  */
 @Injectable({ providedIn: 'root' })
 export class BarcodeScannerService {
-  private readonly reader = new BrowserMultiFormatReader();
+  private reader?: Promise<BrowserMultiFormatReader>;
+
+  /** zxing (~570 kB) wird erst beim ersten Öffnen des Scanners nachgeladen. */
+  protected loadReader(): Promise<BrowserMultiFormatReader> {
+    return (this.reader ??= import('@zxing/browser').then((m) => new m.BrowserMultiFormatReader()));
+  }
 
   /** True, wenn der Browser Kamerazugriff (getUserMedia) unterstützt. */
   isSupported(): boolean {
@@ -31,7 +36,8 @@ export class BarcodeScannerService {
     onResult: (code: string) => void,
     onError?: (err: unknown) => void,
   ): Promise<IScannerControls> {
-    return this.reader.decodeFromConstraints(
+    const reader = await this.loadReader();
+    return reader.decodeFromConstraints(
       { video: { facingMode: 'environment' } },
       video,
       (result, err) => {
