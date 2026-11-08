@@ -320,13 +320,13 @@ describe('GET /health und Modellwechsel', () => {
     assert.equal(res.status, 200);
     assert.equal(res.headers.get('Access-Control-Allow-Origin'), APP_ORIGIN);
     const body = await res.json();
-    assert.deepEqual(body, { ok: true, hasKey: true, model: 'gemini-3.6-flash', fallbackModel: 'gemini-3.5-flash-lite' });
+    assert.deepEqual(body, { ok: true, hasKey: true, hasRecipeKey: false, model: 'gemini-3.6-flash', fallbackModel: 'gemini-3.5-flash-lite' });
     assert.ok(!JSON.stringify(body).includes('test-key'));
   });
 
   it('meldet hasKey=false ohne Secret und respektiert Modell-Overrides', async () => {
     const res = await worker.fetch(get('/health'), { GEMINI_MODEL: 'm1', GEMINI_FALLBACK_MODEL: 'm2' });
-    assert.deepEqual(await res.json(), { ok: true, hasKey: false, model: 'm1', fallbackModel: 'm2' });
+    assert.deepEqual(await res.json(), { ok: true, hasKey: false, hasRecipeKey: false, model: 'm1', fallbackModel: 'm2' });
   });
 
   it('wechselt bei 404 (Modell unbekannt) sofort auf das Fallback-Modell', async () => {
@@ -346,5 +346,119 @@ describe('GET /health und Modellwechsel', () => {
     const res = await run();
     assert.equal(res.status, 200);
     assert.equal(upstream.length, 2);
+  });
+});
+
+describe('GET /recipes/complexSearch (spoonacular)', () => {
+  const RECIPE_ENV = { ...ENV, SPOONACULAR_API_KEY: 'spoon-secret' };
+  const okReply = () => new Response('{"results":[],"totalResults":0}', {
+    status: 200,
+    headers: { 'Content-Type': 'application/json', 'X-Api-Quota-Left': '37' },
+  });
+
+  it('leitet die Suche mit Server-Key weiter und reicht Quota-Header durch', async () => {
+    // Arrange
+    mockFetch(okReply);
+
+    // Act
+    const res = await worker.fetch(get('/recipes/complexSearch?query=soup&maxCalories=400&number=5'), RECIPE_ENV);
+
+    // Assert
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { results: [], totalResults: 0 });
+    assert.equal(res.headers.get('X-Api-Quota-Left'), '37');
+    assert.match(res.headers.get('Access-Control-Expose-Headers'), /X-Api-Quota-Left/);
+    const target = new URL(upstream[0].url);
+    assert.equal(target.origin + target.pathname, 'https://api.spoonacular.com/recipes/complexSearch');
+    assert.equal(target.searchParams.get('query'), 'soup');
+    assert.equal(target.searchParams.get('maxCalories'), '400');
+    assert.equal(new Headers(upstream[0].init.headers).get('x-api-key'), 'spoon-secret');
+  });
+
+  it('antwortet 503 ohne Server-Key und ruft nichts auf', async () => {
+    // Arrange
+    mockFetch(okReply);
+
+    // Act
+    const res = await worker.fetch(get('/recipes/complexSearch?query=soup'), ENV);
+
+    // Assert
+    assert.equal(res.status, 503);
+    assert.deepEqual(await res.json(), { error: 'Rezept-Suche nicht eingerichtet.' });
+    assert.equal(upstream.length, 0);
+  });
+
+  it('verwirft unbekannte Parameter und einen mitgeschickten apiKey', async () => {
+    // Arrange
+    mockFetch(okReply);
+
+    // Act
+    await worker.fetch(get('/recipes/complexSearch?query=soup&apiKey=fremd&evil=1&sort=random&diet=vegan'), RECIPE_ENV);
+
+    // Assert
+    const params = new URL(upstream[0].url).searchParams;
+    assert.equal(params.get('apiKey'), null);
+    assert.equal(params.get('evil'), null);
+    assert.equal(params.get('sort'), null);
+    assert.equal(params.get('diet'), 'vegan');
+    assert.ok(!upstream[0].url.includes('spoon-secret'));
+  });
+
+  it('begrenzt number auf 20 und setzt einen Standard bei ungültigem Wert', async () => {
+    // Arrange
+    mockFetch(okReply);
+
+    // Act
+    await worker.fetch(get('/recipes/complexSearch?number=500'), RECIPE_ENV);
+    await worker.fetch(get('/recipes/complexSearch?number=abc'), RECIPE_ENV);
+    await worker.fetch(get('/recipes/complexSearch'), RECIPE_ENV);
+
+    // Assert
+    assert.deepEqual(upstream.map((u) => new URL(u.url).searchParams.get('number')), ['20', '10', '10']);
+  });
+
+  it('reicht Fehlerstatus wie 402 (Tageslimit) durch', async () => {
+    // Arrange
+    mockFetch(() => new Response('{"message":"limit"}', { status: 402, headers: { 'Content-Type': 'application/json' } }));
+
+    // Act
+    const res = await worker.fetch(get('/recipes/complexSearch?query=a'), RECIPE_ENV);
+
+    // Assert
+    assert.equal(res.status, 402);
+  });
+
+  it('meldet einen abgelehnten Server-Key als 502 statt 401', async () => {
+    // Arrange
+    mockFetch(() => new Response('{}', { status: 401 }));
+
+    // Act
+    const res = await worker.fetch(get('/recipes/complexSearch?query=a'), RECIPE_ENV);
+
+    // Assert
+    assert.equal(res.status, 502);
+  });
+
+  it('antwortet 429, wenn das Rate-Limit greift', async () => {
+    // Arrange
+    mockFetch(okReply);
+    const env = { ...RECIPE_ENV, AI_LIMITER: { limit: async () => ({ success: false }) } };
+
+    // Act
+    const res = await worker.fetch(get('/recipes/complexSearch?query=a'), env);
+
+    // Assert
+    assert.equal(res.status, 429);
+    assert.equal(upstream.length, 0);
+  });
+
+  it('meldet hasRecipeKey in /health ohne den Wert zu verraten', async () => {
+    // Act
+    const res = await worker.fetch(get('/health'), RECIPE_ENV);
+
+    // Assert
+    const body = await res.json();
+    assert.equal(body.hasRecipeKey, true);
+    assert.ok(!JSON.stringify(body).includes('spoon-secret'));
   });
 });

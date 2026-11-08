@@ -21,22 +21,27 @@
         <p class="hint">
           Die Online-Suche nutzt die Rezeptdatenbank von
           <a href="https://spoonacular.com/food-api" target="_blank" rel="noopener noreferrer">spoonacular.com</a>.
-          Der kostenlose Plan reicht für etwa 50 Punkte pro Tag. Der Schlüssel bleibt nur auf diesem Gerät.
+          Der kostenlose Plan reicht für etwa 50 Punkte pro Tag, geteilt mit allen Nutzern des globalen Servers.
         </p>
-        <label class="field-label" id="rs-key-label" for="rs-key">spoonacular API-Key</label>
-        <ion-input
-          id="rs-key"
-          class="nt-field"
-          type="password"
-          aria-labelledby="rs-key-label"
-          [ngModel]="apiKey()"
-          (ngModelChange)="apiKey.set($event)"
-          [clearOnEdit]="false"
-          autocomplete="off"
-          placeholder="Schlüssel einfügen"
-        ></ion-input>
+        <p class="hint" data-testid="rs-status">Status: {{ status() }}</p>
+        <details class="advanced" [open]="access.mode() === 'ownKey'">
+          <summary>Erweitert</summary>
+          <p class="hint">Nur nötig, wenn du einen eigenen spoonacular-Schlüssel nutzen willst. Er hat Vorrang und bleibt nur auf diesem Gerät.</p>
+          <label class="field-label" id="rs-key-label" for="rs-key">Eigener spoonacular-Schlüssel (optional)</label>
+          <ion-input
+            id="rs-key"
+            class="nt-field"
+            type="password"
+            aria-labelledby="rs-key-label"
+            [ngModel]="apiKey()"
+            (ngModelChange)="apiKey.set($event)"
+            [clearOnEdit]="false"
+            autocomplete="off"
+            placeholder="Schlüssel einfügen"
+          ></ion-input>
+        </details>
         <div class="actions">
-          <ion-button fill="outline" expand="block" [disabled]="test().busy || !apiKey().trim()" (click)="testConnection()">Verbindung testen</ion-button>
+          <ion-button fill="outline" expand="block" [disabled]="test().busy || !canTest()" (click)="testConnection()">Verbindung testen</ion-button>
         </div>
         @if (test().message; as msg) {
           <p class="hint" role="status" [class.hint--warn]="test().ok === false">{{ msg }}</p>

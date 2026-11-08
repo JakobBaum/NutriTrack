@@ -93,16 +93,30 @@ export function register({ test }) {
     await topModal(page).locator('.nt-sheet-header__title', { hasText: 'Rezept bearbeiten' }).waitFor();
   });
 
-  test('recipes: Online-Suche ohne Schlüssel zeigt die Einrichtung', seed(), async (page) => {
+  test('recipes: Online-Suche ohne eigenen Schlüssel nutzt den Worker (503 → Hinweis, keine Einrichtung)', seed(), async (page) => {
+    const hits = [];
+    await page.route('https://*.workers.dev/recipes/complexSearch**', async (route) => {
+      const req = route.request();
+      const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' };
+      if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+      hits.push(req.headers()['x-api-key'] ?? null);
+      return route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        headers: cors,
+        body: '{"error":"Rezept-Suche nicht eingerichtet."}',
+      });
+    });
     await go(page, 'recipes');
     await page.locator('[data-testid="online-search-btn"]').click();
     const modal = topModal(page);
-    await modal.locator('[data-testid="os-no-key"]').waitFor();
-    assert.match(await modal.innerText(), /spoonacular\.com/);
-    assert.match(await modal.innerText(), /Profil › Rezept-Suche/);
-    await modal.locator('button', { hasText: 'Schlüssel eintragen' }).click();
-    await page.waitForURL(/settings\?open=recipe-search/);
-    await page.locator('ion-modal.show-modal .nt-sheet-header__title', { hasText: 'Rezept-Suche' }).waitFor();
+    await modal.locator('.nt-sheet-header__title', { hasText: 'Rezepte online' }).waitFor();
+    assert.equal(await modal.locator('[data-testid="os-no-key"]').count(), 0, 'Einrichtung darf mit globalem Worker nicht erscheinen');
+    await modal.locator('ion-input input[aria-label="Rezept suchen"]').fill('lentil');
+    await modal.locator('.os-search-btn').click();
+    await modal.locator('.os-error').waitFor();
+    assert.match(await modal.locator('.os-error').innerText(), /nicht eingerichtet/);
+    assert.deepEqual(hits, [null], 'genau eine Worker-Anfrage ohne x-api-key');
   });
 
   test('recipes: Online-Suche (gemockt) finden, öffnen, speichern', seed({ 'recipe-search-config': { apiKey: 'test-key', baseUrl: 'https://api.spoonacular.com' } }), async (page) => {

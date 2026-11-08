@@ -3,7 +3,14 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { SpoonacularProvider } from '../../core/recipes/online/spoonacular.provider';
 import { toOnlineSearchError } from '../../core/recipes/online/spoonacular.errors';
+import { RecipeSearchAccessService } from '../../core/recipes/online/recipe-search-access';
 import { RecipeSearchConfigStore } from '../../core/state/recipe-search-config.store';
+
+const STATUS_LABELS = {
+  ownKey: 'Eigener Schlüssel aktiv',
+  worker: 'Globaler Server aktiv',
+  none: 'Nicht eingerichtet',
+} as const;
 
 interface TestState {
   busy: boolean;
@@ -24,6 +31,7 @@ interface TestState {
 })
 export class RecipeSearchSettingsComponent {
   private readonly store = inject(RecipeSearchConfigStore);
+  readonly access = inject(RecipeSearchAccessService);
   private readonly provider = inject(SpoonacularProvider);
   private readonly route = inject(ActivatedRoute);
   private readonly queryParams = toSignal(this.route.queryParamMap);
@@ -31,8 +39,10 @@ export class RecipeSearchSettingsComponent {
   readonly open = signal(false);
   readonly apiKey = signal(this.store.config().apiKey);
   readonly test = signal<TestState>({ busy: false, ok: null, message: null });
-  readonly status = computed(() => (this.store.config().apiKey.trim() ? 'Verbunden' : 'Kein Schlüssel'));
-  readonly isConnected = computed(() => this.store.config().apiKey.trim().length > 0);
+  readonly status = computed(() => STATUS_LABELS[this.access.mode()]);
+  readonly isConnected = computed(() => this.access.isAvailable());
+  /** Verbindungstest ist möglich, sobald irgendein Zugang besteht (eingetippter Key oder Worker). */
+  readonly canTest = computed(() => this.apiKey().trim().length > 0 || this.access.mode() === 'worker');
 
   constructor() {
     effect(() => {

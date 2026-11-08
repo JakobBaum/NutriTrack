@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { ModalController } from '@ionic/angular/lazy';
-import { RecipeSearchConfigStore } from '../../core/state/recipe-search-config.store';
+import { RecipeSearchAccessService } from '../../core/recipes/online/recipe-search-access';
 import { RecipeStore } from '../../core/state/recipe.store';
 import { OnlineRecipe } from '../../core/recipes/online/online-recipe.model';
 import { RecipeTranslateService } from '../../core/recipes/online/recipe-translate';
@@ -33,7 +33,7 @@ export class OnlineSearchComponent {
   private readonly modal = inject(ModalController);
   private readonly router = inject(Router);
   private readonly provider = inject(SpoonacularProvider);
-  private readonly config = inject(RecipeSearchConfigStore);
+  private readonly access = inject(RecipeSearchAccessService);
   private readonly recipeStore = inject(RecipeStore);
   private readonly translator = inject(RecipeTranslateService);
 
@@ -63,7 +63,8 @@ export class OnlineSearchComponent {
   private readonly savedIds = signal<ReadonlySet<string>>(new Set());
   readonly toast = signal<string | null>(null);
 
-  readonly hasKey = computed(() => this.config.config().apiKey.trim().length > 0);
+  /** Nur ohne eigenen Schlüssel und ohne globalen Server ist die Einrichtung nötig. */
+  readonly needsSetup = computed(() => !this.access.isAvailable());
   readonly hasMore = computed(() => this.results().length < this.total());
   /** Angezeigtes Rezept: übersetzt, wenn der Schalter an ist und eine Übersetzung vorliegt. */
   readonly shown = computed(() => {
