@@ -3,10 +3,12 @@ import { ActionSheetController, AlertController } from '@ionic/angular';
 import { formatDecimal, parseDecimal } from '../core/util/number-input';
 import { UNIT_OPTIONS } from '../core/util/units';
 import { AiService } from '../core/ai/ai.service';
-import { MealType } from '../core/models';
+import { MealType, ShoppingItem } from '../core/models';
 import { ProfileStore } from '../core/state/profile.store';
 import { RecipeStore } from '../core/state/recipe.store';
-import { ShoppingStore, sumItems } from '../core/state/shopping.store';
+import { ShoppingStore, itemPrice, sumItems } from '../core/state/shopping.store';
+import { AppSettingsStore } from '../core/state/app-settings.store';
+import { formatQuantity } from '../core/shopping/units/unit-format';
 import { WeekPlanStore } from '../core/state/week-plan.store';
 import { WeekPlanService } from '../core/week-plan/week-plan.service';
 import { UNDO_TOAST_BUTTONS, UNDO_TOAST_MS, UndoableDelete, settleUndoToast } from '../meals/undoable-delete';
@@ -25,7 +27,6 @@ import {
   encodeIndexes,
   formatShareText,
   groupByCategory,
-  scaleRecipeIngredients,
   splitRows,
 } from './shopping-list.util';
 
@@ -111,9 +112,8 @@ export class ShoppingPage implements OnDestroy {
   /** Ohne KI keine Rezepte = nichts zu generieren. */
   readonly hasRecipes = computed(() => this.recipeStore.recipes().length > 0);
   readonly noRecipesBlock = computed(() => !this.live() && !this.hasRecipes());
-  /** Summen zeigen, wenn die Liste KI-Preise hat oder mindestens ein Preis eingetragen ist. */
+  /** Summen zeigen, sobald die Liste Positionen hat (Preise werden immer geschätzt). */
   readonly showTotals = computed(() => this.totals().priced > 0);
-  readonly isMockPrice = computed(() => (this.list()?.priceSource ?? (this.live() ? 'ai' : 'mock')) === 'mock');
 
   readonly personsMin = PERSONS_MIN;
   readonly personsMax = PERSONS_MAX;
@@ -399,7 +399,7 @@ export class ShoppingPage implements OnDestroy {
       this.showShareToast('Nichts zu teilen: alle Positionen sind erledigt.');
       return;
     }
-    const text = formatShareText(this.rows().map((r) => r.item));
+    const text = formatShareText(this.rows().map((r) => r.item), 'Einkaufsliste', this.appSettings.unitSystem());
     const nav = typeof navigator === 'undefined' ? undefined : navigator;
     if (typeof nav?.share === 'function') {
       try {
@@ -433,18 +433,6 @@ export class ShoppingPage implements OnDestroy {
     this.shareToastOpen.set(false);
   }
 
-  /** Tippen auf ein Gericht: seine Zutaten (auf die Personenzahl skaliert) landen in der Liste. */
-  addDish(title: string): void {
-    const recipe = this.recipeStore.recipes().find((r) => r.title === title);
-    const items = recipe ? scaleRecipeIngredients(recipe, this.list()?.persons ?? this.persons) : [];
-    if (items.length === 0) {
-      this.showShareToast(`${title}: keine Zutaten hinterlegt`);
-      return;
-    }
-    items.forEach((it) => this.store.addItem(it));
-    this.showShareToast(`${items.length} Zutaten von ${title} hinzugefügt`);
-  }
-
   setBudget(value: number | null): void {
     this.budget = value;
   }
@@ -457,20 +445,33 @@ export class ShoppingPage implements OnDestroy {
     this.persons = value;
   }
 
+  private readonly appSettings = inject(AppSettingsStore);
+  readonly translateProgress = this.weekPlanService.translateProgress;
+
+  /** Menge einer Position im gewählten Einheitensystem. */
+  qty(item: ShoppingItem): string {
+    return formatQuantity(item.amount, item.unit, item.name, this.appSettings.unitSystem());
+  }
+
+  /** Angezeigter Preis (eigener vor geschätzt). */
+  shownPrice(item: ShoppingItem): number | undefined {
+    return itemPrice(item);
+  }
+
   /** Eigenen Preis einer Position eintragen oder löschen (leer lassen). */
   async editPrice(index: number): Promise<void> {
     const item = this.list()?.items[index];
     if (!item) return;
     const alert = await this.alertCtrl.create({
-      header: 'Preis eintragen',
+      header: 'Preis ändern',
       subHeader: item.name,
-      message: 'Betrag in Euro (€)',
+      message: 'Eigener Betrag in Euro (€); leer = Schätzung verwenden',
       inputs: [
         {
           name: 'price',
           type: 'text',
           placeholder: '0,00 €',
-          value: item.estPrice != null ? formatDecimal(item.estPrice) : '',
+          value: item.userPrice != null ? formatDecimal(item.userPrice) : '',
           attributes: { inputmode: 'decimal' },
         },
       ],
@@ -534,7 +535,7 @@ export class ShoppingPage implements OnDestroy {
       amount: Math.max(0, parseDecimal(this.newItemAmountText) ?? 0),
       unit: this.newItemUnit || 'g',
       checked: false,
-      ...(price !== null && price > 0 ? { estPrice: price } : {}),
+      ...(price !== null && price > 0 ? { userPrice: price } : {}),
     });
     this.newItemName = '';
     this.newItemAmountText = '';

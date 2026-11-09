@@ -1,5 +1,6 @@
 import { ShoppingItem } from '../core/models';
 import { SHOPPING_CATEGORIES } from '../core/shopping/shopping-category';
+import { DEFAULT_UNIT_SYSTEM, UnitSystem, formatQuantity } from '../core/shopping/units/unit-format';
 
 /** Eine Position samt Index in der gespeicherten Liste. */
 export interface ShoppingRow {
@@ -70,18 +71,21 @@ export function groupByCategory(rows: readonly ShoppingRow[]): ShoppingGroup[] {
   return sorted.map((category) => ({ category, rows: byCategory.get(category) ?? [] }));
 }
 
-/** Menge als Text („0,5 kg“); null bei „ohne Menge“. */
-export function formatAmount(item: ShoppingItem): string | null {
+/** Menge als Text im Einheitensystem ("0,5 kg" / "1,1 lb"); null bei "ohne Menge". */
+export function formatAmount(item: ShoppingItem, system: UnitSystem = DEFAULT_UNIT_SYSTEM): string | null {
   if (!(item.amount > 0)) return null;
-  const amount = item.amount.toLocaleString('de-AT', { maximumFractionDigits: 2 });
-  return `${amount} ${item.unit}`.trim();
+  return formatQuantity(item.amount, item.unit, item.name, system);
 }
 
 /** Klartext-Liste der offenen Positionen zum Teilen, nach Kategorie gruppiert. */
-export function formatShareText(items: readonly ShoppingItem[], title = 'Einkaufsliste'): string {
+export function formatShareText(
+  items: readonly ShoppingItem[],
+  title = 'Einkaufsliste',
+  system: UnitSystem = DEFAULT_UNIT_SYSTEM,
+): string {
   const rows = items.map((item, index) => ({ item, index })).filter((r) => !r.item.checked);
   const line = (r: ShoppingRow): string => {
-    const amount = formatAmount(r.item);
+    const amount = formatAmount(r.item, system);
     return amount ? `- ${r.item.name} (${amount})` : `- ${r.item.name}`;
   };
   const blocks = groupByCategory(rows).map((g) => {

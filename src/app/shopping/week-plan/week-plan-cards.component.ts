@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { ModalController } from '@ionic/angular/lazy';
 import { WeekPlanStore } from '../../core/state/week-plan.store';
 import { WeekPlanRecipe } from '../../core/week-plan/week-plan.model';
+import { WeekPlanService } from '../../core/week-plan/week-plan.service';
 import { groupByMeal, recipeMetaLine } from './week-plan-format';
 import { WeekRecipeSheetComponent } from './week-recipe-sheet.component';
 
@@ -20,6 +21,16 @@ const SHEET_INITIAL_BREAKPOINT = 0.8;
 export class WeekPlanCardsComponent {
   private readonly store = inject(WeekPlanStore);
   private readonly modals = inject(ModalController);
+  private readonly service = inject(WeekPlanService);
+
+  /** "Übersetze Rezepte (n/m)" während der Übersetzung, sonst null. */
+  readonly progress = this.service.translateProgress;
+  /** Anzahl Rezepte, die nicht übersetzt werden konnten (Hinweis in der Liste). */
+  readonly untranslated = computed(() => (this.plan()?.recipes ?? []).filter((r) => r.lang === 'en').length);
+
+  constructor() {
+    void this.service.ensureTranslated();
+  }
 
   readonly plan = this.store.plan;
   readonly groups = computed(() => groupByMeal(this.plan()?.recipes ?? []));

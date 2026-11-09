@@ -13,6 +13,8 @@ import {
   ShoppingPlanRequest,
   ShoppingPlanResult,
 } from './ai-provider';
+import { RecipeTexts, TranslateLanguage } from '../recipes/translate/translate.model';
+import { normalizeTranslatedTexts } from '../recipes/translate/translate-normalize';
 import { DebugLogService } from '../debug/debug-log.service';
 import { AI_ERROR_MESSAGES, AI_TIMEOUT_MS, friendlyAiErrorMessage, isTimeoutError, mapTimeoutError } from './ai-errors';
 import { defaultAiProxyUrl } from './ai-endpoint';
@@ -70,6 +72,16 @@ export class ProxyAiProvider implements AiProvider {
   async importRecipe(input: RecipeImportInput): Promise<RecipeImportResult> {
     const raw = await this.call<unknown>('importRecipe', input);
     return normalizeRecipeImport(raw, input.url);
+  }
+
+  async translateRecipe(texts: RecipeTexts, lang: TranslateLanguage): Promise<RecipeTexts> {
+    const raw = await this.call<unknown>('translateRecipe', { ...texts, lang });
+    return normalizeTranslatedTexts(raw, texts);
+  }
+
+  async translateSearchQuery(query: string, lang: TranslateLanguage): Promise<string> {
+    const raw = await this.call<{ query?: unknown }>('translateSearchQuery', { query, lang });
+    return typeof raw?.query === 'string' && raw.query.trim() ? raw.query.trim() : query;
   }
 
   /**

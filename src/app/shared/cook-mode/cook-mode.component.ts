@@ -1,10 +1,15 @@
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import { AppSettingsStore } from '../../core/state/app-settings.store';
+import { formatQuantity } from '../../core/shopping/units/unit-format';
+import { convertStepText } from '../../core/shopping/units/unit-text';
 
 /** Zutat in der Kochansicht (Menge bereits skaliert). */
 export interface CookIngredient {
   name: string;
   amount: number;
   unit: string;
+  /** Umrechnung nur ungefähr. */
+  approx?: boolean;
 }
 
 /**
@@ -19,6 +24,8 @@ export interface CookIngredient {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NtCookModeComponent {
+  private readonly settings = inject(AppSettingsStore);
+
   readonly open = input(false);
   readonly title = input('');
   readonly steps = input<readonly string[]>([]);
@@ -48,8 +55,14 @@ export class NtCookModeComponent {
     this.dismissed.emit();
   }
 
-  protected amountText(amount: number, unit: string): string {
-    const n = amount > 0 ? String(amount).replace('.', ',') : '';
-    return [n, unit].filter(Boolean).join(' ');
+  /** Menge im gewählten Einheitensystem (g/kg/ml/l oder lb/oz/cups). */
+  protected ingredientAmount(ing: CookIngredient): string {
+    if (!(ing.amount > 0)) return ing.unit;
+    return (ing.approx ? 'ca. ' : '') + formatQuantity(ing.amount, ing.unit, ing.name, this.settings.unitSystem());
+  }
+
+  /** Schritttext mit Temperaturen und Längen im gewählten System. */
+  protected stepText(step: string | undefined): string {
+    return convertStepText(step ?? '', this.settings.unitSystem());
   }
 }

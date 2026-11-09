@@ -39,8 +39,8 @@ describe('mergeKept', () => {
 describe('ShoppingStore total', () => {
   it('derives estTotal when items are added and removed', () => {
     const store = TestBed.inject(ShoppingStore);
-    store.addItem(item('a', 2));
-    store.addItem(item('b', 3));
+    store.addItem({ ...item('a'), userPrice: 2 });
+    store.addItem({ ...item('b'), userPrice: 3 });
     expect(store.list()?.estTotal).toBe(5);
 
     store.removeItem(0);
@@ -69,7 +69,7 @@ describe('mergeKept mit manueller Position ohne Menge', () => {
 });
 
 describe('mergeKept übernimmt Preis und Kategorie der generierten Position', () => {
-  it('füllt estPrice und category, wenn die behaltene manuelle Position keine hat', () => {
+  it('schätzt neu und übernimmt die Kategorie, wenn die behaltene manuelle Position keine hat', () => {
     const prev: ShoppingItem[] = [{ name: 'Reis', amount: 0, unit: 'g', checked: false }];
     const generated: ShoppingItem[] = [
       { name: 'Reis', amount: 300, unit: 'g', checked: false, estPrice: 1.2, category: 'Trockenware/Nudeln/Reis' },
@@ -77,22 +77,22 @@ describe('mergeKept übernimmt Preis und Kategorie der generierten Position', ()
 
     const [merged] = mergeKept(prev, generated);
 
-    expect(merged.estPrice).toBe(1.2);
+    expect(merged.estPrice).toBe(1.6);
     expect(merged.category).toBe('Trockenware/Nudeln/Reis');
   });
 
-  it('skaliert den Preis auf die behaltene Menge', () => {
+  it('schätzt den Preis für die behaltene Menge neu', () => {
     const prev: ShoppingItem[] = [{ name: 'Reis', amount: 600, unit: 'g', checked: false }];
     const generated: ShoppingItem[] = [{ name: 'Reis', amount: 300, unit: 'g', checked: false, estPrice: 1.2 }];
 
-    expect(mergeKept(prev, generated)[0].estPrice).toBe(2.4);
+    expect(mergeKept(prev, generated)[0].estPrice).toBe(3.2);
   });
 
   it('behält eigene Kategorie und eigenen Preis einer abgehakten Position', () => {
-    const prev: ShoppingItem[] = [{ name: 'Reis', amount: 500, unit: 'g', checked: true, estPrice: 9, category: 'Sonstiges' }];
+    const prev: ShoppingItem[] = [{ name: 'Reis', amount: 500, unit: 'g', checked: true, userPrice: 9, category: 'Sonstiges' }];
     const generated: ShoppingItem[] = [{ name: 'Reis', amount: 300, unit: 'g', checked: false, estPrice: 1.2, category: 'Obst & Gemüse' }];
 
-    expect(mergeKept(prev, generated)[0]).toMatchObject({ estPrice: 9, category: 'Sonstiges' });
+    expect(mergeKept(prev, generated)[0]).toMatchObject({ userPrice: 9, category: 'Sonstiges' });
   });
 });
 
@@ -100,13 +100,15 @@ describe('ShoppingStore.setItemPrice', () => {
   it('sets, rounds and clears an entered price and keeps estTotal in sync', () => {
     const store = TestBed.inject(ShoppingStore);
     store.addItem({ name: 'Brot', amount: 1, unit: 'Stk', checked: false });
+    const estimate = store.list()?.items[0].estPrice;
+    expect(estimate).toBeGreaterThan(0);
 
     store.setItemPrice(0, 2.499);
-    expect(store.list()?.items[0].estPrice).toBe(2.5);
+    expect(store.list()?.items[0].userPrice).toBe(2.5);
     expect(store.list()?.estTotal).toBe(2.5);
 
     store.setItemPrice(0, null);
-    expect(store.list()?.items[0].estPrice).toBeUndefined();
-    expect(store.list()?.estTotal).toBe(0);
+    expect(store.list()?.items[0].userPrice).toBeUndefined();
+    expect(store.list()?.estTotal).toBe(estimate);
   });
 });

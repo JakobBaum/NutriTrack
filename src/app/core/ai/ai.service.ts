@@ -11,6 +11,7 @@ import {
   ShoppingPlanRequest,
   ShoppingPlanResult,
 } from './ai-provider';
+import { RecipeTexts, TranslateLanguage } from '../recipes/translate/translate.model';
 import { ProxyAiProvider } from './proxy-ai-provider';
 import { MockAiProvider } from './mock-ai-provider';
 import { defaultAiProxyUrl } from './ai-endpoint';
@@ -53,6 +54,14 @@ export class AiService implements AiProvider {
 
   importRecipe(input: RecipeImportInput): Promise<RecipeImportResult> {
     return this.provider().importRecipe(input);
+  }
+
+  translateRecipe(texts: RecipeTexts, lang: TranslateLanguage): Promise<RecipeTexts> {
+    return this.provider().translateRecipe(texts, lang);
+  }
+
+  translateSearchQuery(query: string, lang: TranslateLanguage): Promise<string> {
+    return this.provider().translateSearchQuery(query, lang);
   }
 
   /** Prüft ohne KI-Kosten, ob der globale KI-Dienst erreichbar ist. */

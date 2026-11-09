@@ -87,7 +87,8 @@
 
           <ion-button expand="block" class="generate-btn" data-testid="week-plan-btn" (click)="generateWeekPlan()" [disabled]="loading() || !onlineAvailable()">
             @if (loading()) {
-              <ion-spinner name="dots" slot="start"></ion-spinner> Erstelle…
+              <ion-spinner name="dots" slot="start"></ion-spinner>
+              @if (translateProgress(); as pr) { Übersetze Rezepte ({{ pr.done }}/{{ pr.total }})… } @else { Erstelle… }
             } @else {
               <ion-icon slot="start" name="sparkles-outline"></ion-icon> Wochenplan erstellen
             }
@@ -120,7 +121,7 @@
                 </ion-select>
               </div>
             } @else {
-              <p class="generator__mode" role="note">Ohne KI: Mengen-Liste ohne echte Preise.</p>
+              <p class="generator__mode" role="note">Ohne KI: Preise werden aus einer Richtwert-Tabelle geschätzt.</p>
             }
             @if (noRecipesBlock()) {
               <div class="generator__empty" role="status">
@@ -156,16 +157,16 @@
         <div class="totals">
           <div class="totals__main">
             <span class="totals__group">
-              <span class="totals__label">{{ isMockPrice() ? 'Eingetragen gesamt' : 'Gesamt' }}</span>
-              <span class="totals__sum" [class.over]="live() && overBudget()">{{ isMockPrice() ? '' : '≈ ' }}{{ totals().total | ntNum:2:2 }} €</span>
+              <span class="totals__label">Gesamt (geschätzt)</span>
+              <span class="totals__sum" [class.over]="live() && overBudget()">ca. {{ totals().total | ntNum:2:2 }} €</span>
             </span>
             <span class="totals__group">
               <span class="totals__label">Davon offen</span>
-              <span class="totals__open">{{ isMockPrice() ? '' : '≈ ' }}{{ totals().open | ntNum:2:2 }} €</span>
+              <span class="totals__open">ca. {{ totals().open | ntNum:2:2 }} €</span>
             </span>
           </div>
           <div class="totals__meta">
-            <span class="ai-badge">{{ isMockPrice() ? 'Nur eingetragene Preise' : 'KI-Schätzung' }}</span>
+            <span class="ai-badge">geschätzt</span>
             @if (live() && (l.budget ?? null) !== null) {
               <span class="totals__budget">Budget {{ l.budget! | ntNum:2:2 }} €</span>
             }
@@ -179,15 +180,6 @@
       }
       @if (l.note) {
         <p class="totals__note" role="status">{{ l.note }}</p>
-      }
-
-      @if (l.suggestedDishes && l.suggestedDishes.length) {
-        <div class="suggested">
-          <span class="suggested__label">Gerichte (antippen = Zutaten hinzufügen):</span>
-          @for (dish of l.suggestedDishes; track dish) {
-            <ion-chip (click)="addDish(dish)" [attr.aria-label]="dish + ': Zutaten hinzufügen'">{{ dish }}</ion-chip>
-          }
-        </div>
       }
 
       <!-- Eine Zeile (offen oder erledigt); Index = Position in der gespeicherten Liste. -->
@@ -207,17 +199,17 @@
                 <span class="check-row__name">{{ item.name }}</span>
                 <span class="qty">
                   @let hasAmount = item.amount > 0;
-                  @let hasPrice = (item.estPrice ?? null) !== null;
-                  @if (hasAmount) { {{ item.amount | ntNum:2 }} {{ item.unit }} }
+                  @let hasPrice = shownPrice(item) !== undefined;
+                  @if (hasAmount) { {{ qty(item) }} }
                   @if (hasAmount && hasPrice) { · }
-                  @if (hasPrice) { {{ isMockPrice() ? '' : '≈ ' }}{{ item.estPrice! | ntNum:2:2 }} € }
+                  @if (hasPrice) { ca. {{ shownPrice(item)! | ntNum:2:2 }} € <span class="est-badge">{{ item.userPrice != null ? 'eigener Preis' : 'geschätzt' }}</span> }
                   @if (!hasAmount && !hasPrice) { ohne Menge }
                   @else if (!hasAmount) { ohne Menge }
                 </span>
               </span>
             </ion-checkbox>
-            <ion-button slot="end" fill="clear" size="small" class="price-btn" (click)="editPrice(row.index)" [attr.aria-label]="item.name + ': Preis eintragen'">
-              {{ (item.estPrice ?? null) !== null ? 'Preis ändern' : 'Preis eintragen' }}
+            <ion-button slot="end" fill="clear" size="small" class="price-btn" (click)="editPrice(row.index)" [attr.aria-label]="item.name + ': Preis ändern'">
+              Preis ändern
             </ion-button>
             <ion-button slot="end" fill="clear" color="medium" class="nt-hover-delete" (click)="removeItem(row.index)" [attr.aria-label]="item.name + ' löschen'">
               <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
@@ -272,10 +264,7 @@
         }
       }
 
-      <p class="price-note">
-        @if (isMockPrice()) { Ohne KI keine Preisschätzung. Preise zählen nur, wenn du sie selbst einträgst. }
-        @else { Preise sind KI-Schätzungen und können im Markt abweichen. }
-      </p>
+      <p class="price-note">Preise sind Richtwerte (Österreich, Supermarkt) und können im Markt abweichen. Eigene Preise überschreiben die Schätzung.</p>
     } @else {
       <div class="empty">
         <ion-icon name="cart-outline" class="empty__icon" aria-hidden="true"></ion-icon>

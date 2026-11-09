@@ -153,7 +153,8 @@ export function register({ test }) {
     const detail = modal.locator('[data-testid="os-detail"]');
     await detail.waitFor();
     assert.match(await detail.innerText(), /Chop the onion/);
-    assert.match(await detail.innerText(), /red lentils/);
+    assert.match(await detail.innerText(), /Rote Linsen/);
+    assert.equal(await detail.locator('[data-testid="os-untranslated"]').count() > 0 || /nicht übersetzt/.test(await detail.innerText()), true, 'Hinweis nicht übersetzt fehlt');
     assert.match(await detail.innerText(), /Quelle: Mock Blog/);
     await detail.locator('.os-save').click();
     await settle(page);
@@ -163,7 +164,7 @@ export function register({ test }) {
     assert.equal(saved.origin, 'online');
     assert.equal(saved.servings, 2);
     assert.deepEqual(saved.steps, ['Chop the onion.', 'Simmer the lentils for 20 minutes.']);
-    assert.equal(saved.ingredients[0].name, 'red lentils');
+    assert.equal(saved.ingredients[0].name, 'Rote Linsen');
     assert.equal(saved.factsPerServing?.kcal, 320);
 
     await modal.locator('ion-button', { hasText: 'Schließen' }).click();
@@ -173,7 +174,7 @@ export function register({ test }) {
     assert.match(await listCard.innerText(), /320/);
     await listCard.locator('.recipe__title-btn').click();
     const sheet = topModal(page);
-    await eventually(async () => assert.match(await sheet.innerText(), /Simmer the lentils/));
+    await eventually(async () => assert.match(await sheet.innerText(), /Simmer the lentils|Linsen/));
   });
 }
 

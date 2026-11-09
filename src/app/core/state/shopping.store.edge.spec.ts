@@ -30,12 +30,12 @@ describe('sumItems / mergeKept — Randfälle', () => {
     expect(sumItems([item('a', 0.1), item('b', 0.2)]).total).toBe(0.3);
   });
 
-  it('verwirft unabgehakte bepreiste Positionen, addiert manuelle Duplikate und skaliert den generierten Preis auf die Menge', () => {
+  it('verwirft unabgehakte bepreiste Positionen, addiert manuelle Duplikate und schätzt den Preis für die Menge neu', () => {
     const prev = [item('Milch', 1), item('Brot', undefined), item('brot', undefined)];
     const generated = [item('Brot', 2)];
     const merged = mergeKept(prev, generated);
     expect(merged.map((i) => i.amount)).toEqual([2]);
-    expect(merged.map((i) => i.estPrice)).toEqual([4]);
+    expect(merged.map((i) => i.estPrice)).toEqual([2.25]);
   });
 
   it('liefert generierte Positionen bei leerer Vorliste unverändert', () => {
@@ -85,7 +85,7 @@ describe('ShoppingStore — Verhalten', () => {
     expect(localStorage.getItem('nutritrack:shopping')).toBeNull();
   });
 
-  it('generiert ohne KI nur Mengen, ignoriert Budget/Markt und behält abgehakte Positionen', async () => {
+  it('generiert ohne KI mit geschätzten Preisen, ignoriert Budget/Markt und behält abgehakte Positionen', async () => {
     addRecipe();
     store.addItem(item('Eigenes', undefined, true));
     const list = await store.generatePlan({ persons: 2, days: 7, meals: ['dinner'], budget: 1, store: 'Lidl' });
@@ -94,9 +94,9 @@ describe('ShoppingStore — Verhalten', () => {
     expect(list.store).toBeUndefined();
     expect(list.note).toBeUndefined();
     expect(list.items.some((i) => i.name === 'Eigenes' && i.checked)).toBe(true);
-    expect(list.items.filter((i) => !i.checked).every((i) => i.estPrice === undefined)).toBe(true);
+    expect(list.items.filter((i) => !i.checked).every((i) => i.estPrice !== undefined)).toBe(true);
     expect(list.dishes).toBe(7);
-    expect(list.estTotal).toBe(0);
+    expect(list.estTotal).toBeGreaterThan(0);
   });
 
   it('verweigert die Generierung ohne KI und ohne Rezepte', async () => {
@@ -106,9 +106,9 @@ describe('ShoppingStore — Verhalten', () => {
 
   it('behält eigene Positionen mit selbst eingetragenem Preis beim Neu-Generieren', async () => {
     addRecipe();
-    store.addItem({ name: 'Kaffee', amount: 1, unit: 'Pck', checked: false, estPrice: 5.5, manual: true });
+    store.addItem({ name: 'Kaffee', amount: 1, unit: 'Pck', checked: false, userPrice: 5.5, manual: true });
     const list = await store.generatePlan({ persons: 1, days: 1, meals: ['dinner'] });
-    expect(list.items.find((i) => i.name === 'Kaffee')?.estPrice).toBe(5.5);
+    expect(list.items.find((i) => i.name === 'Kaffee')?.userPrice).toBe(5.5);
   });
 
   it('erzwingt Mindestwerte für Personen/Tage/Mahlzeiten', async () => {

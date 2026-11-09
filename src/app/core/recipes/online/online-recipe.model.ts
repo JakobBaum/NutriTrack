@@ -15,6 +15,8 @@ export interface OnlineRecipe {
   facts?: NutritionFacts;
   ingredients: RecipeIngredient[];
   steps: string[];
+  /** Sprache der Texte: 'de' = übersetzt, 'en' = Original (nicht übersetzt); fehlt = Original. */
+  lang?: 'de' | 'en';
 }
 
 export interface OnlineSearchPage {

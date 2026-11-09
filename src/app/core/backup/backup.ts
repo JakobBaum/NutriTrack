@@ -20,7 +20,9 @@ const ARRAY_KEYS = ['diary', 'recipes', 'savedMeals', 'customFoods', 'favorites'
 const NULLABLE_OBJECT_KEYS = ['profile', 'shopping'] as const;
 /** Frühere KI-Verbindung (eigener Key, Server-Adresse): wird weder exportiert noch importiert. */
 const AI_KEY = 'ai-config';
-const NEVER_BACKED_UP_KEYS: ReadonlySet<string> = new Set([LAST_BACKUP_KEY, AI_KEY]);
+/** Übersetzungs-Cache: jederzeit neu aufbaubar, gehört nicht ins Backup. */
+const TRANSLATION_CACHE_KEY = 'translations';
+const NEVER_BACKED_UP_KEYS: ReadonlySet<string> = new Set([LAST_BACKUP_KEY, AI_KEY, TRANSLATION_CACHE_KEY]);
 const RECIPE_SEARCH_KEY = 'recipe-search-config';
 
 /** Gespeicherte Daten: Schlüssel (ohne Präfix) → bereits geparster JSON-Wert. */

@@ -15,6 +15,8 @@ import { defaultAiProxyUrl } from '../core/ai/ai-endpoint';
 import { AiService } from '../core/ai/ai.service';
 import { CustomFoodStore } from '../core/state/custom-food.store';
 import { SettingsStore } from '../core/state/settings.store';
+import { AppSettingsStore } from '../core/state/app-settings.store';
+import { UnitSystem } from '../core/shopping/units/unit-format';
 import { WeekPlanStore } from '../core/state/week-plan.store';
 import { ShoppingStore } from '../core/state/shopping.store';
 import { WeightStore } from '../core/state/weight.store';
@@ -53,6 +55,12 @@ export class SettingsPage implements OnInit {
   private readonly profileStore = inject(ProfileStore);
   private readonly route = inject(ActivatedRoute);
   private readonly settingsStore = inject(SettingsStore);
+  private readonly appSettings = inject(AppSettingsStore);
+  readonly unitSystem = this.appSettings.unitSystem;
+
+  setUnitSystem(value: UnitSystem): void {
+    this.appSettings.setUnitSystem(value);
+  }
   private readonly diary = inject(DiaryStore);
   private readonly recipes = inject(RecipeStore);
   private readonly customFoods = inject(CustomFoodStore);
@@ -345,6 +353,7 @@ export class SettingsPage implements OnInit {
     this.weightStore.clear();
     this.favoriteStore.clear();
     this.settingsStore.clear();
+    this.appSettings.clear();
     this.storage.clearAll();
     this.savedToast.set('Alle Daten wurden zurückgesetzt.');
   }

@@ -27,3 +27,9 @@
   &__meta { font-size: var(--nt-fs-caption); color: var(--nt-secondary); font-variant-numeric: tabular-nums; }
   &__chev { flex: none; color: var(--nt-secondary); }
 }
+
+.wp-translate {
+  margin: var(--nt-space-2) var(--nt-space-1) 0;
+  font-size: var(--nt-fs-caption);
+  color: var(--nt-secondary);
+}

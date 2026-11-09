@@ -4,6 +4,8 @@ import {
   FastFoodSuggestion,
 } from '../models';
 import { estimateIngredientFacts } from '../nutrition/ingredient-estimate';
+import { translateIngredientName, translateQueryWithDictionary } from '../recipes/translate/ingredient-dictionary';
+import { RecipeTexts, TranslateLanguage } from '../recipes/translate/translate.model';
 import { buildWeekPlan } from '../shopping/shopping-generator';
 import {
   AiProvider,
@@ -46,6 +48,15 @@ export class MockAiProvider implements AiProvider {
     const plan = buildWeekPlan(req.recipes, req.persons, req.days, req.meals.length);
     // Ehrlich ohne KI: nur Mengen, keine erfundenen Preise.
     return { items: plan.items, suggestedDishes: plan.suggestedDishes, estTotal: 0 };
+  }
+
+  /** Ohne KI nur Zutatennamen über das Wörterbuch; Titel und Schritte bleiben im Original. */
+  async translateRecipe(texts: RecipeTexts, _lang: TranslateLanguage): Promise<RecipeTexts> {
+    return { ...texts, ingredients: texts.ingredients.map(translateIngredientName) };
+  }
+
+  async translateSearchQuery(query: string, _lang: TranslateLanguage): Promise<string> {
+    return translateQueryWithDictionary(query);
   }
 
   async recognizeLabel(

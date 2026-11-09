@@ -667,3 +667,67 @@ describe('spoonacular-Cache (WRK-03)', () => {
     assert.equal(upstream.length, 2);
   });
 });
+
+describe('translateRecipe / translateSearchQuery', () => {
+  const RECIPE = {
+    lang: 'de',
+    title: 'Pork shoulder tacos',
+    ingredients: ['pork shoulder', 'chopped fresh rosemary'],
+    steps: ['Season the pork.', 'Roast at 350 degrees F.'],
+  };
+
+  it('übersetzt mit Schema, temperature 0 und Token-Obergrenze', async () => {
+    mockFetch(() => geminiReply({ title: 'Schweineschulter-Tacos', ingredients: ['Schweineschulter', 'Rosmarin, frisch'], steps: ['Schweinefleisch würzen.', 'Bei 350 Grad F rösten.'] }));
+    const res = await worker.fetch(post({ fn: 'translateRecipe', payload: RECIPE }), ENV);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.title, 'Schweineschulter-Tacos');
+    assert.deepEqual(body.ingredients, ['Schweineschulter', 'Rosmarin, frisch']);
+    const cfg = JSON.parse(upstream[0].init.body).generationConfig;
+    assert.equal(cfg.temperature, 0);
+    assert.equal(cfg.responseSchema.type, 'OBJECT');
+    assert.ok(cfg.maxOutputTokens > 0 && cfg.maxOutputTokens <= 8192);
+  });
+
+  it('gleicht falsche Eintragszahlen und leere Einträge an das Original an', async () => {
+    mockFetch(() => geminiReply({ title: ' ', ingredients: ['Nur eins'], steps: ['Würzen.', ' '] }));
+    const body = await (await worker.fetch(post({ fn: 'translateRecipe', payload: RECIPE }), ENV)).json();
+    assert.equal(body.title, RECIPE.title);
+    assert.deepEqual(body.ingredients, RECIPE.ingredients);
+    assert.deepEqual(body.steps, ['Würzen.', 'Roast at 350 degrees F.']);
+  });
+
+  it('lehnt fehlenden Titel, unbekannte Sprache und zu viele Zutaten mit 400 ab, ohne Upstream-Call', async () => {
+    const bad = [
+      { ...RECIPE, title: '' },
+      { ...RECIPE, lang: 'xx' },
+      { ...RECIPE, ingredients: Array.from({ length: 61 }, () => 'salt') },
+      { ...RECIPE, steps: 'nope' },
+    ];
+    for (const payload of bad) {
+      const res = await worker.fetch(post({ fn: 'translateRecipe', payload }), ENV);
+      assert.equal(res.status, 400);
+    }
+    assert.equal(upstream.length, 0);
+  });
+
+  it('zählt gegen den Tageszähler wie die anderen KI-Funktionen', async () => {
+    mockFetch(() => geminiReply({}));
+    const store = { [`cap:${new Date().toISOString().slice(0, 10)}`]: '5' };
+    const kv = { get: async (k) => store[k] ?? null, put: async (k, v) => { store[k] = v; } };
+    const res = await worker.fetch(post({ fn: 'translateRecipe', payload: RECIPE }), { ...ENV, DAILY_KV: kv, DAILY_AI_CAP: '5' });
+    assert.equal(res.status, 429);
+    assert.equal(upstream.length, 0);
+  });
+
+  it('übersetzt Suchbegriffe und fällt bei leerer Antwort auf den Begriff zurück', async () => {
+    mockFetch(() => geminiReply({ query: 'chicken' }));
+    const ok = await (await worker.fetch(post({ fn: 'translateSearchQuery', payload: { query: 'Hähnchen', lang: 'de' } }), ENV)).json();
+    assert.deepEqual(ok, { query: 'chicken' });
+    mockFetch(() => geminiReply({ query: '' }));
+    const fallback = await (await worker.fetch(post({ fn: 'translateSearchQuery', payload: { query: 'Hähnchen', lang: 'de' } }), ENV)).json();
+    assert.deepEqual(fallback, { query: 'Hähnchen' });
+    const empty = await worker.fetch(post({ fn: 'translateSearchQuery', payload: { query: ' ' } }), ENV);
+    assert.equal(empty.status, 400);
+  });
+});

@@ -35,5 +35,11 @@ export function groupByMeal(recipes: readonly WeekPlanRecipe[]): MealGroup[] {
 
 /** Zutaten für die Kochansicht, auf die Personenzahl skaliert. */
 export function cookIngredients(recipe: WeekPlanRecipe, persons: number): CookIngredient[] {
-  return scaleRecipeIngredients(recipe, persons).map(({ name, amount, unit }) => ({ name, amount, unit }));
+  const named = recipe.ingredients.filter((i) => i.name.trim() !== '');
+  return scaleRecipeIngredients(recipe, persons).map(({ name, amount, unit }, i) => ({
+    name,
+    amount,
+    unit,
+    ...(named[i]?.approx ? { approx: true } : {}),
+  }));
 }
