@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { isTimeoutError } from '../ai/ai-errors';
+import { STATE_MESSAGES } from '../messages/state-messages';
 
 /** Warum eine Lebensmittel-Abfrage fehlschlug (für passende Nutzer-Meldungen). */
 export type FoodLookupFailure = 'offline' | 'rate-limit' | 'server' | 'timeout';
@@ -43,15 +44,15 @@ export function toFoodLookupError(e: unknown): FoodLookupError {
 
 /** Nutzerfreundliche Meldung für die UI. */
 export function foodErrorMessage(e: unknown): string {
-  if (!(e instanceof FoodLookupError)) return 'Abfrage fehlgeschlagen — bitte erneut versuchen.';
+  if (!(e instanceof FoodLookupError)) return STATE_MESSAGES.foodGeneric;
   switch (e.reason) {
     case 'rate-limit':
-      return 'Zu viele Anfragen an die Lebensmittel-Datenbank — bitte kurz warten.';
+      return STATE_MESSAGES.foodRateLimited;
     case 'timeout':
-      return 'Die Lebensmittel-Datenbank antwortet gerade nicht — bitte erneut versuchen.';
+      return STATE_MESSAGES.foodTimeout;
     case 'offline':
-      return 'Keine Verbindung zur Lebensmittel-Datenbank — Internet prüfen.';
+      return STATE_MESSAGES.offline;
     default:
-      return 'Lebensmittel-Datenbank gerade nicht erreichbar — bitte später erneut versuchen.';
+      return STATE_MESSAGES.foodServer;
   }
 }

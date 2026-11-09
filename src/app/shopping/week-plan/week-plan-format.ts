@@ -1,4 +1,5 @@
 import { MealType } from '../../core/models';
+import { NewDiaryEntry } from '../../core/state/diary.store';
 import { CookIngredient } from '../../shared/cook-mode/cook-mode.component';
 import { MEAL_LABELS, MEAL_ORDER } from '../../core/week-plan/week-plan-targets';
 import { WeekPlanRecipe } from '../../core/week-plan/week-plan.model';
@@ -42,4 +43,10 @@ export function cookIngredients(recipe: WeekPlanRecipe, persons: number): CookIn
     unit,
     ...(named[i]?.approx ? { approx: true } : {}),
   }));
+}
+
+/** Tagebuch-Eintrag für eine Portion eines Plan-Rezepts; null ohne Nährwerte. */
+export function weekRecipeToDiaryEntry(recipe: WeekPlanRecipe, meal: MealType, dateISO: string): NewDiaryEntry | null {
+  if (!recipe.facts) return null;
+  return { dateISO, meal, label: recipe.title, facts: recipe.facts, servings: 1, ref: { kind: 'manual' } };
 }

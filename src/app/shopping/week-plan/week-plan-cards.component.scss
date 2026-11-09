@@ -33,3 +33,9 @@
   font-size: var(--nt-fs-caption);
   color: var(--nt-secondary);
 }
+
+.wp-translate__retry {
+  display: inline-flex;
+  margin-top: var(--nt-space-2);
+  min-height: var(--nt-touch);
+}

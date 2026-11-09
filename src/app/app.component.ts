@@ -1,11 +1,7 @@
-import { Component, effect, inject, untracked } from '@angular/core';
-import { ToastController } from '@ionic/angular';
-import { StorageService } from './core/storage/storage.service';
-
-/** Meldung, wenn der Gerätespeicher das Schreiben verweigert (QAE-02). */
-export const STORAGE_WRITE_ERROR_MESSAGE =
-  'Konnte nicht gespeichert werden — der Speicher ist voll oder gesperrt. Lege ein Backup an und gib Platz frei.';
-const STORAGE_ERROR_TOAST_MS = 6000;
+import { Component, DestroyRef, inject } from '@angular/core';
+import { showKeyboardDoneBar } from './core/keyboard/keyboard-accessory';
+import { reducedMotionQuery, setIonicAnimated, watchReducedMotion } from './core/motion/reduced-motion';
+import { StoragePersistenceService } from './core/storage/storage-persistence.service';
 
 @Component({
   selector: 'app-root',
@@ -14,23 +10,11 @@ const STORAGE_ERROR_TOAST_MS = 6000;
   standalone: false,
 })
 export class AppComponent {
-  private readonly storage = inject(StorageService);
-  private readonly toastCtrl = inject(ToastController);
-
   constructor() {
-    effect(() => {
-      const failures = this.storage.writeFailures();
-      if (failures > 0) untracked(() => void this.showStorageError());
-    });
-  }
-
-  private async showStorageError(): Promise<void> {
-    const toast = await this.toastCtrl.create({
-      message: STORAGE_WRITE_ERROR_MESSAGE,
-      duration: STORAGE_ERROR_TOAST_MS,
-      position: 'top',
-      color: 'danger',
-    });
-    await toast.present();
+    void inject(StoragePersistenceService).request();
+    void showKeyboardDoneBar();
+    // Systemwunsch „Bewegung reduzieren“ auch zur Laufzeit übernehmen (Ionic-Animationen).
+    const stop = watchReducedMotion(reducedMotionQuery, setIonicAnimated);
+    inject(DestroyRef).onDestroy(stop);
   }
 }

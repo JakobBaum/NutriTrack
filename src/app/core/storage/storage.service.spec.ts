@@ -85,7 +85,7 @@ describe('StorageService gebündeltes Schreiben (PRF-09)', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    store = memoryStorage({});
+    store = memoryStorage({ 'nutritrack:schemaVersion': '1' });
     setItem = vi.spyOn(store, 'setItem');
     vi.stubGlobal('localStorage', store);
   });

@@ -102,6 +102,14 @@ export class WeekPlanService {
     return job;
   }
 
+  /** „Erneut übersetzen“: hebt die Sperre der Sitzung für den aktuellen Plan auf und übersetzt noch einmal. */
+  retryTranslation(): Promise<void> {
+    const plan = this.planStore.plan();
+    if (!plan) return Promise.resolve();
+    this.attempted.delete(plan.id);
+    return this.ensureTranslated();
+  }
+
   private async retranslate(plan: WeekPlan): Promise<void> {
     const recipes = await this.translateRecipes(plan.recipes);
     const next: WeekPlan = { ...plan, recipes };

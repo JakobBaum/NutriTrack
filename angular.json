@@ -54,7 +54,7 @@
                 "output": "assets/tesseract/lang"
               }
             ],
-            "styles": ["src/global.scss", "src/theme/variables.scss"],
+            "styles": ["src/global.scss", "src/styles/overlays-and-polish.scss", "src/styles/ios-patterns-and-fixes.scss", "src/styles/foundation.scss", "src/theme/variables.scss"],
             "scripts": []
           },
           "configurations": {
@@ -78,8 +78,10 @@
                 }
               ],
               "outputHashing": "all",
-              "security": {
-                "autoCsp": true
+              "optimization": {
+                "scripts": true,
+                "styles": { "minify": true, "inlineCritical": false },
+                "fonts": true
               }
             },
             "development": {
@@ -121,7 +123,7 @@
           "options": {
             "tsConfig": "tsconfig.spec.json",
             "buildTarget": "::development",
-            "setupFiles": ["src/test-setup.ts"]
+            "setupFiles": ["src/test-setup.ts", "src/test-modules.ts"]
           },
           "configurations": {
             "ci": {

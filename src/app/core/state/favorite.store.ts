@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { AmountUnit, DiaryEntry, DiaryRef, MealType, NutritionFacts } from '../models';
 import { StorageService } from '../storage/storage.service';
 import { makeId } from '../util/id';
+import { sanitizeList } from './record-sanitize';
 import type { NewDiaryEntry } from './diary.store';
 
 export const KEY_FAVORITES = 'favorites';
@@ -64,7 +65,7 @@ export class FavoriteStore {
   private readonly storage = inject(StorageService);
 
   private readonly _favorites = signal<readonly FavoriteFood[]>(
-    (this.storage.get<unknown[]>(KEY_FAVORITES, []) ?? []).filter(isUsable),
+    this.storage.getSanitized<FavoriteFood>(KEY_FAVORITES, (raw) => sanitizeList<FavoriteFood>(raw, isUsable)),
   );
 
   readonly favorites = this._favorites.asReadonly();

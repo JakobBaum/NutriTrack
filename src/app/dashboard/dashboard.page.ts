@@ -1,12 +1,13 @@
-import { ChangeDetectionStrategy, Component, HostListener, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { Router } from '@angular/router';
+import { AppResumeService } from '../core/app-resume/app-resume.service';
 import { MealType, NutritionFacts } from '../core/models';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { formatNum } from '../shared/num.pipe';
 import { dayLabel, rollDate, toDateISO } from '../core/util/date';
 import { MEAL_DEFS, mealForHour, mealLabel } from '../diary/diary-helpers';
-import { isWarnMacro, macroEnergyShares, proteinHint, proteinOfEntries, softHyphenLabel } from './dashboard-math';
+import { isWarnMacro, macroEnergyShares, macroNote, proteinHint, proteinOfEntries, softHyphenLabel } from './dashboard-math';
 
 interface MacroView {
   key: 'kcal' | 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar';
@@ -20,7 +21,7 @@ interface MacroView {
   target: number;
   /** Überschreitung in Einheiten (0, solange das Ziel nicht überschritten ist). */
   overBy: number;
-  /** True, wenn eine Überschreitung rot gezeigt wird (nur kcal und Zucker). */
+  /** True, wenn eine Überschreitung rot gezeigt wird (nur kcal). */
   warn: boolean;
 }
 
@@ -40,6 +41,8 @@ interface DrillData {
   color: string;
   /** True, wenn das Ziel dieses Werts deutlich überschritten ist (Warnfarbe). */
   over: boolean;
+  /** Erklärung zum Wert (z. B. Zucker: Gesamtzucker gegen Richtwert für freien Zucker). */
+  note: string | null;
   items: DrillItem[];
 }
 
@@ -67,6 +70,13 @@ export class DashboardPage {
   private readonly profileStore = inject(ProfileStore);
   private readonly diary = inject(DiaryStore);
   private readonly router = inject(Router);
+  private readonly resume = inject(AppResumeService);
+
+  constructor() {
+    effect(() => {
+      if (this.resume.resumeCount() > 0) untracked(() => this.refreshToday());
+    });
+  }
 
   readonly selectedDate = signal(toDateISO());
   /** Der Tag, den die Seite zuletzt als "heute" kannte (für den Tageswechsel). */
@@ -128,7 +138,7 @@ export class DashboardPage {
       mk('carbs', 'Kohlenhydrate', 'g', 'var(--nt-carbs)', Math.round(e.carbsG), t.carbsG),
       mk('fat', 'Fett', 'g', 'var(--nt-fat)', Math.round(e.fatG), t.fatG),
       mk('fiber', 'Ballaststoffe', 'g', 'var(--nt-fiber)', Math.round(e.fiberG), t.fiberG),
-      mk('sugar', 'Zucker', 'g', 'var(--nt-sugar)', Math.round(e.sugarG), t.sugarG),
+      mk('sugar', 'Zucker gesamt', 'g', 'var(--nt-sugar)', Math.round(e.sugarG), t.sugarG),
     ];
   });
 
@@ -174,7 +184,7 @@ export class DashboardPage {
     const total = items.reduce((s, i) => s + i.value, 0);
     const target = macro?.target ?? 0;
     return {
-      label, unit, color, over, target,
+      label, unit, color, over, target, note: macroNote(key),
       targetPercent: target > 0 ? Math.round((total / target) * 100) : 0,
       total: Math.round(total * 10) / 10,
       items: items.map(i => ({
@@ -202,11 +212,6 @@ export class DashboardPage {
   /** Beim Betreten der Seite und beim Zurückkehren in die App: nach Mitternacht auf den neuen Tag springen. */
   ionViewWillEnter(): void {
     this.refreshToday();
-  }
-
-  @HostListener('document:visibilitychange')
-  onVisibilityChange(): void {
-    if (document.visibilityState === 'visible') this.refreshToday();
   }
 
   private refreshToday(): void {

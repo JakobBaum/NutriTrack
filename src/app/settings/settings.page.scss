@@ -32,7 +32,7 @@ ion-content {
     gap: var(--nt-space-2);
 
     .num {
-      font-size: 40px;
+      font-size: 2.5rem;
       font-weight: 700;
       letter-spacing: 0.3px;
       font-variant-numeric: tabular-nums;
@@ -100,70 +100,6 @@ ion-item {
   margin: 2px 0 0;
   font-size: var(--nt-fs-caption);
   color: var(--nt-secondary);
-}
-
-// Formular im Profil-Sheet: feste Zeilenhoehe, Stepper mit Luft zum Rand.
-.form-row {
-  --min-height: 60px;
-  --padding-top: var(--nt-space-2);
-  --padding-bottom: var(--nt-space-2);
-  --inner-padding-end: var(--nt-space-3);
-
-  nt-stepper {
-    margin-inline-start: var(--nt-space-3);
-  }
-}
-
-// Segment (Abnehmen / Halten / Zunehmen): eigene Zeile mit Abstand oben und unten.
-.form-row--segment {
-  --min-height: 56px;
-  --padding-top: var(--nt-space-3);
-  --padding-bottom: var(--nt-space-3);
-
-  ion-segment {
-    width: 100%;
-  }
-}
-
-// Tempo-Auswahl als Chips, 44 px Tippflaeche.
-.rate-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--nt-space-2);
-  margin-top: var(--nt-space-2);
-}
-
-.rate-chip {
-  min-height: var(--nt-touch);
-  padding: 0 var(--nt-space-4);
-  border: 0;
-  border-radius: var(--nt-radius-pill);
-  background: var(--nt-accent-tint);
-  color: var(--ion-color-primary-shade);
-  font: inherit;
-  font-size: var(--nt-fs-body);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-
-  &--on {
-    background: var(--nt-accent);
-    color: var(--nt-on-accent);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--nt-focus);
-    outline-offset: 2px;
-  }
-}
-
-// Speichern-Button: Abstand oben zum letzten Inhalt, Abstand unten zum Sheet-Rand.
-.form-actions {
-  padding: var(--nt-space-6) 0 var(--nt-space-6);
-
-  &--top {
-    padding: var(--nt-space-2) 0 0;
-  }
 }
 
 // Feldgruppe im KI-Sheet: Beschriftung oberhalb, Feld .nt-field.
@@ -236,14 +172,14 @@ ion-item {
     border-radius: 4px;
     min-height: 44px;
     padding: 4px 14px;
-    font-size: 12px;
+    font-size: 0.75rem;
     margin-bottom: 8px;
     cursor: pointer;
   }
 
   &__empty {
     color: #9ca3af;
-    font-size: 12px;
+    font-size: 0.75rem;
     text-align: center;
     margin: 8px 0;
   }
@@ -251,7 +187,7 @@ ion-item {
   &__entry {
     display: flex;
     gap: 8px;
-    font-size: 11px;
+    font-size: 0.75rem;
     font-family: monospace;
     padding: 2px 0;
     border-bottom: 1px solid #1e1e1e;

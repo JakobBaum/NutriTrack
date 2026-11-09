@@ -1,6 +1,5 @@
 <ion-header class="ion-no-border">
-  <div class="nt-page-header">
-    <h1 class="nt-large-title" role="heading" aria-level="1">Einkaufsliste</h1>
+  <nt-page-header title="Einkaufsliste">
     @if (isListView() && list() !== null) {
       <div class="nt-page-header__action">
         <ion-button class="share-btn" fill="clear" (click)="shareList()" aria-label="Liste teilen">
@@ -8,7 +7,7 @@
         </ion-button>
       </div>
     }
-  </div>
+  </nt-page-header>
   <div class="nt-page view-switch">
     <ion-segment [value]="view()" (ionChange)="onViewChange($any($event).detail.value)" aria-label="Ansicht wählen">
       <ion-segment-button value="recipes" class="view-segment__btn"><ion-label>Wochenplan</ion-label></ion-segment-button>
@@ -30,6 +29,12 @@
             <ion-icon slot="start" name="refresh-outline"></ion-icon>
             Neuen Wochenplan erstellen
           </ion-button>
+          @if (list(); as l) {
+            <ion-button class="nt-add-btn summary__btn" data-testid="open-list-btn" (click)="setView('list')">
+              <ion-icon slot="start" name="list-outline"></ion-icon>
+              Einkaufsliste öffnen ({{ l.items.length }} {{ l.items.length === 1 ? 'Position' : 'Positionen' }}, {{ openCount() }} offen)
+            </ion-button>
+          }
         </div>
       }
     }
@@ -42,8 +47,8 @@
           }
           @if (!onlineAvailable()) {
             <p class="generator__mode" role="note">
-              Die Online-Rezeptsuche ist nicht eingerichtet.
-              <a routerLink="/settings">Profil › Rezept-Suche</a>
+              Die Rezeptsuche ist nicht eingerichtet. Unten kannst du aus deinen eigenen Rezepten planen.
+              <a routerLink="/settings" [queryParams]="{ open: 'recipe-search' }">Profil › Rezeptsuche</a>
             </p>
           }
 
@@ -126,10 +131,10 @@
             @if (noRecipesBlock()) {
               <div class="generator__empty" role="status">
                 <p>Lege zuerst eigene Rezepte an, daraus entsteht dann die Einkaufsliste.</p>
-                <ion-button fill="outline" size="small" routerLink="/recipes">Zu den Rezepten</ion-button>
+                <ion-button fill="outline" size="small" routerLink="/recipes">Zu meinen Rezepten</ion-button>
               </div>
             }
-            <ion-button expand="block" fill="outline" class="own-btn" data-testid="own-plan-btn" (click)="generate()" [disabled]="loading() || noRecipesBlock()">
+            <ion-button expand="block" [fill]="onlineAvailable() ? 'outline' : 'solid'" class="own-btn" data-testid="own-plan-btn" (click)="generate()" [disabled]="loading() || noRecipesBlock()">
               <ion-icon slot="start" name="book-outline"></ion-icon> Aus meinen Rezepten planen
             </ion-button>
           </div>
@@ -202,7 +207,7 @@
                   @let hasPrice = shownPrice(item) !== undefined;
                   @if (hasAmount) { {{ qty(item) }} }
                   @if (hasAmount && hasPrice) { · }
-                  @if (hasPrice) { ca. {{ shownPrice(item)! | ntNum:2:2 }} € <span class="est-badge">{{ item.userPrice != null ? 'eigener Preis' : 'geschätzt' }}</span> }
+                  @if (hasPrice) { ca. {{ shownPrice(item)! | ntNum:2:2 }} € <span class="est-badge">{{ typeof item.userPrice === 'number' ? 'eigener Preis' : 'geschätzt' }}</span> }
                   @if (!hasAmount && !hasPrice) { ohne Menge }
                   @else if (!hasAmount) { ohne Menge }
                 </span>
@@ -268,8 +273,8 @@
     } @else {
       <div class="empty">
         <ion-icon name="cart-outline" class="empty__icon" aria-hidden="true"></ion-icon>
-        <p>Noch keine Liste. Tippe auf „+“, um Artikel von Hand hinzuzufügen, oder erstelle einen Wochenplan unter „Rezepte“.</p>
-        <ion-button class="nt-add-btn empty__btn" (click)="setView('recipes')">Zu den Rezepten</ion-button>
+        <p>Noch keine Liste. Tippe auf „+“, um Artikel einzutragen, oder erstelle einen Wochenplan.</p>
+        <ion-button class="nt-add-btn empty__btn" (click)="setView('recipes')">Wochenplan erstellen</ion-button>
       </div>
     }
   }
@@ -334,6 +339,8 @@
         <ion-input
           #addName
           class="nt-field add-name"
+          autocapitalize="words"
+          autocorrect="off"
           enterkeyhint="done"
           [autofocus]="true"
           [(ngModel)]="newItemName"
@@ -367,10 +374,13 @@
             enterkeyhint="done"
             [(ngModel)]="newItemPriceText"
             (keyup.enter)="addManual()"
+            (ionFocus)="selectAll($event)"
             placeholder="Preis (optional)"
             aria-label="Preis in Euro, optional"
           ></ion-input>
         </div>
+        @if (addAmountError(); as err) { <p class="add-error" role="alert" data-testid="add-amount-error">Menge: {{ err }}</p> }
+        @if (addPriceError(); as err) { <p class="add-error" role="alert" data-testid="add-price-error">Preis: {{ err }}</p> }
         <button type="button" class="nt-add-btn add-submit" (click)="addManual()">Hinzufügen</button>
       </div>
     </ion-content>

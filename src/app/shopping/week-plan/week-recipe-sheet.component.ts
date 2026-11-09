@@ -1,11 +1,16 @@
 import { ChangeDetectionStrategy, Component, Input, inject, signal } from '@angular/core';
+import { ActionSheetController, ToastController } from '@ionic/angular';
 import { ModalController } from '@ionic/angular/lazy';
+import { pickMealSheet } from '../../diary/diary-sheets';
+import { showEntryToast } from '../../diary/entry-toast';
+import { DiaryStore } from '../../core/state/diary.store';
+import { toDateISO } from '../../core/util/date';
 import { toRecipeDraft } from '../../core/recipes/online/spoonacular.mapper';
 import { RecipeStore } from '../../core/state/recipe.store';
 import { isOnlineRecipeSaved } from '../../core/week-plan/week-plan-recipes';
 import { WeekPlanRecipe } from '../../core/week-plan/week-plan.model';
 import { CookIngredient } from '../../shared/cook-mode/cook-mode.component';
-import { cookIngredients, recipeMetaLine } from './week-plan-format';
+import { cookIngredients, recipeMetaLine, weekRecipeToDiaryEntry } from './week-plan-format';
 
 /**
  * Detail-Sheet eines Wochenplan-Rezepts: Bild, Eckdaten, „Zu Favoriten“, „Kochen“ (geteilter
@@ -21,6 +26,9 @@ import { cookIngredients, recipeMetaLine } from './week-plan-format';
 export class WeekRecipeSheetComponent {
   private readonly modal = inject(ModalController);
   private readonly recipeStore = inject(RecipeStore);
+  private readonly diary = inject(DiaryStore);
+  private readonly sheets = inject(ActionSheetController);
+  private readonly toasts = inject(ToastController);
 
   @Input({ required: true }) recipe!: WeekPlanRecipe;
   @Input() persons = 1;
@@ -34,6 +42,17 @@ export class WeekRecipeSheetComponent {
   save(): void {
     if (this.isSaved()) return;
     this.recipeStore.add(toRecipeDraft(this.recipe));
+  }
+
+  /** Eine Portion heute ins Tagebuch (Essenszeit per Auswahl, vorbelegt mit der Plan-Mahlzeit). */
+  async logToDiary(): Promise<void> {
+    if (!this.recipe.facts) return;
+    const meal = await pickMealSheet(this.sheets, this.recipe.meal);
+    if (!meal) return;
+    const entry = weekRecipeToDiaryEntry(this.recipe, meal, toDateISO());
+    if (!entry) return;
+    const saved = this.diary.add(entry);
+    void showEntryToast(this.toasts, 'Ins Tagebuch eingetragen.', () => this.diary.remove(saved.id));
   }
 
   startCook(): void {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DayTotals, currentStreak, isDayInGoal, lastDays, weekSummary } from './week-stats';
+import { DayTotals, currentStreak, isDayInGoal, isProteinGoalMet, lastDays, proteinStripStates, weekSummary } from './week-stats';
 
 const target = { kcal: 2000, proteinG: 100 };
 const day = (dateISO: string, kcal: number, proteinG: number, logged = true): DayTotals => ({ dateISO, kcal, proteinG, logged });
@@ -73,5 +73,36 @@ describe('currentStreak', () => {
 
   it('stops at the look-back limit', () => {
     expect(currentStreak(() => true, '2026-11-08', 10)).toBe(10);
+  });
+});
+
+describe('isProteinGoalMet', () => {
+  it('gilt ab 90 % des Eiweißziels, unabhängig von den kcal', () => {
+    expect(isProteinGoalMet(day('2026-11-08', 3000, 90), target)).toBe(true);
+    expect(isProteinGoalMet(day('2026-11-08', 1500, 89), target)).toBe(false);
+  });
+
+  it('zählt Tage ohne Einträge oder ohne Ziel nie', () => {
+    expect(isProteinGoalMet(day('2026-11-08', 0, 0, false), target)).toBe(false);
+    expect(isProteinGoalMet(day('2026-11-08', 2000, 100), { kcal: 2000, proteinG: 0 })).toBe(false);
+  });
+});
+
+describe('proteinStripStates', () => {
+  it('liefert je Tag den Zustand erreicht, teilweise, offen oder leer und markiert heute', () => {
+    const days = [
+      day('2026-11-05', 2000, 95),
+      day('2026-11-06', 2000, 50),
+      day('2026-11-07', 0, 0, false),
+      day('2026-11-08', 2000, 20),
+    ];
+    const states = proteinStripStates(days, target, '2026-11-08');
+    expect(states.map((s) => s.state)).toEqual(['met', 'partial', 'empty', 'open']);
+    expect(states.map((s) => s.isToday)).toEqual([false, false, false, true]);
+  });
+
+  it('hält den Anteil zwischen 0 und 1', () => {
+    const [over] = proteinStripStates([day('2026-11-08', 2000, 250)], target, '2026-11-08');
+    expect(over.share).toBe(1);
   });
 });

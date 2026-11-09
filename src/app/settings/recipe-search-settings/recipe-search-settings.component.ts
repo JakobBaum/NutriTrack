@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { clearQueryParams, pickParam } from '../../core/navigation/query-params';
 import { SpoonacularProvider } from '../../core/recipes/online/spoonacular.provider';
 import { toOnlineSearchError } from '../../core/recipes/online/spoonacular.errors';
 import { RecipeSearchAccessService } from '../../core/recipes/online/recipe-search-access';
@@ -34,6 +35,7 @@ export class RecipeSearchSettingsComponent {
   readonly access = inject(RecipeSearchAccessService);
   private readonly provider = inject(SpoonacularProvider);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
   readonly open = signal(false);
@@ -46,7 +48,9 @@ export class RecipeSearchSettingsComponent {
 
   constructor() {
     effect(() => {
-      if (this.queryParams()?.get('open') === 'recipe-search') this.openSheet();
+      if (pickParam(this.queryParams(), 'open', ['recipe-search']) !== 'recipe-search') return;
+      untracked(() => this.openSheet());
+      void clearQueryParams(this.router, ['open']);
     });
   }
 

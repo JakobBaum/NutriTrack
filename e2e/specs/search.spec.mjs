@@ -109,12 +109,12 @@ export function register({ test }) {
   }), async (page) => {
     await go(page, 'settings');
     assert.equal(await readStore(page, 'ai-config'), null, 'alte KI-Verbindung muss beim Start verworfen werden');
-    await page.locator('ion-item', { hasText: 'KI-Verbindung' }).click();
-    const modal = topModal(page);
-    await modal.locator('.nt-sheet-header__title', { hasText: 'KI-Verbindung' }).waitFor();
-    assert.equal(await modal.locator('ion-input, ion-select, details').count(), 0, 'keine Eingabefelder, kein Erweitert');
-    assert.doesNotMatch(await modal.innerText(), /Erweitert|Schlüssel einfügen|Speichern/);
-    // Harness sperrt den Worker (503): Status zeigt ehrlich „nicht erreichbar“ oder „erreichbar“.
-    await eventually(async () => assert.match(await modal.locator('p[role="status"]').innerText(), /erreichbar/));
+    // KI-Status: reine Anzeige in der Zeile, kein Sheet, keine Eingabefelder.
+    const row = page.locator('[data-testid="ai-status-row"]');
+    await row.waitFor();
+    assert.equal(await row.locator('ion-input, ion-select, details').count(), 0, 'keine Eingabefelder');
+    assert.doesNotMatch(await row.innerText(), /Erweitert|Schlüssel einfügen|Speichern/);
+    // Harness sperrt den Worker (503): Status zeigt ehrlich „Nicht erreichbar“ oder „Verbunden“.
+    await eventually(async () => assert.match(await page.locator('[data-testid="ai-status-badge"]').innerText(), /Verbunden|Nicht erreichbar/));
   });
 }

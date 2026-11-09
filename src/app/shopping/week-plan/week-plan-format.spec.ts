@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { WeekPlanRecipe } from '../../core/week-plan/week-plan.model';
-import { cookIngredients, groupByMeal, recipeMetaLine } from './week-plan-format';
+import { cookIngredients, groupByMeal, recipeMetaLine, weekRecipeToDiaryEntry } from './week-plan-format';
 
 const base: WeekPlanRecipe = {
   id: '1', title: 'Linsen', servings: 4, steps: [], meal: 'dinner', portions: 2,
@@ -35,5 +35,20 @@ describe('groupByMeal', () => {
 describe('cookIngredients', () => {
   it('scales to persons and drops nameless ingredients', () => {
     expect(cookIngredients(base, 2)).toEqual([{ name: 'Linsen', amount: 100, unit: 'g' }]);
+  });
+});
+
+describe('weekRecipeToDiaryEntry', () => {
+  const facts = { kcal: 420, proteinG: 30, carbsG: 40, fatG: 10, basis: 'perPortion' as const };
+
+  it('builds a one-portion manual entry from the per-portion facts', () => {
+    const entry = weekRecipeToDiaryEntry({ ...base, facts }, 'lunch', '2026-11-09');
+    expect(entry).toEqual({
+      dateISO: '2026-11-09', meal: 'lunch', label: 'Linsen', facts, servings: 1, ref: { kind: 'manual' },
+    });
+  });
+
+  it('returns null without facts', () => {
+    expect(weekRecipeToDiaryEntry(base, 'lunch', '2026-11-09')).toBeNull();
   });
 });

@@ -14,12 +14,12 @@
     <h3 class="wp-detail__title">{{ recipe.title }}</h3>
     <p class="wp-detail__meta">{{ meta() }}</p>
     @if (recipe.lang === 'en') {
-      <p class="wp-note" data-testid="wp-untranslated-note">nicht übersetzt: Titel und Anleitung bleiben Englisch (KI nicht erreichbar).</p>
+      <p class="wp-note" data-testid="wp-untranslated-note">Titel und Anleitung sind noch auf Englisch. Auf der Plan-Seite kannst du „Erneut übersetzen“ tippen.</p>
     }
     @if (recipe.facts; as f) {
       <dl class="wp-macros">
         <div class="wp-macros__main"><dt>Eiweiß</dt><dd>{{ f.proteinG | ntNum }} g</dd></div>
-        <div><dt>Kohlenh.</dt><dd>{{ f.carbsG | ntNum }} g</dd></div>
+        <div><dt><span aria-hidden="true">Kohlenh.</span><span class="visually-hidden">Kohlenhydrate</span></dt><dd>{{ f.carbsG | ntNum }} g</dd></div>
         <div><dt>Fett</dt><dd>{{ f.fatG | ntNum }} g</dd></div>
       </dl>
       <p class="wp-note">Nährwerte je Portion.</p>
@@ -30,6 +30,12 @@
         <ion-icon name="restaurant-outline" aria-hidden="true"></ion-icon>
         Kochen
       </button>
+      @if (recipe.facts) {
+        <button type="button" class="nt-pill nt-pill--secondary wp-log" data-testid="wp-log-diary" (click)="logToDiary()">
+          <ion-icon name="add-circle-outline" aria-hidden="true"></ion-icon>
+          In Tagebuch eintragen
+        </button>
+      }
       <button type="button" class="nt-pill nt-pill--secondary wp-fav" [disabled]="isSaved()" (click)="save()">
         <ion-icon [name]="isSaved() ? 'checkmark' : 'bookmark-outline'" aria-hidden="true"></ion-icon>
         {{ isSaved() ? 'Gespeichert' : 'Zu Favoriten' }}

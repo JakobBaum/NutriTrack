@@ -1,0 +1,66 @@
+:host {
+  display: block;
+  margin-top: var(--nt-space-4);
+}
+
+.strip {
+  padding: var(--nt-space-3) var(--nt-space-4);
+
+  &__days {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__day {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  &__dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid var(--nt-track);
+    box-sizing: border-box;
+
+    &[data-state='met'] {
+      background: var(--nt-protein);
+      border-color: var(--nt-protein);
+    }
+
+    &[data-state='partial'] {
+      background: linear-gradient(to top, var(--nt-protein) 50%, transparent 50%);
+      border-color: var(--nt-protein);
+    }
+
+    &[data-state='open'] {
+      border-color: var(--nt-protein);
+    }
+  }
+
+  &__weekday {
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+  }
+
+  &__day--today &__weekday {
+    color: var(--nt-ink);
+    font-weight: 700;
+  }
+
+  &__sum {
+    margin: var(--nt-space-2) 0 0;
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+    text-align: center;
+
+    strong {
+      color: var(--nt-ink);
+    }
+  }
+}

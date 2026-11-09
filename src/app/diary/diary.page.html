@@ -1,14 +1,12 @@
-<ion-header class="ion-no-border page-header">
-  <ion-toolbar></ion-toolbar>
-</ion-header>
-
-<ion-content>
-  <div class="page-head">
-    <h1 class="nt-large-title">Tagebuch</h1>
+<ion-header class="ion-no-border">
+  <nt-page-header title="Tagebuch">
     <button type="button" class="nt-pill page-head__add" (click)="openAdd()" aria-label="Neuen Eintrag eintragen">
       <ion-icon name="add" aria-hidden="true"></ion-icon> Eintragen
     </button>
-  </div>
+  </nt-page-header>
+</ion-header>
+
+<ion-content>
 
   <ion-segment class="view-switch" [value]="view()" aria-label="Ansicht" (ionChange)="setView($any($event).detail.value)">
     <ion-segment-button value="day"><ion-label>Tag</ion-label></ion-segment-button>
@@ -27,14 +25,23 @@
     </div>
   }
 
-  <div class="summary nt-card">
-    <span class="summary__kcal">{{ totalKcal() | ntNum:0 }}</span>
-    <span class="summary__unit">kcal gegessen</span>
-    @if (overKcal() > 0) {
-      <span class="summary__target"><strong class="summary__over">{{ overKcal() | ntNum:0 }}</strong> kcal über Ziel ({{ targetKcal() | ntNum:0 }} kcal)</span>
-    } @else if (targetKcal() > 0) {
-      <span class="summary__target">von {{ targetKcal() | ntNum:0 }} kcal</span>
-    }
+  <div class="summary nt-card" data-testid="diary-summary">
+    <div class="summary__col">
+      <span class="summary__kcal">{{ totalKcal() | ntNum:0 }}</span>
+      <span class="summary__unit">kcal gegessen</span>
+      @if (overKcal() > 0) {
+        <span class="summary__target"><strong class="summary__over">{{ overKcal() | ntNum:0 }}</strong> kcal über Ziel ({{ targetKcal() | ntNum:0 }} kcal)</span>
+      } @else if (targetKcal() > 0) {
+        <span class="summary__target">von {{ targetKcal() | ntNum:0 }} kcal</span>
+      }
+    </div>
+    <div class="summary__col">
+      <span class="summary__kcal summary__kcal--protein">{{ totalProtein() | ntNum:0 }}</span>
+      <span class="summary__unit">g Eiweiß gegessen</span>
+      @if (targetProtein() > 0) {
+        <span class="summary__target">von {{ targetProtein() | ntNum:0 }} g@if (remainingProtein() > 0) { · noch {{ remainingProtein() | ntNum:0 }} g }</span>
+      }
+    </div>
   </div>
 
   <div class="diary-list diary-list--spaced">
@@ -82,7 +89,7 @@
                   <h3>{{ entry.label }}@if (entry.brand) { <span class="entry-brand"> · {{ entry.brand }}</span> }</h3>
                   <p>
                     @if (entry.amountG) { {{ entry.amountG | ntAmount:entry.unit }} · }
-                    E {{ entry.facts.proteinG | ntNum }} g · KH {{ entry.facts.carbsG | ntNum }} g · F {{ entry.facts.fatG | ntNum }} g
+                    <span class="protein-val"><span aria-hidden="true">E</span><span class="visually-hidden">Eiweiß</span> {{ entry.facts.proteinG | ntNum }} g</span> · <span aria-hidden="true">KH</span><span class="visually-hidden">Kohlenhydrate</span> {{ entry.facts.carbsG | ntNum }} g · <span aria-hidden="true">F</span><span class="visually-hidden">Fett</span> {{ entry.facts.fatG | ntNum }} g
                     @if (entry.isEstimate) { · @if (ffLive()) { <span class="ai-badge">KI-Schätzung</span> } }
                   </p>
                 </ion-label>
@@ -100,8 +107,8 @@
                 </ion-item-option>
               </ion-item-options>
             </ion-item-sliding>
-            <button type="button" class="nt-hover-delete entry-row__delete" (click)="remove(entry)" [attr.aria-label]="'Eintrag löschen: ' + entry.label">
-              <ion-icon name="trash-outline" aria-hidden="true"></ion-icon>
+            <button type="button" class="entry-row__more" data-testid="entry-more" (click)="openEntryMenu(entry)" [attr.aria-label]="'Mehr zu ' + entry.label">
+              <ion-icon name="ellipsis-horizontal" aria-hidden="true"></ion-icon>
             </button>
             </div>
           }
@@ -143,7 +150,7 @@
       }
       <ion-list class="diary-list" lines="none">
         <ion-item lines="none">
-          <ion-input label="Name" labelPlacement="stacked" [(ngModel)]="editForm.label" enterkeyhint="done"></ion-input>
+          <ion-input label="Name" labelPlacement="stacked" [(ngModel)]="editForm.label" autocapitalize="words" autocorrect="off" enterkeyhint="done" (keyup.enter)="dismissKeyboard()"></ion-input>
         </ion-item>
         @if (editMode === 'portion') {
           <app-amount-row label="Portionen" suffix="Portionen" [text]="numText('editServings', editServings)" (textChange)="setEditServings($event)" (stepped)="stepEditServings($event)"></app-amount-row>
@@ -159,6 +166,9 @@
       </ion-list>
       <button type="button" class="edit-fav" data-testid="edit-favorite" (click)="toggleEditFavorite()" [attr.aria-pressed]="isEditFavorite()">
         <ion-icon [name]="isEditFavorite() ? 'star' : 'star-outline'" aria-hidden="true"></ion-icon> {{ isEditFavorite() ? 'Favorit entfernen' : 'Als Favorit merken' }}
+      </button>
+      <button type="button" class="edit-fav" data-testid="edit-duplicate" (click)="duplicateFromEdit()">
+        <ion-icon name="copy-outline" aria-hidden="true"></ion-icon> Doppelt eintragen
       </button>
       <button type="button" class="edit-delete" (click)="deleteFromEdit()">
         <ion-icon name="trash-outline" aria-hidden="true"></ion-icon> Eintrag löschen

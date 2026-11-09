@@ -8,7 +8,8 @@ import { MealsStore } from '../core/state/meals.store';
 import { CustomFoodStore } from '../core/state/custom-food.store';
 import { RecipeStore } from '../core/state/recipe.store';
 import { FoodSourceResult } from '../shared/food-sources/food-sources.component';
-import { formatDecimal, parseDecimal } from '../core/util/number-input';
+import { formatDecimal, parseDecimal, parseNutrientInput } from '../core/util/number-input';
+import { selectAllOnFocus } from '../core/keyboard/select-all';
 import { toDateISO } from '../core/util/date';
 import { confirmDiscard } from './confirm-discard';
 import { isMealDraftChanged, mealSaveBlockReason, rescaleEntryAmount } from './meal-draft';
@@ -20,6 +21,9 @@ const MEAL_OPTIONS: { value: MealType; label: string }[] = [
   { value: 'dinner', label: 'Abendessen' },
   { value: 'snack', label: 'Snack' },
 ];
+
+type NutrientField = 'kcal' | 'proteinG' | 'carbsG' | 'fatG';
+const NUTRIENT_FIELDS: readonly NutrientField[] = ['kcal', 'proteinG', 'carbsG', 'fatG'];
 
 interface ManualDraft {
   name: string;
@@ -79,6 +83,9 @@ export class MealsListComponent implements OnDestroy {
   readonly pickerOpen = signal(false);
   readonly pickerView = signal<'sources' | 'manual'>('sources');
   manual: ManualDraft = emptyManual();
+  /** Feldfehler der manuellen Eingabe, je Feld; leer = gültig. */
+  readonly manualErrors = signal<Partial<Record<NutrientField, string>>>({});
+  readonly selectAll = selectAllOnFocus;
 
   ngOnDestroy(): void {
     this.deletion.flush();
@@ -193,6 +200,7 @@ export class MealsListComponent implements OnDestroy {
 
   openManual(name: string): void {
     this.manual = { ...emptyManual(), name };
+    this.manualErrors.set({});
     this.pickerView.set('manual');
   }
 
@@ -201,13 +209,18 @@ export class MealsListComponent implements OnDestroy {
   }
 
   addManual(): void {
-    if (!this.manualValid()) return;
     const m = this.manual;
+    const parsed = NUTRIENT_FIELDS.map((f) => [f, parseNutrientInput(m[f])] as const);
+    const errors: Partial<Record<NutrientField, string>> = {};
+    for (const [field, res] of parsed) if (res.error) errors[field] = res.error;
+    this.manualErrors.set(errors);
+    if (Object.keys(errors).length > 0 || !this.manualValid()) return;
+    const v = (f: NutrientField): number => parsed.find(([k]) => k === f)?.[1].value ?? 0;
     const facts: NutritionFacts = {
-      kcal: parseDecimal(m.kcal) ?? 0,
-      proteinG: parseDecimal(m.proteinG) ?? 0,
-      carbsG: parseDecimal(m.carbsG) ?? 0,
-      fatG: parseDecimal(m.fatG) ?? 0,
+      kcal: v('kcal'),
+      proteinG: v('proteinG'),
+      carbsG: v('carbsG'),
+      fatG: v('fatG'),
       basis: 'perPortion',
     };
     this.draftEntries = [...this.draftEntries, { label: m.name.trim(), facts, ref: { kind: 'manual' } }];

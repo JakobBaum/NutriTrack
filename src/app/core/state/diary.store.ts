@@ -9,13 +9,22 @@ import {
 } from '../models';
 import { NutritionCalcService } from '../nutrition/nutrition-calc.service';
 import { StorageService } from '../storage/storage.service';
-import { addDaysISO } from '../util/date';
+import { addDaysISO, toDateISO } from '../util/date';
 import { makeId } from '../util/id';
+import { sanitizeDiaryEntries } from './record-sanitize';
 
 const KEY_ENTRIES = 'diary';
 /** Wie viele Tage "Wie gestern" / "Tag kopieren" höchstens zurückschaut. */
 export const COPY_LOOKBACK_DAYS = 7;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const VALID_MEALS: ReadonlySet<string> = new Set(['breakfast', 'lunch', 'dinner', 'snack']);
+const DEFAULT_LABEL = 'Eintrag';
+/** Zeitfenster (Tage), in dem "Zuletzt benutzt" nach Essenszeit zählt. */
+const RECENT_WINDOW_DAYS = 30;
+const MS_PER_DAY = 86_400_000;
+
+/** Identität eines Lebensmittels in "Zuletzt benutzt": Name und Marke, ohne Groß-/Kleinschreibung. */
+const foodKey = (e: DiaryEntry): string => `${e.label.trim().toLowerCase()}|${(e.brand ?? '').trim().toLowerCase()}`;
 
 /** Ein früherer Tag mit Einträgen als Kopier-Quelle. */
 export interface CopySource {
@@ -101,7 +110,7 @@ export class DiaryStore {
   private readonly calc = inject(NutritionCalcService);
 
   private readonly _entries = signal<DiaryEntry[]>(
-    this.storage.get<DiaryEntry[]>(KEY_ENTRIES, []),
+    this.storage.getSanitized<DiaryEntry>(KEY_ENTRIES, sanitizeDiaryEntries),
   );
 
   /** Alle Einträge (unsortiert). */
@@ -111,9 +120,9 @@ export class DiaryStore {
   add(input: NewDiaryEntry): DiaryEntry {
     const entry: DiaryEntry = {
       id: makeId('diary'),
-      dateISO: input.dateISO,
-      meal: input.meal,
-      label: input.label,
+      dateISO: ISO_DATE_RE.test(input.dateISO) ? input.dateISO : toDateISO(),
+      meal: VALID_MEALS.has(input.meal) ? input.meal : 'snack',
+      label: typeof input.label === 'string' && input.label.trim() !== '' ? input.label : DEFAULT_LABEL,
       brand: input.brand,
       ref: input.ref ?? { kind: 'manual' },
       amountG: validAmountOrUndefined(input.amountG),
@@ -199,9 +208,11 @@ export class DiaryStore {
    */
   restore(entry: DiaryEntry, index?: number): boolean {
     if (this._entries().some((e) => e.id === entry.id)) return false;
+    const [clean] = sanitizeDiaryEntries([entry]).items;
+    if (!clean) return false;
     this._entries.update((list) => {
       const at = index === undefined ? list.length : Math.min(Math.max(0, index), list.length);
-      return [...list.slice(0, at), entry, ...list.slice(at)];
+      return [...list.slice(0, at), clean, ...list.slice(at)];
     });
     this.persist();
     return true;
@@ -274,20 +285,34 @@ export class DiaryStore {
   }
 
   /**
-   * Letzte `limit` eindeutige Lebensmittel-Einträge (manuelle + Food/Barcode),
-   * sortiert nach Erstell-Datum absteigend. Rezepte werden ausgelassen.
+   * Letzte `limit` eindeutige Lebensmittel-Einträge (manuell + Food/Barcode); Rezepte entfallen.
+   * Mit `meal`: zuerst Lebensmittel dieser Essenszeit nach Häufigkeit der letzten 30 Tage
+   * (bei Gleichstand das jüngste), danach der Rest nach Aktualität. Eindeutig nach Name und Marke.
    */
-  recentFoods(limit = 5): DiaryEntry[] {
-    const seen = new Set<string>();
-    return [...this._entries()]
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .filter((e) => {
-        if (e.ref?.kind === 'recipe') return false;
-        if (seen.has(e.label)) return false;
-        seen.add(e.label);
+  recentFoods(limit = 5, meal?: MealType, now: Date = new Date()): DiaryEntry[] {
+    const newestFirst = [...this._entries()]
+      .filter((e) => e.ref?.kind !== 'recipe')
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const unique = (list: readonly DiaryEntry[]): DiaryEntry[] => {
+      const seen = new Set<string>();
+      return list.filter((e) => {
+        const key = foodKey(e);
+        if (seen.has(key)) return false;
+        seen.add(key);
         return true;
-      })
-      .slice(0, limit);
+      });
+    };
+    if (!meal) return unique(newestFirst).slice(0, limit);
+
+    const since = new Date(now.getTime() - RECENT_WINDOW_DAYS * MS_PER_DAY).toISOString();
+    const counts = new Map<string, number>();
+    newestFirst
+      .filter((e) => e.meal === meal && e.createdAt >= since)
+      .forEach((e) => counts.set(foodKey(e), (counts.get(foodKey(e)) ?? 0) + 1));
+    const ofMeal = unique(newestFirst.filter((e) => e.meal === meal));
+    // Array.sort ist stabil: bei gleicher Häufigkeit bleibt die Reihenfolge nach Aktualität.
+    const ranked = [...ofMeal].sort((a, b) => (counts.get(foodKey(b)) ?? 0) - (counts.get(foodKey(a)) ?? 0));
+    return unique([...ranked, ...newestFirst]).slice(0, limit);
   }
 
   /**

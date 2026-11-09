@@ -30,6 +30,10 @@ export interface UserProfile {
   rateKgPerWeek?: number;
   /** Optionales Zielgewicht (kg); ersetzt bei BMI über 30 das Referenzgewicht der Eiweißberechnung. */
   targetWeightKg?: number;
+  /** Manuelles Kalorienziel (kcal/Tag); ersetzt die Formel, solange gesetzt. */
+  manualKcal?: number;
+  /** Manuelles Eiweißziel in g pro kg Körpergewicht; ersetzt die Formel, solange gesetzt. */
+  manualProteinGPerKg?: number;
   updatedAt: string;
 }
 
@@ -40,7 +44,7 @@ export interface DailyTarget {
   carbsG: number;
   fatG: number;
   fiberG: number;
-  /** Richtwert freier Zucker (Obergrenze, WHO: < 10 % der Energie). */
+  /** Richtwert für freien Zucker (WHO: < 10 % der Energie). Gezählt wird Gesamtzucker, der Wert ist nur eine Orientierung. */
   sugarG: number;
 }
 

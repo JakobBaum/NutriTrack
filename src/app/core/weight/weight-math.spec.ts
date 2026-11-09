@@ -4,6 +4,7 @@ import {
   MIN_WEIGHT_KG,
   WeightEntry,
   driftSinceProfile,
+  shouldShowDriftHint,
   isValidWeight,
   removeWeight,
   smoothWeights,
@@ -111,5 +112,22 @@ describe('driftSinceProfile', () => {
     expect(driftSinceProfile(78, 76.5)).toBeNull();
     expect(driftSinceProfile(78, null)).toBeNull();
     expect(driftSinceProfile(null, 80)).toBeNull();
+  });
+});
+
+describe('shouldShowDriftHint', () => {
+  it('zeigt den Hinweis bei Abweichung, solange er nicht ausgeblendet wurde', () => {
+    expect(shouldShowDriftHint(78, 75.5, null)).toBe(true);
+  });
+
+  it('zeigt nichts ohne Abweichung', () => {
+    expect(shouldShowDriftHint(78, 77, null)).toBe(false);
+  });
+
+  it('bleibt nach dem Ausblenden still, bis sich das Gewicht um weitere 2 kg ändert', () => {
+    expect(shouldShowDriftHint(78, 75.0, 75.5)).toBe(false);
+    expect(shouldShowDriftHint(78, 74.0, 75.5)).toBe(false);
+    expect(shouldShowDriftHint(78, 73.5, 75.5)).toBe(true);
+    expect(shouldShowDriftHint(78, 78.0, 75.5)).toBe(false);
   });
 });

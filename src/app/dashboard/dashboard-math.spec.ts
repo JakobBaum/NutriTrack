@@ -5,16 +5,30 @@ import {
   proteinHint,
   proteinOfEntries,
   softHyphenLabel,
+  macroNote,
 } from './dashboard-math';
 
 describe('isWarnMacro', () => {
-  it('warnt nur bei kcal und Zucker, nie bei Eiweiß', () => {
+  it('warnt nur bei kcal, nie bei Eiweiß und nicht beim Zucker-Richtwert', () => {
     expect(isWarnMacro('kcal')).toBe(true);
-    expect(isWarnMacro('sugar')).toBe(true);
+    expect(isWarnMacro('sugar')).toBe(false);
     expect(isWarnMacro('protein')).toBe(false);
     expect(isWarnMacro('carbs')).toBe(false);
     expect(isWarnMacro('fat')).toBe(false);
     expect(isWarnMacro('fiber')).toBe(false);
+  });
+});
+
+describe('macroNote', () => {
+  it('erklärt beim Zucker den Unterschied zwischen Gesamtzucker und freiem Zucker', () => {
+    const note = macroNote('sugar');
+    expect(note).toContain('freien Zucker');
+    expect(note).toContain('Gesamtzucker');
+  });
+
+  it('hat sonst keinen Hinweis', () => {
+    expect(macroNote('protein')).toBeNull();
+    expect(macroNote('kcal')).toBeNull();
   });
 });
 

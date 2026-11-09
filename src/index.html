@@ -5,6 +5,10 @@
   <meta charset="utf-8" />
   <title>NutriTrack</title>
   <meta name="description" content="NutriTrack – Kalorien, Makros und Rezepte einfach tracken." />
+  <!-- Content-Security-Policy: wasm-unsafe-eval und worker-src blob: braucht Tesseract (OCR-Core, Blob-Worker);
+       connect-src: KI-Worker, OpenFoodFacts (Barcode + Preise), Spoonacular; Bilder von Rezept-Anbietern per https.
+       ws://localhost nur fuer den Dev-Server. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self' https://nutritrack.baumgartner-jakob12.workers.dev https://world.openfoodfacts.org https://prices.openfoodfacts.org https://api.spoonacular.com ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <meta name="theme-color" content="#f7f5f1" />
 
   <base href="/" />
@@ -15,6 +19,8 @@
   <meta name="msapplication-tap-highlight" content="no" />
 
   <link rel="icon" type="image/png" href="assets/icon/favicon.png" />
+  <link rel="apple-touch-icon" href="assets/icon/apple-touch-icon.png" />
+  <link rel="manifest" href="assets/manifest.webmanifest" />
 
   <!-- add to homescreen for ios -->
   <meta name="mobile-web-app-capable" content="yes" />

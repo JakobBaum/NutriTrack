@@ -6,6 +6,7 @@ import { makeId } from '../util/id';
 import { parseDecimal } from '../util/number-input';
 import { FoodProvider } from './food-provider';
 import { FOOD_TIMEOUT_MS, toFoodLookupError } from './food-errors';
+import { plausibleServingG } from './serving';
 import { environment } from '../../../environments/environment';
 import { DebugLogService } from '../debug/debug-log.service';
 import {
@@ -185,7 +186,7 @@ export class OpenFoodFactsProvider implements FoodProvider {
       brand,
       barcode: p.code,
       facts,
-      servingG: p.serving_quantity ? this.num(p.serving_quantity) : undefined,
+      servingG: plausibleServingG(p.serving_quantity),
       quantity,
       nutriscore,
     };

@@ -76,7 +76,7 @@ export function register({ test }) {
     assert.equal(stored?.amountG, 12.5);
     assert.equal(stored?.facts.proteinG, 1.9);
     assert.equal(stored?.facts.fatG, 8.2);
-    await eventually(async () => assert.match(await diaryEntry(page, 'Walnüsse').innerText(), /12,5 g[\s\S]*E 1,9 g/));
+    await eventually(async () => assert.match(await diaryEntry(page, 'Walnüsse').innerText(), /12,5 g[\s\S]*Eiweiß\s+1,9 g/));
   });
 
   test('diary: Eintrag bearbeiten (Name + Menge skaliert kcal)', seed({ diary: DIARY_NORMAL }), async (page) => {
@@ -110,5 +110,15 @@ export function register({ test }) {
     const restored = await findStored(page, 'Linsencurry');
     assert.equal(restored?.meal, 'lunch');
     assert.equal(restored?.facts.kcal, 520);
+  });
+  test('diary: Mehr-Menü trägt doppelt ein und löscht', seed({ diary: DIARY_NORMAL }), async (page) => {
+    await go(page, 'diary');
+    const row = page.locator('.entry-row', { has: page.locator('h3:text-is("Linsencurry")') });
+    await row.locator('[data-testid="entry-more"]').click();
+    await page.locator('ion-action-sheet button', { hasText: 'Doppelt eintragen' }).click();
+    await eventually(async () => assert.equal(await diaryEntry(page, 'Linsencurry').count(), 2));
+    await row.first().locator('[data-testid="entry-more"]').click();
+    await page.locator('ion-action-sheet button', { hasText: 'Löschen' }).click();
+    await eventually(async () => assert.equal(await diaryEntry(page, 'Linsencurry').count(), 1));
   });
 }

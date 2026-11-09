@@ -1,0 +1,176 @@
+<ion-modal [isOpen]="isOpen()" [handle]="true" (ionModalDidDismiss)="closed.emit()">
+  <ng-template>
+    <div class="nt-sheet-header">
+      <span class="nt-sheet-header__start"></span>
+      <h2 class="nt-sheet-header__title" role="heading" aria-level="2">Mein Profil</h2>
+      <span class="nt-sheet-header__end">
+        <ion-button fill="clear" (click)="closed.emit()">Schließen</ion-button>
+      </span>
+    </div>
+    <ion-content>
+      <div class="nt-page profile-sheet">
+        <!-- Live-Vorschau: bleibt beim Scrollen oben stehen -->
+        <div class="preview" data-testid="profile-preview" role="status" aria-live="polite" aria-atomic="true">
+          @if (preview(); as t) {
+            <div class="preview__nums">
+              <span class="preview__item preview__item--kcal"><strong data-testid="preview-kcal">{{ t.kcal | ntNum:0 }}</strong> kcal</span>
+              <span class="preview__item preview__item--protein"><strong data-testid="preview-protein">{{ t.proteinG | ntNum:0 }}</strong> g Eiweiß</span>
+            </div>
+            <p class="preview__sub">Dein Tagesziel · {{ previewIsManual() ? 'manuell festgelegt' : 'aus der Formel' }}</p>
+          } @else {
+            <p class="preview__sub preview__sub--empty">Gewicht, Größe und Alter eingeben, um dein Tagesziel zu sehen.</p>
+          }
+        </div>
+
+        <ion-list class="nt-grouped settings-form">
+          <ion-item class="form-row">
+            <ion-label>
+              Gewicht
+              @if (form().weightKg === null) { <p class="row-sub">z. B. 75 kg</p> }
+              @if (visibleError('weightKg'); as err) { <p class="row-error" role="alert">{{ err }}</p> }
+            </ion-label>
+            <nt-stepper slot="end" data-field="weightKg" label="Gewicht" unit="kg" [value]="form().weightKg" [min]="30" [max]="300" [step]="0.5" [decimals]="1" [start]="75" (valueChange)="setField('weightKg', $event)"></nt-stepper>
+          </ion-item>
+          <ion-item class="form-row">
+            <ion-label>
+              Größe
+              @if (form().heightCm === null) { <p class="row-sub">z. B. 175 cm</p> }
+              @if (visibleError('heightCm'); as err) { <p class="row-error" role="alert">{{ err }}</p> }
+            </ion-label>
+            <nt-stepper slot="end" data-field="heightCm" label="Größe" unit="cm" [value]="form().heightCm" [min]="100" [max]="250" [step]="1" [start]="175" (valueChange)="setField('heightCm', $event)"></nt-stepper>
+          </ion-item>
+          <ion-item class="form-row">
+            <ion-label>
+              Alter
+              @if (form().age === null) { <p class="row-sub">z. B. 30 Jahre</p> }
+              @if (visibleError('age'); as err) { <p class="row-error" role="alert">{{ err }}</p> }
+            </ion-label>
+            <nt-stepper slot="end" data-field="age" label="Alter" unit="Jahre" [value]="form().age" [min]="14" [max]="100" [step]="1" [start]="30" (valueChange)="setField('age', $event)"></nt-stepper>
+          </ion-item>
+          <ion-item class="form-row">
+            <ion-select label="Geschlecht" [value]="form().sex" (ionChange)="setSex($any($event).detail.value)" interface="action-sheet" cancelText="Abbrechen">
+              @for (s of sexes; track s.value) {
+                <ion-select-option [value]="s.value">{{ s.label }}</ion-select-option>
+              }
+            </ion-select>
+          </ion-item>
+          @if (form().sex === 'diverse') {
+            <ion-item lines="none" class="form-row">
+              <ion-icon slot="start" name="information-circle-outline" color="warning"></ion-icon>
+              <ion-label class="ion-text-wrap hint hint--info">
+                Hinweis: Für „Divers“ verwenden wir den Durchschnittswert aus männlichen und weiblichen Referenzwerten. Das Ergebnis ist eine Näherung – individuelle Abweichungen sind möglich.
+              </ion-label>
+            </ion-item>
+          }
+          <ion-item class="form-row">
+            <ion-select label="Aktivität" labelPlacement="stacked" [value]="form().activityLevel" (ionChange)="setActivity($any($event).detail.value)" interface="action-sheet" cancelText="Abbrechen">
+              @for (a of activities; track a.value) {
+                <ion-select-option [value]="a.value">{{ a.label }}</ion-select-option>
+              }
+            </ion-select>
+          </ion-item>
+          <ion-item lines="none" class="form-row form-row--segment">
+            <ion-segment [value]="form().goal" aria-label="Ziel" (ionChange)="setGoal($any($event).detail.value)">
+              @for (g of goals; track g.value) {
+                <ion-segment-button [value]="g.value"><ion-label>{{ g.label }}</ion-label></ion-segment-button>
+              }
+            </ion-segment>
+          </ion-item>
+        </ion-list>
+
+        @if (showRate()) {
+          <h2 class="nt-section-header">Tempo (kg pro Woche)</h2>
+          <div class="rate-chips" role="group" aria-label="Tempo in Kilogramm pro Woche">
+            @for (r of rateChoices(); track r.value) {
+              <button type="button" class="rate-chip" [class.rate-chip--on]="form().rateKgPerWeek === r.value" [attr.aria-pressed]="form().rateKgPerWeek === r.value" (click)="setRate(r.value)">{{ r.value | ntNum:2 }} kg · {{ r.label }}</button>
+            }
+          </div>
+          <p class="hint" role="status" data-testid="rate-hint">
+            {{ rateDeltaText() }}@if (maxRateText()) { · höchstens {{ maxRateText() }} kg pro Woche ({{ form().goal === 'gain' ? '0,5' : '1' }} % deines Gewichts).}
+            @if (form().goal === 'gain') { Beim Aufbau reicht ein moderater Überschuss, mehr wird überwiegend Fett. }
+            @if (rateIsCapped()) { Dein gewähltes Tempo wird darauf begrenzt. }
+          </p>
+        }
+
+        <h2 class="nt-section-header">Zielgewicht (optional)</h2>
+        <ion-list class="nt-grouped settings-form">
+          <ion-item class="form-row" lines="none">
+            <ion-label>
+              Zielgewicht
+              @if (form().targetWeightKg === null) { <p class="row-sub">Nicht gesetzt</p> }
+              @if (targetError(); as err) { <p class="row-error" role="alert">{{ err }}</p> }
+            </ion-label>
+            <nt-stepper slot="end" data-field="targetWeightKg" label="Zielgewicht" unit="kg" [value]="form().targetWeightKg" [min]="30" [max]="300" [step]="0.5" [decimals]="1" [start]="form().weightKg ?? 75" (valueChange)="setTargetWeight($event)"></nt-stepper>
+          </ion-item>
+        </ion-list>
+        @if (form().targetWeightKg !== null) {
+          <ion-button fill="clear" size="small" (click)="clearTargetWeight()">Zielgewicht entfernen</ion-button>
+        }
+
+        <h2 class="nt-section-header">Ziele</h2>
+        <ion-list class="nt-grouped settings-form" data-testid="target-mode">
+          <ion-item lines="none" class="form-row form-row--segment">
+            <ion-segment [value]="form().manual ? 'manual' : 'auto'" aria-label="Tagesziel festlegen" (ionChange)="setManualMode($any($event).detail.value === 'manual')">
+              <ion-segment-button value="auto" data-testid="target-auto"><ion-label>Automatisch</ion-label></ion-segment-button>
+              <ion-segment-button value="manual" data-testid="target-manual"><ion-label>Manuell</ion-label></ion-segment-button>
+            </ion-segment>
+          </ion-item>
+        </ion-list>
+        @if (!form().manual) {
+          <p class="hint">Kalorien und Eiweiß kommen aus der Formel. Mit „Manuell“ legst du beide selbst fest.</p>
+        } @else {
+          <ion-list class="nt-grouped settings-form manual-form">
+            <ion-item class="form-row manual-row" lines="none">
+              <ion-input label="Kalorien" labelPlacement="start" class="manual-input" type="text" inputmode="numeric" enterkeyhint="done" autocomplete="off"
+                data-field="manualKcal" data-testid="manual-kcal" aria-label="Kalorienziel in kcal pro Tag"
+                [value]="form().manualKcalText" (ionInput)="setManualKcal($any($event).detail.value ?? '')" (ionBlur)="markTouched('manualKcal')">
+                <span slot="end" class="manual-unit">kcal</span>
+              </ion-input>
+            </ion-item>
+          </ion-list>
+            @if (visibleManualError('kcal'); as err) { <p class="row-error row-error--block" role="alert" data-testid="manual-kcal-error">{{ err }}</p> }
+            @else if (manualKcalWarning(); as warn) { <p class="hint hint--warn row-error--block" role="status">{{ warn }}</p> }
+            @if (formula(); as f) { <p class="row-sub row-sub--block">Formel: {{ f.kcal | ntNum:0 }} kcal pro Tag</p> }
+          <ion-list class="nt-grouped settings-form manual-form">
+            <ion-item class="form-row manual-row" lines="none">
+              <ion-input label="Eiweiß" labelPlacement="start" class="manual-input" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off"
+                data-field="manualProtein" data-testid="manual-protein" aria-label="Eiweißziel in Gramm pro Kilogramm Körpergewicht"
+                [value]="form().manualProteinText" (ionInput)="setManualProtein($any($event).detail.value ?? '')" (ionBlur)="markTouched('manualProtein')">
+                <span slot="end" class="manual-unit">g/kg</span>
+              </ion-input>
+            </ion-item>
+          </ion-list>
+            @if (visibleManualError('protein'); as err) { <p class="row-error row-error--block" role="alert" data-testid="manual-protein-error">{{ err }}</p> }
+            @else if (manualProteinNote(); as note) { <p class="hint hint--info row-error--block" role="status">{{ note }}</p> }
+            @if (manualProteinGrams(); as g) { <p class="row-sub row-sub--block">≈ {{ g | ntNum:0 }} g Eiweiß pro Tag (erlaubt: 1,2 bis 2,4 g/kg)</p> }
+            @else { <p class="row-sub row-sub--block">Erlaubt: 1,2 bis 2,4 g pro kg Körpergewicht</p> }
+          <ion-button fill="clear" size="small" data-testid="target-reset" (click)="resetToFormula()">Auf Formel zurücksetzen</ion-button>
+        }
+
+        @for (note of notes(); track note.code) {
+          <p class="hint hint--warn" role="status">{{ note.text }}</p>
+        }
+        @if (minKcalApplied()) {
+          <p class="hint hint--warn" role="status">
+            Mindestzufuhr aktiv: Die Formel läge darunter, das Ziel wird auf den Mindestwert angehoben – tatsächlich ca. {{ achievedRateText() }} kg/Woche.
+          </p>
+          @if (lowerRateOffer(); as offer) {
+            <ion-button fill="clear" size="small" (click)="setRate(offer)">
+              Tempo auf {{ offer | ntNum:2 }} kg/Woche senken
+            </ion-button>
+          }
+        }
+        @if (submitted() && !isValid()) {
+          <p class="row-error row-error--block" role="alert" data-testid="form-error">Bitte die markierten Felder korrigieren.</p>
+        } @else if (form().weightKg === null || form().heightCm === null || form().age === null) {
+          <p class="hint" role="status">Bitte Gewicht, Größe und Alter angeben.</p>
+        }
+        <div class="form-actions">
+          <ion-button expand="block" data-testid="profile-save" (click)="save()">
+            Speichern
+          </ion-button>
+        </div>
+      </div>
+    </ion-content>
+  </ng-template>
+</ion-modal>

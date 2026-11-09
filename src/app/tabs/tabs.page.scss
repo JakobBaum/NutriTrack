@@ -38,7 +38,7 @@ ion-tab-button {
 
   ion-label {
     // 12 px: "Tagebuch" passt so auch bei 375 px Breite ohne Abschneiden.
-    font-size: 12px;
+    font-size: min(0.75rem, 3.4vw);
     font-weight: 600;
     letter-spacing: 0;
     white-space: nowrap;
@@ -54,7 +54,7 @@ ion-tab-button {
 
 @media (max-width: 360px) {
   ion-tab-button ion-label {
-    font-size: 11px;
+    font-size: min(0.75rem, 3.4vw);
   }
 }
 

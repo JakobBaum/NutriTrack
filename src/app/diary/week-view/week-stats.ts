@@ -71,3 +71,40 @@ export function currentStreak(
   }
   return streak;
 }
+
+/** Eiweißziel eines Tages erreicht (ab 90 %); Tage ohne Einträge oder ohne Ziel nie. */
+export function isProteinGoalMet(day: DayTotals, target: DayTargets): boolean {
+  return day.logged && target.proteinG > 0 && day.proteinG >= target.proteinG * PROTEIN_GOAL_SHARE;
+}
+
+/** Zustand eines Tages im Wochenstreifen. */
+export type ProteinStripState = 'met' | 'partial' | 'open' | 'empty';
+
+export interface ProteinStripDay {
+  readonly dateISO: string;
+  readonly state: ProteinStripState;
+  /** Eiweiß im Verhältnis zum Ziel, 0 bis 1. */
+  readonly share: number;
+  readonly isToday: boolean;
+}
+
+/** Anteil am Eiweißziel ab dem ein Tag als "teilweise" gilt. */
+const PARTIAL_SHARE = 0.5;
+
+/**
+ * Wochenstreifen auf Heute: je Tag "erreicht" (ab 90 % des Ziels), "teilweise" (ab 50 %),
+ * "offen" (darunter) oder "leer" (nichts eingetragen). Gleiche Schwelle wie die Wochenansicht.
+ */
+export function proteinStripStates(days: readonly DayTotals[], target: DayTargets, todayISO: string): ProteinStripDay[] {
+  return days.map((d) => {
+    const share = target.proteinG > 0 ? Math.min(1, Math.max(0, d.proteinG / target.proteinG)) : 0;
+    const state: ProteinStripState = !d.logged
+      ? 'empty'
+      : isProteinGoalMet(d, target)
+        ? 'met'
+        : share >= PARTIAL_SHARE
+          ? 'partial'
+          : 'open';
+    return { dateISO: d.dateISO, state, share, isToday: d.dateISO === todayISO };
+  });
+}

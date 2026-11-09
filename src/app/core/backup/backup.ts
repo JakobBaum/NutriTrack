@@ -1,4 +1,6 @@
-import { hasValidRecords } from './backup-records';
+import { sanitizeBackupData } from './backup-sanitize';
+import { SCHEMA_KEY } from '../storage/storage-schema';
+import { isQuarantineKey } from '../storage/storage-quarantine';
 
 /**
  * Reine Funktionen für Daten-Backups (Export/Import aller `nutritrack:`-Schlüssel).
@@ -22,7 +24,20 @@ const NULLABLE_OBJECT_KEYS = ['profile', 'shopping'] as const;
 const AI_KEY = 'ai-config';
 /** Übersetzungs-Cache: jederzeit neu aufbaubar, gehört nicht ins Backup. */
 const TRANSLATION_CACHE_KEY = 'translations';
-const NEVER_BACKED_UP_KEYS: ReadonlySet<string> = new Set([LAST_BACKUP_KEY, AI_KEY, TRANSLATION_CACHE_KEY]);
+/** Automatische Sicherung vor Import, Wiederherstellen und Zurücksetzen (siehe BackupService). */
+export const AUTO_SNAPSHOT_KEY = 'autosnapshot';
+/** Zeitpunkt, bis zu dem die Backup-Erinnerung ruht. */
+export const REMINDER_SNOOZE_KEY = 'backupReminderSnooze';
+const NEVER_BACKED_UP_KEYS: ReadonlySet<string> = new Set([
+  LAST_BACKUP_KEY,
+  AI_KEY,
+  TRANSLATION_CACHE_KEY,
+  SCHEMA_KEY,
+  AUTO_SNAPSHOT_KEY,
+  REMINDER_SNOOZE_KEY,
+]);
+/** Geräte-interne Schlüssel (Meta, Auto-Sicherung, Quarantäne): weder Export noch Import. */
+export const isNeverBackedUp = (key: string): boolean => NEVER_BACKED_UP_KEYS.has(key) || isQuarantineKey(key);
 const RECIPE_SEARCH_KEY = 'recipe-search-config';
 
 /** Gespeicherte Daten: Schlüssel (ohne Präfix) → bereits geparster JSON-Wert. */
@@ -38,8 +53,15 @@ export interface BackupFile {
 
 /** Ergebnis der Prüfung einer Backup-Datei. */
 export type BackupParseResult =
-  | { readonly ok: true; readonly backup: BackupFile }
+  | { readonly ok: true; readonly backup: BackupFile; readonly cleanup: BackupCleanup }
   | { readonly ok: false; readonly error: string };
+
+/** Was beim Einlesen repariert oder aussortiert wurde. */
+export interface BackupCleanup {
+  readonly repaired: number;
+  readonly skipped: number;
+  readonly quarantined: Readonly<Record<string, readonly unknown[]>>;
+}
 
 /** Anzahl der wichtigsten Datensätze für die Vorschau vor dem Import. */
 export interface BackupCounts {
@@ -87,7 +109,7 @@ function withoutSecrets(data: BackupData): BackupData {
 
 /** Erstellt das Backup-Objekt aus den gespeicherten Daten (ohne Meta-Schlüssel, KI-Verbindung und Secrets). */
 export function buildBackup(data: BackupData, now: Date): BackupFile {
-  const entries = Object.entries(data).filter(([key]) => !NEVER_BACKED_UP_KEYS.has(key));
+  const entries = Object.entries(data).filter(([key]) => !isNeverBackedUp(key));
   return {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
@@ -136,14 +158,15 @@ export function validateBackup(value: unknown): BackupParseResult {
   if (!isValidIsoDate(value['exportedAt'])) return { ok: false, error: BACKUP_ERRORS.badDate };
   const data = value['data'];
   if (!validateData(data)) return { ok: false, error: BACKUP_ERRORS.badData };
-  if (!hasValidRecords(data)) return { ok: false, error: BACKUP_ERRORS.badContent };
+  const cleaned = sanitizeBackupData(data);
   const backup: BackupFile = {
     format: BACKUP_FORMAT,
     version: value['version'] as number,
     exportedAt: value['exportedAt'],
-    data: { ...data },
+    data: { ...cleaned.data },
   };
-  return { ok: true, backup };
+  const cleanup: BackupCleanup = { repaired: cleaned.repaired, skipped: cleaned.skipped, quarantined: cleaned.quarantined };
+  return { ok: true, backup, cleanup };
 }
 
 /** Parst den Dateiinhalt und validiert ihn. Wirft nie. */
@@ -225,7 +248,7 @@ function dropEndpoints(restored: BackupData, current: BackupData): BackupData {
  * bleibt erhalten, wenn das Backup (wie beim Export üblich) keinen enthält.
  */
 export function prepareRestore(backup: BackupData, current: BackupData): BackupData {
-  const restored = Object.fromEntries(Object.entries(backup).filter(([key]) => !NEVER_BACKED_UP_KEYS.has(key)));
+  const restored = Object.fromEntries(Object.entries(backup).filter(([key]) => !isNeverBackedUp(key)));
   return dropEndpoints(keepLocalKey(restored, current, RECIPE_SEARCH_KEY), current);
 }
 

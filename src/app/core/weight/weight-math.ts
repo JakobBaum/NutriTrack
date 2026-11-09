@@ -85,3 +85,12 @@ export function driftSinceProfile(profileKg: number | null, latestKg: number | n
   const drift = Math.round((latestKg - profileKg) * 10) / 10;
   return Math.abs(drift) >= RECALC_DRIFT_KG ? drift : null;
 }
+
+/**
+ * Soll der Hinweis „Ziel neu berechnen“ erscheinen? Nur bei Abweichung zum Profil und einmalig:
+ * Nach dem Ausblenden (gemerktes Gewicht) kommt er erst bei weiteren 2 kg Änderung wieder.
+ */
+export function shouldShowDriftHint(profileKg: number | null, latestKg: number | null, dismissedAtKg: number | null): boolean {
+  if (driftSinceProfile(profileKg, latestKg) === null || latestKg === null) return false;
+  return dismissedAtKg === null || Math.abs(latestKg - dismissedAtKg) >= RECALC_DRIFT_KG;
+}

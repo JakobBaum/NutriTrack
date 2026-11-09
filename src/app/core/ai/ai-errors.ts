@@ -1,13 +1,15 @@
-/** Gemeinsame, nutzerfreundliche Fehlertexte für Proxy- und Direkt-Anbieter. */
+import { STATE_MESSAGES } from '../messages/state-messages';
+
+/** Gemeinsame, nutzerfreundliche Fehlertexte für Proxy- und Direkt-Anbieter (Texte: core/messages). */
 
 export const AI_ERROR_MESSAGES = {
-  overloaded: 'Die KI ist gerade überlastet — bitte in einer Minute erneut versuchen.',
-  rateLimited: 'Zu viele KI-Anfragen — bitte kurz warten und erneut versuchen.',
-  offline: 'Keine Verbindung zur KI. Prüfe deine Internetverbindung.',
-  unauthorized: 'KI-Zugang abgelehnt. Prüfe den Schlüssel unter Profil › KI-Verbindung.',
-  unreadable: 'Die Antwort der KI war nicht lesbar oder wurde blockiert - bitte noch einmal versuchen.',
-  timeout: 'Die KI antwortet gerade nicht - bitte erneut versuchen.',
-  generic: 'Die KI-Anfrage ist fehlgeschlagen. Bitte erneut versuchen.',
+  overloaded: STATE_MESSAGES.aiOverloaded,
+  rateLimited: STATE_MESSAGES.rateLimited,
+  offline: STATE_MESSAGES.offline,
+  unauthorized: STATE_MESSAGES.aiUnavailable,
+  unreadable: STATE_MESSAGES.aiUnreadable,
+  timeout: STATE_MESSAGES.aiTimeout,
+  generic: STATE_MESSAGES.aiGeneric,
 } as const;
 
 /** Client-seitiges Zeitlimit für einen KI-Aufruf (globaler Worker). */

@@ -32,3 +32,23 @@ export function formatDecimal(value: number | null | undefined): string {
   const rounded = Math.round(value * factor) / factor;
   return String(rounded).replace('.', ',');
 }
+
+/** Feldfehler für ungültige Zahleneingaben (einheitlich in allen Formularen). */
+export const NUMBER_FIELD_ERROR = 'Zahl eingeben, z. B. 12,5';
+
+export interface NutrientInputResult {
+  /** Geparster Wert; null bei leerem oder ungültigem Feld. */
+  readonly value: number | null;
+  /** Fehlertext bei nicht leerer, aber ungültiger (oder negativer) Eingabe, sonst null. */
+  readonly error: string | null;
+}
+
+/** Prüft ein Zahlenfeld: leer ist erlaubt (kein Fehler), ungültig oder negativ ergibt einen Feldfehler. */
+export function parseNutrientInput(text: unknown): NutrientInputResult {
+  if (text === null || text === undefined || (typeof text === 'string' && text.trim() === '')) {
+    return { value: null, error: null };
+  }
+  const value = parseDecimal(text);
+  if (value === null || value < 0) return { value: null, error: NUMBER_FIELD_ERROR };
+  return { value, error: null };
+}

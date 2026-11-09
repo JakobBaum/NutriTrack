@@ -171,7 +171,15 @@ describe('toFoodLookupError / foodErrorMessage', () => {
   });
 
   it('liefert eine generische Meldung für fremde Fehler', () => {
-    expect(foodErrorMessage(new Error('x'))).toBe('Abfrage fehlgeschlagen — bitte erneut versuchen.');
-    expect(foodErrorMessage(null)).toMatch(/erneut versuchen/);
+    expect(foodErrorMessage(new Error('x'))).toBe('Die Abfrage ist fehlgeschlagen. Versuche es erneut.');
+    expect(foodErrorMessage(null)).toMatch(/Versuche es erneut/);
+  });
+});
+
+describe('OpenFoodFactsProvider — unplausible Portionsgrößen (Welle B)', () => {
+  it('verwirft Packungsgrößen und Zehntelgramm-Werte als Portion', async () => {
+    expect((await mapProduct({ ...base, serving_quantity: '1500' }))?.servingG).toBeUndefined();
+    expect((await mapProduct({ ...base, serving_quantity: '0.2' }))?.servingG).toBeUndefined();
+    expect((await mapProduct({ ...base, serving_quantity: 250 }))?.servingG).toBe(250);
   });
 });

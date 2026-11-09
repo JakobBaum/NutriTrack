@@ -53,10 +53,15 @@ ion-content {
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--nt-space-3);
+  flex-wrap: wrap;
   padding: var(--nt-space-2) 4px var(--nt-space-4);
 
   &__text {
     min-width: 0;
+
+    .nt-large-title {
+      font-size: min(var(--nt-fs-large-title), 11vw);
+    }
   }
 
   &__add {
@@ -120,7 +125,7 @@ ion-content {
   }
 
   &__big {
-    font-size: 48px;
+    font-size: clamp(1.875rem, 11vw, 3rem);
     font-weight: 700;
     line-height: 1;
     letter-spacing: -1.5px;
@@ -134,7 +139,7 @@ ion-content {
 
   &__chip {
     display: inline-block;
-    margin-left: var(--nt-space-2);
+    margin-top: var(--nt-space-1);
     padding: 2px 10px;
     border-radius: 999px;
     font-size: var(--nt-fs-caption);
@@ -191,8 +196,10 @@ ion-content {
   }
 
   &__secondary {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    display: flex;
+    flex-direction: column;
+    gap: var(--nt-space-1);
+    padding: 0 var(--nt-space-3);
   }
 
   &__share {
@@ -246,7 +253,7 @@ ion-content {
     flex-direction: column;
     align-items: center;
     white-space: nowrap;
-    font-size: 13px;
+    font-size: 0.8125rem;
     line-height: 18px;
     color: var(--nt-secondary);
     font-variant-numeric: tabular-nums;
@@ -262,10 +269,6 @@ ion-content {
     text-align: center;
     font-size: var(--nt-fs-body);
     color: var(--nt-secondary);
-  }
-
-  &--empty &__col {
-    opacity: 0.45;
   }
 
   &__label {
@@ -350,7 +353,7 @@ ion-content {
 
   &__total {
     font-weight: 400;
-    font-size: 14px;
+    font-size: 0.875rem;
     color: var(--nt-secondary);
   }
 }
@@ -372,7 +375,7 @@ ion-content {
   margin-bottom: 0;
 
   &__name {
-    font-size: 14px;
+    font-size: 0.875rem;
     font-weight: 600;
     margin-bottom: 4px;
     white-space: normal;
@@ -403,14 +406,14 @@ ion-content {
   }
 
   &__val {
-    font-size: 13px;
+    font-size: 0.8125rem;
     font-weight: 700;
     text-align: right;
     min-width: 80px;
   }
 
   &__pct {
-    font-size: 12px;
+    font-size: 0.75rem;
     font-weight: 400;
     color: var(--nt-secondary);
     display: block;
@@ -452,5 +455,54 @@ ion-content {
     > .nt-grouped {
       grid-column: 2;
     }
+  }
+}
+
+/* --- Mini-Balken (Kohlenhydrate, Fett, Ballaststoffe, Zucker) --- */
+.minibar {
+  display: grid;
+  grid-template-columns: minmax(0, 7.5em) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--nt-space-3);
+  min-height: var(--nt-touch);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--nt-focus);
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
+
+  &__label {
+    color: var(--nt-ink);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__track {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--nt-track);
+    overflow: hidden;
+  }
+
+  &__fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+  }
+
+  &__val {
+    color: var(--nt-secondary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 }

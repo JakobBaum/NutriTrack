@@ -2,59 +2,42 @@
 // Modals werden ausserhalb des Hosts gerendert, daher keine :host-Properties.
 @use 'diary-sheets';
 
-// --- Seitenkopf -------------------------------------------------------------
-.page-header ion-toolbar {
-  --background: var(--nt-ground);
-  --min-height: 0;
-  --padding-top: 0;
-  --padding-bottom: 0;
-}
-
 ion-content {
   --background: var(--nt-ground);
   --color: var(--nt-ink);
 }
 
-.page-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--nt-space-2);
-  padding: var(--nt-space-2) var(--nt-space-5) 0;
+// Pill im gemeinsamen Seitenkopf darf bei 320 px nicht überlaufen.
+.page-head__add {
+  flex: none;
+  white-space: nowrap;
+  padding-inline: var(--nt-space-3);
 
-  .nt-large-title {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  // Pill darf bei 320 px nicht überlaufen.
-  &__add {
-    flex: none;
-    white-space: nowrap;
-    padding-inline: var(--nt-space-3);
-
-    ion-icon {
-      font-size: 20px;
-    }
-  }
-}
-
-@media (max-width: 340px) {
-  .page-head {
-    padding-inline: var(--nt-space-4);
+  ion-icon {
+    font-size: 20px;
   }
 }
 
 // --- Tages-Summe ------------------------------------------------------------
 .summary {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nt-space-3);
   margin-top: var(--nt-space-2);
 
+  &__col {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__kcal--protein {
+    color: var(--nt-protein);
+  }
+
   &__kcal {
-    font-size: var(--nt-fs-hero);
+    font-size: clamp(1.875rem, 9vw, var(--nt-fs-hero));
     font-weight: 700;
     letter-spacing: -0.5px;
     line-height: 1.1;
@@ -79,10 +62,8 @@ ion-content {
     font-weight: 700;
   }
 }
-
-// Eintragszeile: sichtbarer Papierkorb neben dem Wischen (Maus/Tastatur)
-// Papierkorb steht neben der Zeile (nicht darueber); Sichtbarkeit steuert global .nt-hover-delete
-// (auf Touch-Geraeten ausgeblendet, dort bleibt Wischen).
+// Eintragszeile: sichtbares „Mehr“-Menü (Bearbeiten, Doppelt eintragen, Löschen) neben dem Wischen,
+// auf Touch-Geräten wie am Desktop erreichbar.
 .entry-row {
   display: flex;
   align-items: center;
@@ -92,14 +73,14 @@ ion-content {
     min-width: 0;
   }
 
-  &__delete {
+  &__more {
     width: var(--nt-touch);
     height: var(--nt-touch);
     padding: 0;
     border: 0;
     border-radius: var(--nt-radius-pill);
     background: var(--nt-card);
-    color: var(--nt-danger);
+    color: var(--nt-secondary);
     cursor: pointer;
 
     ion-icon {

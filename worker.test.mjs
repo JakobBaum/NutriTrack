@@ -554,11 +554,49 @@ describe('Tageszähler (WRK-01/SEC-02)', () => {
     assert.equal(health.warning, undefined);
   });
 
-  it('läuft bei KV-Fehler weiter (fail-open) statt 500', async () => {
+  it('antwortet bei konfiguriertem, aber nicht erreichbarem KV mit 503 (fail-closed) ohne Upstream-Call', async () => {
     mockFetch(() => geminiReply({}));
     const kv = { get: async () => { throw new Error('kv down'); }, put: async () => {} };
     const res = await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), { ...ENV, DAILY_KV: kv });
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 503);
+    assert.equal(upstream.length, 0);
+    assert.match((await res.json()).error, /Tageszähler/);
+  });
+
+  it('antwortet auch bei fehlschlagendem put mit 503', async () => {
+    mockFetch(() => geminiReply({}));
+    const kv = { get: async () => null, put: async () => { throw new Error('kv put down'); } };
+    const res = await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), { ...ENV, DAILY_KV: kv });
+    assert.equal(res.status, 503);
+    assert.equal(upstream.length, 0);
+  });
+
+  it('zaehlt Foto-Aufrufe doppelt', async () => {
+    mockFetch(() => geminiReply({ name: 'x', facts: {} }));
+    const kv = fakeKv();
+    const env = { ...ENV, DAILY_KV: kv, DAILY_AI_CAP: '10' };
+    await worker.fetch(post({ fn: 'recognizeLabel', payload: { imageBase64: 'QUJD' } }), env);
+    assert.equal(kv.store[today()], '2');
+    await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), env);
+    assert.equal(kv.store[today()], '3');
+  });
+
+  it('zaehlt importRecipe mit Bild doppelt', async () => {
+    mockFetch(() => geminiReply({ title: 't' }));
+    const kv = fakeKv();
+    const env = { ...ENV, DAILY_KV: kv, DAILY_AI_CAP: '10' };
+    await worker.fetch(post({ fn: 'importRecipe', payload: { imageBase64: 'QUJD' } }), env);
+    assert.equal(kv.store[today()], '2');
+  });
+
+  it('blockt einen Foto-Aufruf, wenn nur noch ein Slot uebrig ist', async () => {
+    mockFetch(() => geminiReply({}));
+    const kv = fakeKv({ [today()]: '4' });
+    const env = { ...ENV, DAILY_KV: kv, DAILY_AI_CAP: '5' };
+    const res = await worker.fetch(post({ fn: 'recognizeLabel', payload: { imageBase64: 'QUJD' } }), env);
+    assert.equal(res.status, 429);
+    assert.equal(upstream.length, 0);
+    assert.equal(kv.store[today()], '4');
   });
 });
 

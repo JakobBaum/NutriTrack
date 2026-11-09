@@ -2,18 +2,26 @@ import { Injectable } from '@angular/core';
 import {
   ActivityLevel,
   DailyTarget,
+  Goal,
   NutritionFacts,
   UserProfile,
 } from '../models';
+import { manualKcalOf, manualProteinPerKgOf } from './manual-target';
 
 /** Energiegehalt pro Gramm Makronährstoff (kcal/g). */
 const KCAL_PER_G = { protein: 4, carbs: 4, fat: 9 } as const;
 
-/** 1 kg Körperfett ≈ 7700 kcal. */
+/** 1 kg Körpergewicht ≈ 7700 kcal (Fettgewebe). */
 const KCAL_PER_KG = 7700;
 
-/** Größtes empfohlenes Tempo: Anteil des Körpergewichts pro Woche (1 %); darüber wird gedeckelt. */
+/** Größtes empfohlenes Abnehm-Tempo: Anteil des Körpergewichts pro Woche (1 %); darüber wird gedeckelt. */
 export const MAX_RATE_FRACTION_PER_WEEK = 0.01;
+
+/** Größtes empfohlenes Aufbau-Tempo (0,5 % pro Woche): ein größerer Überschuss wird überwiegend Fett. */
+export const MAX_GAIN_FRACTION_PER_WEEK = 0.005;
+
+/** Vorgabe-Tempo in kg pro Woche, wenn keines gespeichert ist. */
+export const DEFAULT_RATE_KG_PER_WEEK = { lose: 0.5, gain: 0.25 } as const;
 
 /** PAL-Faktoren je Aktivitätslevel. */
 const ACTIVITY_FACTORS: Record<ActivityLevel, number> = {
@@ -79,9 +87,10 @@ export class NutritionCalcService {
     return this.basalMetabolicRate(p) * ACTIVITY_FACTORS[p.activityLevel];
   }
 
-  /** Größtes Tempo (kg/Woche) für ein Körpergewicht: 1 % pro Woche. */
-  maxRateKgPerWeek(weightKg: number): number {
-    return Number.isFinite(weightKg) && weightKg > 0 ? weightKg * MAX_RATE_FRACTION_PER_WEEK : 0;
+  /** Größtes Tempo (kg/Woche) für ein Körpergewicht: 1 % beim Abnehmen, 0,5 % beim Zunehmen. */
+  maxRateKgPerWeek(weightKg: number, goal: Goal = 'lose'): number {
+    const fraction = goal === 'gain' ? MAX_GAIN_FRACTION_PER_WEEK : MAX_RATE_FRACTION_PER_WEEK;
+    return Number.isFinite(weightKg) && weightKg > 0 ? weightKg * fraction : 0;
   }
 
   /**
@@ -103,11 +112,13 @@ export class NutritionCalcService {
    * Beim Abnehmen wird das Ergebnis auf eine sichere Untergrenze angehoben.
    */
   dailyTarget(p: UserProfile): DailyTarget {
-    const uncapped = this.uncappedKcal(p);
-    const kcal = Math.round(this.applyMinKcal(p, uncapped));
+    const kcal = manualKcalOf(p) ?? Math.round(this.applyMinKcal(p, this.uncappedKcal(p)));
 
+    const manualPerKg = manualProteinPerKgOf(p);
     const perKg = Math.min(PROTEIN_G_PER_KG[p.goal], MAX_PROTEIN_G_PER_KG);
-    const proteinG = Math.round(perKg * this.proteinReferenceWeightKg(p));
+    const proteinG = manualPerKg !== null
+      ? Math.round(manualPerKg * p.weightKg)
+      : Math.round(perKg * this.proteinReferenceWeightKg(p));
     const fatG = Math.round((kcal * FAT_ENERGY_RATIO) / KCAL_PER_G.fat);
     const proteinKcal = proteinG * KCAL_PER_G.protein;
     const fatKcal = fatG * KCAL_PER_G.fat;
@@ -123,14 +134,15 @@ export class NutritionCalcService {
 
   /** `true`, wenn die Mindestzufuhr das rechnerische Ziel anhebt (nur beim Abnehmen, Formel liegt darunter). */
   isMinKcalApplied(p: UserProfile): boolean {
+    if (manualKcalOf(p) !== null) return false;
     const uncapped = this.uncappedKcal(p);
     if (!Number.isFinite(uncapped)) return true;
     return p.goal === 'lose' && uncapped < this.minKcal(p);
   }
 
-  /** Tägliches Defizit/Überschuss (kcal) für ein Tempo in kg/Woche (auf 1 % des Körpergewichts begrenzt). */
-  dailyDeltaKcal(rateKgPerWeek: number, weightKg: number): number {
-    const rate = Math.min(Math.abs(rateKgPerWeek), this.maxRateKgPerWeek(weightKg));
+  /** Tägliches Defizit/Überschuss (kcal) für ein Tempo in kg/Woche (je Ziel auf 1 % bzw. 0,5 % des Körpergewichts begrenzt). */
+  dailyDeltaKcal(rateKgPerWeek: number, weightKg: number, goal: Goal = 'lose'): number {
+    const rate = Math.min(Math.abs(rateKgPerWeek), this.maxRateKgPerWeek(weightKg, goal));
     return Math.round((rate * KCAL_PER_KG) / 7);
   }
 
@@ -140,7 +152,7 @@ export class NutritionCalcService {
    */
   achievedRateKgPerWeek(p: UserProfile): number {
     if (p.goal === 'maintain') return 0;
-    const wished = Math.min(Math.abs(p.rateKgPerWeek ?? 0.5), this.maxRateKgPerWeek(p.weightKg));
+    const wished = Math.min(Math.abs(p.rateKgPerWeek ?? DEFAULT_RATE_KG_PER_WEEK[p.goal]), this.maxRateKgPerWeek(p.weightKg, p.goal));
     const actualDelta = Math.abs(this.totalDailyEnergy(p) - this.dailyTarget(p).kcal);
     return Math.min(wished, (actualDelta * 7) / KCAL_PER_KG);
   }
@@ -148,8 +160,8 @@ export class NutritionCalcService {
   /** Rechnerisches Kalorienziel vor der Mindestzufuhr. */
   private uncappedKcal(p: UserProfile): number {
     const tdee = this.totalDailyEnergy(p);
-    const rate = p.goal === 'maintain' ? 0 : Math.abs(p.rateKgPerWeek ?? 0.5);
-    const dailyDelta = this.dailyDeltaKcal(rate, p.weightKg);
+    const rate = p.goal === 'maintain' ? 0 : Math.abs(p.rateKgPerWeek ?? DEFAULT_RATE_KG_PER_WEEK[p.goal]);
+    const dailyDelta = this.dailyDeltaKcal(rate, p.weightKg, p.goal);
     if (p.goal === 'lose') return tdee - dailyDelta;
     if (p.goal === 'gain') return tdee + dailyDelta;
     return tdee;
@@ -162,6 +174,11 @@ export class NutritionCalcService {
   }
 
   private minKcal(p: UserProfile): number {
+    return this.minimumKcal(p);
+  }
+
+  /** Mindestzufuhr (kcal) für das Geschlecht; dient auch für Warnhinweise bei manuellen Zielen. */
+  minimumKcal(p: Pick<UserProfile, 'sex'>): number {
     return MIN_KCAL[p.sex] ?? 1350;
   }
 

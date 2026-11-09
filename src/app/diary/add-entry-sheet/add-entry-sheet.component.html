@@ -13,19 +13,22 @@
         </div>
         <h2 class="nt-sheet-header__title" role="heading" aria-level="2">{{ modalTitle() }}</h2>
         <div class="nt-sheet-header__end">
-          <ion-button fill="clear" (click)="requestCloseAdd()">Abbrechen</ion-button>
+          <ion-button fill="clear" data-testid="add-close" (click)="requestCloseAdd()">{{ addedCount() > 0 ? 'Fertig' : 'Abbrechen' }}</ion-button>
         </div>
       </div>
     </ion-header>
 
     <ion-content class="sheet-content">
+      @if (storageError(); as storageMessage) {
+        <p class="form-error form-error--banner" role="alert" data-testid="sheet-storage-error">{{ storageMessage }}</p>
+      }
       @if (error()) {
-        <p class="form-error" role="alert">{{ error() }}</p>
+        <p class="form-error form-error--banner" role="alert">{{ error() }}</p>
       }
 
       <div class="meal-picker" role="radiogroup" aria-label="Essenszeit">
         @for (opt of mealOptions; track opt.value) {
-          <button type="button" class="meal-chip" role="radio" [attr.aria-checked]="form.meal === opt.value" [class.meal-chip--on]="form.meal === opt.value" [attr.aria-label]="opt.label" (click)="form.meal = opt.value">{{ opt.short }}</button>
+          <button type="button" class="meal-chip" role="radio" [attr.aria-checked]="form.meal === opt.value" [class.meal-chip--on]="form.meal === opt.value" [attr.aria-label]="opt.label" (click)="setMeal(opt.value)">{{ opt.short }}</button>
         }
       </div>
 
@@ -58,7 +61,7 @@
                     <span class="recent__text">
                       <span class="recent__name">{{ fav.label }}@if (fav.brand) { <span class="entry-brand"> · {{ fav.brand }}</span> }</span>
                       <span class="recent__meta">
-                        @if (fav.amountG) { {{ formatAmount(fav.amountG, fav.unit) }} · }{{ fav.isPartial ? 'mind. ' : '' }}{{ fav.facts.kcal | ntNum:0 }} kcal
+                        @if (fav.amountG) { {{ formatAmount(fav.amountG, fav.unit) }} · }{{ fav.isPartial ? 'mind. ' : '' }}{{ fav.facts.kcal | ntNum:0 }} kcal · <span class="protein-val">{{ fav.facts.proteinG | ntNum:0 }} g Eiweiß</span>
                       </span>
                     </span>
                     <span class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
@@ -80,7 +83,7 @@
                     <span class="recent__text">
                       <span class="recent__name">{{ entry.label }}@if (entry.brand) { <span class="entry-brand"> · {{ entry.brand }}</span> }</span>
                       <span class="recent__meta">
-                        @if (entry.amountG) { {{ formatAmount(entry.amountG, entry.unit) }} · }{{ entry.isPartial ? 'mind. ' : '' }}{{ entry.facts.kcal | ntNum:0 }} kcal
+                        @if (entry.amountG) { {{ formatAmount(entry.amountG, entry.unit) }} · }{{ entry.isPartial ? 'mind. ' : '' }}{{ entry.facts.kcal | ntNum:0 }} kcal · <span class="protein-val">{{ entry.facts.proteinG | ntNum:0 }} g Eiweiß</span>
                       </span>
                     </span>
                     <span class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
@@ -96,7 +99,7 @@
                   <button type="button" class="recent__main" (click)="quickAddRecipe(recipe)" [attr.aria-label]="recipe.title + ' direkt eintragen'">
                     <span class="recent__text">
                       <span class="recent__name">{{ recipe.title }}</span>
-                      <span class="recent__meta">1 Portion · {{ recipe.factsPerServing?.kcal | ntNum:0 }} kcal</span>
+                      <span class="recent__meta">1 Portion · {{ recipe.factsPerServing?.kcal | ntNum:0 }} kcal · <span class="protein-val">{{ recipe.factsPerServing?.proteinG | ntNum:0 }} g Eiweiß</span></span>
                     </span>
                     <span class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
                   </button>
@@ -125,7 +128,7 @@
                 <ion-item button detail="false" lines="none" (click)="selectRecipe(recipe)">
                   <ion-label>
                     <h3>{{ recipe.title }}</h3>
-                    <p>{{ recipe.factsPerServing?.kcal | ntNum:0 }} kcal / Portion</p>
+                    <p>{{ recipe.factsPerServing?.kcal | ntNum:0 }} kcal · <span class="protein-val">{{ recipe.factsPerServing?.proteinG | ntNum:0 }} g Eiweiß</span> / Portion</p>
                   </ion-label>
                 </ion-item>
               }
@@ -150,7 +153,7 @@
                 <ion-item button detail="false" lines="none" (click)="selectCustomFood(food)">
                   <ion-label>
                     <h3>{{ food.name }}</h3>
-                    <p>{{ food.facts.kcal | ntNum:0 }} kcal</p>
+                    <p>{{ food.facts.kcal | ntNum:0 }} kcal · <span class="protein-val">{{ food.facts.proteinG | ntNum:0 }} g Eiweiß</span></p>
                   </ion-label>
                 </ion-item>
               }
@@ -167,7 +170,7 @@
               <ion-item button detail="false" lines="none" (click)="quickAddSavedMeal(meal)">
                 <ion-label>
                   <h3>{{ meal.name }}</h3>
-                  <p>{{ meal.entries.length }} Einträge · {{ mealKcal(meal) | ntNum:0 }} kcal</p>
+                  <p>{{ meal.entries.length }} Einträge · {{ mealKcal(meal) | ntNum:0 }} kcal · <span class="protein-val">{{ mealProtein(meal) | ntNum:0 }} g Eiweiß</span></p>
                 </ion-label>
               </ion-item>
             }
@@ -185,7 +188,7 @@
 
           <ion-list class="diary-list" lines="none">
             <ion-item lines="none">
-              <ion-input label="Name" labelPlacement="stacked" [ngModel]="form.label" (ngModelChange)="setLabel($event)" placeholder="z. B. Haferflocken" enterkeyhint="done"></ion-input>
+              <ion-input label="Name" labelPlacement="stacked" [ngModel]="form.label" (ngModelChange)="setLabel($event)" [placeholder]="quantityUnit === null ? 'Name (optional bei nur kcal)' : 'z. B. Haferflocken'" autocapitalize="words" autocorrect="off" enterkeyhint="done" (keyup.enter)="dismissKeyboard()"></ion-input>
             </ion-item>
             @if (quantityUnit === 'portion') {
               <app-amount-row label="Portionen" suffix="Portionen" [text]="numText('servings', form.servings)" (textChange)="setServings($event)" (stepped)="stepAddServings($event)"></app-amount-row>
@@ -199,10 +202,13 @@
             <p class="scan-hint">Quelle: {{ basisKcal | ntNum:0 }} kcal pro 100 {{ baseUnit }}</p>
           }
 
-          <p class="preview" aria-live="polite">
-            <strong>{{ form.kcal | ntNum:0 }}</strong> kcal ·
-            Eiweiß {{ form.proteinG | ntNum }} g · Kohlenhydrate {{ form.carbsG | ntNum }} g · Fett {{ form.fatG | ntNum }} g
-          </p>
+          <div class="preview" aria-live="polite" data-testid="entry-preview">
+            <p class="preview__main">
+              <span><strong class="preview__kcal">{{ form.kcal | ntNum:0 }}</strong> kcal</span>
+              <span><strong class="preview__protein protein-val">{{ form.proteinG | ntNum }}</strong> g Eiweiß</span>
+            </p>
+            <p class="preview__rest">Kohlenhydrate {{ form.carbsG | ntNum }} g · Fett {{ form.fatG | ntNum }} g</p>
+          </div>
 
           <ion-accordion-group class="diary-list diary-list--spaced adjust-group" [value]="adjustOpen()" (ionChange)="setAdjustOpen($event.detail.value)">
             <ion-accordion value="adjust">

@@ -1,0 +1,68 @@
+:host {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 21000; // über Ionic-Overlays (20000), damit ein Speicherfehler nie verdeckt wird
+  pointer-events: none;
+}
+
+.banner {
+  pointer-events: auto;
+  margin: 0 auto;
+  max-width: var(--nt-page-max, 720px);
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) var(--nt-page-gutter, 16px) 12px;
+  color: var(--nt-on-accent, #fff);
+  font-size: 0.9375rem;
+  line-height: 1.35;
+
+  &--error {
+    background: var(--nt-danger);
+  }
+
+  &--info {
+    background: var(--nt-accent);
+  }
+
+  &__text {
+    margin: 0;
+
+    &--sub {
+      margin-top: 4px;
+      font-size: 0.8125rem;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  &__btn {
+    min-height: 44px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 999px;
+    background: #fff;
+    color: var(--nt-ink, #1c1c1e);
+    font: inherit;
+    font-weight: 600;
+
+    &:disabled {
+      opacity: 0.6;
+    }
+
+    &:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 2px;
+    }
+
+    &--ghost {
+      background: transparent;
+      color: inherit;
+      box-shadow: inset 0 0 0 1.5px currentColor;
+    }
+  }
+}

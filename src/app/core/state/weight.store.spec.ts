@@ -44,6 +44,16 @@ describe('WeightStore', () => {
     expect(storage.get('weight', null)).toBeNull();
   });
 
+  it('merkt sich das Ausblenden des Gewichtshinweises dauerhaft und vergisst es beim Zurücksetzen', () => {
+    expect(store.driftHintDismissedAtKg()).toBeNull();
+    store.dismissDriftHint(75.5);
+    expect(store.driftHintDismissedAtKg()).toBe(75.5);
+    expect(storage.get('weightHintDismissedAtKg', null)).toBe(75.5);
+    store.clear();
+    expect(store.driftHintDismissedAtKg()).toBeNull();
+    expect(storage.get('weightHintDismissedAtKg', null)).toBeNull();
+  });
+
   it('never mutates a previously read list', () => {
     store.set('2026-11-05', 80);
     const before = store.entries();

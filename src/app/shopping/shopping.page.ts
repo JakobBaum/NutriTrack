@@ -1,6 +1,11 @@
-import { ChangeDetectionStrategy, Component, ElementRef, OnDestroy, computed, inject, signal, viewChild } from '@angular/core';
+import { selectAllOnFocus } from '../core/keyboard/select-all';
+import { ChangeDetectionStrategy, Component, ElementRef, OnDestroy, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
 import { ActionSheetController, AlertController } from '@ionic/angular';
-import { formatDecimal, parseDecimal } from '../core/util/number-input';
+import { lightHaptic } from '../diary/haptics';
+import { clearQueryParams, pickParam } from '../core/navigation/query-params';
+import { formatDecimal, parseDecimal, parseNutrientInput } from '../core/util/number-input';
 import { UNIT_OPTIONS } from '../core/util/units';
 import { AiService } from '../core/ai/ai.service';
 import { MealType, ShoppingItem } from '../core/models';
@@ -42,6 +47,9 @@ export interface MealToggle {
 /** Ansichten der Einkaufsseite: Rezepte (Generator) oder Liste (Einkauf). */
 export type ShoppingView = 'recipes' | 'list';
 
+/** Werte von `?view=` (Link-Wert -> Ansicht): `plan` ist der Wochenplan. */
+const QUERY_VIEWS: Readonly<Record<string, ShoppingView>> = { plan: 'recipes', list: 'list' };
+
 /** Dauer des Hinweises nach „Liste teilen“ in ms. */
 const SHARE_TOAST_MS = 2500;
 /** Dauer des Hinweises nach „Wochenplan erstellt“ (länger, damit „Zur Liste“ erreichbar bleibt). */
@@ -68,6 +76,18 @@ export class ShoppingPage implements OnDestroy {
   private readonly actionSheet = inject(ActionSheetController);
   private readonly weekPlanService = inject(WeekPlanService);
   private readonly weekPlanStore = inject(WeekPlanStore);
+  private readonly router = inject(Router);
+  private readonly queryParams = toSignal(inject(ActivatedRoute).queryParamMap);
+
+  constructor() {
+    // Deep Link `?view=plan|list`: einmal übernehmen, dann aus der URL entfernen.
+    effect(() => {
+      const requested = pickParam(this.queryParams(), 'view', Object.keys(QUERY_VIEWS));
+      if (!requested) return;
+      this.setView(QUERY_VIEWS[requested]);
+      void clearQueryParams(this.router, ['view']);
+    });
+  }
 
   /** Eine ID = Komma-Liste von Indizes (Einzel- oder Sammel-Löschen). */
   private readonly deletion = new UndoableDelete((id) => this.commitRemoval(decodeIndexes(id)));
@@ -160,6 +180,9 @@ export class ShoppingPage implements OnDestroy {
   newItemName = '';
   newItemAmountText = '';
   newItemPriceText = '';
+  /** Feldfehler im Hinzufügen-Sheet (null = gültig). */
+  readonly addAmountError = signal<string | null>(null);
+  readonly addPriceError = signal<string | null>(null);
   readonly addBreakpoints = [0, 0.5, 1];
   readonly addInitialBreakpoint = 0.5;
   readonly categoryLabel = categoryLabel;
@@ -349,6 +372,7 @@ export class ShoppingPage implements OnDestroy {
   setChecked(index: number, checked: boolean): void {
     const item = this.list()?.items[index];
     if (!item || item.checked === checked) return;
+    lightHaptic();
     this.store.toggleItem(index);
   }
 
@@ -459,32 +483,44 @@ export class ShoppingPage implements OnDestroy {
   }
 
   /** Eigenen Preis einer Position eintragen oder löschen (leer lassen). */
-  async editPrice(index: number): Promise<void> {
+  async editPrice(index: number, draft?: string, errorText?: string): Promise<void> {
     const item = this.list()?.items[index];
     if (!item) return;
     const alert = await this.alertCtrl.create({
       header: 'Preis ändern',
       subHeader: item.name,
-      message: 'Eigener Betrag in Euro (€); leer = Schätzung verwenden',
+      message: errorText ?? 'Eigener Betrag in Euro (€); leer = Schätzung verwenden',
+      cssClass: errorText ? 'alert-error' : undefined,
       inputs: [
         {
           name: 'price',
           type: 'text',
           placeholder: '0,00 €',
-          value: item.userPrice != null ? formatDecimal(item.userPrice) : '',
+          value: draft ?? (item.userPrice != null ? formatDecimal(item.userPrice) : ''),
           attributes: { inputmode: 'decimal' },
         },
       ],
       buttons: [
+        { text: 'Position löschen', role: 'destructive' },
         { text: 'Abbrechen', role: 'cancel' },
         { text: 'Speichern', role: 'confirm' },
       ],
     });
     await alert.present();
     const { role, data } = await alert.onDidDismiss<{ values?: { price?: string } }>();
+    if (role === 'destructive') {
+      this.removeItem(index);
+      return;
+    }
     if (role !== 'confirm') return;
     const raw = String(data?.values?.price ?? '').trim();
-    this.store.setItemPrice(index, raw === '' ? null : parseDecimal(raw));
+    const parsed = parseNutrientInput(raw);
+    if (parsed.error) {
+      // Ungültig: Eingabe behalten und erneut fragen, den Preis nicht löschen.
+      await this.editPrice(index, raw, parsed.error);
+      return;
+    }
+    this.store.setItemPrice(index, parsed.value);
   }
 
   openAdd(): void {
@@ -499,10 +535,7 @@ export class ShoppingPage implements OnDestroy {
     void this.addNameInput()?.nativeElement.setFocus?.();
   }
 
-  selectAll(event: Event): void {
-    const el = event.target as { getInputElement?: () => Promise<HTMLInputElement> } | null;
-    void el?.getInputElement?.().then((input) => input.select());
-  }
+  readonly selectAll = selectAllOnFocus;
 
   async pickUnit(): Promise<void> {
     const sheet = await this.actionSheet.create({
@@ -528,11 +561,16 @@ export class ShoppingPage implements OnDestroy {
       this.focusName();
       return;
     }
-    const price = parseDecimal(this.newItemPriceText);
+    const amountRes = parseNutrientInput(this.newItemAmountText);
+    const priceRes = parseNutrientInput(this.newItemPriceText);
+    this.addAmountError.set(amountRes.error);
+    this.addPriceError.set(priceRes.error);
+    if (amountRes.error || priceRes.error) return;
+    const price = priceRes.value;
     this.store.addItem({
       name,
-      // Leer, ungültig oder ≤ 0 = „ohne Menge“.
-      amount: Math.max(0, parseDecimal(this.newItemAmountText) ?? 0),
+      // Leer = „ohne Menge“.
+      amount: amountRes.value ?? 0,
       unit: this.newItemUnit || 'g',
       checked: false,
       ...(price !== null && price > 0 ? { userPrice: price } : {}),
