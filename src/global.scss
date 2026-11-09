@@ -1097,3 +1097,9 @@ ion-modal .nt-add-btn + .nt-add-btn {
 .nt-macro--protein dd {
   color: var(--nt-protein) !important; // schlaegt die komponentengebundene dd-Farbe der Kacheln
 }
+
+// Eiweiß-Zahl in Listenzeilen (Tagebuch, Eintragen-Sheet, Mahlzeiten): Eiweiß-Farbe, halbfett.
+.protein-val {
+  font-weight: 600;
+  color: var(--nt-protein);
+}

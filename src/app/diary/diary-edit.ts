@@ -36,14 +36,25 @@ export interface AmountChip {
   value: number;
   /** True beim „wie zuletzt“-Chip (nur wenn der Wert nicht schon eine Vorgabe ist). */
   isLast: boolean;
+  /** True beim Chip „1 Portion“ (Packungsangabe), nur bei g/ml. */
+  isServing?: boolean;
 }
 
-/** Schnellwahl-Chips: Vorgaben, plus „zuletzt“ nur wenn abweichend (ersetzt dann die größte Vorgabe). */
-export function amountChips(unit: AmountUnit, last: number | null): AmountChip[] {
+/**
+ * Schnellwahl-Chips: Vorgaben, plus die Packungsportion vorn (nur g/ml, wenn sie keine Vorgabe ist)
+ * und „zuletzt“ (wenn abweichend); beides verdrängt Vorgaben von hinten, max. 4 Chips.
+ */
+export function amountChips(unit: AmountUnit, last: number | null, serving: number | null = null): AmountChip[] {
   const presets = quickAmounts(unit);
-  const chips = presets.map((value) => ({ value, isLast: false }));
-  if (last == null || presets.some((p) => Math.abs(p - last) < 1e-9)) return chips;
-  return [...chips.slice(0, MAX_CHIPS - 1), { value: last, isLast: true }];
+  const isPreset = (v: number): boolean => presets.some((p) => Math.abs(p - v) < 1e-9);
+  const front: AmountChip[] = serving != null && unitFactor(unit) === 1 && !isPreset(serving)
+    ? [{ value: serving, isLast: false, isServing: true }]
+    : [];
+  const back: AmountChip[] = last != null && !isPreset(last) && !(front[0] && Math.abs(front[0].value - last) < 1e-9)
+    ? [{ value: last, isLast: true }]
+    : [];
+  const keep = MAX_CHIPS - front.length - back.length;
+  return [...front, ...presets.slice(0, keep).map((value) => ({ value, isLast: false })), ...back];
 }
 
 const MEAL_SHORT: Record<MealType, string> = {

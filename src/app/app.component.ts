@@ -1,4 +1,5 @@
 import { Component, inject } from '@angular/core';
+import { showKeyboardDoneBar } from './core/keyboard/keyboard-accessory';
 import { StoragePersistenceService } from './core/storage/storage-persistence.service';
 
 @Component({
@@ -10,5 +11,6 @@ import { StoragePersistenceService } from './core/storage/storage-persistence.se
 export class AppComponent {
   constructor() {
     void inject(StoragePersistenceService).request();
+    void showKeyboardDoneBar();
   }
 }

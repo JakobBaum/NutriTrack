@@ -137,6 +137,14 @@
   font-size: var(--nt-fs-body);
   font-weight: 600;
   color: var(--nt-danger);
+
+  // Banner: Fehler im offenen Sheet bleiben sichtbar, auch wenn man scrollt oder die Liste darunter steht.
+  &--banner {
+    margin: var(--nt-space-2) var(--nt-space-4);
+    padding: var(--nt-space-3) var(--nt-space-4);
+    border-radius: var(--nt-radius-tile, 16px);
+    background: color-mix(in srgb, var(--nt-danger) 10%, var(--nt-card));
+  }
 }
 
 .entry-brand {

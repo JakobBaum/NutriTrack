@@ -33,3 +33,35 @@ Stand 2026-11-09, Branch `review2-wellen`, nicht committet. Verifikation: tsc sa
 - Persistenz-Backend (Sharding/SQLite) bewusst nicht entschieden.
 - Nicht auf einem Gerät getestet (nativer `appStateChange`, echter Quota-Fehler, `persist()` in WebView); kein E2E-Lauf.
 - Das Banner liegt fix über der Statusleiste und wurde nicht visuell geprüft (Safe-Area, Dark Mode).
+
+## Welle B (Eintragen und Heute)
+
+Stand: 2026-11-09, Branch `review2-wellen`, nicht committet.
+
+### Eintragen-Sheet
+- Bleibt nach Schnell-Eintrag (Chip, Favorit, Zuletzt benutzt, Rezept, Mahlzeit) offen. Toast mit Essenszeit, kcal und Eiweiß ("In Frühstück eingetragen · 250 kcal · 18 g Eiweiß", `diary/entry-message.ts`), Rückgängig passt den Zähler an, 400 ms Sperre gegen Doppeltipp. Kopfzeilen-Knopf heißt "Fertig" nach dem ersten Eintrag, sonst "Abbrechen". Speichern aus dem Formular schließt das Sheet weiterhin.
+- Autofokus nur ohne Schnellauswahl (Favoriten, Zuletzt benutzt), damit die Tastatur die Auswahl nicht verdeckt.
+- "Zuletzt benutzt" nach Essenszeit gefiltert (`DiaryStore.recentFoods(limit, meal)`: gleiche Essenszeit zuerst nach Häufigkeit der letzten 30 Tage, danach der Rest nach Aktualität).
+- Eiweiß in den Listenzeilen (`nt-food-row`, Favoriten, Zuletzt, Rezepte, Eigene, Mahlzeiten) in `--nt-protein`.
+- Nur-kcal-Schnelleintrag (Label "Schnell-Eintrag", wird nicht als eigenes Lebensmittel gemerkt). Vorschau mit zwei großen Zahlen.
+- OFF-Portion: `plausibleServingG` (1 bis 1000 g), erste Menge-Chip ist die Packungsportion ("Portion").
+- Fehler beim Speichern erscheinen als Banner im Sheet (der globale Banner liegt hinter dem Modal).
+
+### Heute
+- Hero: Schrift `clamp(30px, 11vw, 48px)`, "über Ziel" als eigene Zeile, einheitlicher Zusatz "noch" für kcal und Eiweiß.
+- Keine 45-%-Abdunklung mehr am leeren Tag. Die vier kleinen Ringe sind kompakte Mini-Balken (Zucker rot bei Überschreitung, alle öffnen den Drill).
+- Wochenstreifen (`dashboard/week-strip.*`, Logik `proteinStripStates` mit Schwelle der Wochenansicht: erreicht ab 90 %, teilweise ab 50 %).
+- Gewichtskachel erst nach dem ersten Eintrag des Tages und nur am heutigen Tag; öffnet das aus der Gewichtskarte herausgelöste `app-weight-sheet`.
+- Tagebuch: Kopfkarte mit Eiweiß (gegessen, noch X g), `E x g` in `--nt-protein`.
+
+### Eingabefelder
+- Kein stilles 0 mehr: `parseNutrientInput` (leer = ok, ungültig oder negativ = Feldfehler "Zahl eingeben, z. B. 12,5") in manueller Mahlzeiten-Eingabe, Einkauf (Menge, Preis, Preis ändern behält die Eingabe und fragt erneut).
+- iOS: "Fertig"-Leiste über der Zahlentastatur (`@capacitor/keyboard`, nur iOS), `autocapitalize="words"`/`autocorrect="off"` auf Namensfeldern, `enterkeyhint` nur noch mit Enter-Handler, Inhalt wird beim Fokus markiert (`selectAllOnFocus`: Mahlzeiten, Einkauf).
+
+### Bewusst unverändert
+Fastfood-Block, fünf Tabs, Hardware-Zurück, Widget, Health, `nt-input`, Sheet-Breakpoints.
+
+### Offene Punkte
+- Fertig-Leiste, Tastatur und Autofokus nicht auf einem Gerät geprüft.
+- `selectAllOnFocus` nicht in Rezept-Feldern und im Tagebuch-Bearbeiten-Dialog; Rezeptfelder zeigen keine Feldfehler (Fehlerbehandlung dort unverändert).
+- Speichern aus dem Formular schließt das Sheet weiterhin (nur Schnell-Einträge bleiben offen).

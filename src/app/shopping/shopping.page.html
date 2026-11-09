@@ -334,6 +334,8 @@
         <ion-input
           #addName
           class="nt-field add-name"
+          autocapitalize="words"
+          autocorrect="off"
           enterkeyhint="done"
           [autofocus]="true"
           [(ngModel)]="newItemName"
@@ -367,10 +369,13 @@
             enterkeyhint="done"
             [(ngModel)]="newItemPriceText"
             (keyup.enter)="addManual()"
+            (ionFocus)="selectAll($event)"
             placeholder="Preis (optional)"
             aria-label="Preis in Euro, optional"
           ></ion-input>
         </div>
+        @if (addAmountError(); as err) { <p class="add-error" role="alert" data-testid="add-amount-error">Menge: {{ err }}</p> }
+        @if (addPriceError(); as err) { <p class="add-error" role="alert" data-testid="add-price-error">Preis: {{ err }}</p> }
         <button type="button" class="nt-add-btn add-submit" (click)="addManual()">Hinzufügen</button>
       </div>
     </ion-content>

@@ -48,13 +48,24 @@ ion-content {
 
 // --- Tages-Summe ------------------------------------------------------------
 .summary {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nt-space-3);
   margin-top: var(--nt-space-2);
 
+  &__col {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__kcal--protein {
+    color: var(--nt-protein);
+  }
+
   &__kcal {
-    font-size: var(--nt-fs-hero);
+    font-size: clamp(30px, 9vw, var(--nt-fs-hero));
     font-weight: 700;
     letter-spacing: -0.5px;
     line-height: 1.1;

@@ -5,9 +5,11 @@ import { DashboardPage } from './dashboard.page';
 import { DashboardPageRoutingModule } from './dashboard-routing.module';
 import { EntrySheetsModule } from '../diary/entry-sheets.module';
 import { NumPipe } from '../shared/num.pipe';
+import { WeightModule } from '../weight/weight.module';
+import { WeekStripComponent } from './week-strip.component';
 
 @NgModule({
-  imports: [SharedModule, NumPipe, EntrySheetsModule, DashboardPageRoutingModule],
-  declarations: [DashboardPage],
+  imports: [SharedModule, NumPipe, EntrySheetsModule, WeightModule, DashboardPageRoutingModule],
+  declarations: [DashboardPage, WeekStripComponent],
 })
 export class DashboardPageModule {}

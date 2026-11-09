@@ -3,7 +3,7 @@ import { ToastController } from '@ionic/angular';
 import { ProfileStore } from '../core/state/profile.store';
 import { WeightStore } from '../core/state/weight.store';
 import { dayLabel, toDateISO } from '../core/util/date';
-import { MAX_WEIGHT_KG, MIN_WEIGHT_KG, driftSinceProfile, trendKgPerWeek } from '../core/weight/weight-math';
+import { driftSinceProfile, trendKgPerWeek } from '../core/weight/weight-math';
 import { lightHaptic } from '../diary/haptics';
 import { showEntryToast } from '../diary/entry-toast';
 import { formatNum } from '../shared/num.pipe';
@@ -12,8 +12,6 @@ import { buildWeightChart } from './weight-chart';
 const CHART_SIZE = { width: 320, height: 140, padX: 12, padY: 14 } as const;
 /** So viele letzte Einträge zeigt die Liste unter dem Diagramm. */
 const RECENT_COUNT = 5;
-const DEFAULT_START_KG = 75;
-const STEP_KG = 0.1;
 
 /** Kurzdatum "08.11." für Achse und Liste. */
 function shortDate(dateISO: string): string {
@@ -47,11 +45,7 @@ export class WeightCardComponent {
   /** Der Nutzer will das Ziel mit diesem Gewicht (kg) neu berechnen. */
   readonly recalculate = output<number>();
 
-  readonly minKg = MIN_WEIGHT_KG;
-  readonly maxKg = MAX_WEIGHT_KG;
-  readonly stepKg = STEP_KG;
   readonly sheetOpen = signal(false);
-  readonly draftKg = signal<number>(DEFAULT_START_KG);
 
   readonly latest = this.weights.latest;
   readonly chart = computed(() => buildWeightChart(this.weights.entries(), CHART_SIZE));
@@ -73,26 +67,12 @@ export class WeightCardComponent {
     if (d === null || !p || !l) return null;
     return `Dein Gewicht hat sich seit deinem Profil um ${formatNum(Math.abs(d), 1)} kg ${d < 0 ? 'verringert' : 'erhöht'} (${formatNum(p.weightKg, 1)} auf ${formatNum(l.kg, 1)} kg). Berechne dein Ziel neu, damit es zu deinem Gewicht passt.`;
   });
-  /** Heute schon eingetragen: Speichern ersetzt den Wert. */
-  readonly todayKg = computed(() => this.weights.entries().find((e) => e.dateISO === toDateISO())?.kg ?? null);
-
   openSheet(): void {
-    this.draftKg.set(this.todayKg() ?? this.latest()?.kg ?? this.profile.profile()?.weightKg ?? DEFAULT_START_KG);
     this.sheetOpen.set(true);
   }
 
   closeSheet(): void {
     this.sheetOpen.set(false);
-  }
-
-  setDraft(kg: number): void {
-    this.draftKg.set(kg);
-  }
-
-  save(): void {
-    if (!this.weights.set(toDateISO(), this.draftKg())) return;
-    lightHaptic();
-    this.closeSheet();
   }
 
   remove(dateISO: string, kg: number): void {

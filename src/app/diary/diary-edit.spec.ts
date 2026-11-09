@@ -43,6 +43,25 @@ describe('amountChips', () => {
   });
 });
 
+describe('amountChips mit Portionsgröße', () => {
+  it('stellt die Packungsportion an die erste Stelle und bleibt bei vier Chips', () => {
+    const chips = amountChips('g', null, 35);
+    expect(chips.map((c) => c.value)).toEqual([35, 50, 100, 150]);
+    expect(chips[0].isServing).toBe(true);
+  });
+  it('lässt die Portion weg, wenn sie schon eine Vorgabe ist', () => {
+    expect(amountChips('g', null, 100).map((c) => c.value)).toEqual([50, 100, 150, 200]);
+  });
+  it('zeigt Portion und zuletzt gemeinsam, ohne vier Chips zu überschreiten', () => {
+    const chips = amountChips('g', 120, 35);
+    expect(chips.map((c) => c.value)).toEqual([35, 50, 100, 120]);
+    expect(chips.length).toBe(4);
+  });
+  it('ignoriert die Portion bei kg und l', () => {
+    expect(amountChips('kg', null, 35).map((c) => c.value)).toEqual([0.1, 0.25, 0.5, 1]);
+  });
+});
+
 describe('editModeFor / withServings / mealShortLabel', () => {
   it('detects the edit mode', () => {
     expect(editModeFor(entry(), FACTS)).toBe('amount');

@@ -25,12 +25,15 @@ export class NtFoodRowComponent {
     return [it.brand, it.quantity].filter((part): part is string => !!part).join(' · ');
   });
 
-  protected readonly meta = computed(() => {
-    const it = this.item();
-    const base = it.facts.basis === 'per100g' ? ' / 100 g' : ' / Portion';
-    const protein = Number.isFinite(it.facts.proteinG) ? ` · ${Math.round(it.facts.proteinG)} g Eiweiß` : '';
-    return `${Math.round(it.facts.kcal)} kcal${protein}${base}`;
+  protected readonly kcalText = computed(() => `${Math.round(this.item().facts.kcal)} kcal`);
+
+  /** Eiweiß je Basis, hervorgehoben (Eiweiß-Farbe, halbfett); leer, wenn der Wert fehlt. */
+  protected readonly proteinText = computed(() => {
+    const protein = this.item().facts.proteinG;
+    return Number.isFinite(protein) ? `${Math.round(protein)} g Eiweiß` : '';
   });
+
+  protected readonly baseText = computed(() => (this.item().facts.basis === 'per100g' ? ' / 100 g' : ' / Portion'));
 
   protected readonly scoreLabel = computed(() => {
     const s = this.item().nutriscore;

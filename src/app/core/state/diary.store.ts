@@ -19,6 +19,12 @@ export const COPY_LOOKBACK_DAYS = 7;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const VALID_MEALS: ReadonlySet<string> = new Set(['breakfast', 'lunch', 'dinner', 'snack']);
 const DEFAULT_LABEL = 'Eintrag';
+/** Zeitfenster (Tage), in dem "Zuletzt benutzt" nach Essenszeit zählt. */
+const RECENT_WINDOW_DAYS = 30;
+const MS_PER_DAY = 86_400_000;
+
+/** Identität eines Lebensmittels in "Zuletzt benutzt": Name und Marke, ohne Groß-/Kleinschreibung. */
+const foodKey = (e: DiaryEntry): string => `${e.label.trim().toLowerCase()}|${(e.brand ?? '').trim().toLowerCase()}`;
 
 /** Ein früherer Tag mit Einträgen als Kopier-Quelle. */
 export interface CopySource {
@@ -279,20 +285,34 @@ export class DiaryStore {
   }
 
   /**
-   * Letzte `limit` eindeutige Lebensmittel-Einträge (manuelle + Food/Barcode),
-   * sortiert nach Erstell-Datum absteigend. Rezepte werden ausgelassen.
+   * Letzte `limit` eindeutige Lebensmittel-Einträge (manuell + Food/Barcode); Rezepte entfallen.
+   * Mit `meal`: zuerst Lebensmittel dieser Essenszeit nach Häufigkeit der letzten 30 Tage
+   * (bei Gleichstand das jüngste), danach der Rest nach Aktualität. Eindeutig nach Name und Marke.
    */
-  recentFoods(limit = 5): DiaryEntry[] {
-    const seen = new Set<string>();
-    return [...this._entries()]
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .filter((e) => {
-        if (e.ref?.kind === 'recipe') return false;
-        if (seen.has(e.label)) return false;
-        seen.add(e.label);
+  recentFoods(limit = 5, meal?: MealType, now: Date = new Date()): DiaryEntry[] {
+    const newestFirst = [...this._entries()]
+      .filter((e) => e.ref?.kind !== 'recipe')
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const unique = (list: readonly DiaryEntry[]): DiaryEntry[] => {
+      const seen = new Set<string>();
+      return list.filter((e) => {
+        const key = foodKey(e);
+        if (seen.has(key)) return false;
+        seen.add(key);
         return true;
-      })
-      .slice(0, limit);
+      });
+    };
+    if (!meal) return unique(newestFirst).slice(0, limit);
+
+    const since = new Date(now.getTime() - RECENT_WINDOW_DAYS * MS_PER_DAY).toISOString();
+    const counts = new Map<string, number>();
+    newestFirst
+      .filter((e) => e.meal === meal && e.createdAt >= since)
+      .forEach((e) => counts.set(foodKey(e), (counts.get(foodKey(e)) ?? 0) + 1));
+    const ofMeal = unique(newestFirst.filter((e) => e.meal === meal));
+    // Array.sort ist stabil: bei gleicher Häufigkeit bleibt die Reihenfolge nach Aktualität.
+    const ranked = [...ofMeal].sort((a, b) => (counts.get(foodKey(b)) ?? 0) - (counts.get(foodKey(a)) ?? 0));
+    return unique([...ranked, ...newestFirst]).slice(0, limit);
   }
 
   /**

@@ -82,3 +82,9 @@
   &.s-d { background: #ee8100; }
   &.s-e { background: #c8341b; color: #fff; }
 }
+
+// Eiweiß ist die Kernzahl der App: gleiche Farbe wie auf Heute (--nt-protein, 6,5:1 auf Weiß).
+.meta__protein {
+  font-weight: 600;
+  color: var(--nt-protein);
+}

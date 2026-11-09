@@ -13,12 +13,15 @@ import {
 import { ActionSheetController, ToastController } from '@ionic/angular';
 import { AmountUnit, DiaryEntry, FoodItem, MealType, NutritionFacts, Recipe, SavedMeal } from '../../core/models';
 import { OpenPricesProvider } from '../../core/price/open-prices.provider';
+import { StorageService } from '../../core/storage/storage.service';
+import { describeStorageError } from '../../core/storage/storage-messages';
 import { DiaryStore, NewDiaryEntry } from '../../core/state/diary.store';
 import { FavoriteFood, FavoriteStore, newEntryFromFavorite } from '../../core/state/favorite.store';
 import { CustomFood, CustomFoodStore } from '../../core/state/custom-food.store';
 import { MealsStore } from '../../core/state/meals.store';
 import { RecipeStore } from '../../core/state/recipe.store';
 import { countMissingFacts } from '../../recipes/recipe-view';
+import { plausibleServingG } from '../../core/food/serving';
 import { formatNum } from '../../shared/num.pipe';
 import { AmountRowComponent } from '../../shared/amount-row/amount-row.component';
 import { FoodSourceResult, NtFoodSourcesComponent } from '../../shared/food-sources/food-sources.component';
@@ -53,6 +56,8 @@ import { lightHaptic } from '../haptics';
 import { hasMacros, withDerivedKcal } from '../nutrient-fields';
 import { clearRawTexts } from '../raw-texts';
 import { showEntryToast } from '../entry-toast';
+import { dismissKeyboard } from '../../core/keyboard/dismiss-keyboard';
+import { entryAddedMessage } from '../entry-message';
 
 type AddView = 'search' | 'form' | 'recipes' | 'saved' | 'meals';
 type QuantityUnit = 'g' | 'portion';
@@ -79,6 +84,8 @@ interface ApplyOptions {
   isPartial?: boolean;
   hint?: string;
   brand?: string;
+  /** Plausible Packungsportion in g/ml (Vorbelegung der Menge und Chip). */
+  servingG?: number;
 }
 
 const EMPTY_FORM: EntryForm = {
@@ -92,6 +99,10 @@ const EMPTY_FORM: EntryForm = {
 const DEFAULT_AMOUNT_G = 100;
 const MAX_RECENT_FOODS = 8;
 const SEARCH_FOCUS_DELAY_MS = 60;
+/** Kurze Sperre nach einem Schnell-Eintrag gegen versehentliches Doppeltippen (das Sheet bleibt offen). */
+const QUICK_ADD_LOCK_MS = 400;
+/** Name, wenn nur Kalorien (und ggf. Makros) eingetragen werden. */
+const QUICK_ENTRY_LABEL = 'Schnell-Eintrag';
 const AMOUNT_FOCUS_DELAY_MS = 150;
 /** rawTexts-Schlüssel des Add-Formulars (Menge, Portionen, Nährwerte). */
 const ADD_FORM_TEXT_KEYS: readonly string[] = ['amount', 'servings', ...Object.keys(EMPTY_FIELDS)];
@@ -117,6 +128,7 @@ export class AddEntrySheetComponent implements OnChanges {
   private readonly prices = inject(OpenPricesProvider);
   private readonly toastCtrl = inject(ToastController);
   private readonly sheetCtrl = inject(ActionSheetController);
+  private readonly storage = inject(StorageService);
 
   /** Sheet offen. Wechsel auf true startet einen neuen Eintrag. */
   readonly isOpen = input(false);
@@ -134,6 +146,15 @@ export class AddEntrySheetComponent implements OnChanges {
   private readonly rawTexts: Record<string, string> = {};
 
   readonly view = signal<AddView>('search');
+  /** Gewählte Essenszeit (steuert "Zuletzt benutzt"); form.meal bleibt die Quelle fürs Speichern. */
+  readonly selectedMeal = signal<MealType>('breakfast');
+  /** Anzahl Schnell-Einträge in dieser Sitzung (Sheet bleibt offen; der Kopfknopf wird zu "Fertig"). */
+  readonly addedCount = signal(0);
+  /** Speicherfehler als Banner im Sheet (das globale Banner liegt hinter dem Sheet). */
+  readonly storageError = computed(() => {
+    const error = this.storage.lastError();
+    return error ? describeStorageError(error) : null;
+  });
   readonly error = signal<string | null>(null);
   /** Wert der Accordion-Gruppe „Nährwerte anpassen“ ('adjust' = offen). */
   readonly adjustOpen = signal<string | undefined>(undefined);
@@ -156,6 +177,8 @@ export class AddEntrySheetComponent implements OnChanges {
   private pickedRecipeId: string | null = null;
   /** Marke des gewählten Suchtreffers (nur Anzeige), sonst undefined. */
   private pickedBrand: string | undefined;
+  /** Packungsportion (g/ml) des gewählten Treffers, falls plausibel; sonst null. */
+  private pickedServingG: number | null = null;
   /** Bezugswerte für die Mengenskalierung; null bei manueller Eingabe. */
   scaleBase: ScaleBase | null = null;
   /** Gewählte Einheit der Mengeneingabe; form.amountG zeigt den Wert in dieser Einheit. */
@@ -193,7 +216,7 @@ export class AddEntrySheetComponent implements OnChanges {
   readonly hasSavedMeals = computed(() => this.mealsStore.meals().length > 0);
 
   /** Zuletzt benutzte Lebensmittel. */
-  readonly recentFoods = computed(() => this.diary.recentFoods(MAX_RECENT_FOODS));
+  readonly recentFoods = computed(() => this.diary.recentFoods(MAX_RECENT_FOODS, this.selectedMeal()));
 
   /** Zuletzt benutzte Rezepte (max. 3) aus Tagebuch-Einträgen. */
   readonly recentRecipes = computed<Recipe[]>(() => {
@@ -219,6 +242,9 @@ export class AddEntrySheetComponent implements OnChanges {
     this.addDirty = false;
     this.kcalManual = false;
     this.form = { ...EMPTY_FORM, meal };
+    this.selectedMeal.set(meal);
+    this.addedCount.set(0);
+    this.pickedServingG = null;
     clearRawTexts(this.rawTexts, ADD_FORM_TEXT_KEYS);
     this.amountUnit = 'g';
     this.unitTouched = false;
@@ -250,8 +276,23 @@ export class AddEntrySheetComponent implements OnChanges {
     return !this.addDirty || confirmDiscardSheet(this.sheetCtrl);
   }
 
-  /** ion-modal didPresent → Suchfeld fokussieren, damit sofort getippt werden kann. */
+  /** True, wenn Favoriten oder Zuletzt benutzt sichtbar sind (die Tastatur würde sie verdecken). */
+  private hasQuickPicks(): boolean {
+    return this.favoriteList().length > 0 || this.recentFoods().length > 0 || this.recentRecipes().length > 0;
+  }
+
+  /** Eingabetaste im Namensfeld: Tastatur schließen ("Fertig"). */
+  readonly dismissKeyboard = dismissKeyboard;
+
+  /** Essenszeit wählen (Chips oben). */
+  setMeal(meal: MealType): void {
+    this.form = { ...this.form, meal };
+    this.selectedMeal.set(meal);
+  }
+
+  /** ion-modal didPresent → Suchfeld fokussieren, aber nur ohne Favoriten/Zuletzt (sonst verdeckt die Tastatur sie). */
   focusSearch(): void {
+    if (this.hasQuickPicks()) return;
     setTimeout(() => this.foodSearch?.focus(), SEARCH_FOCUS_DELAY_MS);
   }
 
@@ -328,6 +369,7 @@ export class AddEntrySheetComponent implements OnChanges {
     this.scaleBase = null;
     this.pickedRecipeId = null;
     this.pickedBrand = undefined;
+    this.pickedServingG = null;
     const label = this.foodSearch?.query.trim() ?? '';
     this.addDirty = false;
     this.kcalManual = false;
@@ -377,7 +419,7 @@ export class AddEntrySheetComponent implements OnChanges {
 
   /** Chips der Mengenzeile (Vorgaben, „zuletzt“ nur wenn abweichend). */
   get addChips(): AmountChip[] {
-    return amountChips(this.amountUnit, this.lastAmountFor(this.form.label, this.amountUnit));
+    return amountChips(this.amountUnit, this.lastAmountFor(this.form.label, this.amountUnit), this.pickedServingG);
   }
 
   stepAddAmount(direction: StepDirection): void {
@@ -431,7 +473,7 @@ export class AddEntrySheetComponent implements OnChanges {
   /** Schreibt Name + Nährwerte ins Formular und wechselt zur Mengen-Ansicht. */
   private applyFacts(name: string, facts: NutritionFacts, opts: ApplyOptions = {}): void {
     const unit: QuantityUnit = facts.basis === 'per100g' ? 'g' : 'portion';
-    const baseAmount = unit === 'g' ? (opts.amountG ?? DEFAULT_AMOUNT_G) : null;
+    const baseAmount = unit === 'g' ? (opts.amountG ?? opts.servingG ?? DEFAULT_AMOUNT_G) : null;
     const shownUnit = opts.unit ?? unitForName(name);
     const amountG = baseAmount == null ? null : fromBaseAmount(baseAmount, shownUnit);
     const servings = unit === 'portion' ? (opts.servings ?? 1) : null;
@@ -445,6 +487,7 @@ export class AddEntrySheetComponent implements OnChanges {
     this.unitTouched = false;
     this.pickedRecipeId = opts.recipeId ?? null;
     this.pickedBrand = opts.brand;
+    this.pickedServingG = unit === 'g' ? (opts.servingG ?? null) : null;
     this.form = {
       ...this.form,
       ...fieldsFromFacts(scaleFacts(facts, factor)),
@@ -567,21 +610,32 @@ export class AddEntrySheetComponent implements OnChanges {
     return this.mealsStore.totalKcal(meal);
   }
 
+  /** Eiweiß (g) einer gespeicherten Mahlzeit. */
+  mealProtein(meal: SavedMeal): number {
+    return meal.entries.reduce((sum, e) => sum + (e.facts.proteinG || 0), 0);
+  }
+
+  /** Schnell-Eintrag: das Sheet bleibt offen, die Bestätigung kommt als Toast mit Essenszeit, kcal und Eiweiß. */
   private addAndConfirm(inputs: NewDiaryEntry[]): void {
     if (this.isSaving) return;
     this.isSaving = true;
+    setTimeout(() => (this.isSaving = false), QUICK_ADD_LOCK_MS);
     lightHaptic();
     const added = inputs.map((input) => this.diary.add(input));
-    this.closeAdd();
-    const kcal = added.reduce((sum, e) => sum + (e.facts.kcal || 0), 0);
-    this.showToast(`Eingetragen · ${formatNum(kcal, 0)} kcal`, () =>
-      added.forEach((e) => this.diary.remove(e.id)),
+    this.addedCount.update((n) => n + added.length);
+    const totals = added.reduce(
+      (sum, e) => ({ kcal: sum.kcal + (e.facts.kcal || 0), proteinG: sum.proteinG + (e.facts.proteinG || 0) }),
+      { kcal: 0, proteinG: 0 },
     );
+    this.showToast(entryAddedMessage(this.form.meal, totals), () => {
+      added.forEach((e) => this.diary.remove(e.id));
+      this.addedCount.update((n) => Math.max(0, n - added.length));
+    });
   }
 
   // --- Ergebnis aus Suche / Barcode / Etikett (nt-food-sources) ---
   onSource(res: FoodSourceResult): void {
-    this.applyFacts(res.name, res.facts, { brand: res.brand, isAi: res.isAi, hint: res.hint });
+    this.applyFacts(res.name, res.facts, { brand: res.brand, isAi: res.isAi, hint: res.hint, servingG: plausibleServingG(res.servingG) });
     if (res.blankFields) this.form = { ...this.form, ...res.blankFields };
     if (res.code) void this.addPriceHint(res.code);
   }
@@ -601,12 +655,15 @@ export class AddEntrySheetComponent implements OnChanges {
   // --- Speichern ---
   save(): void {
     if (this.isSaving) return;
-    const label = this.form.label.trim();
+    const base = this.scaleBase;
+    const typedLabel = this.form.label.trim();
+    // Nur Kalorien (ohne Name): als Schnell-Eintrag; mit Quelle (Suche, Rezept) ist der Name immer gesetzt.
+    const isQuickEntry = !typedLabel && !base && factsFromFields(this.form) !== null;
+    const label = isQuickEntry ? QUICK_ENTRY_LABEL : typedLabel;
     if (!label) {
       this.error.set('Der Name fehlt — gib ein, was du gegessen hast.');
       return;
     }
-    const base = this.scaleBase;
     if (base?.unit === 'g' && !isValidAmount(this.baseAmount)) {
       this.error.set('Die Menge fehlt — gib eine Menge größer als 0 ein.');
       return;
@@ -643,12 +700,12 @@ export class AddEntrySheetComponent implements OnChanges {
       isPartial: this.isPartialSource || undefined,
       unit: this.baseAmount ? this.amountUnit : undefined,
     });
-    const remember = shouldRememberAsCustomFood({ recipeId, baseUnit: base?.unit, isEstimate: this.isAiEstimate() });
+    const remember = !isQuickEntry && shouldRememberAsCustomFood({ recipeId, baseUnit: base?.unit, isEstimate: this.isAiEstimate() });
     if (remember) this.customFoods.save(label, facts);
 
     lightHaptic();
     this.closeAdd();
-    this.showToast(`Eingetragen · ${formatNum(facts.kcal, 0)} kcal`, () => this.diary.remove(entry.id));
+    this.showToast(entryAddedMessage(this.form.meal, facts), () => this.diary.remove(entry.id));
   }
 
   /** Bezugswerte für spätere Mengenänderung; bei manuell angepassten Werten daraus neu abgeleitet. */

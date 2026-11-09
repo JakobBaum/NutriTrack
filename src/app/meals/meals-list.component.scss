@@ -175,3 +175,11 @@ ion-modal ion-buttons ion-button {
   font-size: var(--nt-fs-caption);
   color: var(--nt-secondary);
 }
+
+.field-error {
+  margin: 4px 0 0;
+  padding: 0 var(--nt-space-4);
+  font-size: var(--nt-fs-caption);
+  font-weight: 600;
+  color: var(--nt-over);
+}

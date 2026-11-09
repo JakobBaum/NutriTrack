@@ -214,3 +214,10 @@ ion-fab.add-fab {
   right: max(var(--nt-page-gutter), calc((100% - var(--nt-page-max)) / 2 + var(--nt-page-gutter)));
   ion-fab-button { --background: var(--nt-accent); --background-activated: var(--nt-accent); --color: var(--nt-on-accent); width: 56px; height: 56px; }
 }
+
+.add-error {
+  margin: 0 0 var(--nt-space-2);
+  font-size: var(--nt-fs-caption);
+  font-weight: 600;
+  color: var(--nt-over);
+}

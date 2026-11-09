@@ -33,11 +33,11 @@
         <button type="button" class="hero__main" [attr.aria-label]="heroLabel()" (click)="openDrill('kcal')">
           <span class="hero__big">{{ (kcalOverBy() > 0 ? kcalOverBy() : kcalRemaining()) | ntNum:0 }}</span>
           <span class="hero__unit">
-            kcal{{ kcalOverBy() > 0 ? '' : ' übrig' }}
-            @if (kcalOverBy() > 0) {
-              <span class="hero__chip">über Ziel</span>
-            }
+            kcal{{ kcalOverBy() > 0 ? '' : ' noch' }}
           </span>
+          @if (kcalOverBy() > 0) {
+            <span class="hero__chip">über Ziel</span>
+          }
         </button>
         <div class="hero__meta"><strong class="hero__eaten">{{ kcalEaten() | ntNum:0 }}</strong> von <span class="hero__target">{{ kcalTarget() | ntNum:0 }}</span> kcal</div>
       </div>
@@ -67,7 +67,11 @@
       </div>
       <div class="macros__secondary">
         @for (m of secondaryMacros(); track m.key) {
-          <ng-container *ngTemplateOutlet="macroTpl; context: { $implicit: m, size: 56, stroke: 5 }"></ng-container>
+          <button type="button" class="minibar" [attr.data-testid]="'minibar-' + m.key" [attr.aria-label]="m.label + ' ' + (m.eaten | ntNum) + ' von ' + (m.target | ntNum) + ' ' + m.unit + (m.overBy > 0 ? ', ' + (m.overBy | ntNum) + ' ' + m.unit + ' über Ziel' : '') + ', Details anzeigen'" (click)="openDrill(m.key)">
+            <span class="minibar__label">{{ m.label }}</span>
+            <span class="minibar__track"><span class="minibar__fill" [style.width.%]="m.target > 0 ? (m.eaten / m.target * 100 > 100 ? 100 : m.eaten / m.target * 100) : 0" [style.background]="m.warn && m.overBy > 0 ? 'var(--nt-over)' : m.color"></span></span>
+            <span class="minibar__val">{{ m.eaten | ntNum }} / {{ m.target | ntNum }} {{ m.unit }}</span>
+          </button>
         }
       </div>
       @if (energyShares(); as sh) {
@@ -77,6 +81,12 @@
         <p class="macros__hint">Noch nichts eingetragen</p>
       }
     </section>
+
+    <app-week-strip></app-week-strip>
+
+    @if (isToday() && !isEmptyDay()) {
+      <app-weight-tile></app-weight-tile>
+    }
 
     <ng-template #macroTpl let-m let-size="size" let-stroke="stroke">
       <button type="button" class="macros__col" [class.macros__col--small]="size < 80" [attr.aria-label]="m.label + ' ' + (m.eaten | ntNum) + ' von ' + (m.target | ntNum) + ' ' + m.unit + (m.overBy > 0 ? ', ' + (m.overBy | ntNum) + ' ' + m.unit + ' über Ziel' : '') + ', Details anzeigen'" (click)="openDrill(m.key)">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDecimal, parseDecimal } from './number-input';
+import { NUMBER_FIELD_ERROR, formatDecimal, parseDecimal, parseNutrientInput } from './number-input';
 
 describe('parseDecimal', () => {
   it('parses a German decimal comma', () => {
@@ -71,5 +71,26 @@ describe('formatDecimal', () => {
   it('ist mit parseDecimal umkehrbar', () => {
     expect(parseDecimal(formatDecimal(2.5))).toBe(2.5);
     expect(parseDecimal(formatDecimal(1000))).toBe(1000);
+  });
+});
+
+describe('parseNutrientInput', () => {
+  it('liefert bei leerem Feld keinen Wert und keinen Fehler', () => {
+    expect(parseNutrientInput('  ')).toEqual({ value: null, error: null });
+    expect(parseNutrientInput(null)).toEqual({ value: null, error: null });
+  });
+
+  it('parst gültige Zahlen mit Komma', () => {
+    expect(parseNutrientInput('12,5')).toEqual({ value: 12.5, error: null });
+    expect(parseNutrientInput('0')).toEqual({ value: 0, error: null });
+  });
+
+  it('meldet Tippfehler statt sie still zu 0 zu machen', () => {
+    expect(parseNutrientInput('12a')).toEqual({ value: null, error: NUMBER_FIELD_ERROR });
+    expect(parseNutrientInput('1,2,3').error).toBe(NUMBER_FIELD_ERROR);
+  });
+
+  it('lehnt negative Werte ab', () => {
+    expect(parseNutrientInput('-5')).toEqual({ value: null, error: NUMBER_FIELD_ERROR });
   });
 });

@@ -6,7 +6,7 @@
       @if (subline()) { <span class="sub__text">{{ subline() }}</span> }
     </span>
   }
-  <span class="meta">{{ meta() }}</span>
+  <span class="meta">{{ kcalText() }}@if (proteinText(); as protein) { · <strong class="meta__protein">{{ protein }}</strong>}{{ baseText() }}</span>
 </div>
 @if (scoreLabel(); as label) {
   <span class="score" [class]="'score s-' + item().nutriscore" [attr.aria-label]="label"

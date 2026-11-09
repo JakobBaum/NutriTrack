@@ -21,6 +21,7 @@ import { formatNum } from '../shared/num.pipe';
 import { MEAL_DEFS, mealForHour, mealLabel, isIsoDate, isMealType, isValidAmount, toBaseAmount, toNumberOrNull, inputTextFor, AMOUNT_UNITS, fromBaseAmount, convertAmount, lastAmountForLabel, editBaseFor } from './diary-helpers';
 import { confirmDiscardSheet, pickMealSheet } from './diary-sheets';
 import { lightHaptic } from './haptics';
+import { dismissKeyboard } from '../core/keyboard/dismiss-keyboard';
 import { showEntryToast } from './entry-toast';
 import { clearRawTexts } from './raw-texts';
 import { EditMode, StepDirection, amountChips, editModeFor, entryToInput, stepAmount, stepServings, withServings } from './diary-edit';
@@ -94,6 +95,11 @@ export class DiaryPage {
     Math.round(this.diary.totalsForDate(this.selectedDate()).kcal),
   );
   readonly targetKcal = computed(() => this.profileStore.target()?.kcal ?? 0);
+  readonly totalProtein = computed(() => Math.round(this.diary.totalsForDate(this.selectedDate()).proteinG));
+  readonly targetProtein = computed(() => this.profileStore.target()?.proteinG ?? 0);
+  /** Eiweiß, das zum Tagesziel noch fehlt (0, wenn erreicht oder ohne Ziel). */
+  readonly remainingProtein = computed(() => Math.max(0, this.targetProtein() - this.totalProtein()));
+  readonly dismissKeyboard = dismissKeyboard;
   /** Verbleibende kcal des gewählten Tages (0, wenn das Ziel erreicht oder überschritten ist). */
   readonly remainingKcal = computed(() => Math.max(0, this.targetKcal() - this.totalKcal()));
   readonly overKcal = computed(() =>

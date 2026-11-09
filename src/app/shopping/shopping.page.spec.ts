@@ -317,12 +317,31 @@ describe('ShoppingPage share', () => {
 });
 
 describe('ShoppingPage manual add sanity', () => {
-  it('stores a negative amount as "ohne Menge"', () => {
+  it('rejects a negative amount with a field error and keeps the input', () => {
     const { page, store } = createPage();
     page.newItemName = 'Salz';
     page.newItemAmountText = '-3';
     page.addManual();
+    expect(store.list()).toBeNull();
+    expect(page.addAmountError()).toBe('Zahl eingeben, z. B. 12,5');
+    expect(page.newItemAmountText).toBe('-3');
+  });
+
+  it('rejects an unparsable price instead of silently dropping it', () => {
+    const { page, store } = createPage();
+    page.newItemName = 'Salz';
+    page.newItemPriceText = 'abc';
+    page.addManual();
+    expect(store.list()).toBeNull();
+    expect(page.addPriceError()).not.toBeNull();
+  });
+
+  it('stores an empty amount as "ohne Menge"', () => {
+    const { page, store } = createPage();
+    page.newItemName = 'Salz';
+    page.addManual();
     expect(store.list()?.items.at(-1)?.amount).toBe(0);
+    expect(page.addAmountError()).toBeNull();
   });
 
   it('ignores a blank name (Enter on empty field)', () => {

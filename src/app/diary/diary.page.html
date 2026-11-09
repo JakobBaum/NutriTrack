@@ -27,14 +27,23 @@
     </div>
   }
 
-  <div class="summary nt-card">
-    <span class="summary__kcal">{{ totalKcal() | ntNum:0 }}</span>
-    <span class="summary__unit">kcal gegessen</span>
-    @if (overKcal() > 0) {
-      <span class="summary__target"><strong class="summary__over">{{ overKcal() | ntNum:0 }}</strong> kcal über Ziel ({{ targetKcal() | ntNum:0 }} kcal)</span>
-    } @else if (targetKcal() > 0) {
-      <span class="summary__target">von {{ targetKcal() | ntNum:0 }} kcal</span>
-    }
+  <div class="summary nt-card" data-testid="diary-summary">
+    <div class="summary__col">
+      <span class="summary__kcal">{{ totalKcal() | ntNum:0 }}</span>
+      <span class="summary__unit">kcal gegessen</span>
+      @if (overKcal() > 0) {
+        <span class="summary__target"><strong class="summary__over">{{ overKcal() | ntNum:0 }}</strong> kcal über Ziel ({{ targetKcal() | ntNum:0 }} kcal)</span>
+      } @else if (targetKcal() > 0) {
+        <span class="summary__target">von {{ targetKcal() | ntNum:0 }} kcal</span>
+      }
+    </div>
+    <div class="summary__col">
+      <span class="summary__kcal summary__kcal--protein">{{ totalProtein() | ntNum:0 }}</span>
+      <span class="summary__unit">g Eiweiß gegessen</span>
+      @if (targetProtein() > 0) {
+        <span class="summary__target">von {{ targetProtein() | ntNum:0 }} g@if (remainingProtein() > 0) { · noch {{ remainingProtein() | ntNum:0 }} g }</span>
+      }
+    </div>
   </div>
 
   <div class="diary-list diary-list--spaced">
@@ -82,7 +91,7 @@
                   <h3>{{ entry.label }}@if (entry.brand) { <span class="entry-brand"> · {{ entry.brand }}</span> }</h3>
                   <p>
                     @if (entry.amountG) { {{ entry.amountG | ntAmount:entry.unit }} · }
-                    E {{ entry.facts.proteinG | ntNum }} g · KH {{ entry.facts.carbsG | ntNum }} g · F {{ entry.facts.fatG | ntNum }} g
+                    <span class="protein-val">E {{ entry.facts.proteinG | ntNum }} g</span> · KH {{ entry.facts.carbsG | ntNum }} g · F {{ entry.facts.fatG | ntNum }} g
                     @if (entry.isEstimate) { · @if (ffLive()) { <span class="ai-badge">KI-Schätzung</span> } }
                   </p>
                 </ion-label>
@@ -143,7 +152,7 @@
       }
       <ion-list class="diary-list" lines="none">
         <ion-item lines="none">
-          <ion-input label="Name" labelPlacement="stacked" [(ngModel)]="editForm.label" enterkeyhint="done"></ion-input>
+          <ion-input label="Name" labelPlacement="stacked" [(ngModel)]="editForm.label" autocapitalize="words" autocorrect="off" enterkeyhint="done" (keyup.enter)="dismissKeyboard()"></ion-input>
         </ion-item>
         @if (editMode === 'portion') {
           <app-amount-row label="Portionen" suffix="Portionen" [text]="numText('editServings', editServings)" (textChange)="setEditServings($event)" (stepped)="stepEditServings($event)"></app-amount-row>

@@ -175,3 +175,11 @@ describe('toFoodLookupError / foodErrorMessage', () => {
     expect(foodErrorMessage(null)).toMatch(/erneut versuchen/);
   });
 });
+
+describe('OpenFoodFactsProvider — unplausible Portionsgrößen (Welle B)', () => {
+  it('verwirft Packungsgrößen und Zehntelgramm-Werte als Portion', async () => {
+    expect((await mapProduct({ ...base, serving_quantity: '1500' }))?.servingG).toBeUndefined();
+    expect((await mapProduct({ ...base, serving_quantity: '0.2' }))?.servingG).toBeUndefined();
+    expect((await mapProduct({ ...base, serving_quantity: 250 }))?.servingG).toBe(250);
+  });
+});

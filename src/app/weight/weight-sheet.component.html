@@ -1,0 +1,27 @@
+<ion-modal [isOpen]="isOpen()" [handle]="true" (ionModalDidDismiss)="closed.emit()">
+  <ng-template>
+    <div class="nt-sheet-header">
+      <span class="nt-sheet-header__start">
+        <ion-button fill="clear" (click)="closed.emit()">Abbrechen</ion-button>
+      </span>
+      <h2 class="nt-sheet-header__title" role="heading" aria-level="2">Gewicht eintragen</h2>
+      <span class="nt-sheet-header__end">
+        <ion-button fill="clear" data-testid="weight-save" (click)="save()">Speichern</ion-button>
+      </span>
+    </div>
+    <ion-content>
+      <div class="nt-page weight-sheet">
+        <ion-list class="nt-grouped" lines="none">
+          <ion-item class="form-row" lines="none">
+            <ion-label>
+              Gewicht heute
+              @if (todayKg() !== null) { <p class="row-sub">Ersetzt den heutigen Eintrag ({{ todayKg() | ntNum:1 }} kg)</p> }
+            </ion-label>
+            <nt-stepper slot="end" data-field="weightEntry" label="Gewicht" unit="kg" [value]="draftKg()" [min]="minKg" [max]="maxKg" [step]="stepKg" [decimals]="1" (valueChange)="setDraft($event)"></nt-stepper>
+          </ion-item>
+        </ion-list>
+        <p class="weight-sheet__hint">Ein Eintrag je Tag. Morgens nüchtern gewogen sind die Werte am besten vergleichbar.</p>
+      </div>
+    </ion-content>
+  </ng-template>
+</ion-modal>

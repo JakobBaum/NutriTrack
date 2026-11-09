@@ -161,15 +161,19 @@
         <nt-food-sources [showRecentCustom]="true" (result)="pickSource($event)" (manual)="openManual($event)"></nt-food-sources>
       } @else {
         <label class="field-label nt-section-header" for="manual-name">Name</label>
-        <ion-input id="manual-name" class="nt-field" aria-label="Name" placeholder="z. B. Haferflocken" enterkeyhint="next" [(ngModel)]="manual.name"></ion-input>
+        <ion-input id="manual-name" class="nt-field" aria-label="Name" placeholder="z. B. Haferflocken" autocapitalize="words" autocorrect="off" [(ngModel)]="manual.name"></ion-input>
         <label class="field-label nt-section-header" for="manual-kcal">Kalorien (kcal)</label>
-        <ion-input id="manual-kcal" class="nt-field" aria-label="Kalorien (kcal)" inputmode="decimal" placeholder="0" enterkeyhint="next" [(ngModel)]="manual.kcal"></ion-input>
+        <ion-input id="manual-kcal" class="nt-field" aria-label="Kalorien (kcal)" inputmode="decimal" placeholder="0" [(ngModel)]="manual.kcal" (ionFocus)="selectAll($event)"></ion-input>
+        @if (manualErrors().kcal; as err) { <p class="field-error" role="alert" data-testid="manual-error-kcal">{{ err }}</p> }
         <label class="field-label nt-section-header" for="manual-protein">Eiweiß (g)</label>
-        <ion-input id="manual-protein" class="nt-field" aria-label="Eiweiß (g)" inputmode="decimal" placeholder="0" enterkeyhint="next" [(ngModel)]="manual.proteinG"></ion-input>
+        <ion-input id="manual-protein" class="nt-field" aria-label="Eiweiß (g)" inputmode="decimal" placeholder="0" [(ngModel)]="manual.proteinG" (ionFocus)="selectAll($event)"></ion-input>
+        @if (manualErrors().proteinG; as err) { <p class="field-error" role="alert" data-testid="manual-error-protein">{{ err }}</p> }
         <label class="field-label nt-section-header" for="manual-carbs">Kohlenhydrate (g)</label>
-        <ion-input id="manual-carbs" class="nt-field" aria-label="Kohlenhydrate (g)" inputmode="decimal" placeholder="0" enterkeyhint="next" [(ngModel)]="manual.carbsG"></ion-input>
+        <ion-input id="manual-carbs" class="nt-field" aria-label="Kohlenhydrate (g)" inputmode="decimal" placeholder="0" [(ngModel)]="manual.carbsG" (ionFocus)="selectAll($event)"></ion-input>
+        @if (manualErrors().carbsG; as err) { <p class="field-error" role="alert" data-testid="manual-error-carbs">{{ err }}</p> }
         <label class="field-label nt-section-header" for="manual-fat">Fett (g)</label>
-        <ion-input id="manual-fat" class="nt-field" aria-label="Fett (g)" inputmode="decimal" placeholder="0" enterkeyhint="done" [(ngModel)]="manual.fatG"></ion-input>
+        <ion-input id="manual-fat" class="nt-field" aria-label="Fett (g)" inputmode="decimal" placeholder="0" [(ngModel)]="manual.fatG" (ionFocus)="selectAll($event)"></ion-input>
+        @if (manualErrors().fatG; as err) { <p class="field-error" role="alert" data-testid="manual-error-fat">{{ err }}</p> }
         <p class="manual-hint">Werte für die ganze Portion in dieser Mahlzeit.</p>
         <ion-button expand="block" [disabled]="!manualValid()" (click)="addManual()">Hinzufügen</ion-button>
       }

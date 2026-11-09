@@ -9,9 +9,10 @@ import { formatChipAmount } from '../diary-helpers';
   template: `
     <div class="quick-amounts" role="group" aria-label="Schnellwahl Menge">
       @for (chip of chips(); track chip.value) {
-        <button type="button" class="nt-pill nt-pill--secondary quick-chip" [class.quick-chip--last]="chip.isLast" (click)="pick.emit(chip.value)" [attr.aria-label]="(chip.isLast ? 'Menge wie zuletzt: ' : 'Menge ') + chipText(chip.value, unit()) + ' ' + unit()">
+        <button type="button" class="nt-pill nt-pill--secondary quick-chip" [class.quick-chip--last]="chip.isLast" (click)="pick.emit(chip.value)" [attr.aria-label]="(chip.isLast ? 'Menge wie zuletzt: ' : chip.isServing ? 'Eine Portion laut Packung: ' : 'Menge ') + chipText(chip.value, unit()) + ' ' + unit()">
           {{ chipText(chip.value, unit()) }}
           @if (chip.isLast) { <small>zuletzt</small> }
+          @if (chip.isServing) { <small>Portion</small> }
         </button>
       }
     </div>
