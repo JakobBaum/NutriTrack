@@ -1,8 +1,10 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { MealType } from '../models';
+import { RecipeTranslateService } from '../recipes/translate/recipe-translate';
 import { RecipeSearchAccessService } from '../recipes/online/recipe-search-access';
 import { ONLINE_SEARCH_MESSAGES, OnlineSearchError, toOnlineSearchError } from '../recipes/online/spoonacular.errors';
 import { SpoonacularProvider } from '../recipes/online/spoonacular.provider';
+import { OnlineRecipe } from '../recipes/online/online-recipe.model';
 import { ProfileStore } from '../state/profile.store';
 import { ShoppingStore } from '../state/shopping.store';
 import { WeekPlanStore } from '../state/week-plan.store';
@@ -35,6 +37,14 @@ export class WeekPlanService {
   private readonly profile = inject(ProfileStore);
   private readonly planStore = inject(WeekPlanStore);
   private readonly shopping = inject(ShoppingStore);
+  private readonly translator = inject(RecipeTranslateService);
+  private readonly _progress = signal<{ done: number; total: number } | null>(null);
+  private ensuring: Promise<void> | null = null;
+  /** Pläne, die in dieser Sitzung schon nachübersetzt wurden (kein erneutes KI-Hämmern bei Fehlern). */
+  private readonly attempted = new Set<string>();
+
+  /** Fortschritt der Übersetzung ("Übersetze Rezepte (n/m)"), sonst null. */
+  readonly translateProgress = this._progress.asReadonly();
 
   /** Ob die Online-Suche erreichbar konfiguriert ist (eigener Key oder globaler Worker). */
   isAvailable(): boolean {
@@ -61,17 +71,49 @@ export class WeekPlanService {
       throw toOnlineSearchError(e, typeof navigator !== 'undefined' && navigator.onLine === false);
     }
     if (draft.recipes.length === 0) throw new Error(NO_RECIPES_FOUND_MESSAGE);
+    const recipes = await this.translateRecipes(draft.recipes);
     const plan: WeekPlan = {
       id: makeId('week'),
       generatedAt: new Date().toISOString(),
       persons: opts.persons,
       days: opts.days,
       meals: opts.meals,
-      recipes: draft.recipes,
+      recipes,
       notices: draft.notices,
     };
     this.planStore.set(plan);
     const list = this.shopping.applyWeekPlan(plan);
     return { plan, itemCount: list.items.length };
+  }
+
+  /**
+   * Übersetzt Rezepte eines bereits gespeicherten Plans nach (z. B. aus älteren Versionen) und schreibt die Einkaufsliste
+   * mit den deutschen Zutatennamen neu. Läuft nie doppelt; ohne Plan oder bei fertiger Übersetzung passiert nichts.
+   */
+  ensureTranslated(): Promise<void> {
+    if (this.ensuring) return this.ensuring;
+    const plan = this.planStore.plan();
+    if (!plan || this.attempted.has(plan.id) || !plan.recipes.some((r) => this.translator.needsTranslation(r))) return Promise.resolve();
+    this.attempted.add(plan.id);
+    const job = this.retranslate(plan).finally(() => {
+      this.ensuring = null;
+    });
+    this.ensuring = job;
+    return job;
+  }
+
+  private async retranslate(plan: WeekPlan): Promise<void> {
+    const recipes = await this.translateRecipes(plan.recipes);
+    const next: WeekPlan = { ...plan, recipes };
+    this.planStore.set(next);
+    this.shopping.applyWeekPlan(next);
+  }
+
+  private async translateRecipes<T extends OnlineRecipe>(recipes: readonly T[]): Promise<T[]> {
+    try {
+      return await this.translator.translateAll(recipes, (done, total) => this._progress.set({ done, total }));
+    } finally {
+      this._progress.set(null);
+    }
   }
 }

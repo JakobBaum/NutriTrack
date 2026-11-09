@@ -4,6 +4,11 @@
       @for (n of p.notices; track n) { <li>{{ n }}</li> }
     </ul>
   }
+  @if (progress(); as pr) {
+    <p class="wp-translate" role="status" data-testid="wp-translating">übersetze… Rezepte ({{ pr.done }}/{{ pr.total }})</p>
+  } @else if (untranslated() > 0) {
+    <p class="wp-translate" role="status" data-testid="wp-untranslated">nicht übersetzt: {{ untranslated() }} {{ untranslated() === 1 ? 'Rezept bleibt' : 'Rezepte bleiben' }} Englisch (KI nicht erreichbar).</p>
+  }
   @for (group of groups(); track group.meal) {
     <h2 class="nt-section-header wp-group">{{ group.label }}</h2>
     <ul class="wp-list" [attr.data-testid]="'wp-group-' + group.meal">

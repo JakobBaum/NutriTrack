@@ -4,7 +4,7 @@ import { AiService } from '../ai/ai.service';
 import { MockAiProvider } from '../ai/mock-ai-provider';
 import { StorageService } from '../storage/storage.service';
 import { withCategories, withCategory } from '../shopping/shopping-category';
-import { fillMissingPrices } from '../shopping/price-table';
+import { estimateItemPrice, fillMissingPrices } from '../shopping/ingredient-price';
 import { roundItemsToPackages } from '../shopping/package-size';
 import { buildShoppingList } from '../shopping/shopping-generator';
 import { fromNormalized, itemKey, normalizeUnit } from '../shopping/shopping-units';
@@ -32,15 +32,27 @@ export interface ShoppingListView extends ShoppingList {
 
 const KEY_LIST = 'shopping';
 
-/** Summe der Schätzpreise; `unpriced` zählt Positionen ohne Preis. */
+/** Angezeigter Preis einer Position: eigener Preis vor Schätzung; undefined, wenn keiner da ist. */
+export function itemPrice(it: ShoppingItem): number | undefined {
+  const p = it.userPrice ?? it.estPrice;
+  return typeof p === 'number' && Number.isFinite(p) ? p : undefined;
+}
+
+/** Summe der Preise (eigener Preis vor Schätzung); `unpriced` zählt Positionen ohne Preis. */
 export function sumItems(items: readonly ShoppingItem[]): { total: number; unpriced: number } {
   let total = 0;
   let unpriced = 0;
   for (const it of items) {
-    if (typeof it.estPrice === 'number' && Number.isFinite(it.estPrice)) total += it.estPrice;
-    else unpriced += 1;
+    const p = itemPrice(it);
+    if (p === undefined) unpriced += 1;
+    else total += p;
   }
   return { total: Math.round(total * 100) / 100, unpriced };
+}
+
+/** Setzt die Schätzung einer Position anhand ihrer aktuellen Menge neu; ein eigener Preis bleibt unberührt. */
+function repriced(it: ShoppingItem): ShoppingItem {
+  return { ...it, estPrice: estimateItemPrice(it) };
 }
 
 const keyOf = (it: ShoppingItem): string => itemKey(it.name, it.unit);
@@ -68,13 +80,13 @@ function collapseDuplicates(items: readonly ShoppingItem[]): ShoppingItem[] {
       continue;
     }
     const amount = round2(first.amount + fromNormalized(baseAmount(it), first.unit));
-    byKey.set(key, {
+    byKey.set(key, repriced({
       ...first,
       amount,
       checked: first.checked && it.checked,
-      estPrice: sumPrice(first.estPrice, it.estPrice),
+      userPrice: sumPrice(first.userPrice, it.userPrice),
       category: first.category ?? it.category,
-    });
+    }));
   }
   return [...byKey.values()];
 }
@@ -89,14 +101,8 @@ function mergeOne(old: ShoppingItem, g: ShoppingItem): ShoppingItem {
   const amount = grows ? round2(fromNormalized(needBase, old.unit)) : old.amount;
   const category = old.category ?? g.category;
   const checked = grows ? false : old.checked;
-  if (old.estPrice != null) {
-    const scaled = grows && old.amount > 0 ? round2((old.estPrice * amount) / old.amount) : old.estPrice;
-    return { ...old, amount, category, checked, estPrice: scaled };
-  }
-  // Ohne eigenen Preis den generierten übernehmen, auf die Menge skaliert.
-  const gAmount = fromNormalized(needBase, old.unit);
-  const estPrice = g.estPrice != null && gAmount > 0 ? round2((g.estPrice * amount) / gAmount) : g.estPrice;
-  return { ...old, amount, category, checked, estPrice };
+  // Die Schätzung folgt der Menge; ein eigener Preis (userPrice) der behaltenen Position bleibt.
+  return repriced({ ...old, amount, category, checked });
 }
 
 /**
@@ -180,8 +186,8 @@ export class ShoppingStore {
       return this.mock.generateShoppingList(req);
     });
     const generated = withCategories(roundItemsToPackages(result.items)).map((it) => ({ ...it, manual: false }));
-    // Ohne KI keine Preise; mit KI fehlende Preise über die Kategorie-Tabelle ergänzen.
-    const priced = live ? fillMissingPrices(generated) : generated;
+    // Immer schätzen (Tabelle, ohne KI); vorhandene KI-Preise bleiben.
+    const priced = fillMissingPrices(generated);
     const items = withCategories(mergeKept(this._list()?.items ?? [], priced));
     const list: ShoppingListView = {
       id: makeId('shopping'),
@@ -211,7 +217,7 @@ export class ShoppingStore {
     const live = this.ai.isLive();
     const { items: raw, suggestedDishes } = buildShoppingList(weekPlanToRecipes(plan), plan.recipes.length, plan.persons);
     const generated = withCategories(roundItemsToPackages(raw)).map((it) => ({ ...it, manual: false }));
-    const priced = live ? fillMissingPrices(generated) : generated;
+    const priced = fillMissingPrices(generated);
     const items = withCategories(mergeKept(this._list()?.items ?? [], priced));
     const list: ShoppingListView = {
       id: makeId('shopping'),
@@ -249,8 +255,8 @@ export class ShoppingStore {
       if (!l || index < 0 || index >= l.items.length) return l;
       const items = l.items.map((it, i) => {
         if (i !== index) return it;
-        const { estPrice: _drop, ...rest } = it;
-        return valid ? { ...rest, estPrice: Math.round((price as number) * 100) / 100 } : rest;
+        const { userPrice: _drop, ...rest } = it;
+        return valid ? { ...rest, userPrice: Math.round((price as number) * 100) / 100 } : rest;
       });
       return withTotal({ ...l, items });
     });
@@ -269,7 +275,8 @@ export class ShoppingStore {
           suggestedDishes: [],
           generatedAt: new Date().toISOString(),
         };
-      return withTotal({ ...base, items: [...base.items, withCategory({ ...item, manual: item.manual ?? true })] });
+      const added = repriced(withCategory({ ...item, manual: item.manual ?? true }));
+      return withTotal({ ...base, items: [...base.items, added] });
     });
     this.persist();
   }

@@ -82,6 +82,8 @@ export interface RecipeIngredient {
   unit: string;
   /** Verknüpfung zu einem FoodItem (für Nährwert-Summe), optional. */
   foodItemId?: string;
+  /** Umrechnung nur ungefähr (z. B. Tasse ohne bekannte Dichte); die UI zeigt "ca.". */
+  approx?: boolean;
   /** Nährwerte der Zutat in ihrer Bezugsmenge (z.B. per100g aus der Food-API),
    *  Basis für die automatische Summierung. Fehlt bei manuellen Zutaten. */
   facts?: NutritionFacts;
@@ -151,6 +153,8 @@ export interface ShoppingItem {
   checked: boolean;
   /** Geschätzter Preis in EUR (KI-Schätzung; echte Preise folgen später). */
   estPrice?: number;
+  /** Vom Nutzer eingetragener Preis; überschreibt die Schätzung. */
+  userPrice?: number;
   /** Supermarkt-Kategorie (siehe SHOPPING_CATEGORIES); fehlt bei älteren Daten. */
   category?: string;
   /** Vom Nutzer selbst angelegt (bleibt beim Neu-Generieren erhalten, auch mit eigenem Preis). */

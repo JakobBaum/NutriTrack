@@ -56,11 +56,3 @@ export function estimateByCategory(item: ShoppingItem): number | null {
   return Math.round(Math.max(PRICE_STEP, rounded) * 100) / 100;
 }
 
-/** Ergänzt fehlende Schätzpreise (nur für Live-KI-Listen); vorhandene Preise bleiben. */
-export function fillMissingPrices(items: readonly ShoppingItem[]): ShoppingItem[] {
-  return items.map((it) => {
-    if (it.estPrice != null) return it;
-    const est = estimateByCategory(it);
-    return est === null ? it : { ...it, estPrice: est };
-  });
-}

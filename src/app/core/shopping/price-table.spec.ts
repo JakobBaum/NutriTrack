@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ShoppingItem } from '../models';
-import { estimateByCategory, fillMissingPrices } from './price-table';
+import { estimateByCategory } from './price-table';
 
 const item = (o: Partial<ShoppingItem>): ShoppingItem => ({ name: 'X', amount: 500, unit: 'g', checked: false, ...o });
 
@@ -27,15 +27,5 @@ describe('estimateByCategory', () => {
 
   it('hat einen Mindestpreis von 0,10 €', () => {
     expect(estimateByCategory(item({ amount: 1, unit: 'g' }))).toBe(0.1);
-  });
-});
-
-describe('fillMissingPrices', () => {
-  it('ergänzt nur fehlende Preise und lässt vorhandene unverändert', () => {
-    const input = [item({ estPrice: 9.99 }), item({ category: 'Fleisch & Fisch' })];
-    const out = fillMissingPrices(input);
-    expect(out[0].estPrice).toBe(9.99);
-    expect(out[1].estPrice).toBe(7);
-    expect(input[1].estPrice).toBeUndefined();
   });
 });

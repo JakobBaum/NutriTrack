@@ -147,6 +147,7 @@ ion-list.nt-grouped {
 }
 
 .qty { display: block; font-size: var(--nt-fs-caption); color: var(--nt-secondary); font-variant-numeric: tabular-nums; }
+.est-badge { margin-left: 4px; padding: 1px 6px; border-radius: 8px; font-size: 11px; background: var(--ion-color-step-100, rgba(128, 128, 128, 0.15)); color: var(--nt-secondary); }
 
 .cat-header {
   margin: var(--nt-space-6) var(--nt-space-4) var(--nt-space-2);

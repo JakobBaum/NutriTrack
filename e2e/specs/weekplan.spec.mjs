@@ -91,12 +91,12 @@ export function register({ test }) {
 
     await eventually(async () => assert.ok((await readStore(page, 'shopping'))?.items?.length > 0, 'Liste leer'));
     const names = (await readStore(page, 'shopping')).items.map((i) => i.name.toLowerCase());
-    assert.ok(names.some((n) => n.includes('lentil')), `Linsen fehlen: ${names.join(', ')}`);
+    assert.ok(names.some((n) => n.includes('linsen')), `Linsen fehlen: ${names.join(', ')}`);
     assert.ok(await page.locator('.wp-card').first().isVisible(), 'Ansicht darf nicht automatisch wechseln');
 
     await page.locator('ion-segment-button', { hasText: 'Liste' }).first().click();
     await settle(page);
-    assert.match(await page.locator('ion-content').first().innerText(), /lentil/i);
+    assert.match(await page.locator('ion-content').first().innerText(), /linsen/i);
     assert.equal(await page.locator('.wp-card').count(), 0, 'Liste zeigt nur Zutaten');
   });
 
@@ -123,7 +123,7 @@ export function register({ test }) {
     await stableClick(detail.locator('.wp-cook'));
     const ingredients = page.locator('[data-testid="cook-ingredients"]');
     await ingredients.waitFor();
-    assert.match(await ingredients.innerText(), /lentils/i);
+    assert.match(await ingredients.innerText(), /linsen/i);
     await dismissToasts(page);
     await stableClick(page.locator('.cook__nav-btn--next'));
     const step = page.locator('[data-testid="cook-step"]');

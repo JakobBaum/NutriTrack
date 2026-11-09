@@ -47,6 +47,17 @@
 
     <app-recipe-search-settings></app-recipe-search-settings>
 
+    <h2 class="nt-section-header">Einheiten</h2>
+    <ion-list class="nt-grouped" lines="none">
+      <ion-item lines="none">
+        <ion-segment [value]="unitSystem()" aria-label="Einheitensystem" data-testid="unit-system" (ionChange)="setUnitSystem($any($event).detail.value)">
+          <ion-segment-button value="metric" data-testid="unit-metric"><ion-label>Metrisch</ion-label></ion-segment-button>
+          <ion-segment-button value="imperial" data-testid="unit-imperial"><ion-label>Imperial</ion-label></ion-segment-button>
+        </ion-segment>
+      </ion-item>
+    </ion-list>
+    <p class="hint">Rezepte, Kochmodus und Einkaufsliste zeigen g, kg, ml, l und °C (metrisch) oder lb, oz, cups und °F (imperial).</p>
+
     <h2 class="nt-section-header">App</h2>
     <ion-list class="nt-grouped" lines="full">
       <ion-item button detail="true" (click)="infoSection.set('anleitung')">

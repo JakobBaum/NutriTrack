@@ -66,7 +66,9 @@ describe('groupByCategory', () => {
 
 describe('formatAmount', () => {
   it('formats with decimal comma and returns null without amount', () => {
-    expect(formatAmount(item('Mehl', { amount: 0.5, unit: 'kg' }))).toBe('0,5 kg');
+    expect(formatAmount(item('Mehl', { amount: 0.5, unit: 'kg' }))).toBe('500 g');
+    expect(formatAmount(item('Mehl', { amount: 1.5, unit: 'kg' }))).toBe('1,5 kg');
+    expect(formatAmount(item('Schweinefleisch', { amount: 900, unit: 'g' }), 'imperial')).toBe('2 lb');
     expect(formatAmount(item('Salz', { amount: 0, unit: 'g' }))).toBeNull();
   });
 });

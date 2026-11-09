@@ -1,6 +1,7 @@
 import { Recipe, ShoppingItem } from '../models';
 import { withCategories } from './shopping-category';
-import { itemKey, normalizeUnit } from './shopping-units';
+import { normalizeIngredient } from './normalize-ingredient';
+import { itemKey } from './shopping-units';
 
 /** Rundet eine Menge auf max. 2 Nachkommastellen (hübsche Anzeige). */
 function round2(n: number): number {
@@ -26,15 +27,13 @@ function mergeIngredients(recipes: readonly Recipe[], persons: number): Shopping
   for (const recipe of recipes) {
     const factor = persons / safeServings(recipe.servings);
     for (const ing of recipe.ingredients) {
-      const key = itemKey(ing.name, ing.unit);
-      const norm = normalizeUnit(ing.amount * factor, ing.unit);
+      if (ing.name.trim() === '') continue;
+      const norm = normalizeIngredient(ing.name, ing.amount * factor, ing.unit);
+      const key = itemKey(norm.name, norm.unit);
       const existing = merged.get(key);
-      merged.set(
-        key,
-        existing
-          ? { ...existing, amount: round2(existing.amount + norm.amount) }
-          : { name: ing.name.trim(), amount: round2(norm.amount), unit: norm.unit, checked: false },
-      );
+      // Gewürze/Kräuter bleiben bei einer Kaufeinheit, alles andere wird addiert.
+      const amount = existing && !norm.spice ? round2(existing.amount + norm.amount) : norm.amount;
+      merged.set(key, { name: existing?.name ?? norm.name, amount, unit: norm.unit, checked: false });
     }
   }
   return [...merged.values()];

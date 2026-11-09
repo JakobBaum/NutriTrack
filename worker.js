@@ -108,6 +108,8 @@ const TOKENS_LABEL = 1024;
 const TOKENS_LIST = 4096;
 const TOKENS_FASTFOOD = 2048;
 const TOKENS_IMPORT = 8192;
+const TOKENS_TRANSLATE = 4096;
+const TOKENS_QUERY = 128;
 const MAX_TEXT_CHARS = 20000;
 const MAX_PAGE_BYTES = 1024 * 1024;
 const MAX_PROMPT_PAGE_CHARS = 12000;
@@ -119,6 +121,8 @@ const AI_FUNCTIONS = {
   recognizeLabel: { validate: validateLabelRequest, run: recognizeLabel },
   suggestFastfood: { validate: validateFastfoodRequest, run: suggestFastfood },
   importRecipe: { validate: validateImportRequest, run: importRecipe },
+  translateRecipe: { validate: validateTranslateRequest, run: translateRecipe },
+  translateSearchQuery: { validate: validateQueryTranslateRequest, run: translateSearchQuery },
 };
 
 /** Fehler, die als 4xx an den Client gehen (Eingabe ist schuld, nicht der Server). */
@@ -498,6 +502,38 @@ function validateImportRequest(p) {
   return { text: recipeText };
 }
 
+// Übersetzung: Zielsprachen (erweiterbar) und Obergrenzen je Rezept.
+const TRANSLATE_LANGS = { de: 'Deutsch' };
+const MAX_TR_INGREDIENTS = 60;
+const MAX_TR_STEPS = 40;
+const MAX_TR_TITLE = 200;
+const MAX_TR_INGREDIENT_CHARS = 120;
+const MAX_TR_STEP_CHARS = 1200;
+const MAX_TR_QUERY_CHARS = 120;
+
+function textList(value, maxItems, maxChars, name) {
+  if (!Array.isArray(value)) throw new ClientError(400, `${name} ungültig.`);
+  if (value.length > maxItems) throw new ClientError(400, `${name}: zu viele Einträge.`);
+  return value.map((v) => text(v, maxChars));
+}
+
+function validateTranslateRequest(p) {
+  const title = text(p.title, MAX_TR_TITLE);
+  if (!title) throw new ClientError(400, 'Titel fehlt.');
+  return {
+    lang: oneOf(p.lang ?? 'de', Object.keys(TRANSLATE_LANGS), 'Sprache'),
+    title,
+    ingredients: textList(p.ingredients, MAX_TR_INGREDIENTS, MAX_TR_INGREDIENT_CHARS, 'Zutaten'),
+    steps: textList(p.steps, MAX_TR_STEPS, MAX_TR_STEP_CHARS, 'Schritte'),
+  };
+}
+
+function validateQueryTranslateRequest(p) {
+  const query = text(p.query, MAX_TR_QUERY_CHARS);
+  if (!query) throw new ClientError(400, 'Suchbegriff fehlt.');
+  return { lang: oneOf(p.lang ?? 'de', Object.keys(TRANSLATE_LANGS), 'Sprache'), query };
+}
+
 // ── SSRF-Schutz + Seitentext ───────────────────────────────────────────
 
 function isPrivateIPv4(host) {
@@ -702,13 +738,18 @@ function extractAnswer(data) {
   return answer;
 }
 
-async function gemini(prompt, env, imageBase64 = null, { maxOutputTokens = TOKENS_LIST, temperature = 0 } = {}) {
+async function gemini(prompt, env, imageBase64 = null, { maxOutputTokens = TOKENS_LIST, temperature = 0, responseSchema = null } = {}) {
   const parts = imageBase64
     ? [{ inlineData: { mimeType: 'image/jpeg', data: imageBase64 } }, { text: prompt }]
     : [{ text: prompt }];
   const body = JSON.stringify({
     contents: [{ parts }],
-    generationConfig: { responseMimeType: 'application/json', temperature, maxOutputTokens },
+    generationConfig: {
+      responseMimeType: 'application/json',
+      temperature,
+      maxOutputTokens,
+      ...(responseSchema ? { responseSchema } : {}),
+    },
   });
   const resp = await geminiWithFallback(body, env);
 
@@ -815,4 +856,71 @@ async function importRecipe(req, env) {
     prompt = `Extrahiere das Rezept aus folgendem Text:\n\n${req.text}`;
   }
   return gemini(`${prompt}\n\n${IMPORT_SCHEMA}`, env, req.imageBase64 ?? null, { maxOutputTokens: TOKENS_IMPORT });
+}
+
+// ── Übersetzung (Rezepte, Suchbegriffe) ────────────────────────────────
+
+const TRANSLATE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    title: { type: 'STRING' },
+    ingredients: { type: 'ARRAY', items: { type: 'STRING' } },
+    steps: { type: 'ARRAY', items: { type: 'STRING' } },
+  },
+  required: ['title', 'ingredients', 'steps'],
+};
+
+const QUERY_SCHEMA = {
+  type: 'OBJECT',
+  properties: { query: { type: 'STRING' } },
+  required: ['query'],
+};
+
+/** Gleich viele Einträge wie die Eingabe; leere oder fehlende Übersetzungen fallen auf das Original zurück. */
+function alignList(translated, source) {
+  if (!Array.isArray(translated) || translated.length !== source.length) return [...source];
+  return source.map((orig, i) => {
+    const t = typeof translated[i] === 'string' ? translated[i].trim() : '';
+    return t || orig;
+  });
+}
+
+async function translateRecipe(req, env) {
+  const language = TRANSLATE_LANGS[req.lang];
+  const prompt = `Übersetze dieses englische Rezept ins ${language}.
+Regeln:
+- "title": übersetzter Titel.
+- "ingredients": gleiche Anzahl und Reihenfolge wie die Eingabe. Jeder Eintrag ist ein Zutatenname in der Einkaufs-Grundform:
+  ohne Mengen, Zubereitungswörter und Marken, Einzahl wo üblich (z. B. "pork shoulder" -> "Schweineschulter",
+  "chopped fresh rosemary" -> "Rosmarin, frisch", "2 cloves garlic, minced" -> "Knoblauch").
+- "steps": gleiche Anzahl und Reihenfolge, natürliches ${language}, Zahlen, Temperaturen und Zeiten unverändert lassen.
+Antworte NUR mit gültigem JSON.
+
+Titel: ${req.title}
+Zutaten:
+${req.ingredients.map((n, i) => `${i + 1}. ${n}`).join('\n')}
+Schritte:
+${req.steps.map((n, i) => `${i + 1}. ${n}`).join('\n')}`;
+  const out = await gemini(prompt, env, null, {
+    maxOutputTokens: TOKENS_TRANSLATE,
+    temperature: 0,
+    responseSchema: TRANSLATE_SCHEMA,
+  });
+  return {
+    title: typeof out?.title === 'string' && out.title.trim() ? out.title.trim() : req.title,
+    ingredients: alignList(out?.ingredients, req.ingredients),
+    steps: alignList(out?.steps, req.steps),
+  };
+}
+
+async function translateSearchQuery(req, env) {
+  const prompt = `Übersetze diesen Suchbegriff für eine Rezeptdatenbank (${TRANSLATE_LANGS[req.lang]}) ins Englische. Nur die Übersetzung, keine Erklärung. Ist er schon Englisch, gib ihn unverändert zurück.
+Suchbegriff: ${req.query}`;
+  const out = await gemini(prompt, env, null, {
+    maxOutputTokens: TOKENS_QUERY,
+    temperature: 0,
+    responseSchema: QUERY_SCHEMA,
+  });
+  const query = typeof out?.query === 'string' ? out.query.trim().slice(0, MAX_TR_QUERY_CHARS) : '';
+  return { query: query || req.query };
 }

@@ -1,5 +1,6 @@
 import { NutritionFacts, RecipeIngredient } from '../../models';
 import { RecipeDraft } from '../../state/recipe.store';
+import { isUsUnit, toMetric } from '../../shopping/units/unit-convert';
 import { OnlineRecipe } from './online-recipe.model';
 import {
   SpoonExtendedIngredient,
@@ -65,7 +66,7 @@ export function factsFromNutrients(list: readonly SpoonNutrient[] | undefined): 
 }
 
 /** Menge + Einheit einer Zutat: bevorzugt metrisch (g/ml), sonst App-Einheit. */
-export function mapAmountUnit(ing: SpoonExtendedIngredient): { amount: number; unit: string } {
+export function mapAmountUnit(ing: SpoonExtendedIngredient): { amount: number; unit: string; approx?: boolean } {
   const metric = ing.measures?.metric;
   const metricUnit = METRIC_UNITS[(metric?.unitShort ?? '').trim().toLowerCase()];
   if (metric && metricUnit && typeof metric.amount === 'number' && metric.amount > 0) {
@@ -73,6 +74,11 @@ export function mapAmountUnit(ing: SpoonExtendedIngredient): { amount: number; u
   }
   const amount = typeof ing.amount === 'number' && ing.amount > 0 ? roundAmount(ing.amount) : 0;
   const raw = (ing.unit ?? '').trim().toLowerCase();
+  if (amount > 0 && isUsUnit(raw)) {
+    // Tassen, Unzen, Pfund ...: metrisch speichern; ohne bekannte Dichte nur ungefähr (approx).
+    const m = toMetric(amount, raw, (ing.nameClean ?? ing.name ?? '').trim());
+    return { amount: roundAmount(m.amount), unit: m.unit, ...(m.approx ? { approx: true } : {}) };
+  }
   const mapped = raw === '' ? 'Stk' : UNIT_MAP[raw] ?? (ing.unit ?? '').trim();
   const imperialG = IMPERIAL_G[mapped];
   if (imperialG !== undefined && amount > 0) return { amount: roundAmount(amount * imperialG), unit: 'g' };
@@ -125,9 +131,9 @@ export function mapIngredients(raw: SpoonRecipe): RecipeIngredient[] {
   ext.forEach((e, i) => {
     const name = (e.nameClean ?? e.name ?? e.original ?? '').trim();
     if (!name) return;
-    const { amount, unit } = mapAmountUnit(e);
+    const { amount, unit, approx } = mapAmountUnit(e);
     const facts = ingredientFacts(factsFromNutrients(matchNutrition(e, i, nutrition, ext.length, used)?.nutrients), amount, unit);
-    out.push({ name, amount, unit, ...(facts ? { facts } : {}) });
+    out.push({ name, amount, unit, ...(approx ? { approx } : {}), ...(facts ? { facts } : {}) });
   });
   return out;
 }

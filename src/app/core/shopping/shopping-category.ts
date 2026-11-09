@@ -49,7 +49,7 @@ const RULES: readonly CategoryRule[] = [
   {
     category: 'Getränke',
     keywords: [
-      'saft', 'juice', 'wasser', 'water', 'cola', 'limo', 'bier', 'beer', 'wein', 'wine', 'sekt', 'prosecco', '=tee',
+      'saft', 'juice', 'wasser', 'water', 'cola', 'limo', 'bier', 'beer', '=wein', 'rotwein', 'weißwein', 'weisswein', 'wine', 'sekt', 'prosecco', '=tee',
       'kaffee', 'coffee', 'getränk', 'drink', 'sprudel', 'smoothie', 'wodka', 'vodka', '=rum',
     ],
   },

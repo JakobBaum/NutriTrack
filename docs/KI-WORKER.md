@@ -46,6 +46,13 @@ Einrichten:
 - Fehler: ohne Secret antwortet die Route mit 503 "Rezept-Suche nicht eingerichtet."; ein vom Anbieter abgelehnter Server-Schluessel wird als 502 gemeldet; Zeitlimit 12 s (504). Ist `AI_LIMITER` gebunden, gilt dasselbe Rate-Limit wie bei der KI.
 - Quota: Der kostenlose Plan hat ca. 50 Punkte pro Tag, geteilt fuer alle Nutzer des globalen Servers. Ist das Limit erreicht (402), zeigt die App "Tageslimit erreicht"; einzelne Nutzer koennen einen eigenen Schluessel eintragen.
 
+## Uebersetzung (translateRecipe, translateSearchQuery)
+Spoonacular liefert nur Englisch. Die App uebersetzt Rezepte in die App-Sprache (`appLanguage`, derzeit `de`).
+- `translateRecipe` `{ texts: { title, ingredients[], steps[] }, lang }`: Gemini mit festem JSON-Schema, Temperatur 0. Zutatennamen werden zur Einkaufs-Grundform normalisiert (z. B. "pork shoulder" -> "Schweineschulter", "chopped fresh rosemary" -> "Rosmarin, frisch"). Der Worker gleicht die Listenlaengen serverseitig an.
+- `translateSearchQuery` `{ query, lang }`: deutscher Suchbegriff -> englischer Suchbegriff.
+- Beide nutzen Tageszaehler und Rate-Limit wie alle KI-Funktionen. Ohne neuen Worker faellt die App ehrlich auf das Woerterbuch zurueck ("nicht uebersetzt").
+- Ergebnisse werden lokal zwischengespeichert (`nutritrack:translations`, nicht im Backup); nichts wird doppelt uebersetzt.
+
 ## Testen
 ```
 curl https://nutritrack.baumgartner-jakob12.workers.dev/health

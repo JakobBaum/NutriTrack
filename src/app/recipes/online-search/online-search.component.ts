@@ -3,8 +3,11 @@ import { Router } from '@angular/router';
 import { ModalController } from '@ionic/angular/lazy';
 import { RecipeSearchAccessService } from '../../core/recipes/online/recipe-search-access';
 import { RecipeStore } from '../../core/state/recipe.store';
+import { AppSettingsStore } from '../../core/state/app-settings.store';
+import { formatQuantity } from '../../core/shopping/units/unit-format';
+import { convertStepText } from '../../core/shopping/units/unit-text';
 import { OnlineRecipe } from '../../core/recipes/online/online-recipe.model';
-import { RecipeTranslateService } from '../../core/recipes/online/recipe-translate';
+import { RecipeTranslateService } from '../../core/recipes/translate/recipe-translate';
 import { OnlineSearchError } from '../../core/recipes/online/spoonacular.errors';
 import { toRecipeDraft } from '../../core/recipes/online/spoonacular.mapper';
 import { SpoonacularProvider } from '../../core/recipes/online/spoonacular.provider';
@@ -36,6 +39,7 @@ export class OnlineSearchComponent {
   private readonly access = inject(RecipeSearchAccessService);
   private readonly recipeStore = inject(RecipeStore);
   private readonly translator = inject(RecipeTranslateService);
+  private readonly settings = inject(AppSettingsStore);
 
   readonly dietOptions = DIET_OPTIONS;
   readonly timeOptions = TIME_OPTIONS;
@@ -56,8 +60,8 @@ export class OnlineSearchComponent {
   readonly selected = signal<OnlineRecipe | null>(null);
   readonly quotaLeft = this.provider.quotaLeft;
 
+  /** Ohne KI-Verbindung gibt es nur das Wörterbuch: Suche und Rezepttexte bleiben dann überwiegend Englisch. */
   readonly canTranslate = this.translator.canTranslate();
-  readonly translateOn = signal(this.canTranslate);
   readonly translating = signal(false);
   private readonly translations = signal<ReadonlyMap<string, OnlineRecipe>>(new Map());
   private readonly savedIds = signal<ReadonlySet<string>>(new Set());
@@ -66,11 +70,16 @@ export class OnlineSearchComponent {
   /** Nur ohne eigenen Schlüssel und ohne globalen Server ist die Einrichtung nötig. */
   readonly needsSetup = computed(() => !this.access.isAvailable());
   readonly hasMore = computed(() => this.results().length < this.total());
-  /** Angezeigtes Rezept: übersetzt, wenn der Schalter an ist und eine Übersetzung vorliegt. */
+  /** Angezeigtes Rezept: die Übersetzung, sobald sie vorliegt. */
   readonly shown = computed(() => {
     const sel = this.selected();
     if (!sel) return null;
-    return (this.translateOn() ? this.translations().get(sel.id) : undefined) ?? sel;
+    return this.translations().get(sel.id) ?? sel;
+  });
+  /** Hinweis, wenn das geöffnete Rezept nicht (vollständig) übersetzt werden konnte. */
+  readonly showUntranslatedHint = computed(() => {
+    const r = this.shown();
+    return !!r && !this.translating() && r.lang === 'en';
   });
   readonly isSaved = computed(() => {
     const sel = this.selected();
@@ -86,12 +95,19 @@ export class OnlineSearchComponent {
     };
   }
 
+  /** Filter mit dem Suchbegriff auf Englisch (KI, sonst Wörterbuch); die Datenbank kennt nur Englisch. */
+  private async englishFilters(): Promise<OnlineSearchFilters> {
+    const filters = this.filters();
+    const { query } = await this.translator.translateQuery(filters.query);
+    return { ...filters, query };
+  }
+
   async search(): Promise<void> {
     if (this.loading()) return;
     this.loading.set(true);
     this.error.set(null);
     try {
-      const page = await this.provider.search(this.filters());
+      const page = await this.provider.search(await this.englishFilters());
       this.results.set(page.recipes);
       this.total.set(page.totalResults);
     } catch (e: unknown) {
@@ -109,7 +125,7 @@ export class OnlineSearchComponent {
     this.loadingMore.set(true);
     this.error.set(null);
     try {
-      const page = await this.provider.search(this.filters(), this.results().length);
+      const page = await this.provider.search(await this.englishFilters(), this.results().length);
       this.results.update((list) => [...list, ...page.recipes.filter((r) => !list.some((o) => o.id === r.id))]);
       this.total.set(page.totalResults);
     } catch (e: unknown) {
@@ -132,21 +148,21 @@ export class OnlineSearchComponent {
     this.selected.set(null);
   }
 
-  async setTranslate(on: boolean): Promise<void> {
-    this.translateOn.set(on);
-    if (on) await this.ensureTranslation();
-  }
-
   private async ensureTranslation(): Promise<void> {
     const sel = this.selected();
-    if (!sel || !this.translateOn() || !this.canTranslate || this.translations().has(sel.id)) return;
+    if (!sel || this.translations().has(sel.id)) return;
     this.translating.set(true);
-    const translated = await this.translator.toGerman(sel);
-    this.translations.update((m) => new Map(m).set(sel.id, translated));
-    this.translating.set(false);
+    try {
+      const translated = await this.translator.translate(sel);
+      this.translations.update((m) => new Map(m).set(sel.id, translated));
+    } finally {
+      this.translating.set(false);
+    }
   }
 
-  save(): void {
+  /** Speichert das Rezept in der App-Sprache (wartet auf eine laufende Übersetzung). */
+  async save(): Promise<void> {
+    await this.ensureTranslation();
     const recipe = this.shown();
     const sel = this.selected();
     if (!recipe || !sel || this.isSaved()) return;
@@ -172,9 +188,13 @@ export class OnlineSearchComponent {
     return parts.join(' · ');
   }
 
-  amountText(amount: number, unit: string): string {
-    const n = amount > 0 ? String(amount).replace('.', ',') : '';
-    return [n, unit].filter(Boolean).join(' ');
+  /** Menge im gewählten Einheitensystem. */
+  amountText(amount: number, unit: string, name = ''): string {
+    return amount > 0 ? formatQuantity(amount, unit, name, this.settings.unitSystem()) : unit;
+  }
+
+  stepText(step: string): string {
+    return convertStepText(step, this.settings.unitSystem());
   }
 
   onToastDismiss(): void {

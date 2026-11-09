@@ -38,7 +38,7 @@ describe('ShoppingPage add FAB', () => {
     page.newItemName = 'Käse';
     page.newItemPriceText = '2,49';
     page.addManual();
-    expect(store.list()?.items.at(-1)?.estPrice).toBe(2.49);
+    expect(store.list()?.items.at(-1)?.userPrice).toBe(2.49);
     expect(page.newItemPriceText).toBe('');
     expect(page.newItemName).toBe('');
   });
@@ -189,8 +189,8 @@ describe('ShoppingPage checking items', () => {
 describe('ShoppingPage totals and undo delete', () => {
   it('excludes a pending delete from rows and total, and restores it on undo', () => {
     const { page, store } = createPage();
-    store.addItem({ name: 'Reis', amount: 1, unit: 'kg', checked: false, estPrice: 2 });
-    store.addItem({ name: 'Brot', amount: 1, unit: 'Stk', checked: false, estPrice: 3 });
+    store.addItem({ name: 'Reis', amount: 1, unit: 'kg', checked: false, userPrice: 2 });
+    store.addItem({ name: 'Brot', amount: 1, unit: 'Stk', checked: false, userPrice: 3 });
 
     page.removeItem(0);
     expect(page.rows().map((r) => r.item.name)).toEqual(['Brot']);
@@ -341,12 +341,12 @@ describe('ShoppingPage ohne KI und Rezepte', () => {
     expect(page.showTotals()).toBe(false);
   });
 
-  it('zeigt Summen nur aus eingetragenen Preisen', () => {
+  it('summiert eigene Preise vor Schätzungen', () => {
     const { page, store } = createPage();
     store.addItem({ name: 'Brot', amount: 1, unit: 'Stk', checked: false });
     store.addItem({ name: 'Milch', amount: 1, unit: 'l', checked: false });
     store.setItemPrice(0, 2.5);
     expect(page.showTotals()).toBe(true);
-    expect(page.totals()).toMatchObject({ total: 2.5, unpriced: 1, priced: 1 });
+    expect(page.totals()).toMatchObject({ total: 4, unpriced: 0, priced: 2 });
   });
 });

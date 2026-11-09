@@ -34,6 +34,9 @@ describe('categorizeName', () => {
     ['Eis', 'Tiefkühl'],
     ['Apfelsaft', 'Getränke'],
     ['Mineralwasser', 'Getränke'],
+    ['Schweineschulter', 'Fleisch & Fisch'],
+    ['Rotwein', 'Getränke'],
+    ['Wein', 'Getränke'],
   ])('ordnet %s zu %s', (name, expected) => {
     expect(categorizeName(name)).toBe(expected);
   });

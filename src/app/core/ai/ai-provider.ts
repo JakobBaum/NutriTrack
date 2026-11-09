@@ -7,6 +7,7 @@ import {
   Recipe,
   ShoppingItem,
 } from '../models';
+import { RecipeTexts, TranslateLanguage } from '../recipes/translate/translate.model';
 
 /** Anfrage für die (Wochen-)Einkaufslisten-Generierung. */
 export interface ShoppingPlanRequest {
@@ -84,6 +85,15 @@ export interface AiProvider {
 
   /** Parst eingefügten Text oder eine URL zu einem strukturierten Rezept. */
   importRecipe(input: RecipeImportInput): Promise<RecipeImportResult>;
+
+  /**
+   * Übersetzt Titel, Zutatennamen und Schritte in die App-Sprache und bringt Zutatennamen auf die
+   * Einkaufs-Grundform (z. B. 'chopped fresh rosemary' -> 'Rosmarin, frisch'). Gleiche Anzahl Einträge wie die Eingabe.
+   */
+  translateRecipe(texts: RecipeTexts, lang: TranslateLanguage): Promise<RecipeTexts>;
+
+  /** Übersetzt einen Suchbegriff (App-Sprache) ins Englische für die Rezeptdatenbank. */
+  translateSearchQuery(query: string, lang: TranslateLanguage): Promise<string>;
 }
 
 /** DI-Token für den aktiven KI-Anbieter (Routing via {@link AiService}). */
