@@ -1,17 +1,16 @@
 import { DOCUMENT } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router } from '@angular/router';
 import { AlertController } from '@ionic/angular';
-import { ActivityLevel, Goal, Sex, UserProfile } from '../core/models';
+import { filter } from 'rxjs';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { RecipeStore } from '../core/state/recipe.store';
 import { MealsStore } from '../core/state/meals.store';
 import { formatDecimal } from '../core/util/number-input';
 import { NutritionCalcService } from '../core/nutrition/nutrition-calc.service';
-import { ProfileNote, profileNotes } from '../core/nutrition/profile-plausibility';
 import { defaultAiProxyUrl } from '../core/ai/ai-endpoint';
-import { AiService } from '../core/ai/ai.service';
 import { CustomFoodStore } from '../core/state/custom-food.store';
 import { SettingsStore } from '../core/state/settings.store';
 import { AppSettingsStore } from '../core/state/app-settings.store';
@@ -23,27 +22,16 @@ import { FavoriteStore } from '../core/state/favorite.store';
 import { DebugLogService } from '../core/debug/debug-log.service';
 import { resolveDebugMode, safeLocalStorage } from './debug-flag';
 import { BackupService } from '../core/backup/backup.service';
-import { PROFILE_FIELD_ORDER, ProfileField, ProfileFieldErrors, targetWeightError, validateProfileForm } from './profile-form';
+import { isSetupLink } from './setup-link';
 import { BackupCleanup, BackupFile, countBackup, describeCounts, formatBackupDate } from '../core/backup/backup';
 import { describeSafetySnapshot } from '../core/backup/backup-safety';
 
+const GOAL_LABELS: Readonly<Record<string, string>> = { lose: 'Abnehmen', maintain: 'Halten', gain: 'Zunehmen' };
+
 /**
- * Einstellungen: Profil erfassen → Tagesbedarf berechnen (deterministisch),
- * KI-Anbieter konfigurieren (lokal gespeichert) und Daten zurücksetzen.
+ * Einstellungen: Profil (eigenes Sheet), KI-Status, Backup und Rechtliches.
+ * Der Einrichtungslink (?setup=1) öffnet das Profil und wird danach entfernt.
  */
-/** Wählbare Tempi (kg/Woche). Die Berechnung deckelt zusätzlich bei 1 % des Körpergewichts pro Woche. */
-const MAX_RATE_CHOICE = 0.75;
-const RATE_CHOICES: readonly number[] = [0.25, 0.5, MAX_RATE_CHOICE];
-const DEFAULT_RATE = 0.5;
-/** Kleinste Schrittweite beim Angebot „niedrigeres Tempo“. */
-const RATE_OFFER_STEP = 0.05;
-const MIN_RATE = 0.1;
-
-function nearestRate(value: number | null | undefined): number {
-  if (value === null || value === undefined || !Number.isFinite(value)) return DEFAULT_RATE;
-  return RATE_CHOICES.reduce((best, r) => (Math.abs(r - value) < Math.abs(best - value) ? r : best), DEFAULT_RATE);
-}
-
 @Component({
   selector: 'app-settings',
   templateUrl: './settings.page.html',
@@ -53,7 +41,7 @@ function nearestRate(value: number | null | undefined): number {
 })
 export class SettingsPage implements OnInit {
   private readonly profileStore = inject(ProfileStore);
-  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly settingsStore = inject(SettingsStore);
   private readonly appSettings = inject(AppSettingsStore);
   readonly unitSystem = this.appSettings.unitSystem;
@@ -81,12 +69,18 @@ export class SettingsPage implements OnInit {
   /** Ziel des gespeicherten Profils als Lesetext (z. B. „Abnehmen“), sonst null. */
   readonly profileGoalLabel = computed(() => {
     const goal = this.profileStore.profile()?.goal;
-    return this.goals.find((g) => g.value === goal)?.label ?? null;
+    return goal ? (GOAL_LABELS[goal] ?? null) : null;
+  });
+  /** Das Tagesziel ist ganz oder teilweise manuell festgelegt (Karte zeigt „manuell“). */
+  readonly isManualTarget = computed(() => {
+    const p = this.profileStore.profile();
+    return p?.manualKcal !== undefined || p?.manualProteinGPerKg !== undefined;
   });
   readonly savedToast = signal<string | null>(null);
 
   readonly profileOpen = signal(false);
-  readonly aiOpen = signal(false);
+  /** Gewicht, das das Profil-Sheet beim Öffnen vorbelegt (Hinweis „Ziel neu berechnen“). */
+  readonly prefillWeight = signal<number | null>(null);
   readonly logOpen = signal(false);
   readonly infoSection = signal<'anleitung' | 'datenschutz' | 'agb' | 'hilfe' | null>(null);
 
@@ -100,59 +94,37 @@ export class SettingsPage implements OnInit {
   readonly debugLog = inject(DebugLogService);
   readonly logEntries = this.debugLog.entries;
 
-  // --- Profil-Formular (mit Werten aus gespeichertem Profil, sonst Defaults) ---
-  private readonly existing = this.profileStore.profile();
-  // Körperwerte starten leer (Platzhalter sind nur Beispiele), damit nichts Vorbelegtes als echte Eingabe gespeichert wird.
-  weightKg: number | null = this.existing?.weightKg ?? null;
-  heightCm: number | null = this.existing?.heightCm ?? null;
-  age: number | null = this.existing?.age ?? null;
-  sex: Sex = this.existing?.sex ?? 'male';
-  activityLevel: ActivityLevel = this.existing?.activityLevel ?? 'moderate';
-  goal: Goal = this.existing?.goal ?? 'maintain';
-  /** Optionales Zielgewicht; null = nicht gesetzt. */
-  targetWeightKg: number | null = this.existing?.targetWeightKg ?? null;
-  rateKgPerWeek: number | null = this.existing?.goal && this.existing.goal !== 'maintain'
-    ? (this.existing.rateKgPerWeek !== undefined && this.existing.rateKgPerWeek <= MAX_RATE_CHOICE && this.existing.rateKgPerWeek >= MIN_RATE
-        ? this.existing.rateKgPerWeek
-        : nearestRate(this.existing.rateKgPerWeek))
-    : DEFAULT_RATE;
-  readonly rateChoices = RATE_CHOICES;
-
-  private readonly aiService = inject(AiService);
-  /** Erreichbarkeit des globalen KI-Dienstes (read-only Status). */
-  readonly aiTest = signal<{ busy: boolean; ok: boolean | null; message: string | null }>({
-    busy: false, ok: null, message: null,
-  });
-
-  readonly sexes: { value: Sex; label: string }[] = [
-    { value: 'male', label: 'Männlich' },
-    { value: 'female', label: 'Weiblich' },
-    { value: 'diverse', label: 'Divers' },
-  ];
-
-  readonly activities: { value: ActivityLevel; label: string }[] = [
-    { value: 'sedentary', label: 'Sitzend (wenig Bewegung)' },
-    { value: 'light', label: 'Leicht aktiv (1–3×/Woche)' },
-    { value: 'moderate', label: 'Mäßig aktiv (3–5×/Woche)' },
-    { value: 'active', label: 'Aktiv (6–7×/Woche)' },
-    { value: 'veryActive', label: 'Sehr aktiv (körperl. Arbeit)' },
-  ];
-
-  readonly goals: { value: Goal; label: string }[] = [
-    { value: 'lose', label: 'Abnehmen' },
-    { value: 'maintain', label: 'Halten' },
-    { value: 'gain', label: 'Zunehmen' },
-  ];
-
-
-  /** Felder, die der Nutzer schon verlassen hat (Fehler erst danach zeigen). */
-  touched: Partial<Record<ProfileField, boolean>> = {};
+  constructor() {
+    // Ionic hält die Seite im Cache: ngOnInit läuft nur einmal. Darum jede Navigation prüfen.
+    this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd), takeUntilDestroyed(inject(DestroyRef)))
+      .subscribe((e) => this.handleNavigation(e.urlAfterRedirects));
+  }
 
   ngOnInit(): void {
-    if (this.route.snapshot.queryParamMap.get('setup') === '1') {
-      this.profileOpen.set(true);
-    }
     this.refreshSafetyInfo();
+  }
+
+  /** Einrichtungslink: Profil öffnen und den Parameter entfernen, damit er nicht erneut greift. */
+  private handleNavigation(url: string): void {
+    if (!isSetupLink(this.router.parseUrl(url))) return;
+    this.openProfile(null);
+    void this.router.navigate(['/settings'], { replaceUrl: true });
+  }
+
+  openProfile(prefillKg: number | null): void {
+    this.prefillWeight.set(prefillKg);
+    this.profileOpen.set(true);
+  }
+
+  /** Hinweis „Ziel neu berechnen“: Profil mit dem zuletzt gewogenen Gewicht öffnen (nichts wird automatisch gespeichert). */
+  recalculateWithWeight(kg: number): void {
+    this.openProfile(kg);
+  }
+
+  onProfileClosed(): void {
+    this.profileOpen.set(false);
+    this.prefillWeight.set(null);
   }
 
   /** Beschreibung der automatischen Sicherung (leer, wenn es keine gibt). */
@@ -167,173 +139,6 @@ export class SettingsPage implements OnInit {
   get savedMinKcalApplied(): boolean {
     const p = this.profileStore.profile();
     return p !== null && this.calc.isMinKcalApplied(p);
-  }
-
-  /** Profil aus dem Formular, sofern Gewicht, Größe und Alter gesetzt sind. */
-  private formProfile(): UserProfile | null {
-    const w = Number(this.weightKg), h = Number(this.heightCm), a = Number(this.age);
-    if (this.weightKg === null || this.heightCm === null || this.age === null) return null;
-    if (![w, h, a].every((n) => Number.isFinite(n) && n > 0)) return null;
-    const rate = this.showRate ? Number(this.rateKgPerWeek) : 0;
-    return {
-      weightKg: w, heightCm: h, age: a, sex: this.sex, activityLevel: this.activityLevel,
-      goal: this.goal, rateKgPerWeek: Number.isFinite(rate) ? rate : 0, updatedAt: '',
-    };
-  }
-
-  /** Formular (falls vollständig) ergibt ein Ziel unter der Mindestzufuhr. */
-  get formMinKcalApplied(): boolean {
-    const p = this.formProfile();
-    return p !== null && this.calc.isMinKcalApplied(p);
-  }
-
-  /** Tägliches Defizit/Überschuss zum gewählten Tempo, z. B. „≈ −550 kcal/Tag“. */
-  get rateDeltaLabel(): string {
-    const kcal = this.calc.dailyDeltaKcal(Number(this.rateKgPerWeek) || 0, Number(this.weightKg) || 0);
-    return `≈ ${this.goal === 'lose' ? '−' : '+'}${kcal} kcal/Tag`;
-  }
-
-  /** Größtes Tempo für das eingegebene Gewicht (1 % pro Woche), z. B. „0,8“; leer ohne Gewicht. */
-  get maxRateText(): string {
-    const max = this.calc.maxRateKgPerWeek(Number(this.weightKg) || 0);
-    return max > 0 ? formatDecimal(Math.round(max * 100) / 100) : '';
-  }
-
-  /** True, wenn das gewählte Tempo über 1 % des Körpergewichts liegt und gedeckelt wird. */
-  get rateIsCapped(): boolean {
-    const max = this.calc.maxRateKgPerWeek(Number(this.weightKg) || 0);
-    return max > 0 && (Number(this.rateKgPerWeek) || 0) > max;
-  }
-
-  /** Hinweise zu Alter und BMI der Formulareingabe (leer, solange Werte fehlen oder unauffällig sind). */
-  get plausibilityNotes(): ProfileNote[] {
-    if (this.weightKg === null || this.heightCm === null || this.age === null) return [];
-    return profileNotes({ weightKg: this.weightKg, heightCm: this.heightCm, age: this.age, goal: this.goal });
-  }
-
-  /** Erreichtes Tempo bei aktiver Mindestzufuhr, z. B. „0,3“ (kg/Woche). */
-  get achievedRateText(): string {
-    const p = this.formProfile();
-    return p ? formatDecimal(Math.round(this.calc.achievedRateKgPerWeek(p) * 10) / 10) || '0' : '';
-  }
-
-  /** Niedrigeres Tempo, das ohne Mindestzufuhr funktioniert (null = keines möglich). */
-  get lowerRateOffer(): number | null {
-    const p = this.formProfile();
-    if (!p) return null;
-    const achieved = this.calc.achievedRateKgPerWeek(p);
-    const offer = Math.floor(achieved / RATE_OFFER_STEP) * RATE_OFFER_STEP;
-    return offer >= MIN_RATE ? Math.round(offer * 100) / 100 : null;
-  }
-
-  /** Aus der Anleitung direkt zur KI-Verbindung wechseln. */
-  openAiFromGuide(): void {
-    this.infoSection.set(null);
-    this.openAi();
-  }
-
-  /** Öffnet den KI-Status und prüft die Erreichbarkeit des globalen Dienstes. */
-  openAi(): void {
-    this.aiOpen.set(true);
-    void this.testAi();
-  }
-
-  setRate(rate: number): void {
-    this.rateKgPerWeek = rate;
-  }
-
-  setGoal(goal: Goal): void {
-    this.goal = goal;
-  }
-  get showRate(): boolean {
-    return this.goal !== 'maintain';
-  }
-
-  /** Alle aktuellen Feldfehler (leer = Formular gültig). */
-  get fieldErrors(): ProfileFieldErrors {
-    return validateProfileForm(
-      { weightKg: this.weightKg, heightCm: this.heightCm, age: this.age, rateKgPerWeek: this.rateKgPerWeek },
-      this.showRate,
-    );
-  }
-
-  get isFormValid(): boolean {
-    return Object.keys(this.fieldErrors).length === 0 && this.targetError === null;
-  }
-
-  /** Fehler des optionalen Zielgewichts (null = in Ordnung oder leer). */
-  get targetError(): string | null {
-    return targetWeightError(this.targetWeightKg, this.weightKg, this.goal, this.heightCm);
-  }
-
-  setTargetWeight(value: number): void {
-    this.targetWeightKg = value;
-  }
-
-  clearTargetWeight(): void {
-    this.targetWeightKg = null;
-  }
-
-  /** Hinweis "Ziel neu berechnen": Profil mit dem zuletzt gewogenen Gewicht öffnen (nichts wird automatisch gespeichert). */
-  recalculateWithWeight(kg: number): void {
-    this.weightKg = kg;
-    this.markTouched('weightKg');
-    this.profileOpen.set(true);
-  }
-
-  /** Fehlertext nur für Felder, die schon besucht wurden. */
-  visibleError(field: ProfileField): string | null {
-    return this.touched[field] ? (this.fieldErrors[field] ?? null) : null;
-  }
-
-  markTouched(field: ProfileField): void {
-    this.touched = { ...this.touched, [field]: true };
-  }
-
-  /** Stepper-Wert übernehmen. */
-  setField(field: 'weightKg' | 'heightCm' | 'age', value: number): void {
-    this[field] = value;
-    this.markTouched(field);
-  }
-
-  /** Fokussiert das erste fehlerhafte Feld (Reihenfolge wie im Formular). */
-  private focusFirstInvalid(errors: ProfileFieldErrors): void {
-    const first = PROFILE_FIELD_ORDER.find((f) => errors[f]);
-    if (!first) return;
-    this.win?.document.querySelector<HTMLElement>(`[data-field="${first}"] button`)?.focus();
-  }
-
-  saveProfile(): void {
-    const errors = this.fieldErrors;
-    const { weightKg, heightCm, age, rateKgPerWeek } = this;
-    if (Object.keys(errors).length > 0 || this.targetError !== null || weightKg === null || heightCm === null || age === null) {
-      this.touched = { weightKg: true, heightCm: true, age: true, rateKgPerWeek: true };
-      this.focusFirstInvalid(errors);
-      return;
-    }
-    const rate = this.showRate ? (rateKgPerWeek ?? 0) : 0;
-
-    const profile: UserProfile = {
-      weightKg,
-      heightCm,
-      age,
-      sex: this.sex,
-      activityLevel: this.activityLevel,
-      goal: this.goal,
-      rateKgPerWeek: rate,
-      ...(this.targetWeightKg !== null ? { targetWeightKg: this.targetWeightKg } : {}),
-      updatedAt: new Date().toISOString(),
-    };
-    this.profileStore.setProfile(profile);
-    this.profileOpen.set(false);
-    this.savedToast.set('Profil gespeichert — Tagesbedarf aktualisiert.');
-  }
-
-  /** Prüft ohne KI-Kosten, ob der globale KI-Dienst erreichbar ist. */
-  async testAi(): Promise<void> {
-    this.aiTest.set({ busy: true, ok: null, message: 'Prüfe Verbindung…' });
-    const result = await this.aiService.testConnection();
-    this.aiTest.set({ busy: false, ok: result.ok, message: result.message });
   }
 
   /** Fragt vor dem Löschen aller lokalen Daten nach und bietet vorher ein Backup an. */

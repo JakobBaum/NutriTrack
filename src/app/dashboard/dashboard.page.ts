@@ -7,7 +7,7 @@ import { ProfileStore } from '../core/state/profile.store';
 import { formatNum } from '../shared/num.pipe';
 import { dayLabel, rollDate, toDateISO } from '../core/util/date';
 import { MEAL_DEFS, mealForHour, mealLabel } from '../diary/diary-helpers';
-import { isWarnMacro, macroEnergyShares, proteinHint, proteinOfEntries, softHyphenLabel } from './dashboard-math';
+import { isWarnMacro, macroEnergyShares, macroNote, proteinHint, proteinOfEntries, softHyphenLabel } from './dashboard-math';
 
 interface MacroView {
   key: 'kcal' | 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar';
@@ -21,7 +21,7 @@ interface MacroView {
   target: number;
   /** Überschreitung in Einheiten (0, solange das Ziel nicht überschritten ist). */
   overBy: number;
-  /** True, wenn eine Überschreitung rot gezeigt wird (nur kcal und Zucker). */
+  /** True, wenn eine Überschreitung rot gezeigt wird (nur kcal). */
   warn: boolean;
 }
 
@@ -41,6 +41,8 @@ interface DrillData {
   color: string;
   /** True, wenn das Ziel dieses Werts deutlich überschritten ist (Warnfarbe). */
   over: boolean;
+  /** Erklärung zum Wert (z. B. Zucker: Gesamtzucker gegen Richtwert für freien Zucker). */
+  note: string | null;
   items: DrillItem[];
 }
 
@@ -136,7 +138,7 @@ export class DashboardPage {
       mk('carbs', 'Kohlenhydrate', 'g', 'var(--nt-carbs)', Math.round(e.carbsG), t.carbsG),
       mk('fat', 'Fett', 'g', 'var(--nt-fat)', Math.round(e.fatG), t.fatG),
       mk('fiber', 'Ballaststoffe', 'g', 'var(--nt-fiber)', Math.round(e.fiberG), t.fiberG),
-      mk('sugar', 'Zucker', 'g', 'var(--nt-sugar)', Math.round(e.sugarG), t.sugarG),
+      mk('sugar', 'Zucker gesamt', 'g', 'var(--nt-sugar)', Math.round(e.sugarG), t.sugarG),
     ];
   });
 
@@ -182,7 +184,7 @@ export class DashboardPage {
     const total = items.reduce((s, i) => s + i.value, 0);
     const target = macro?.target ?? 0;
     return {
-      label, unit, color, over, target,
+      label, unit, color, over, target, note: macroNote(key),
       targetPercent: target > 0 ? Math.round((total / target) * 100) : 0,
       total: Math.round(total * 10) / 10,
       items: items.map(i => ({

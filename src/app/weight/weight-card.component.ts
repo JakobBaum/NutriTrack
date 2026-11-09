@@ -3,7 +3,7 @@ import { ToastController } from '@ionic/angular';
 import { ProfileStore } from '../core/state/profile.store';
 import { WeightStore } from '../core/state/weight.store';
 import { dayLabel, toDateISO } from '../core/util/date';
-import { driftSinceProfile, trendKgPerWeek } from '../core/weight/weight-math';
+import { driftSinceProfile, shouldShowDriftHint, trendKgPerWeek } from '../core/weight/weight-math';
 import { lightHaptic } from '../diary/haptics';
 import { showEntryToast } from '../diary/entry-toast';
 import { formatNum } from '../shared/num.pipe';
@@ -65,7 +65,8 @@ export class WeightCardComponent {
     const p = this.profile.profile();
     const l = this.latest();
     if (d === null || !p || !l) return null;
-    return `Dein Gewicht hat sich seit deinem Profil um ${formatNum(Math.abs(d), 1)} kg ${d < 0 ? 'verringert' : 'erhöht'} (${formatNum(p.weightKg, 1)} auf ${formatNum(l.kg, 1)} kg). Berechne dein Ziel neu, damit es zu deinem Gewicht passt.`;
+    if (!shouldShowDriftHint(p.weightKg, l.kg, this.weights.driftHintDismissedAtKg())) return null;
+    return `Dein Gewicht hat sich seit deinem Profil um ${formatNum(Math.abs(d), 1)} kg ${d < 0 ? 'verringert' : 'erhöht'} (${formatNum(p.weightKg, 1)} auf ${formatNum(l.kg, 1)} kg). Berechne dein Ziel neu, wenn es dazu passen soll. Es wird nichts automatisch geändert.`;
   });
   openSheet(): void {
     this.sheetOpen.set(true);
@@ -83,8 +84,16 @@ export class WeightCardComponent {
     });
   }
 
+  /** Der Hinweis ist einmalig: Neuberechnen und Ausblenden merken das aktuelle Gewicht. */
   recalc(): void {
     const kg = this.latest()?.kg;
-    if (kg !== undefined) this.recalculate.emit(kg);
+    if (kg === undefined) return;
+    this.weights.dismissDriftHint(kg);
+    this.recalculate.emit(kg);
+  }
+
+  dismissHint(): void {
+    const kg = this.latest()?.kg;
+    if (kg !== undefined) this.weights.dismissDriftHint(kg);
   }
 }

@@ -41,7 +41,10 @@
   @if (driftText(); as text) {
     <div class="weight__drift" role="status" data-testid="weight-drift">
       <p>{{ text }}</p>
-      <button type="button" class="nt-pill weight__recalc" (click)="recalc()">Ziel neu berechnen</button>
+      <div class="weight__drift-actions">
+        <button type="button" class="nt-pill weight__recalc" (click)="recalc()">Ziel neu berechnen</button>
+        <button type="button" class="nt-pill nt-pill--secondary" data-testid="weight-drift-dismiss" (click)="dismissHint()">Ausblenden</button>
+      </div>
     </div>
   }
 

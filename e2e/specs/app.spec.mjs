@@ -17,10 +17,11 @@ export function register({ test }) {
     await go(page, 'dashboard');
     await page.locator('h1', { hasText: 'Willkommen bei NutriTrack' }).waitFor();
     await page.locator('ion-button', { hasText: 'Profil einrichten' }).click();
-    // ?setup=1 öffnet den Bedarfs-Berechner automatisch
-    await page.waitForURL(/settings\?setup=1/);
+    // ?setup=1 öffnet den Bedarfs-Berechner automatisch und wird danach entfernt
+    await page.waitForURL(/\/settings/);
     const modal = topModal(page);
     await modal.locator('.nt-sheet-header__title', { hasText: 'Mein Profil' }).waitFor();
+    await eventually(async () => assert.ok(!page.url().includes('setup=1'), `setup-Parameter nicht entfernt: ${page.url()}`));
     await stepTo(modal, 'Gewicht', { start: 75, step: 0.5, target: 72.5 });
     await stepTo(modal, 'Größe', { start: 175, step: 1, target: 175 });
     await stepTo(modal, 'Alter', { start: 30, step: 1, target: 28 });
@@ -108,6 +109,45 @@ export function register({ test }) {
     assert.ok(stored, 'Eintrag nicht gespeichert');
     assert.equal(stored.meal, 'lunch');
     await eventually(async () => assert.equal(toInt(await eatenText()), before + 250));
+  });
+
+  test('profil: Live-Vorschau, manuelles Ziel mit Fehlertext, Rückkehr zu automatisch', seed({}), async (page) => {
+    await go(page, 'settings');
+    await page.locator('[data-testid="open-profile"]').click();
+    const modal = topModal(page);
+    await modal.locator('[data-testid="profile-preview"]').waitFor();
+    const kcalBefore = toInt(await modal.locator('[data-testid="preview-kcal"]').innerText());
+    await stepTo(modal, 'Gewicht', { start: 78, step: 0.5, target: 80 });
+    await eventually(async () => assert.notEqual(toInt(await modal.locator('[data-testid="preview-kcal"]').innerText()), kcalBefore));
+
+    await modal.locator('[data-testid="target-manual"]').click();
+    const kcal = modal.locator('[data-testid="manual-kcal"] input');
+    await kcal.waitFor();
+    await kcal.fill('300');
+    await kcal.press('Tab');
+    await eventually(async () => assert.match(await modal.locator('[data-testid="manual-kcal-error"]').innerText(), /1\.000 und 6\.000/));
+    await kcal.fill('2300');
+    const protein = modal.locator('[data-testid="manual-protein"] input');
+    await protein.fill('2,0');
+    await protein.press('Tab');
+    await eventually(async () => assert.equal(await modal.locator('[data-testid="manual-kcal-error"]').count(), 0));
+    await eventually(async () => assert.equal(toInt(await modal.locator('[data-testid="preview-kcal"]').innerText()), 2300));
+    await modal.locator('[data-testid="profile-save"]').click();
+    await settle(page, 500);
+    const stored = await readStore(page, 'profile');
+    assert.equal(stored.manualKcal, 2300);
+    assert.equal(stored.manualProteinGPerKg, 2);
+    assert.equal(toInt(await page.locator('.target-card__kcal .num').innerText()), 2300);
+
+    // Zurück zu automatisch: Profil neu öffnen, Auto wählen, speichern.
+    await page.locator('[data-testid="open-profile"]').click();
+    const again = topModal(page);
+    await again.locator('[data-testid="target-auto"]').click();
+    await again.locator('[data-testid="profile-save"]').click();
+    await settle(page, 500);
+    const reset = await readStore(page, 'profile');
+    assert.equal(reset.manualKcal, undefined);
+    assert.equal(reset.manualProteinGPerKg, undefined);
   });
 
   test('dashboard: Fastfood-Helfer öffnet als Sheet auf Heute', seed({ diary: DIARY_NORMAL }), async (page) => {

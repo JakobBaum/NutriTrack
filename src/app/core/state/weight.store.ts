@@ -3,7 +3,12 @@ import { StorageService } from '../storage/storage.service';
 import { isValidWeight, removeWeight, upsertWeight, WeightEntry } from '../weight/weight-math';
 
 export const KEY_WEIGHT = 'weight';
+const KEY_HINT = 'weightHintDismissedAtKg';
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+function readHintKg(raw: unknown): number | null {
+  return isValidWeight(raw) ? raw : null;
+}
 
 /** Nur Einträge mit gültigem Tag und Gewicht, höchstens einer je Tag, nach Datum sortiert. */
 export function sanitizeWeights(raw: unknown): readonly WeightEntry[] {
@@ -28,6 +33,11 @@ export class WeightStore {
   /** Alle Einträge, älteste zuerst. */
   readonly entries = this._entries.asReadonly();
 
+  private readonly _hintDismissedAtKg = signal<number | null>(readHintKg(this.storage.get<unknown>(KEY_HINT, null)));
+
+  /** Gewicht, bei dem der Hinweis „Ziel neu berechnen“ ausgeblendet wurde (null = nie). */
+  readonly driftHintDismissedAtKg = this._hintDismissedAtKg.asReadonly();
+
   /** Letzter Eintrag oder null. */
   readonly latest = computed<WeightEntry | null>(() => {
     const list = this._entries();
@@ -48,10 +58,19 @@ export class WeightStore {
     this.persist();
   }
 
+  /** Blendet den Hinweis „Ziel neu berechnen“ aus, bis sich das Gewicht erneut deutlich ändert. */
+  dismissDriftHint(atKg: number): void {
+    if (!isValidWeight(atKg)) return;
+    this._hintDismissedAtKg.set(atKg);
+    this.storage.set(KEY_HINT, atKg);
+  }
+
   /** Löscht alle Einträge (für "Daten zurücksetzen"). */
   clear(): void {
     this._entries.set([]);
+    this._hintDismissedAtKg.set(null);
     this.storage.remove(KEY_WEIGHT);
+    this.storage.remove(KEY_HINT);
   }
 
   private persist(): void {

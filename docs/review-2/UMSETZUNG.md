@@ -65,3 +65,25 @@ Fastfood-Block, fünf Tabs, Hardware-Zurück, Widget, Health, `nt-input`, Sheet-
 - Fertig-Leiste, Tastatur und Autofokus nicht auf einem Gerät geprüft.
 - `selectAllOnFocus` nicht in Rezept-Feldern und im Tagebuch-Bearbeiten-Dialog; Rezeptfelder zeigen keine Feldfehler (Fehlerbehandlung dort unverändert).
 - Speichern aus dem Formular schließt das Sheet weiterhin (nur Schnell-Einträge bleiben offen).
+
+## Welle C (Profil und Ziele)
+
+### Gemacht
+- Profil als eigenes Sheet `settings/profile-sheet/*` (Logik in `profile-form-state.ts`, rein und unveränderlich). Das Formular lädt bei jedem Öffnen frisch aus dem gespeicherten Profil (Reset und Import zeigen keine alten Werte). Speichern-Button immer aktiv, Fehler stehen am Feld, Fokus springt zum ersten fehlerhaften Feld.
+- Einrichtungslink `?setup=1`: `settings/setup-link.ts` plus `NavigationEnd`-Abo in `SettingsPage` (greift auch bei der von Ionic gecachten Seite); der Parameter wird per `replaceUrl` entfernt.
+- Live-Vorschau (kcal und Eiweiß, klebt oben im Sheet) ändert sich beim Tippen und Wählen.
+- Manuelles Ziel (Automatisch/Manuell): kcal 1.000 bis 6.000, Eiweiß 1,2 bis 2,4 g pro kg (Hinweis ab 2,2). Fehlertext am Feld statt stillem Begrenzen (`core/nutrition/manual-target.ts`). "Auf Formel zurücksetzen" und Rückkehr zu Automatisch entfernen die Werte. `NutritionCalcService.dailyTarget` bleibt die einzige Stelle der Berechnung; die Mindestzufuhr gilt nicht für manuelle Werte.
+- Aufbau-Tempo: Überschuss mit 7700 kcal/kg, Deckel 0,5 % Körpergewicht pro Woche (Abnehmen weiter 1 %), Chips 0,1/0,25/0,4 kg (Aufbau) und 0,25/0,5/0,75 kg (Abnehmen).
+- Zucker: Ring und Karte heißen "Zucker gesamt (Richtwert)"; Überschreiten färbt nicht mehr rot; Drill-Sheet erklärt freien gegen Gesamtzucker (`macroNote`).
+- Adaptives Ziel nur als einmaliger Hinweis nach Gewichtsänderung (`shouldShowDriftHint`, Ausblenden merkt sich das Gewicht in `WeightStore`), nie automatisch gespeichert.
+- "KI-Verbindung" ersetzt durch reine Anzeige `ai-status-row` (Verbunden / Nicht erreichbar / Prüfe...), Anleitung und Hilfe auf "KI-Status" umgestellt.
+- Disclaimer der Zielkarte umformuliert (Startwert, nach 2 bis 3 Wochen mit dem Gewichtsverlauf vergleichen).
+
+### Dateien
+Neu: `core/nutrition/manual-target(.spec).ts`, `core/nutrition/nutrition-calc.goals.spec.ts`, `settings/profile-sheet/*`, `settings/setup-link(.spec).ts`, `settings/ai-status-row/*`. Geändert: `nutrition-calc.service.ts`, `core/models/index.ts`, `weight-math(.spec).ts`, `weight.store(.spec).ts`, `weight-card.*`, `dashboard-math(.spec).ts`, `dashboard.page.*`, `settings.page.*`, `settings.module.ts`, E2E `app.spec.mjs`, `search.spec.mjs`.
+
+### Offene Punkte
+- Nichts auf einem Gerät geprüft (Tastatur, Sheet-Verhalten).
+- Imperial-Einstellung gilt nicht für Körperwerte.
+- Kein Dirty-Guard beim Schließen des Sheets, kein Minderjährigen-Block, kein Hinweis auf Kohlenhydrate unter 2 g/kg.
+- Texte "Profil › KI-Verbindung" in `fastfood-form.component.html` und `core/ai/ai-errors.ts` bleiben (Welle E).

@@ -170,6 +170,9 @@
         </div>
       </ion-header>
       <ion-content class="drill-content">
+        @if (drill.note) {
+          <p class="drill-hint" data-testid="drill-note">{{ drill.note }}</p>
+        }
         @if (drill.items.length === 0) {
           <p class="drill-empty">Noch keine Einträge an diesem Tag.</p>
         } @else {
