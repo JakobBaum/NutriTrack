@@ -117,3 +117,29 @@ Fünf Tabs, Fastfood-Block, Sheet-Breakpoints.
 - Mahlzeiten- und Zutatenliste: Löschen auf Touch nur per Wischen.
 - `recipes.page.scss` liegt 28 Byte über dem Stilbudget (Warnung, kein Fehler).
 - Heute hat keinen `nt-page-header` (Datumsleiste statt Titel).
+
+## Welle F und Worker (Qualität, Härtung) – 2026-11-09
+
+### Qualität
+- Lint grün (`npm run lint`): Selektor-Präfix `nt` in `eslint.config.js` erlaubt, Template-Vergleich in `shopping.page.html` auf `typeof` umgestellt. Lint läuft im CI-Job `ci` vor den Unit-Tests.
+- E2E im CI: neuer Job `e2e` (Playwright 1.64.0 außerhalb des Repos via `NT_PLAYWRIGHT_DIR`, Chromium mit Systemabhängigkeiten, Produktions-Build, `e2e/serve-static.mjs` mit SPA-Fallback auf Port 4310). `build` (Deploy) hängt jetzt von `ci` und `e2e` ab. Die YAML wurde nur per Durchsicht geprüft, nicht ausgeführt.
+- Stilbudget: `recipes.page.scss` durch Entfernen einer doppelten 359px-Media-Query unter das Budget gebracht (Budget unverändert).
+- Neue Logikmodule mit Specs: `recipes/recipe-form`, `recipes/recipe-sheets`, `diary/add-entry-sheet/add-entry-logic`, `diary/diary-day`, `settings/settings-view`. Dabei Fehler gefunden und behoben: `goalLabel('toString')` lieferte über den Prototyp einen Wert (jetzt `Object.hasOwn`).
+- Große Dateien zerlegt, Verhalten unverändert: `recipes.page.ts` 759 auf 624 Zeilen, `add-entry-sheet.component.ts` 723 auf 677, `global.scss` in `src/styles/foundation.scss`, `overlays-and-polish.scss`, `ios-patterns-and-fixes.scss` (Reihenfolge in `angular.json`).
+
+### CSP
+- Angulars `autoCsp` blockierte WebAssembly im Tesseract-Blob-Worker (OCR war im Produktions-Build kaputt). `autoCsp` entfernt, eigene Meta-CSP in `src/index.html` (u. a. `wasm-unsafe-eval`, `worker-src blob:`, `connect-src` für Worker, OFF, Spoonacular-Bilder), `inlineCritical:false` gegen Inline-Skripte.
+- E2E `e2e/specs/csp.spec.mjs`: keine Verstöße beim Laden, Tesseract-Core läuft im Blob-Worker (rot unter `autoCsp`, grün mit eigener CSP).
+
+### Worker (nur Code und Tests, kein Deploy)
+- Tageslimit fail-closed: ist `DAILY_KV` gebunden, aber nicht erreichbar (get/put-Fehler), antwortet der Worker mit 503 und `Retry-After: 60`, ohne Upstream-Aufruf. Ohne Binding bleibt es fail-open; `/health` weist darauf hin.
+- Foto-Aufrufe (`recognizeLabel`, `importRecipe` mit Bild) zählen doppelt (`PHOTO_CALL_WEIGHT = 2`).
+- 5 neue Worker-Tests, gesamt 77.
+
+### Verifikation
+tsc sauber, Lint sauber, 127 Dateien / 1238 Unit-Tests grün, `ng build` nur Tesseract-ESM-Warnungen (keine Budget-Warnung), Worker 77/77, E2E 37/37 gegen den Produktions-Build.
+
+### Offene Punkte
+- Worker nicht deployt; fail-closed greift erst nach Deploy.
+- CI-YAML (Lint, E2E-Job) nie auf GitHub gelaufen.
+- Gerätetest weiterhin offen.

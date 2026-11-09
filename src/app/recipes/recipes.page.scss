@@ -35,11 +35,6 @@ ion-modal ion-content {
   cursor: pointer;
 }
 
-@media (max-width: 359px) {
-  .page-head__import-label { display: none; }
-  .page-head__import { justify-content: center; width: var(--nt-touch); padding: 0; }
-}
-
 // Schmale Phones: „Online suchen“ und „Import“ nur als Icon
 @media (max-width: 429px) {
   .page-head__import-label { display: none; }
@@ -89,14 +84,12 @@ ion-modal ion-content {
   // Eine Button-Familie fuer Karte und Detail-Footer: gleiche Hoehe, gleiche Form
   &__actions {
     display: flex;
-
     align-items: center;
     gap: var(--nt-space-2);
     margin-top: var(--nt-space-3);
     ion-button.recipe__btn {
       flex: 1 1 0;
       height: var(--nt-touch);
-
       margin: 0;
       --border-radius: var(--nt-radius-pill);
       --background: var(--nt-accent);
@@ -162,7 +155,6 @@ ion-modal ion-content {
   display: flex;
   flex-direction: column;
   gap: 4px;
-
 }
 
 // Feld mit Einheit rechts ("g")

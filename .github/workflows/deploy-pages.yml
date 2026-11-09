@@ -1,6 +1,6 @@
 name: CI und Deploy (GitHub Pages)
 
-# CI laeuft bei jedem Push und Pull Request. Der Pages-Deploy laeuft nur
+# CI (Lint, Typecheck, Unit-, Worker-Tests) und E2E laufen bei jedem Push und Pull Request. Der Pages-Deploy laeuft nur
 # nach gruenem CI und nur fuer main -> https://jakobbaum.github.io/NutriTrack/
 # Der Pages-Build geht nach dist/pages/browser, damit www/ (Capacitor webDir)
 # davon unberuehrt bleibt.
@@ -35,6 +35,9 @@ jobs:
       - name: Typecheck (tsc)
         run: npx tsc -p tsconfig.app.json --noEmit
 
+      - name: Lint (ng lint)
+        run: npm run lint
+
       - name: Unit-Tests (ng test)
         run: npx ng test --watch=false
 
@@ -46,8 +49,49 @@ jobs:
           node --test scripts/sync-version.test.mjs
           node scripts/sync-version.mjs --check
 
+  # E2E gegen den Produktions-Build (www/) mit statischem SPA-Fallback.
+  # Playwright liegt bewusst ausserhalb von package.json (NT_PLAYWRIGHT_DIR), damit die Abhaengigkeiten unveraendert bleiben.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Playwright (ausserhalb des Repos) installieren
+        run: |
+          mkdir -p "$RUNNER_TEMP/pw"
+          cd "$RUNNER_TEMP/pw"
+          npm init -y
+          npm install playwright@1.64.0
+          npx playwright install --with-deps chromium
+          echo "NT_PLAYWRIGHT_DIR=$RUNNER_TEMP/pw" >> "$GITHUB_ENV"
+
+      - name: Produktions-Build (www/)
+        run: npx ng build
+
+      - name: E2E-Tests
+        run: |
+          node e2e/serve-static.mjs www 4310 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:4310/ > /dev/null && break; sleep 1; done
+          E2E_BASE_URL=http://127.0.0.1:4310 node e2e/run.mjs
+
+      - name: E2E-Artefakte (Screenshots bei Fehlern)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts
+          path: e2e/artifacts
+          if-no-files-found: ignore
+
   build:
-    needs: ci
+    needs: [ci, e2e]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:

@@ -1,0 +1,37 @@
+name: iOS IPA (unsigniert)
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: iOS-Projekt anlegen/synchronisieren
+        run: |
+          [ -d ios ] || npx cap add ios
+          npx cap sync ios
+      - name: Bauen ohne Signatur
+        run: |
+          if [ -d ios/App/App.xcworkspace ]; then
+            TARGET="-workspace ios/App/App.xcworkspace"
+          else
+            TARGET="-project ios/App/App.xcodeproj"
+          fi
+          xcodebuild $TARGET -scheme App -configuration Release \
+            -sdk iphoneos -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+      - name: IPA packen
+        run: |
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/App.app Payload/
+          zip -r App.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: App-ipa
+          path: App.ipa

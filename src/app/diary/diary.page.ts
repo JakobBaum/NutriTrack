@@ -19,6 +19,7 @@ import { FavoriteStore } from '../core/state/favorite.store';
 import { dayLabel, rollDate, toDateISO } from '../core/util/date';
 import { formatNum } from '../shared/num.pipe';
 import { MEAL_DEFS, mealForHour, mealLabel, isIsoDate, isMealType, isValidAmount, toBaseAmount, toNumberOrNull, inputTextFor, AMOUNT_UNITS, fromBaseAmount, convertAmount, lastAmountForLabel, editBaseFor } from './diary-helpers';
+import { parseDiaryQuery, summarizeDay } from './diary-day';
 import { confirmDiscardSheet, pickMealSheet } from './diary-sheets';
 import { pickEntryAction } from './entry-menu';
 import { lightHaptic } from './haptics';
@@ -92,20 +93,19 @@ export class DiaryPage {
   readonly dateLabel = computed(() => dayLabel(this.selectedDate()));
   readonly isToday = computed(() => this.selectedDate() === this.today());
 
-  readonly totalKcal = computed(() =>
-    Math.round(this.diary.totalsForDate(this.selectedDate()).kcal),
+  private readonly summary = computed(() =>
+    summarizeDay(this.diary.totalsForDate(this.selectedDate()), this.profileStore.target()),
   );
-  readonly targetKcal = computed(() => this.profileStore.target()?.kcal ?? 0);
-  readonly totalProtein = computed(() => Math.round(this.diary.totalsForDate(this.selectedDate()).proteinG));
-  readonly targetProtein = computed(() => this.profileStore.target()?.proteinG ?? 0);
+  readonly totalKcal = computed(() => this.summary().totalKcal);
+  readonly targetKcal = computed(() => this.summary().targetKcal);
+  readonly totalProtein = computed(() => this.summary().totalProtein);
+  readonly targetProtein = computed(() => this.summary().targetProtein);
   /** Eiweiß, das zum Tagesziel noch fehlt (0, wenn erreicht oder ohne Ziel). */
-  readonly remainingProtein = computed(() => Math.max(0, this.targetProtein() - this.totalProtein()));
+  readonly remainingProtein = computed(() => this.summary().remainingProtein);
   readonly dismissKeyboard = dismissKeyboard;
   /** Verbleibende kcal des gewählten Tages (0, wenn das Ziel erreicht oder überschritten ist). */
-  readonly remainingKcal = computed(() => Math.max(0, this.targetKcal() - this.totalKcal()));
-  readonly overKcal = computed(() =>
-    this.targetKcal() > 0 ? Math.max(0, this.totalKcal() - this.targetKcal()) : 0,
-  );
+  readonly remainingKcal = computed(() => this.summary().remainingKcal);
+  readonly overKcal = computed(() => this.summary().overKcal);
 
   readonly groups = computed<MealGroup[]>(() => {
     const date = this.selectedDate();
@@ -162,21 +162,17 @@ export class DiaryPage {
    * Fastfood-Helfer) und `?date=` einmalig und entfernt sie danach aus der URL.
    */
   private handleQuery(params: ParamMap): void {
-    const add = params.get('add');
-    const wantsFastfood = params.get('fastfood') === '1';
-    const meal = params.get('meal');
-    const date = params.get('date');
-    if (isIsoDate(date)) this.selectedDate.set(date);
-    if (!add && !wantsFastfood && !meal && !date) return;
+    const query = parseDiaryQuery(params);
+    if (query.date) this.selectedDate.set(query.date);
+    if (!query.hasAny) return;
 
-    if (add) {
-      if (!isIsoDate(date)) this.selectedDate.set(toDateISO());
-      this.openAdd(isMealType(add) ? add : this.currentMeal());
+    if (query.wantsAdd) {
+      if (!query.date) this.selectedDate.set(toDateISO());
+      this.openAdd(query.addMeal ?? this.currentMeal());
     }
-    if (wantsFastfood) this.openFastfood();
-    if (isMealType(meal)) {
-      setTimeout(() => this.scrollToMeal(meal), SCROLL_TO_MEAL_DELAY_MS);
-    }
+    if (query.wantsFastfood) this.openFastfood();
+    const scrollMeal = query.scrollMeal;
+    if (scrollMeal) setTimeout(() => this.scrollToMeal(scrollMeal), SCROLL_TO_MEAL_DELAY_MS);
 
     void this.router.navigate([], {
       relativeTo: this.route,

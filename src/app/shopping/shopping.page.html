@@ -207,7 +207,7 @@
                   @let hasPrice = shownPrice(item) !== undefined;
                   @if (hasAmount) { {{ qty(item) }} }
                   @if (hasAmount && hasPrice) { · }
-                  @if (hasPrice) { ca. {{ shownPrice(item)! | ntNum:2:2 }} € <span class="est-badge">{{ item.userPrice != null ? 'eigener Preis' : 'geschätzt' }}</span> }
+                  @if (hasPrice) { ca. {{ shownPrice(item)! | ntNum:2:2 }} € <span class="est-badge">{{ typeof item.userPrice === 'number' ? 'eigener Preis' : 'geschätzt' }}</span> }
                   @if (!hasAmount && !hasPrice) { ohne Menge }
                   @else if (!hasAmount) { ohne Menge }
                 </span>

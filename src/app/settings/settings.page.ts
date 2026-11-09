@@ -21,12 +21,12 @@ import { WeightStore } from '../core/state/weight.store';
 import { FavoriteStore } from '../core/state/favorite.store';
 import { DebugLogService } from '../core/debug/debug-log.service';
 import { resolveDebugMode, safeLocalStorage } from './debug-flag';
+import { backupStatusLabel, goalLabel, hasManualTarget } from './settings-view';
 import { BackupService } from '../core/backup/backup.service';
 import { isSetupLink } from './setup-link';
 import { BackupCleanup, BackupFile, countBackup, describeCounts, formatBackupDate } from '../core/backup/backup';
 import { describeSafetySnapshot } from '../core/backup/backup-safety';
 
-const GOAL_LABELS: Readonly<Record<string, string>> = { lose: 'Abnehmen', maintain: 'Halten', gain: 'Zunehmen' };
 
 /**
  * Einstellungen: Profil (eigenes Sheet), KI-Status, Backup und Rechtliches.
@@ -67,15 +67,9 @@ export class SettingsPage implements OnInit {
 
   readonly target = this.profileStore.target;
   /** Ziel des gespeicherten Profils als Lesetext (z. B. „Abnehmen“), sonst null. */
-  readonly profileGoalLabel = computed(() => {
-    const goal = this.profileStore.profile()?.goal;
-    return goal ? (GOAL_LABELS[goal] ?? null) : null;
-  });
+  readonly profileGoalLabel = computed(() => goalLabel(this.profileStore.profile()?.goal));
   /** Das Tagesziel ist ganz oder teilweise manuell festgelegt (Karte zeigt „manuell“). */
-  readonly isManualTarget = computed(() => {
-    const p = this.profileStore.profile();
-    return p?.manualKcal !== undefined || p?.manualProteinGPerKg !== undefined;
-  });
+  readonly isManualTarget = computed(() => hasManualTarget(this.profileStore.profile()));
   readonly savedToast = signal<string | null>(null);
 
   readonly profileOpen = signal(false);
@@ -86,10 +80,7 @@ export class SettingsPage implements OnInit {
 
   private readonly backup = inject(BackupService);
   readonly backupBusy = signal(false);
-  readonly lastBackupLabel = computed(() => {
-    const label = formatBackupDate(this.backup.lastBackup());
-    return label ? `Letztes Backup: ${label}` : 'Noch kein Backup erstellt';
-  });
+  readonly lastBackupLabel = computed(() => backupStatusLabel(formatBackupDate(this.backup.lastBackup())));
 
   readonly debugLog = inject(DebugLogService);
   readonly logEntries = this.debugLog.entries;

@@ -58,6 +58,15 @@ import { clearRawTexts } from '../raw-texts';
 import { showEntryToast } from '../entry-toast';
 import { dismissKeyboard } from '../../core/keyboard/dismiss-keyboard';
 import { entryAddedMessage } from '../entry-message';
+import {
+  baseFactsForSave,
+  checkAddForm,
+  entriesFromSavedMeal,
+  entryFromRecent,
+  entryFromRecipe,
+  savedMealProtein,
+  sumEntryTotals,
+} from './add-entry-logic';
 
 type AddView = 'search' | 'form' | 'recipes' | 'saved' | 'meals';
 type QuantityUnit = 'g' | 'portion';
@@ -557,53 +566,18 @@ export class AddEntrySheetComponent implements OnChanges {
   // --- Schnell-Loggen (ein Tipp) ---
   /** Loggt einen zuletzt benutzten Eintrag sofort mit seiner letzten Menge. */
   quickAddRecent(entry: DiaryEntry): void {
-    this.addAndConfirm([
-      {
-        dateISO: this.date(),
-        meal: this.form.meal,
-        label: entry.label,
-        brand: entry.brand,
-        ref: entry.ref,
-        amountG: entry.amountG,
-        servings: entry.servings,
-        facts: entry.facts,
-        baseFacts: entry.baseFacts,
-        isEstimate: entry.isEstimate,
-        isPartial: entry.isPartial,
-        unit: entry.unit,
-      },
-    ]);
+    this.addAndConfirm([entryFromRecent(entry, this.date(), this.form.meal)]);
   }
 
   /** Loggt eine Portion eines Rezepts sofort. */
   quickAddRecipe(recipe: Recipe): void {
-    if (!recipe.factsPerServing) return;
-    this.addAndConfirm([
-      {
-        dateISO: this.date(),
-        meal: this.form.meal,
-        label: recipe.title,
-        ref: { kind: 'recipe', recipeId: recipe.id },
-        servings: 1,
-        facts: recipe.factsPerServing,
-        isPartial: countMissingFacts(recipe.ingredients) > 0,
-      },
-    ]);
+    const entry = entryFromRecipe(recipe, this.date(), this.form.meal);
+    if (entry) this.addAndConfirm([entry]);
   }
 
   /** Loggt alle Einträge einer gespeicherten Mahlzeit sofort in die gewählte Mahlzeit. */
   quickAddSavedMeal(meal: SavedMeal): void {
-    this.addAndConfirm(
-      meal.entries.map((e) => ({
-        dateISO: this.date(),
-        meal: this.form.meal,
-        label: e.label,
-        ref: e.ref,
-        amountG: e.amountG,
-        servings: e.servings,
-        facts: e.facts,
-      })),
-    );
+    this.addAndConfirm(entriesFromSavedMeal(meal, this.date(), this.form.meal));
   }
 
   mealKcal(meal: SavedMeal): number {
@@ -612,7 +586,7 @@ export class AddEntrySheetComponent implements OnChanges {
 
   /** Eiweiß (g) einer gespeicherten Mahlzeit. */
   mealProtein(meal: SavedMeal): number {
-    return meal.entries.reduce((sum, e) => sum + (e.facts.proteinG || 0), 0);
+    return savedMealProtein(meal);
   }
 
   /** Schnell-Eintrag: das Sheet bleibt offen, die Bestätigung kommt als Toast mit Essenszeit, kcal und Eiweiß. */
@@ -623,10 +597,7 @@ export class AddEntrySheetComponent implements OnChanges {
     lightHaptic();
     const added = inputs.map((input) => this.diary.add(input));
     this.addedCount.update((n) => n + added.length);
-    const totals = added.reduce(
-      (sum, e) => ({ kcal: sum.kcal + (e.facts.kcal || 0), proteinG: sum.proteinG + (e.facts.proteinG || 0) }),
-      { kcal: 0, proteinG: 0 },
-    );
+    const totals = sumEntryTotals(added);
     this.showToast(entryAddedMessage(this.form.meal, totals), () => {
       added.forEach((e) => this.diary.remove(e.id));
       this.addedCount.update((n) => Math.max(0, n - added.length));
@@ -660,26 +631,18 @@ export class AddEntrySheetComponent implements OnChanges {
     // Nur Kalorien (ohne Name): als Schnell-Eintrag; mit Quelle (Suche, Rezept) ist der Name immer gesetzt.
     const isQuickEntry = !typedLabel && !base && factsFromFields(this.form) !== null;
     const label = isQuickEntry ? QUICK_ENTRY_LABEL : typedLabel;
-    if (!label) {
-      this.error.set('Der Name fehlt — gib ein, was du gegessen hast.');
-      return;
-    }
-    if (base?.unit === 'g' && !isValidAmount(this.baseAmount)) {
-      this.error.set('Die Menge fehlt — gib eine Menge größer als 0 ein.');
-      return;
-    }
-    if (base?.unit === 'portion' && !isValidAmount(this.form.servings)) {
-      this.error.set('Die Portionen fehlen — gib eine Zahl größer als 0 ein.');
-      return;
-    }
-    if (!base && this.form.amountG != null && !isValidAmount(this.baseAmount)) {
-      this.error.set('Die Menge muss größer als 0 sein — oder lass das Feld leer.');
-      return;
-    }
     const facts = factsFromFields(this.form);
-    if (!facts) {
-      this.error.set('Die Kalorien fehlen — trage sie unter „Nährwerte anpassen“ ein.');
-      this.adjustOpen.set('adjust');
+    const problem = checkAddForm({
+      label,
+      sourceUnit: base?.unit ?? null,
+      baseAmount: this.baseAmount,
+      servings: this.form.servings,
+      amountEntered: this.form.amountG,
+      hasFacts: facts !== null,
+    });
+    if (problem || !facts) {
+      this.error.set(problem?.message ?? '');
+      if (problem?.openAdjust) this.adjustOpen.set('adjust');
       return;
     }
 
@@ -695,7 +658,7 @@ export class AddEntrySheetComponent implements OnChanges {
       servings: isPortion ? (this.form.servings ?? 1) : undefined,
       amountG: this.baseAmount ?? undefined,
       facts,
-      baseFacts: this.baseForSave(base, facts),
+      baseFacts: baseFactsForSave(base?.facts ?? null, base?.unit === 'g', this.baseAmount, facts),
       isEstimate: this.isAiEstimate() || undefined,
       isPartial: this.isPartialSource || undefined,
       unit: this.baseAmount ? this.amountUnit : undefined,
@@ -706,15 +669,6 @@ export class AddEntrySheetComponent implements OnChanges {
     lightHaptic();
     this.closeAdd();
     this.showToast(entryAddedMessage(this.form.meal, facts), () => this.diary.remove(entry.id));
-  }
-
-  /** Bezugswerte für spätere Mengenänderung; bei manuell angepassten Werten daraus neu abgeleitet. */
-  private baseForSave(base: ScaleBase | null, facts: NutritionFacts): NutritionFacts | undefined {
-    if (base?.unit !== 'g') return undefined;
-    const amount = this.baseAmount;
-    if (!isValidAmount(amount)) return base.facts;
-    const scaled = scaleFacts(base.facts, amount / 100);
-    return factsDiffer(scaled, facts) ? rebaseTo100(facts, amount) : base.facts;
   }
 
   private showToast(message: string, onUndo?: () => void): void {

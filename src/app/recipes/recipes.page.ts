@@ -18,13 +18,30 @@ import { ModalController } from '@ionic/angular/lazy';
 import { OnlineSearchComponent } from './online-search/online-search.component';
 import { hasIncompleteFacts } from '../core/nutrition/units-weight';
 import { importBlockReason, importErrorMessage } from './recipe-view';
+import {
+  FactKey,
+  IngredientForm,
+  RecipeForm,
+  applyFact,
+  buildRecipeDraft,
+  cookedWeightIsEstimate,
+  cookedWeightValue,
+  emptyForm,
+  formFromImport,
+  formFromRecipe,
+  nextCookedWeight,
+  positiveOrZero,
+  recipeDiaryEntry,
+  toRecipeIngredients,
+} from './recipe-form';
+import { askPortionsSheet, cardMenuSheet, mealLabel, pickMealSheet } from './recipe-sheets';
 import { confirmDiscard } from '../meals/confirm-discard';
 import { MealType, NutritionFacts, Recipe, RecipeIngredient } from '../core/models';
 import { AiService } from '../core/ai/ai.service';
 import { FoodSourceResult } from '../shared/food-sources/food-sources.component';
 import { CameraService } from '../core/scan/camera.service';
 import { DiaryStore } from '../core/state/diary.store';
-import { RecipeDraft, RecipeStore } from '../core/state/recipe.store';
+import { RecipeStore } from '../core/state/recipe.store';
 import {
   perServingFacts,
   totalFacts,
@@ -37,12 +54,10 @@ import { UNDO_TOAST_BUTTONS, UNDO_TOAST_MS, UndoableDelete, settleUndoToast } fr
 import { shrinkPhotoForUpload } from '../core/scan/label-image';
 import {
   APPROX_UNITS,
-  EAT_PORTION_OPTIONS,
   isUnknownUnit,
   isValidYield,
   lowerBoundNote,
   optionalGramsLabel,
-  scaleFacts,
   countMissingFacts,
   hasApproxUnits,
   isAiOrigin,
@@ -56,33 +71,6 @@ import {
 
 type RecipesView = 'recipes' | 'meals';
 const RECIPES_VIEWS: readonly RecipesView[] = ['recipes', 'meals'];
-
-interface IngredientForm {
-  name: string;
-  amount: number | null;
-  unit: string;
-  facts?: NutritionFacts;
-  foodItemId?: string;
-}
-
-interface RecipeForm {
-  title: string;
-  servings: number | null;
-  cookedWeightG: number | null;
-  ingredients: IngredientForm[];
-  steps: string[];
-}
-
-function emptyForm(): RecipeForm {
-  return { title: '', servings: 2, cookedWeightG: null, ingredients: [], steps: [''] };
-}
-
-const MEAL_OPTIONS: { value: MealType; label: string }[] = [
-  { value: 'breakfast', label: 'Frühstück' },
-  { value: 'lunch', label: 'Mittagessen' },
-  { value: 'dinner', label: 'Abendessen' },
-  { value: 'snack', label: 'Snack' },
-];
 
 /**
  * Rezepte: Liste eigener Rezepte, anlegen/bearbeiten, löschen und ins Tagebuch
@@ -119,8 +107,6 @@ export class RecipesPage implements OnDestroy {
 
   readonly nativeCamera = this.camera.isNativeCameraAvailable();
   readonly importPhotoScanning = signal(false);
-
-  readonly mealOptions = MEAL_OPTIONS;
 
   // --- Rezept-Import (Text/URL via KI) ---
   readonly importOpen = signal(false);
@@ -248,18 +234,7 @@ export class RecipesPage implements OnDestroy {
     if (!this.isLive()) throw new Error('Foto-Import braucht die KI, sie ist gerade nicht verbunden.');
     const res = await this.ai.importRecipe({ imageBase64: await shrinkPhotoForUpload(base64) });
     if (res.ingredients.length === 0) throw new Error('Auf dem Foto wurden keine Zutaten erkannt.');
-    this.form = {
-      title: res.title,
-      servings: res.servings || 2,
-      cookedWeightG: null,
-      ingredients: res.ingredients.map((i) => ({
-        name: i.name,
-        amount: i.amount,
-        unit: i.unit,
-        facts: i.facts,
-      })),
-      steps: res.steps.length ? [...res.steps] : [''],
-    };
+    this.form = formFromImport(res);
     this._importOrigin = 'photo';
     this.baseline = '';
     this.editId.set(null);
@@ -304,24 +279,12 @@ export class RecipesPage implements OnDestroy {
 
   // --- Live-Nährwerte (aus den Zutaten berechnet) ---
   private toIngredients(): RecipeIngredient[] {
-    return this.form.ingredients
-      .filter((i) => i.name.trim())
-      .map((i) => ({
-        name: i.name.trim(),
-        amount: this.toNum(i.amount),
-        unit: (i.unit ?? '').trim() || 'g',
-        facts: i.facts,
-        foodItemId: i.foodItemId,
-      }));
-  }
-
-  private calcTotalWeightG(ingredients: RecipeIngredient[]): number {
-    return totalWeightG(ingredients);
+    return toRecipeIngredients(this.form.ingredients);
   }
 
   /** Automatisch berechnetes Gesamtgewicht für Anzeige im Formular. */
   autoWeightG(): number {
-    return this.calcTotalWeightG(this.toIngredients());
+    return totalWeightG(this.toIngredients());
   }
 
   /** True wenn Näherungseinheiten (EL, TL, Stk …) im Rezept vorkommen. */
@@ -331,21 +294,16 @@ export class RecipesPage implements OnDestroy {
 
   /** Wert im Feld „Fertig gekocht“: eigene Eingabe, sonst das berechnete Gewicht. */
   cookedWeightValue(): number | null {
-    if (this.form.cookedWeightG != null && this.form.cookedWeightG > 0) return this.form.cookedWeightG;
-    const auto = this.autoWeightG();
-    return auto > 0 ? auto : null;
+    return cookedWeightValue(this.form.cookedWeightG, this.autoWeightG());
   }
 
   /** True, solange das Gewicht nur geschätzt (aus den Zutaten berechnet) ist. */
   cookedWeightIsEstimate(): boolean {
-    return !(this.form.cookedWeightG != null && this.form.cookedWeightG > 0) && this.autoWeightG() > 0;
+    return cookedWeightIsEstimate(this.form.cookedWeightG, this.autoWeightG());
   }
 
   setCookedWeight(value: unknown): void {
-    const parsed = parseDecimal(value);
-    const auto = this.autoWeightG();
-    // Leer, 0 oder unverändert: wieder die Schätzung verwenden.
-    this.form.cookedWeightG = parsed !== null && parsed > 0 && parsed !== auto ? parsed : null;
+    this.form.cookedWeightG = nextCookedWeight(value, this.autoWeightG());
   }
 
   total(): NutritionFacts {
@@ -387,19 +345,7 @@ export class RecipesPage implements OnDestroy {
   }
 
   openEdit(recipe: Recipe): void {
-    this.form = {
-      title: recipe.title,
-      servings: recipe.servings,
-      cookedWeightG: recipe.cookedWeightG ?? null,
-      ingredients: recipe.ingredients.map((i) => ({
-        name: i.name,
-        amount: i.amount,
-        unit: i.unit,
-        facts: i.facts,
-        foodItemId: i.foodItemId,
-      })),
-      steps: recipe.steps.length ? [...recipe.steps] : [''],
-    };
+    this.form = formFromRecipe(recipe);
     this._importOrigin = recipe.origin ?? 'own';
     this.baseline = JSON.stringify(this.form);
     this.allowClose = false;
@@ -456,18 +402,7 @@ export class RecipesPage implements OnDestroy {
     try {
       const res = await this.ai.importRecipe({ text: text || undefined, url: url || undefined });
       if (res.ingredients.length === 0) throw new Error('Keine Zutaten erkannt.');
-      this.form = {
-        title: res.title,
-        servings: res.servings || 2,
-        cookedWeightG: null,
-        ingredients: res.ingredients.map((i) => ({
-          name: i.name,
-          amount: i.amount,
-          unit: i.unit,
-          facts: i.facts,
-        })),
-        steps: res.steps.length ? [...res.steps] : [''],
-      };
+      this.form = formFromImport(res);
       this._importOrigin = isTikTok ? 'tiktok' : (url ? 'url' : 'text');
       this.baseline = '';
       this.editId.set(null);
@@ -515,7 +450,7 @@ export class RecipesPage implements OnDestroy {
   factsOf(ing: IngredientForm): NutritionFacts {
     return ingredientFacts({
       name: ing.name,
-      amount: this.toNum(ing.amount),
+      amount: positiveOrZero(ing.amount),
       unit: ing.unit,
       facts: ing.facts,
     });
@@ -586,44 +521,20 @@ export class RecipesPage implements OnDestroy {
     this.toastMessage.set(`„${name}" als Zutat hinzugefügt.`);
   }
 
-  setFact(ing: IngredientForm, key: 'kcal' | 'proteinG' | 'carbsG' | 'fatG' | 'fiberG' | 'sugarG', value: unknown): void {
+  setFact(ing: IngredientForm, key: FactKey, value: unknown): void {
     if (!ing.facts) return;
-    const parsed = parseDecimal(value);
-    ing.facts = { ...ing.facts, [key]: key === 'fiberG' || key === 'sugarG' ? parsed ?? undefined : parsed ?? 0 };
-  }
-
-  private toNum(v: number | null): number {
-    return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0;
+    ing.facts = applyFact(ing.facts, key, value);
   }
 
   // --- Speichern ---
   save(): void {
-    const title = this.form.title.trim();
-    if (!title) {
-      this.error.set('Titel fehlt — bitte einen Namen eintragen.');
+    const result = buildRecipeDraft(this.form, this._importOrigin);
+    if ('error' in result) {
+      this.error.set(result.error);
       return;
     }
-    const servings = parseDecimal(this.form.servings);
-    if (!isValidYield(servings)) {
-      this.error.set('„Ergibt“ braucht mindestens 1 Portion, ganz oder halb (z. B. 2 oder 2,5).');
-      return;
-    }
-    const ingredients = this.toIngredients();
     this.error.set(null);
-
-    const autoWeight = this.calcTotalWeightG(ingredients);
-
-    const draft: RecipeDraft = {
-      title,
-      servings,
-      cookedWeightG: this.form.cookedWeightG != null && Number(this.form.cookedWeightG) > 0
-        ? Number(this.form.cookedWeightG)
-        : autoWeight > 0 ? autoWeight : undefined,
-      ingredients,
-      steps: this.form.steps.map((s) => s.trim()).filter(Boolean),
-      origin: this._importOrigin,
-      factsPerServing: perServingFacts(ingredients, servings),
-    };
+    const draft = result.draft;
     this._importOrigin = 'own';
 
     const id = this.editId();
@@ -650,55 +561,18 @@ export class RecipesPage implements OnDestroy {
    * erst hier (beim Klick) abgefragt — sie wird nicht am Rezept gespeichert.
    */
   async logToDiary(recipe: Recipe): Promise<void> {
-    const sheet = await this.actionSheets.create({
-      header: 'Als welche Essenszeit eintragen?',
-      buttons: [
-        ...this.mealOptions.map((m) => ({ text: m.label, data: m.value })),
-        { text: 'Abbrechen', role: 'cancel' },
-      ],
-    });
-    await sheet.present();
-    const { data, role } = await sheet.onDidDismiss<MealType>();
-    if (role === 'cancel' || !data) return;
-    const portions = await this.askPortions();
+    const meal = await pickMealSheet(this.actionSheets);
+    if (!meal) return;
+    const portions = await askPortionsSheet(this.actionSheets);
     if (portions === null) return;
-    this.logMeal(recipe, data, portions);
-  }
-
-  /** Fragt, wie viele Portionen gegessen wurden (0,5 / 1 / 1,5 / 2); null bei Abbruch. */
-  private async askPortions(): Promise<number | null> {
-    const sheet = await this.actionSheets.create({
-      header: 'Wie viel davon hast du gegessen?',
-      buttons: [
-        ...EAT_PORTION_OPTIONS.map((p) => ({ text: servingsLabel(p), data: p })),
-        { text: 'Abbrechen', role: 'cancel' },
-      ],
-    });
-    await sheet.present();
-    const { data, role } = await sheet.onDidDismiss<number>();
-    return role === 'cancel' || typeof data !== 'number' ? null : data;
+    this.logMeal(recipe, meal, portions);
   }
 
   private logMeal(recipe: Recipe, meal: MealType, portions: number): void {
-    const perPortion = recipeDisplayFacts(recipe) ?? {
-      kcal: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0, basis: 'perPortion' as const,
-    };
-    // Eintrag speichert die tatsächlich gegessene Summe; servings = gegessene Portionen (Tagebuch rechnet daraus je Portion zurück).
-    const facts = scaleFacts(perPortion, portions);
     const missing = countMissingFacts(recipe.ingredients);
-    const isPartial = missing > 0;
-    this.diary.add({
-      dateISO: toDateISO(),
-      meal,
-      label: recipe.title,
-      ref: { kind: 'recipe', recipeId: recipe.id },
-      servings: portions,
-      facts,
-      ...(isPartial ? { isPartial: true } : {}),
-    });
-    const mealLabel = this.mealOptions.find((m) => m.value === meal)?.label ?? 'Tagebuch';
-    const hint = isPartial ? ` Unvollständig: ${missingFactsLabel(missing)}, Werte sind eine Untergrenze.` : '';
-    this.toastMessage.set(`${servingsLabel(portions)} „${recipe.title}" als ${mealLabel} eingetragen.${hint}`);
+    this.diary.add(recipeDiaryEntry(recipe, meal, portions, toDateISO()));
+    const hint = missing > 0 ? ` Unvollständig: ${missingFactsLabel(missing)}, Werte sind eine Untergrenze.` : '';
+    this.toastMessage.set(`${servingsLabel(portions)} „${recipe.title}" als ${mealLabel(meal)} eingetragen.${hint}`);
   }
 
   onToastDismiss(): void {
@@ -707,18 +581,9 @@ export class RecipesPage implements OnDestroy {
 
   // --- Karten-Menü (Bearbeiten/Löschen) ---
   async openCardMenu(recipe: Recipe): Promise<void> {
-    const sheet = await this.actionSheets.create({
-      header: recipe.title,
-      buttons: [
-        { text: 'Bearbeiten', icon: 'create-outline', data: 'edit' },
-        { text: 'Löschen', icon: 'trash-outline', role: 'destructive', data: 'delete' },
-        { text: 'Abbrechen', role: 'cancel' },
-      ],
-    });
-    await sheet.present();
-    const { data } = await sheet.onDidDismiss<string>();
-    if (data === 'edit') this.openEdit(recipe);
-    if (data === 'delete') this.remove(recipe.id);
+    const choice = await cardMenuSheet(this.actionSheets, recipe.title);
+    if (choice === 'edit') this.openEdit(recipe);
+    if (choice === 'delete') this.remove(recipe.id);
   }
 
   // --- Nur-Lesen-Detail ---
