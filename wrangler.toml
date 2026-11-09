@@ -22,7 +22,7 @@ namespace_id = "1001"
 #   period = 60
 
 # Globaler Tagesdeckel fuer KI-Aufrufe (WRK-01). Ohne dieses Binding laeuft der Worker OHNE Deckel
-# weiter (fail-open, /health zeigt hasDailyCap=false). Einrichten:
+# weiter (fail-open, /health zeigt hasDailyCap=false). Ist das Binding gesetzt, KV aber ausgefallen: fail-closed (503). Foto-Aufrufe zaehlen doppelt. Einrichten:
 #   npx wrangler kv namespace create DAILY_KV     -> gibt eine id aus, hier eintragen, Block einkommentieren
 # [[kv_namespaces]]
 # binding = "DAILY_KV"
