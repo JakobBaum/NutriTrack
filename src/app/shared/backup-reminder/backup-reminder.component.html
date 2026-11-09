@@ -1,0 +1,17 @@
+@if (due()) {
+  <section class="reminder" aria-label="Backup-Erinnerung" data-testid="backup-reminder">
+    <p class="reminder__text">
+      Deine Einträge liegen nur auf diesem Gerät. Sichere sie jetzt in einer Backup-Datei.
+      @if (persistDenied()) {
+        Das System garantiert den Speicher nicht dauerhaft, ein Backup ist daher besonders wichtig.
+      }
+    </p>
+    @if (error(); as failed) {
+      <p class="reminder__error" role="alert">{{ failed }}</p>
+    }
+    <div class="reminder__actions">
+      <button type="button" class="reminder__btn" [disabled]="busy()" (click)="backupNow()">Jetzt sichern</button>
+      <button type="button" class="reminder__btn reminder__btn--ghost" (click)="later()">Später</button>
+    </div>
+  </section>
+}

@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, HostListener, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { Router } from '@angular/router';
+import { AppResumeService } from '../core/app-resume/app-resume.service';
 import { MealType, NutritionFacts } from '../core/models';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
@@ -67,6 +68,13 @@ export class DashboardPage {
   private readonly profileStore = inject(ProfileStore);
   private readonly diary = inject(DiaryStore);
   private readonly router = inject(Router);
+  private readonly resume = inject(AppResumeService);
+
+  constructor() {
+    effect(() => {
+      if (this.resume.resumeCount() > 0) untracked(() => this.refreshToday());
+    });
+  }
 
   readonly selectedDate = signal(toDateISO());
   /** Der Tag, den die Seite zuletzt als "heute" kannte (für den Tageswechsel). */
@@ -202,11 +210,6 @@ export class DashboardPage {
   /** Beim Betreten der Seite und beim Zurückkehren in die App: nach Mitternacht auf den neuen Tag springen. */
   ionViewWillEnter(): void {
     this.refreshToday();
-  }
-
-  @HostListener('document:visibilitychange')
-  onVisibilityChange(): void {
-    if (document.visibilityState === 'visible') this.refreshToday();
   }
 
   private refreshToday(): void {

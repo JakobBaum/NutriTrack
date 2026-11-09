@@ -2,6 +2,8 @@ import { Injectable, inject, signal } from '@angular/core';
 import { NutritionFacts } from '../models';
 import { StorageService } from '../storage/storage.service';
 import { makeId } from '../util/id';
+import { ARRAY_CHECKS } from '../backup/backup-records';
+import { sanitizeList } from './record-sanitize';
 
 const KEY_CUSTOM = 'customFoods';
 
@@ -24,7 +26,7 @@ export class CustomFoodStore {
   private readonly storage = inject(StorageService);
 
   private readonly _foods = signal<CustomFood[]>(
-    this.storage.get<CustomFood[]>(KEY_CUSTOM, []),
+    this.storage.getSanitized<CustomFood>(KEY_CUSTOM, (raw) => sanitizeList<CustomFood>(raw, ARRAY_CHECKS['customFoods'])),
   );
 
   /** Alle gespeicherten Lebensmittel, neueste zuerst. */

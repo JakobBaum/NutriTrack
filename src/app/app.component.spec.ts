@@ -1,21 +1,15 @@
 import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { ToastController } from '@ionic/angular';
+
+import { AppComponent } from './app.component';
+import { StoragePersistenceService } from './core/storage/storage-persistence.service';
 import { vi } from 'vitest';
 
-import { AppComponent, STORAGE_WRITE_ERROR_MESSAGE } from './app.component';
-import { StorageService } from './core/storage/storage.service';
-
 describe('AppComponent', () => {
-  const present = vi.fn().mockResolvedValue(undefined);
-  const create = vi.fn().mockResolvedValue({ present });
-
   beforeEach(async () => {
-    create.mockClear();
     await TestBed.configureTestingModule({
       declarations: [AppComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
-      providers: [{ provide: ToastController, useValue: { create } }],
     }).compileComponents();
   });
 
@@ -24,21 +18,15 @@ describe('AppComponent', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('meldet einen fehlgeschlagenen Schreibzugriff per Toast (QAE-02)', async () => {
-    const storage = TestBed.inject(StorageService);
+  it('enthält die dauerhafte Statusleiste für Speicherfehler', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
-    vi.stubGlobal('localStorage', {
-      getItem: () => null,
-      setItem: () => { throw new Error('QuotaExceededError'); },
-    });
+    expect(fixture.nativeElement.querySelector('app-status-banner')).not.toBeNull();
+  });
 
-    storage.set('diary', []);
-    storage.flush();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    vi.unstubAllGlobals();
-
-    expect(create).toHaveBeenCalledWith(expect.objectContaining({ message: STORAGE_WRITE_ERROR_MESSAGE }));
+  it('bittet beim Start um dauerhaften Speicher', () => {
+    const request = vi.spyOn(TestBed.inject(StoragePersistenceService), 'request').mockResolvedValue(true);
+    TestBed.createComponent(AppComponent);
+    expect(request).toHaveBeenCalledTimes(1);
   });
 });

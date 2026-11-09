@@ -155,42 +155,75 @@ describe('validateBackup', () => {
   });
 });
 
-describe('validateBackup Inhaltsprüfung (QAE-01)', () => {
-  const bad = (data: Record<string, unknown>) => validateBackup(validFile(data));
+describe('validateBackup Inhaltsprüfung (QAE-01, Welle A)', () => {
+  const run = (data: Record<string, unknown>) => validateBackup(validFile(data));
+  const cleanupOf = (data: Record<string, unknown>) => {
+    const r = run(data);
+    if (!r.ok) throw new Error('erwartet ok');
+    return r;
+  };
 
-  it('lehnt Tagebuch-Einträge ohne createdAt ab (würde entriesForDate abstürzen lassen)', () => {
+  it('repariert Tagebuch-Einträge ohne createdAt statt das Backup abzulehnen', () => {
     const { createdAt: _drop, ...noCreatedAt } = entry('d1');
-    expect(bad({ diary: [noCreatedAt] })).toEqual({ ok: false, error: BACKUP_ERRORS.badContent });
+    const r = cleanupOf({ diary: [noCreatedAt] });
+    expect((r.backup.data['diary'] as Array<{ createdAt: string }>)[0].createdAt).toEqual(expect.any(String));
+    expect(r.cleanup.repaired).toBe(1);
+    expect(r.cleanup.skipped).toBe(0);
   });
 
   it.each([
     ['ohne id', { id: undefined }],
     ['falsche Mahlzeit', { meal: 'brunch' }],
-    ['kaputtes Datum', { dateISO: 'heute' }],
     ['Name keine Zeichenkette', { label: 5 }],
+  ])('repariert Tagebuch-Eintrag %s', (_name, patch) => {
+    const r = cleanupOf({ diary: [{ ...entry('d1'), ...patch }] });
+    expect(r.cleanup.repaired).toBe(1);
+    expect(r.backup.data['diary']).toHaveLength(1);
+  });
+
+  it.each([
+    ['kaputtes Datum ohne createdAt', { dateISO: 'heute', createdAt: undefined }],
     ['kcal nicht endlich', { facts: { kcal: null, proteinG: 1, carbsG: 1, fatG: 1, basis: 'perPortion' } }],
     ['facts fehlen', { facts: undefined }],
-  ])('lehnt Tagebuch-Eintrag %s ab', (_name, patch) => {
-    expect(bad({ diary: [{ ...entry('d1'), ...patch }] }).ok).toBe(false);
+  ])('sortiert Tagebuch-Eintrag %s in die Quarantäne', (_name, patch) => {
+    const r = cleanupOf({ diary: [{ ...entry('d1'), ...patch }] });
+    expect(r.backup.data['diary']).toEqual([]);
+    expect(r.cleanup.skipped).toBe(1);
+    expect(r.cleanup.quarantined['diary']).toHaveLength(1);
   });
 
-  it('lehnt Rezepte ohne Titel oder mit kaputten Zutaten ab', () => {
-    expect(bad({ recipes: [{ id: 'r', servings: 2, ingredients: [] }] }).ok).toBe(false);
-    expect(bad({ recipes: [{ id: 'r', title: 'X', servings: 2, ingredients: [{ name: 'a', amount: 'viel', unit: 'g' }] }] }).ok).toBe(false);
+  it('sortiert Rezepte ohne Titel oder mit kaputten Zutaten aus, behält aber das Backup', () => {
+    const r = cleanupOf({
+      recipes: [
+        { id: 'r', servings: 2, ingredients: [] },
+        { id: 'r2', title: 'X', servings: 2, ingredients: [{ name: 'a', amount: 'viel', unit: 'g' }] },
+        { id: 'r3', title: 'Gut', servings: 2, ingredients: [] },
+      ],
+    });
+    expect(r.backup.data['recipes']).toHaveLength(1);
+    expect(r.cleanup.skipped).toBe(2);
   });
 
-  it('lehnt Einkaufspositionen ohne Menge oder Namen ab', () => {
-    expect(bad({ shopping: { items: [{ name: 'Milch', unit: 'l', checked: false }] } }).ok).toBe(false);
-    expect(bad({ shopping: { items: [{ amount: 1, unit: 'l', checked: false }] } }).ok).toBe(false);
+  it('filtert Einkaufspositionen ohne Menge oder Namen', () => {
+    const r = cleanupOf({ shopping: { items: [{ name: 'Milch', unit: 'l', checked: false }, { amount: 1, unit: 'l', checked: false }] } });
+    expect(r.backup.data['shopping']).toEqual({ items: [] });
+    expect(r.cleanup.skipped).toBe(2);
   });
 
-  it('lehnt eigene Lebensmittel und gespeicherte Mahlzeiten ohne Pflichtfelder ab', () => {
-    expect(bad({ customFoods: [{ id: 'c' }] }).ok).toBe(false);
-    expect(bad({ savedMeals: [{ id: 'm', name: 'M' }] }).ok).toBe(false);
+  it('sortiert eigene Lebensmittel und gespeicherte Mahlzeiten ohne Pflichtfelder aus', () => {
+    const r = cleanupOf({ customFoods: [{ id: 'c' }], savedMeals: [{ id: 'm', name: 'M' }] });
+    expect(r.cleanup.skipped).toBe(2);
   });
 
-  it('akzeptiert vollständige Datensätze', () => {
-    expect(bad({ diary: [entry('d1')] }).ok).toBe(true);
+  it('akzeptiert vollständige Datensätze ohne Bereinigung', () => {
+    const r = cleanupOf({ diary: [entry('d1')] });
+    expect(r.cleanup).toEqual({ repaired: 0, skipped: 0, quarantined: {} });
+  });
+
+  it('lässt Geräte-interne Schlüssel (Version, Auto-Sicherung, Quarantäne) beim Export und Import weg', () => {
+    const data = { diary: [], schemaVersion: 1, autosnapshot: { x: 1 }, 'quarantine.diary.1': {}, backupReminderSnooze: 'x' };
+    expect(Object.keys(buildBackup(data, new Date()).data)).toEqual(['diary']);
+    expect(Object.keys(prepareRestore(data, {}))).toEqual(['diary']);
   });
 });
 
@@ -240,8 +273,10 @@ describe('Gewicht und Favoriten im Backup', () => {
     ['zwei Einträge am selben Tag', { weight: [{ dateISO: '2026-11-05', kg: 80 }, { dateISO: '2026-11-05', kg: 81 }] }],
     ['Favorit ohne Namen', { favorites: [{ ...fav, label: undefined }] }],
     ['Favorit ohne Nährwerte', { favorites: [{ id: 'f', label: 'X' }] }],
-  ])('lehnt ab: %s', (_name, data) => {
-    expect(parseBackup(JSON.stringify(validFile(data))).ok).toBe(false);
+  ])('sortiert aus (Backup bleibt importierbar): %s', (_name, data) => {
+    const r = parseBackup(JSON.stringify(validFile(data)));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.cleanup.skipped).toBeGreaterThan(0);
   });
 
   it('zählt Gewichtseinträge und Favoriten in der Vorschau', () => {

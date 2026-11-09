@@ -22,7 +22,7 @@ function isFacts(v: unknown): boolean {
   return required && [v['fiberG'], v['sugarG'], v['saltG']].every(isOptNum);
 }
 
-function isDiaryEntry(v: unknown): boolean {
+export function isDiaryEntry(v: unknown): boolean {
   if (!isRec(v)) return false;
   return (
     isStr(v['id']) &&
@@ -62,7 +62,7 @@ function isCustomFood(v: unknown): boolean {
   return isRec(v) && isStr(v['id']) && isStr(v['name']) && isFacts(v['facts']);
 }
 
-function isShoppingItem(v: unknown): boolean {
+export function isShoppingItem(v: unknown): boolean {
   return isRec(v) && isStr(v['name']) && isNum(v['amount']) && isStr(v['unit']) && typeof v['checked'] === 'boolean';
 }
 
@@ -71,7 +71,7 @@ function isShoppingList(v: unknown): boolean {
   return isRec(v) && Array.isArray(v['items']) && v['items'].every(isShoppingItem);
 }
 
-function isWeightEntry(v: unknown): boolean {
+export function isWeightEntry(v: unknown): boolean {
   return isRec(v) && isStr(v['dateISO']) && ISO_DAY.test(v['dateISO']) && isNum(v['kg']) && v['kg'] >= MIN_WEIGHT_KG && v['kg'] <= MAX_WEIGHT_KG;
 }
 
@@ -86,7 +86,7 @@ function isFavorite(v: unknown): boolean {
   return isRec(v) && isStr(v['id']) && isStr(v['label']) && v['label'].trim() !== '' && isFacts(v['facts']) && isOptNum(v['amountG']) && isOptNum(v['servings']);
 }
 
-const ARRAY_CHECKS: Readonly<Record<string, (v: unknown) => boolean>> = {
+export const ARRAY_CHECKS: Readonly<Record<string, (v: unknown) => boolean>> = {
   diary: isDiaryEntry,
   recipes: isRecipe,
   savedMeals: isSavedMeal,

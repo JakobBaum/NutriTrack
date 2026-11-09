@@ -2,12 +2,14 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  HostListener,
+  effect,
   inject,
   signal,
+  untracked,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, ParamMap, Router } from '@angular/router';
+import { AppResumeService } from '../core/app-resume/app-resume.service';
 import { ActionSheetController, AlertController, ToastController } from '@ionic/angular';
 import { AmountUnit, DiaryEntry, MealType, NutritionFacts } from '../core/models';
 import { AiService } from '../core/ai/ai.service';
@@ -64,6 +66,7 @@ export class DiaryPage {
   private readonly ai = inject(AiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly resume = inject(AppResumeService);
   private readonly toastCtrl = inject(ToastController);
   private readonly alertCtrl = inject(AlertController);
   private readonly sheetCtrl = inject(ActionSheetController);
@@ -134,6 +137,9 @@ export class DiaryPage {
   readonly mealLabelOf = mealLabel;
 
   constructor() {
+    effect(() => {
+      if (this.resume.resumeCount() > 0) untracked(() => this.refreshToday());
+    });
     this.route.queryParamMap
       .pipe(takeUntilDestroyed())
       .subscribe((params) => this.handleQuery(params));
@@ -181,11 +187,6 @@ export class DiaryPage {
   /** Beim Betreten der Seite und beim Zurückkehren in die App: nach Mitternacht auf den neuen Tag springen. */
   ionViewWillEnter(): void {
     this.refreshToday();
-  }
-
-  @HostListener('document:visibilitychange')
-  onVisibilityChange(): void {
-    if (document.visibilityState === 'visible') this.refreshToday();
   }
 
   private refreshToday(): void {

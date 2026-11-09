@@ -8,7 +8,6 @@ import { ProfileStore } from '../core/state/profile.store';
 import { RecipeStore } from '../core/state/recipe.store';
 import { MealsStore } from '../core/state/meals.store';
 import { formatDecimal } from '../core/util/number-input';
-import { StorageService } from '../core/storage/storage.service';
 import { NutritionCalcService } from '../core/nutrition/nutrition-calc.service';
 import { ProfileNote, profileNotes } from '../core/nutrition/profile-plausibility';
 import { defaultAiProxyUrl } from '../core/ai/ai-endpoint';
@@ -25,7 +24,8 @@ import { DebugLogService } from '../core/debug/debug-log.service';
 import { resolveDebugMode, safeLocalStorage } from './debug-flag';
 import { BackupService } from '../core/backup/backup.service';
 import { PROFILE_FIELD_ORDER, ProfileField, ProfileFieldErrors, targetWeightError, validateProfileForm } from './profile-form';
-import { BackupFile, countBackup, describeCounts, formatBackupDate } from '../core/backup/backup';
+import { BackupCleanup, BackupFile, countBackup, describeCounts, formatBackupDate } from '../core/backup/backup';
+import { describeSafetySnapshot } from '../core/backup/backup-safety';
 
 /**
  * Einstellungen: Profil erfassen → Tagesbedarf berechnen (deterministisch),
@@ -69,7 +69,6 @@ export class SettingsPage implements OnInit {
   private readonly savedMeals = inject(MealsStore);
   private readonly weightStore = inject(WeightStore);
   private readonly favoriteStore = inject(FavoriteStore);
-  private readonly storage = inject(StorageService);
   readonly formatDecimal = formatDecimal;
   private readonly calc = inject(NutritionCalcService);
   private readonly alertCtrl = inject(AlertController);
@@ -153,6 +152,15 @@ export class SettingsPage implements OnInit {
     if (this.route.snapshot.queryParamMap.get('setup') === '1') {
       this.profileOpen.set(true);
     }
+    this.refreshSafetyInfo();
+  }
+
+  /** Beschreibung der automatischen Sicherung (leer, wenn es keine gibt). */
+  readonly safetyInfo = signal<string | null>(null);
+
+  private refreshSafetyInfo(): void {
+    const snapshot = this.backup.readSafetySnapshot();
+    this.safetyInfo.set(snapshot ? describeSafetySnapshot(snapshot) : null);
   }
 
   /** Aktuelles Profil nutzt die Mindestzufuhr statt der Formel. */
@@ -328,21 +336,29 @@ export class SettingsPage implements OnInit {
     this.aiTest.set({ busy: false, ok: result.ok, message: result.message });
   }
 
-  /** Fragt vor dem unwiderruflichen Löschen aller lokalen Daten nach. */
+  /** Fragt vor dem Löschen aller lokalen Daten nach und bietet vorher ein Backup an. */
   async confirmReset(): Promise<void> {
     const alert = await this.alertCtrl.create({
       header: 'Alle Daten löschen?',
       message:
-        'Profil, Tagebuch, Gewichtsverlauf, Favoriten, Rezepte, gespeicherte Mahlzeiten, eigene Lebensmittel, Einkaufsliste und Einstellungen werden von diesem Gerät gelöscht. Das lässt sich nicht rückgängig machen.',
+        `Profil, Tagebuch, Gewichtsverlauf, Favoriten, Rezepte, gespeicherte Mahlzeiten, eigene Lebensmittel, Einkaufsliste und Einstellungen werden von diesem Gerät gelöscht. ${this.lastBackupLabel()}. Zur Sicherheit bleibt eine automatische Sicherung auf diesem Gerät, bis du sie unter Daten löschst.`,
       buttons: [
         { text: 'Abbrechen', role: 'cancel' },
+        { text: 'Backup zuerst', handler: () => void this.exportThen(() => this.confirmReset()) },
         { text: 'Löschen', role: 'destructive', handler: () => this.resetData() },
       ],
     });
     await alert.present();
   }
 
+  /** Exportiert ein Backup und öffnet danach den Dialog erneut, damit nichts ohne Sicherung gelöscht wird. */
+  private async exportThen(next: () => Promise<void>): Promise<void> {
+    await this.exportBackup();
+    await next();
+  }
+
   resetData(): void {
+    const safety = this.backup.takeResetSnapshot();
     this.profileStore.clear();
     this.diary.clear();
     this.recipes.clear();
@@ -354,8 +370,11 @@ export class SettingsPage implements OnInit {
     this.favoriteStore.clear();
     this.settingsStore.clear();
     this.appSettings.clear();
-    this.storage.clearAll();
-    this.savedToast.set('Alle Daten wurden zurückgesetzt.');
+    const safetySaved = this.backup.completeReset(safety);
+    this.refreshSafetyInfo();
+    this.savedToast.set(
+      safety && safetySaved ? 'Alle Daten wurden zurückgesetzt. Eine automatische Sicherung liegt unter Daten.' : 'Alle Daten wurden zurückgesetzt.',
+    );
   }
 
   /** Exportiert alle Daten als JSON (Teilen-Menü auf iOS, sonst Download). */
@@ -385,29 +404,72 @@ export class SettingsPage implements OnInit {
         await this.showBackupError('Backup kann nicht gelesen werden', result.error);
         return;
       }
-      await this.confirmImport(result.backup);
+      await this.confirmImport(result.backup, result.cleanup);
     } finally {
       this.backupBusy.set(false);
     }
   }
 
-  private async confirmImport(backup: BackupFile): Promise<void> {
+  private async confirmImport(backup: BackupFile, cleanup: BackupCleanup): Promise<void> {
     const date = formatBackupDate(backup.exportedAt) ?? 'unbekannt';
+    const skipped = cleanup.skipped > 0 ? ` ${cleanup.skipped} beschädigte Einträge werden übersprungen und gesichert.` : '';
     const alert = await this.alertCtrl.create({
       header: 'Backup importieren?',
-      message: `Backup vom ${date}: ${describeCounts(countBackup(backup.data))}. Alle aktuellen Daten auf diesem Gerät werden dadurch ersetzt.`,
+      message: `Backup vom ${date}: ${describeCounts(countBackup(backup.data))}. Alle aktuellen Daten auf diesem Gerät werden dadurch ersetzt. Der aktuelle Stand wird vorher automatisch gesichert.${skipped}`,
       buttons: [
         { text: 'Abbrechen', role: 'cancel' },
-        { text: 'Ersetzen', role: 'destructive', handler: () => this.applyImport(backup) },
+        { text: 'Erst Backup exportieren', handler: () => void this.exportThen(() => this.confirmImport(backup, cleanup)) },
+        { text: 'Ersetzen', role: 'destructive', handler: () => void this.applyImport(backup, cleanup) },
       ],
     });
     await alert.present();
   }
 
   /** Schreibt das Backup und lädt die App neu, damit alle Stores den neuen Stand lesen. */
-  private applyImport(backup: BackupFile): void {
-    if (!this.backup.restore(backup)) {
-      void this.showBackupError('Import fehlgeschlagen', 'Der Import ist fehlgeschlagen (Speicher voll oder gesperrt). Deine bisherigen Daten sind unverändert.');
+  private async applyImport(backup: BackupFile, cleanup: BackupCleanup): Promise<void> {
+    const result = this.backup.restore(backup, cleanup);
+    if (!result.ok) {
+      await this.showBackupError('Import fehlgeschlagen', 'Der Import ist fehlgeschlagen (Speicher voll oder gesperrt). Deine bisherigen Daten sind unverändert.');
+      return;
+    }
+    if (result.safetySaved) {
+      this.win?.location.reload();
+      return;
+    }
+    const alert = await this.alertCtrl.create({
+      header: 'Import abgeschlossen',
+      message: 'Das Backup wurde eingespielt. Für die automatische Sicherung des alten Stands war nicht genug Speicher frei.',
+      buttons: [{ text: 'OK', handler: () => this.win?.location.reload() }],
+    });
+    await alert.present();
+  }
+
+  /** Fragt nach, ob die automatische Sicherung wiederhergestellt oder gelöscht werden soll. */
+  async confirmRestoreSafety(): Promise<void> {
+    const info = this.safetyInfo();
+    if (!info) return;
+    const alert = await this.alertCtrl.create({
+      header: 'Automatische Sicherung',
+      message: `${info}. Beim Wiederherstellen wird der aktuelle Stand selbst zur automatischen Sicherung.`,
+      buttons: [
+        { text: 'Abbrechen', role: 'cancel' },
+        { text: 'Sicherung löschen', role: 'destructive', handler: () => this.discardSafety() },
+        { text: 'Wiederherstellen', handler: () => void this.restoreSafety() },
+      ],
+    });
+    await alert.present();
+  }
+
+  private discardSafety(): void {
+    this.backup.discardSafetySnapshot();
+    this.refreshSafetyInfo();
+    this.savedToast.set('Automatische Sicherung gelöscht.');
+  }
+
+  private async restoreSafety(): Promise<void> {
+    const result = this.backup.restoreSafetySnapshot();
+    if (!result.ok) {
+      await this.showBackupError('Wiederherstellen fehlgeschlagen', 'Die Sicherung konnte nicht eingespielt werden (Speicher voll oder gesperrt). Deine aktuellen Daten sind unverändert.');
       return;
     }
     this.win?.location.reload();

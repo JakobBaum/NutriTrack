@@ -95,6 +95,15 @@
         <ion-icon slot="start" name="cloud-upload-outline"></ion-icon>
         <ion-label>Backup importieren</ion-label>
       </ion-item>
+      @if (safetyInfo(); as info) {
+        <ion-item button detail="false" [disabled]="backupBusy()" (click)="confirmRestoreSafety()">
+          <ion-icon slot="start" name="refresh-outline"></ion-icon>
+          <ion-label>
+            Automatische Sicherung
+            <p class="row-sub">{{ info }}</p>
+          </ion-label>
+        </ion-item>
+      }
       <ion-item button detail="false" class="danger-row" lines="none" (click)="confirmReset()">
         <ion-icon slot="start" name="trash-outline" color="danger"></ion-icon>
         <ion-label>Alle lokalen Daten zurücksetzen</ion-label>

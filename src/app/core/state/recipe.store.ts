@@ -2,6 +2,8 @@ import { Injectable, inject, signal } from '@angular/core';
 import { Recipe } from '../models';
 import { StorageService } from '../storage/storage.service';
 import { makeId } from '../util/id';
+import { ARRAY_CHECKS } from '../backup/backup-records';
+import { sanitizeList } from './record-sanitize';
 
 const KEY_RECIPES = 'recipes';
 
@@ -29,7 +31,7 @@ export class RecipeStore {
   private readonly storage = inject(StorageService);
 
   private readonly _recipes = signal<Recipe[]>(
-    this.storage.get<Recipe[]>(KEY_RECIPES, []).map(r => ({
+    this.storage.getSanitized<Recipe>(KEY_RECIPES, (raw) => sanitizeList<Recipe>(raw, ARRAY_CHECKS['recipes'])).map(r => ({
       ...r,
       steps: r.steps ?? [],
       ingredients: r.ingredients ?? [],

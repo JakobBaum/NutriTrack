@@ -9,13 +9,16 @@ import {
 } from '../models';
 import { NutritionCalcService } from '../nutrition/nutrition-calc.service';
 import { StorageService } from '../storage/storage.service';
-import { addDaysISO } from '../util/date';
+import { addDaysISO, toDateISO } from '../util/date';
 import { makeId } from '../util/id';
+import { sanitizeDiaryEntries } from './record-sanitize';
 
 const KEY_ENTRIES = 'diary';
 /** Wie viele Tage "Wie gestern" / "Tag kopieren" höchstens zurückschaut. */
 export const COPY_LOOKBACK_DAYS = 7;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const VALID_MEALS: ReadonlySet<string> = new Set(['breakfast', 'lunch', 'dinner', 'snack']);
+const DEFAULT_LABEL = 'Eintrag';
 
 /** Ein früherer Tag mit Einträgen als Kopier-Quelle. */
 export interface CopySource {
@@ -101,7 +104,7 @@ export class DiaryStore {
   private readonly calc = inject(NutritionCalcService);
 
   private readonly _entries = signal<DiaryEntry[]>(
-    this.storage.get<DiaryEntry[]>(KEY_ENTRIES, []),
+    this.storage.getSanitized<DiaryEntry>(KEY_ENTRIES, sanitizeDiaryEntries),
   );
 
   /** Alle Einträge (unsortiert). */
@@ -111,9 +114,9 @@ export class DiaryStore {
   add(input: NewDiaryEntry): DiaryEntry {
     const entry: DiaryEntry = {
       id: makeId('diary'),
-      dateISO: input.dateISO,
-      meal: input.meal,
-      label: input.label,
+      dateISO: ISO_DATE_RE.test(input.dateISO) ? input.dateISO : toDateISO(),
+      meal: VALID_MEALS.has(input.meal) ? input.meal : 'snack',
+      label: typeof input.label === 'string' && input.label.trim() !== '' ? input.label : DEFAULT_LABEL,
       brand: input.brand,
       ref: input.ref ?? { kind: 'manual' },
       amountG: validAmountOrUndefined(input.amountG),
@@ -199,9 +202,11 @@ export class DiaryStore {
    */
   restore(entry: DiaryEntry, index?: number): boolean {
     if (this._entries().some((e) => e.id === entry.id)) return false;
+    const [clean] = sanitizeDiaryEntries([entry]).items;
+    if (!clean) return false;
     this._entries.update((list) => {
       const at = index === undefined ? list.length : Math.min(Math.max(0, index), list.length);
-      return [...list.slice(0, at), entry, ...list.slice(at)];
+      return [...list.slice(0, at), clean, ...list.slice(at)];
     });
     this.persist();
     return true;

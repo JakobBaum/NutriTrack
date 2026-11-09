@@ -2,6 +2,8 @@ import { Injectable, inject, signal } from '@angular/core';
 import { MealType, NutritionFacts, SavedMeal, SavedMealEntry } from '../models';
 import { StorageService } from '../storage/storage.service';
 import { makeId } from '../util/id';
+import { ARRAY_CHECKS } from '../backup/backup-records';
+import { sanitizeList } from './record-sanitize';
 
 const KEY = 'savedMeals';
 
@@ -13,7 +15,9 @@ export interface SavedMealDraft {
 @Injectable({ providedIn: 'root' })
 export class MealsStore {
   private readonly storage = inject(StorageService);
-  private readonly _meals = signal<SavedMeal[]>(this.storage.get<SavedMeal[]>(KEY, []));
+  private readonly _meals = signal<SavedMeal[]>(
+    this.storage.getSanitized<SavedMeal>(KEY, (raw) => sanitizeList<SavedMeal>(raw, ARRAY_CHECKS['savedMeals'])),
+  );
 
   readonly meals = this._meals.asReadonly();
 

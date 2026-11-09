@@ -1,0 +1,21 @@
+@if (errorMessage(); as message) {
+  <div class="banner banner--error" role="alert" data-testid="storage-error-banner">
+    <p class="banner__text">{{ message }}</p>
+    @if (exportError(); as failed) {
+      <p class="banner__text banner__text--sub">{{ failed }}</p>
+    }
+    @if (hasWriteError()) {
+      <div class="banner__actions">
+        <button type="button" class="banner__btn" [disabled]="busy()" (click)="exportBackup()">Backup exportieren</button>
+        <button type="button" class="banner__btn banner__btn--ghost" (click)="retry()">Erneut versuchen</button>
+      </div>
+    }
+  </div>
+} @else if (noticeMessage(); as notice) {
+  <div class="banner banner--info" role="status" data-testid="quarantine-banner">
+    <p class="banner__text">{{ notice }} Die Originale liegen gesichert im Gerätespeicher.</p>
+    <div class="banner__actions">
+      <button type="button" class="banner__btn banner__btn--ghost" (click)="dismissNotice()">Verstanden</button>
+    </div>
+  </div>
+}
