@@ -22,7 +22,8 @@
  *   AI_LIMITER       Rate-Limiting-Binding (wrangler.toml [[ratelimits]]) für POST / und die Rezept-Suche
  *   OFF_LIMITER      eigenes Rate-Limiting-Binding für /off-search (Fallback: AI_LIMITER)
  *   DAILY_KV         KV-Namespace-Binding für den globalen Tageszähler der KI-Aufrufe
- *                    (ohne Binding: kein Deckel, /health meldet hasDailyCap=false + warning)
+ *                    (ohne Binding: kein Deckel, /health meldet hasDailyCap=false + warning;
+ *                    mit Binding aber KV-Ausfall: fail-closed, 503; Foto-Aufrufe zählen doppelt)
  *   DAILY_AI_CAP     Deckel pro UTC-Tag (Standard 2000)
  *
  * Sicherheit: Origin-Allowlist, Payload-Validierung + Größenlimits, Rate-Limit pro IP,
@@ -91,6 +92,8 @@ const RECIPE_CACHED_HEADERS = ['Content-Type', 'X-Api-Quota-Left'];
 const DEFAULT_DAILY_CAP = 2000;
 const DAILY_KEY_TTL_S = 2 * 86400;
 const DAILY_LIMIT_MESSAGE = 'Das Tageslimit für KI-Anfragen ist erreicht — bitte morgen erneut versuchen.';
+const DAILY_UNAVAILABLE_MESSAGE = 'Der Tageszähler für KI-Anfragen ist gerade nicht erreichbar — bitte später erneut versuchen.';
+const PHOTO_CALL_WEIGHT = 2;
 const NO_DAILY_CAP_WARNING = 'Kein Tageslimit aktiv (KV-Binding DAILY_KV fehlt).';
 const RATE_LIMIT_RETRY_AFTER_S = '60';
 const GENERIC_ERROR_MESSAGE = 'Interner Fehler.';
@@ -366,9 +369,9 @@ async function aiProxy(request, env, cors) {
   if (await isRateLimited(env.AI_LIMITER, request)) {
     return rateLimitedResponse('Zu viele KI-Anfragen — bitte kurz warten.', cors);
   }
-  if (!(await takeDailySlot(env))) {
-    return json({ error: DAILY_LIMIT_MESSAGE }, 429, { ...cors, 'Retry-After': '3600' });
-  }
+  const slot = await takeDailySlot(env, dailyWeight(body.fn, payload));
+  if (slot === 'limit') return json({ error: DAILY_LIMIT_MESSAGE }, 429, { ...cors, 'Retry-After': '3600' });
+  if (slot === 'unavailable') return json({ error: DAILY_UNAVAILABLE_MESSAGE }, 503, { ...cors, 'Retry-After': '60' });
   return json(await handler.run(payload, env), 200, cors);
 }
 
@@ -411,23 +414,32 @@ function rateLimitedResponse(message, cors) {
 }
 
 /**
- * Globaler Tageszähler (UTC) über KV. Gibt false zurück, wenn der Deckel erreicht ist.
- * Ohne Binding oder bei KV-Fehlern fail-open (Warnung im Log / in /health) — KV ist nicht atomar,
- * bei gleichzeitigen Anfragen kann der Deckel daher knapp überschritten werden.
+ * Globaler Tageszähler (UTC) über KV. Ergebnis: 'ok' | 'limit' (Deckel erreicht) | 'unavailable'.
+ * Ohne Binding: fail-open ('ok', /health meldet hasDailyCap=false + warning).
+ * Binding konfiguriert, KV aber nicht erreichbar: fail-closed ('unavailable'), damit ein
+ * KV-Ausfall den Kostenschutz nicht aushebelt. KV ist nicht atomar, bei gleichzeitigen
+ * Anfragen kann der Deckel daher knapp überschritten werden.
+ * `weight` = Gewicht des Aufrufs (Foto-Aufrufe zählen doppelt).
  */
-async function takeDailySlot(env) {
-  if (!hasBinding(env.DAILY_KV, 'get')) return true;
+async function takeDailySlot(env, weight = 1) {
+  if (!hasBinding(env.DAILY_KV, 'get')) return 'ok';
   const parsedCap = Number.parseInt(env.DAILY_AI_CAP ?? '', 10);
   const cap = Number.isFinite(parsedCap) && parsedCap > 0 ? parsedCap : DEFAULT_DAILY_CAP;
   const key = `cap:${new Date().toISOString().slice(0, 10)}`;
   try {
     const used = Number(await env.DAILY_KV.get(key)) || 0;
-    if (used >= cap) return false;
-    await env.DAILY_KV.put(key, String(used + 1), { expirationTtl: DAILY_KEY_TTL_S });
+    if (used + weight > cap) return 'limit';
+    await env.DAILY_KV.put(key, String(used + weight), { expirationTtl: DAILY_KEY_TTL_S });
+    return 'ok';
   } catch (e) {
-    console.warn('Tageszähler (KV) nicht verfügbar — Aufruf wird durchgelassen:', e);
+    console.error('Tageszähler (KV) nicht verfügbar — Aufruf wird abgelehnt:', e);
+    return 'unavailable';
   }
-  return true;
+}
+
+/** Foto-Aufrufe (Vision) sind teurer und zählen doppelt gegen den Tagesdeckel. */
+function dailyWeight(fn, payload) {
+  return (fn === 'recognizeLabel' || fn === 'importRecipe') && payload.imageBase64 ? PHOTO_CALL_WEIGHT : 1;
 }
 
 // ── Eingabe-Validierung ────────────────────────────────────────────────
