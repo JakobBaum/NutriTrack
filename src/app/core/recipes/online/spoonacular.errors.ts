@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { isTimeoutError } from '../../ai/ai-errors';
+import { STATE_MESSAGES } from '../../messages/state-messages';
 
 export type OnlineSearchFailure = 'no-key' | 'auth' | 'quota' | 'rate-limit' | 'offline' | 'timeout' | 'server';
 
@@ -12,13 +13,13 @@ export class OnlineSearchError extends Error {
 }
 
 export const ONLINE_SEARCH_MESSAGES: Readonly<Record<OnlineSearchFailure, string>> = {
-  'no-key': 'Die Rezept-Suche ist nicht eingerichtet. Du kannst unter Profil › Rezept-Suche einen eigenen Schlüssel eintragen.',
-  auth: 'Der Schlüssel wurde abgelehnt. Prüfe ihn unter Profil › Rezept-Suche.',
-  quota: 'Das Tageslimit von spoonacular ist erreicht. Morgen geht es weiter.',
-  'rate-limit': 'Zu viele Anfragen. Bitte kurz warten und erneut suchen.',
-  offline: 'Keine Verbindung. Prüfe deine Internetverbindung.',
-  timeout: 'Die Rezept-Suche antwortet gerade nicht. Bitte erneut versuchen.',
-  server: 'spoonacular ist gerade nicht erreichbar. Bitte später erneut versuchen.',
+  'no-key': 'Die Rezeptsuche ist nicht eingerichtet. Du kannst sie unter Profil › Rezeptsuche mit einem eigenen Schlüssel einrichten.',
+  auth: 'Der Schlüssel der Rezeptsuche wurde abgelehnt. Prüfe ihn unter Profil › Rezeptsuche.',
+  quota: 'Das Tageslimit von Spoonacular ist erreicht. Versuche es morgen erneut.',
+  'rate-limit': STATE_MESSAGES.rateLimited,
+  offline: STATE_MESSAGES.offline,
+  timeout: 'Die Rezeptsuche antwortet gerade nicht. Versuche es erneut.',
+  server: 'Spoonacular ist gerade nicht erreichbar. Versuche es später erneut.',
 };
 
 /** Bildet einen HTTP-Status (0 = keine Antwort) auf einen Fehlergrund ab. */

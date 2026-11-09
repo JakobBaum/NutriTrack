@@ -1,8 +1,6 @@
 <ion-content>
   <div class="nt-page settings-page">
-    <div class="nt-page-header">
-      <h1 class="nt-large-title">Profil</h1>
-    </div>
+    <nt-page-header title="Profil"></nt-page-header>
 
     <!-- Aktuelles Tagesziel -->
     @if (target(); as t) {
@@ -19,7 +17,7 @@
           }
           <p class="target-card__note target-card__note--disclaimer">Das ist ein Startwert, keine medizinische Beratung. Vergleiche ihn nach 2 bis 3 Wochen mit deinem Gewichtsverlauf und passe ihn bei Bedarf an.</p>
           <div class="target-card__macros">
-            <span><strong>{{ t.proteinG | ntNum:0 }}</strong> g Eiweiß</span>
+            <span><strong class="protein-val">{{ t.proteinG | ntNum:0 }}</strong> g Eiweiß</span>
             <span><strong>{{ t.carbsG | ntNum:0 }}</strong> g Kohlenhydrate</span>
             <span><strong>{{ t.fatG | ntNum:0 }}</strong> g Fett</span>
             <span><strong>{{ t.fiberG | ntNum:0 }}</strong> g Ballaststoffe</span>
@@ -184,11 +182,12 @@
         @switch (infoSection()) {
           @case ('anleitung') {
             <h3>So funktioniert NutriTrack</h3>
-            <p>1. <strong>Mein Profil einrichten</strong> — trage Gewicht, Größe, Alter und Ziel ein, um deinen persönlichen Tagesbedarf zu berechnen.</p>
-            <p>2. <strong>Tagebuch führen</strong> — trage täglich gegessene Lebensmittel und gespeicherte Mahlzeiten über die Suche oder den Barcode-Scanner ein. Das Etikett per Kamera lesen geht nur <button type="button" class="link-btn" (click)="infoSection.set(null)">(siehe KI-Status)</button>.</p>
-            <p>3. <strong>Rezepte anlegen</strong> — füge Rezepte als Text ein oder lege sie manuell an. Import per Link oder Foto geht nur <button type="button" class="link-btn" (click)="infoSection.set(null)">(siehe KI-Status)</button>. Koche direkt aus der App mit dem Kochmodus.</p>
-            <p>4. <strong>Einkauf planen</strong> — eine Einkaufsliste auf Basis deiner Rezepte erstellt die KI <button type="button" class="link-btn" (click)="infoSection.set(null)">(siehe KI-Status)</button>.</p>
-            <p>5. <strong>Fortschritt beobachten</strong> — das Dashboard zeigt täglich, wie viel Energie und Makros du noch zur Verfügung hast.</p>
+            <p>1. <strong>Profil einrichten</strong> — trage unter „Profil“ Gewicht, Größe, Alter und Ziel ein. Daraus entstehen dein Kalorien- und dein Eiweißziel.</p>
+            <p>2. <strong>Heute</strong> — zeigt, wie viel Eiweiß und wie viele Kalorien noch fehlen. Mit „Eintragen“ erfasst du eine Mahlzeit per Suche, Barcode oder als Schnell-Eintrag.</p>
+            <p>3. <strong>Tagebuch</strong> — alle Einträge je Essenszeit. Tippe auf einen Eintrag zum Bearbeiten, Doppelt eintragen oder Löschen. „Woche“ zeigt die letzten 7 Tage.</p>
+            <p>4. <strong>Rezepte</strong> — eigene Rezepte und gespeicherte Mahlzeiten. Rezepte kannst du als Text einfügen oder von Hand anlegen. Link- und Foto-Import brauchen die KI (Status unter „Profil“).</p>
+            <p>5. <strong>Einkauf</strong> — „Wochenplan“ sucht eiweißreiche Rezepte und setzt alle Zutaten auf die „Liste“. Dort hakst du beim Einkaufen ab.</p>
+            <p>6. <strong>Backup</strong> — alle Daten liegen nur auf diesem Gerät. Exportiere unter „Profil“ regelmäßig ein Backup.</p>
           }
           @case ('datenschutz') {
             <h3>Datenschutzerklärung</h3>

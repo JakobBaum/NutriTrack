@@ -83,7 +83,7 @@ ion-modal .nt-sheet-header { grid-template-columns: minmax(80px, auto) minmax(0,
 
 .draft-total {
   text-align: right;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--nt-secondary);
@@ -100,7 +100,7 @@ ion-modal .nt-sheet-header { grid-template-columns: minmax(80px, auto) minmax(0,
 
 .picker-error {
   color: var(--ion-color-danger);
-  font-size: 13px;
+  font-size: 0.8125rem;
   text-align: center;
   padding: 8px 0;
 }
@@ -114,7 +114,7 @@ ion-modal ion-buttons ion-button {
 .block-reason {
   margin: 6px 0 0;
   text-align: center;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--ion-color-medium);
 }
 

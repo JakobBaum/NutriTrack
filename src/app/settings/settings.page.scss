@@ -32,7 +32,7 @@ ion-content {
     gap: var(--nt-space-2);
 
     .num {
-      font-size: 40px;
+      font-size: 2.5rem;
       font-weight: 700;
       letter-spacing: 0.3px;
       font-variant-numeric: tabular-nums;
@@ -172,14 +172,14 @@ ion-item {
     border-radius: 4px;
     min-height: 44px;
     padding: 4px 14px;
-    font-size: 12px;
+    font-size: 0.75rem;
     margin-bottom: 8px;
     cursor: pointer;
   }
 
   &__empty {
     color: #9ca3af;
-    font-size: 12px;
+    font-size: 0.75rem;
     text-align: center;
     margin: 8px 0;
   }
@@ -187,7 +187,7 @@ ion-item {
   &__entry {
     display: flex;
     gap: 8px;
-    font-size: 11px;
+    font-size: 0.75rem;
     font-family: monospace;
     padding: 2px 0;
     border-bottom: 1px solid #1e1e1e;

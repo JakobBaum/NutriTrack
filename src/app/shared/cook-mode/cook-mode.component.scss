@@ -1,6 +1,6 @@
 // Kochmodus: Basis-Layout (.cook) kommt aus global.scss; hier Lesebreite, Tippflaeche und Zutatenliste.
 .cook { width: 100%; max-width: 680px; margin-inline: auto; }
-.cook__step-text { font-size: 28px; line-height: 1.4; }
+.cook__step-text { font-size: 1.75rem; line-height: 1.4; }
 .cook__close { min-width: var(--nt-touch); min-height: var(--nt-touch); }
 
 .cook__ingredients {

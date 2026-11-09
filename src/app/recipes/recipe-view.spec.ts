@@ -135,8 +135,8 @@ describe('Einheiten-Chips und Import-Texte', () => {
     expect(importErrorMessage(new Error('Gemini ist gerade überlastet (503)'))).not.toMatch(/503/);
     expect(importErrorMessage(new Error('Gemini ist gerade überlastet (503)'))).toMatch(/überlastet/);
     expect(importErrorMessage(new Error('KI-Proxy 429: quota'))).not.toMatch(/429/);
-    expect(importErrorMessage(new Error('KI-Proxy nicht erreichbar (x)'))).toMatch(/Keine Verbindung/);
-    expect(importErrorMessage(new Error('x'), true)).toMatch(/Keine Verbindung/);
+    expect(importErrorMessage(new Error('KI-Proxy nicht erreichbar (x)'))).toMatch(/Keine Internetverbindung/);
+    expect(importErrorMessage(new Error('x'), true)).toMatch(/Keine Internetverbindung/);
     expect(importErrorMessage(new Error('Keine Zutaten erkannt.'))).toContain('Keine Zutaten erkannt.');
     expect(importErrorMessage(null)).toMatch(/unbekannt/);
   });

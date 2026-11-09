@@ -9,6 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { UNIT_OPTIONS } from '../core/util/units';
+import { clearQueryParams, pickParam } from '../core/navigation/query-params';
 import { formatDecimal, parseDecimal } from '../core/util/number-input';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -54,6 +55,7 @@ import {
 } from './recipe-view';
 
 type RecipesView = 'recipes' | 'meals';
+const RECIPES_VIEWS: readonly RecipesView[] = ['recipes', 'meals'];
 
 interface IngredientForm {
   name: string;
@@ -136,7 +138,7 @@ export class RecipesPage implements OnDestroy {
     return importBlockReason(this.importText, this.isLive() ? this.importUrl : '');
   }
 
-  /** Verlässt den Import Richtung Profil › KI-Verbindung. */
+  /** Verlässt den Import Richtung Profil (KI-Status). */
   openAiSettings(): void {
     this.importOpen.set(false);
     void this.router.navigate(['/settings']);
@@ -243,7 +245,7 @@ export class RecipesPage implements OnDestroy {
   }
 
   private async runImportFromBase64(base64: string): Promise<void> {
-    if (!this.isLive()) throw new Error('Foto-Import braucht eine KI-Verbindung.');
+    if (!this.isLive()) throw new Error('Foto-Import braucht die KI, sie ist gerade nicht verbunden.');
     const res = await this.ai.importRecipe({ imageBase64: await shrinkPhotoForUpload(base64) });
     if (res.ingredients.length === 0) throw new Error('Auf dem Foto wurden keine Zutaten erkannt.');
     this.form = {
@@ -444,7 +446,7 @@ export class RecipesPage implements OnDestroy {
     }
     if (url && this.isTikTokUrl(url) && !this.isLive()) {
       this.importError.set(
-        'TikTok-Import braucht die KI-Verbindung. Richte sie im Profil ein oder füge den Beschreibungstext des Videos hier ein.',
+        'TikTok-Import braucht die KI, sie ist gerade nicht verbunden. Füge den Beschreibungstext des Videos ein.',
       );
       return;
     }

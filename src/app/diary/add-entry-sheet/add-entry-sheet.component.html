@@ -205,7 +205,7 @@
           <div class="preview" aria-live="polite" data-testid="entry-preview">
             <p class="preview__main">
               <span><strong class="preview__kcal">{{ form.kcal | ntNum:0 }}</strong> kcal</span>
-              <span><strong class="preview__protein">{{ form.proteinG | ntNum }}</strong> g Eiweiß</span>
+              <span><strong class="preview__protein protein-val">{{ form.proteinG | ntNum }}</strong> g Eiweiß</span>
             </p>
             <p class="preview__rest">Kohlenhydrate {{ form.carbsG | ntNum }} g · Fett {{ form.fatG | ntNum }} g</p>
           </div>

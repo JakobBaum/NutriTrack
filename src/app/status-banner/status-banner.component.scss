@@ -13,7 +13,7 @@
   max-width: var(--nt-page-max, 720px);
   padding: calc(env(safe-area-inset-top, 0px) + 10px) var(--nt-page-gutter, 16px) 12px;
   color: var(--nt-on-accent, #fff);
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.35;
 
   &--error {
@@ -29,7 +29,7 @@
 
     &--sub {
       margin-top: 4px;
-      font-size: 13px;
+      font-size: 0.8125rem;
     }
   }
 

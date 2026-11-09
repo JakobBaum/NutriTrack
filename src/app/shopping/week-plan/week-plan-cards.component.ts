@@ -35,6 +35,11 @@ export class WeekPlanCardsComponent {
   readonly plan = this.store.plan;
   readonly groups = computed(() => groupByMeal(this.plan()?.recipes ?? []));
 
+  /** „Erneut übersetzen“ nach einem Fehlschlag (hebt die Sitzungssperre auf). */
+  retryTranslation(): void {
+    void this.service.retryTranslation();
+  }
+
   meta(recipe: WeekPlanRecipe): string {
     return recipeMetaLine(recipe);
   }

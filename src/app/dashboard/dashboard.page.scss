@@ -53,10 +53,15 @@ ion-content {
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--nt-space-3);
+  flex-wrap: wrap;
   padding: var(--nt-space-2) 4px var(--nt-space-4);
 
   &__text {
     min-width: 0;
+
+    .nt-large-title {
+      font-size: min(var(--nt-fs-large-title), 11vw);
+    }
   }
 
   &__add {
@@ -120,7 +125,7 @@ ion-content {
   }
 
   &__big {
-    font-size: clamp(30px, 11vw, 48px);
+    font-size: clamp(1.875rem, 11vw, 3rem);
     font-weight: 700;
     line-height: 1;
     letter-spacing: -1.5px;
@@ -248,7 +253,7 @@ ion-content {
     flex-direction: column;
     align-items: center;
     white-space: nowrap;
-    font-size: 13px;
+    font-size: 0.8125rem;
     line-height: 18px;
     color: var(--nt-secondary);
     font-variant-numeric: tabular-nums;
@@ -348,7 +353,7 @@ ion-content {
 
   &__total {
     font-weight: 400;
-    font-size: 14px;
+    font-size: 0.875rem;
     color: var(--nt-secondary);
   }
 }
@@ -370,7 +375,7 @@ ion-content {
   margin-bottom: 0;
 
   &__name {
-    font-size: 14px;
+    font-size: 0.875rem;
     font-weight: 600;
     margin-bottom: 4px;
     white-space: normal;
@@ -401,14 +406,14 @@ ion-content {
   }
 
   &__val {
-    font-size: 13px;
+    font-size: 0.8125rem;
     font-weight: 700;
     text-align: right;
     min-width: 80px;
   }
 
   &__pct {
-    font-size: 12px;
+    font-size: 0.75rem;
     font-weight: 400;
     color: var(--nt-secondary);
     display: block;
@@ -464,7 +469,7 @@ ion-content {
   border: 0;
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
   text-align: left;
   cursor: pointer;
 

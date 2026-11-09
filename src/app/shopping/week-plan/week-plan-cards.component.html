@@ -5,9 +5,14 @@
     </ul>
   }
   @if (progress(); as pr) {
-    <p class="wp-translate" role="status" data-testid="wp-translating">übersetze… Rezepte ({{ pr.done }}/{{ pr.total }})</p>
+    <p class="wp-translate" role="status" data-testid="wp-translating">Rezepte werden übersetzt ({{ pr.done }}/{{ pr.total }})</p>
   } @else if (untranslated() > 0) {
-    <p class="wp-translate" role="status" data-testid="wp-untranslated">nicht übersetzt: {{ untranslated() }} {{ untranslated() === 1 ? 'Rezept bleibt' : 'Rezepte bleiben' }} Englisch (KI nicht erreichbar).</p>
+    <div class="wp-translate" role="status" data-testid="wp-untranslated">
+      <span>{{ untranslated() }} {{ untranslated() === 1 ? 'Rezept ist' : 'Rezepte sind' }} noch auf Englisch.</span>
+      <button type="button" class="nt-pill nt-pill--secondary wp-translate__retry" data-testid="wp-retranslate" (click)="retryTranslation()">
+        <ion-icon name="language-outline" aria-hidden="true"></ion-icon> Erneut übersetzen
+      </button>
+    </div>
   }
   @for (group of groups(); track group.meal) {
     <h2 class="nt-section-header wp-group">{{ group.label }}</h2>

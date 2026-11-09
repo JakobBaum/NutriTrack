@@ -20,6 +20,7 @@ import { dayLabel, rollDate, toDateISO } from '../core/util/date';
 import { formatNum } from '../shared/num.pipe';
 import { MEAL_DEFS, mealForHour, mealLabel, isIsoDate, isMealType, isValidAmount, toBaseAmount, toNumberOrNull, inputTextFor, AMOUNT_UNITS, fromBaseAmount, convertAmount, lastAmountForLabel, editBaseFor } from './diary-helpers';
 import { confirmDiscardSheet, pickMealSheet } from './diary-sheets';
+import { pickEntryAction } from './entry-menu';
 import { lightHaptic } from './haptics';
 import { dismissKeyboard } from '../core/keyboard/dismiss-keyboard';
 import { showEntryToast } from './entry-toast';
@@ -393,6 +394,12 @@ export class DiaryPage {
     this.showToast(added ? `„${entry.label}“ als Favorit gemerkt` : `„${entry.label}“ aus den Favoriten entfernt`);
   }
 
+  duplicateFromEdit(): void {
+    const entry = this.editEntry;
+    this.closeEdit();
+    if (entry) this.duplicate(entry);
+  }
+
   deleteFromEdit(): void {
     const entry = this.editEntry;
     this.closeEdit();
@@ -408,6 +415,14 @@ export class DiaryPage {
     this.showToast(`„${entry.label}“ gelöscht`, () => {
       this.diary.restore(entry, index);
     });
+  }
+
+  /** „Mehr“-Menü einer Zeile: sichtbarer Weg zu Bearbeiten, Doppelt eintragen und Löschen. */
+  async openEntryMenu(entry: DiaryEntry): Promise<void> {
+    const action = await pickEntryAction(this.sheetCtrl, entry.label);
+    if (action === 'edit') this.openEdit(entry);
+    else if (action === 'duplicate') this.duplicate(entry);
+    else if (action === 'delete') this.remove(entry);
   }
 
   /** Doppelt eintragen (Wisch-Aktion): Kopie am Ende der Mahlzeit, mit „Rückgängig“. */

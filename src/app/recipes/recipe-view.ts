@@ -1,3 +1,4 @@
+import { STATE_MESSAGES } from '../core/messages/state-messages';
 import { NutritionFacts, Recipe, RecipeIngredient, RecipeOrigin } from '../core/models';
 import { hasNutrition, perServingFacts, reconcileKcal } from '../core/nutrition/recipe-nutrition';
 import { UNIT_WEIGHT_G, countMissingFacts } from '../core/nutrition/units-weight';
@@ -133,10 +134,8 @@ export function importBlockReason(text: string, url: string): string {
 /** Konkreter Grund eines fehlgeschlagenen Imports (503 / 429 / Netzwerk) statt einer Sammelmeldung. */
 export function importErrorMessage(e: unknown, isOffline = false): string {
   const raw = e instanceof Error ? e.message : '';
-  if (isOffline || /failed to fetch|networkerror|load failed|nicht erreichbar/i.test(raw)) {
-    return 'Keine Verbindung zur KI — Internet und KI-Verbindung prüfen.';
-  }
-  if (/\b503\b|überlastet/i.test(raw)) return 'Die KI ist gerade überlastet — bitte in ein paar Sekunden erneut versuchen.';
-  if (/\b429\b|zu viele|rate/i.test(raw)) return 'Zu viele KI-Anfragen — bitte kurz warten und erneut versuchen.';
-  return raw ? `Import fehlgeschlagen: ${raw}` : 'Import fehlgeschlagen, Grund unbekannt.';
+  if (isOffline || /failed to fetch|networkerror|load failed|nicht erreichbar/i.test(raw)) return STATE_MESSAGES.offline;
+  if (/\b503\b|überlastet/i.test(raw)) return STATE_MESSAGES.aiOverloaded;
+  if (/\b429\b|zu viele|rate/i.test(raw)) return STATE_MESSAGES.rateLimited;
+  return raw.trim() || STATE_MESSAGES.importFailed;
 }

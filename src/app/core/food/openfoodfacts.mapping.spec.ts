@@ -171,8 +171,8 @@ describe('toFoodLookupError / foodErrorMessage', () => {
   });
 
   it('liefert eine generische Meldung für fremde Fehler', () => {
-    expect(foodErrorMessage(new Error('x'))).toBe('Abfrage fehlgeschlagen — bitte erneut versuchen.');
-    expect(foodErrorMessage(null)).toMatch(/erneut versuchen/);
+    expect(foodErrorMessage(new Error('x'))).toBe('Die Abfrage ist fehlgeschlagen. Versuche es erneut.');
+    expect(foodErrorMessage(null)).toMatch(/Versuche es erneut/);
   });
 });
 

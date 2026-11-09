@@ -1,14 +1,12 @@
-<ion-header class="ion-no-border page-header">
-  <ion-toolbar></ion-toolbar>
-</ion-header>
-
-<ion-content>
-  <div class="page-head">
-    <h1 class="nt-large-title">Tagebuch</h1>
+<ion-header class="ion-no-border">
+  <nt-page-header title="Tagebuch">
     <button type="button" class="nt-pill page-head__add" (click)="openAdd()" aria-label="Neuen Eintrag eintragen">
       <ion-icon name="add" aria-hidden="true"></ion-icon> Eintragen
     </button>
-  </div>
+  </nt-page-header>
+</ion-header>
+
+<ion-content>
 
   <ion-segment class="view-switch" [value]="view()" aria-label="Ansicht" (ionChange)="setView($any($event).detail.value)">
     <ion-segment-button value="day"><ion-label>Tag</ion-label></ion-segment-button>
@@ -91,7 +89,7 @@
                   <h3>{{ entry.label }}@if (entry.brand) { <span class="entry-brand"> · {{ entry.brand }}</span> }</h3>
                   <p>
                     @if (entry.amountG) { {{ entry.amountG | ntAmount:entry.unit }} · }
-                    <span class="protein-val">E {{ entry.facts.proteinG | ntNum }} g</span> · KH {{ entry.facts.carbsG | ntNum }} g · F {{ entry.facts.fatG | ntNum }} g
+                    <span class="protein-val"><span aria-hidden="true">E</span><span class="visually-hidden">Eiweiß</span> {{ entry.facts.proteinG | ntNum }} g</span> · <span aria-hidden="true">KH</span><span class="visually-hidden">Kohlenhydrate</span> {{ entry.facts.carbsG | ntNum }} g · <span aria-hidden="true">F</span><span class="visually-hidden">Fett</span> {{ entry.facts.fatG | ntNum }} g
                     @if (entry.isEstimate) { · @if (ffLive()) { <span class="ai-badge">KI-Schätzung</span> } }
                   </p>
                 </ion-label>
@@ -109,8 +107,8 @@
                 </ion-item-option>
               </ion-item-options>
             </ion-item-sliding>
-            <button type="button" class="nt-hover-delete entry-row__delete" (click)="remove(entry)" [attr.aria-label]="'Eintrag löschen: ' + entry.label">
-              <ion-icon name="trash-outline" aria-hidden="true"></ion-icon>
+            <button type="button" class="entry-row__more" data-testid="entry-more" (click)="openEntryMenu(entry)" [attr.aria-label]="'Mehr zu ' + entry.label">
+              <ion-icon name="ellipsis-horizontal" aria-hidden="true"></ion-icon>
             </button>
             </div>
           }
@@ -168,6 +166,9 @@
       </ion-list>
       <button type="button" class="edit-fav" data-testid="edit-favorite" (click)="toggleEditFavorite()" [attr.aria-pressed]="isEditFavorite()">
         <ion-icon [name]="isEditFavorite() ? 'star' : 'star-outline'" aria-hidden="true"></ion-icon> {{ isEditFavorite() ? 'Favorit entfernen' : 'Als Favorit merken' }}
+      </button>
+      <button type="button" class="edit-fav" data-testid="edit-duplicate" (click)="duplicateFromEdit()">
+        <ion-icon name="copy-outline" aria-hidden="true"></ion-icon> Doppelt eintragen
       </button>
       <button type="button" class="edit-delete" (click)="deleteFromEdit()">
         <ion-icon name="trash-outline" aria-hidden="true"></ion-icon> Eintrag löschen

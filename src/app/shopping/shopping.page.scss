@@ -106,7 +106,7 @@ ion-content {
   &__group { display: inline-flex; align-items: baseline; gap: var(--nt-space-2); white-space: nowrap; }
   &__label { font-size: var(--nt-fs-caption); color: var(--nt-secondary); }
   &__sum {
-    font-size: 24px;
+    font-size: 1.5rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -141,13 +141,15 @@ ion-list.nt-grouped {
     display: flex;
     flex-direction: column;
     margin-left: var(--nt-space-2);
-    &.checked { text-decoration: line-through; color: var(--nt-secondary); }
+    text-decoration: line-through transparent;
+    transition: color 200ms ease, opacity 200ms ease, text-decoration-color 200ms ease;
+    &.checked { text-decoration-color: currentcolor; color: var(--nt-secondary); opacity: 0.75; }
   }
   &__name { font-size: var(--nt-fs-headline); }
 }
 
 .qty { display: block; font-size: var(--nt-fs-caption); color: var(--nt-secondary); font-variant-numeric: tabular-nums; }
-.est-badge { margin-left: 4px; padding: 1px 6px; border-radius: 8px; font-size: 11px; background: var(--ion-color-step-100, rgba(128, 128, 128, 0.15)); color: var(--nt-secondary); }
+.est-badge { margin-left: 4px; padding: 1px 6px; border-radius: 8px; font-size: 0.75rem; background: var(--ion-color-step-100, rgba(128, 128, 128, 0.15)); color: var(--nt-secondary); }
 
 .cat-header {
   margin: var(--nt-space-6) var(--nt-space-4) var(--nt-space-2);

@@ -239,9 +239,9 @@ describe('foodErrorMessage', () => {
   it('liefert verständliche Texte je Fehlerart', () => {
     // Assert
     expect(foodErrorMessage(new FoodLookupError('rate-limit', 'x'))).toContain('Zu viele Anfragen');
-    expect(foodErrorMessage(new FoodLookupError('offline', 'x'))).toContain('Keine Verbindung');
+    expect(foodErrorMessage(new FoodLookupError('offline', 'x'))).toContain('Keine Internetverbindung');
     expect(foodErrorMessage(new FoodLookupError('server', 'x'))).toContain('nicht erreichbar');
-    expect(foodErrorMessage(new Error('?'))).toContain('bitte erneut versuchen');
+    expect(foodErrorMessage(new Error('?'))).toContain('Versuche es erneut');
   });
 
   it('nennt bei Serverproblem die Datenbank, nicht das Internet', () => {
@@ -250,7 +250,7 @@ describe('foodErrorMessage', () => {
 
     // Assert
     expect(message).toBe(
-      'Lebensmittel-Datenbank gerade nicht erreichbar — bitte später erneut versuchen.',
+      'Die Lebensmittel-Datenbank ist gerade nicht erreichbar. Versuche es später erneut.',
     );
     expect(message).not.toContain('Internet');
   });
@@ -260,6 +260,6 @@ describe('foodErrorMessage', () => {
     const message = foodErrorMessage(new FoodLookupError('offline', 'x'));
 
     // Assert
-    expect(message).toBe('Keine Verbindung zur Lebensmittel-Datenbank — Internet prüfen.');
+    expect(message).toBe('Keine Internetverbindung. Prüfe WLAN oder Mobilnetz und versuche es erneut.');
   });
 });

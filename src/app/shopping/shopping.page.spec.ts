@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
+import { provideRouter } from '@angular/router';
 import { RecipeStore } from '../core/state/recipe.store';
 import { ShoppingStore } from '../core/state/shopping.store';
 import { ShoppingPage } from './shopping.page';
@@ -14,7 +15,7 @@ function createPage(): { page: ShoppingPage; store: ShoppingStore } {
 beforeEach(() => {
   localStorage.clear();
   TestBed.resetTestingModule();
-  TestBed.configureTestingModule({ providers: [provideHttpClient()] });
+  TestBed.configureTestingModule({ providers: [provideHttpClient(), provideRouter([])] });
 });
 
 describe('ShoppingPage add FAB', () => {

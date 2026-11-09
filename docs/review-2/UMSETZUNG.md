@@ -87,3 +87,33 @@ Neu: `core/nutrition/manual-target(.spec).ts`, `core/nutrition/nutrition-calc.go
 - Imperial-Einstellung gilt nicht für Körperwerte.
 - Kein Dirty-Guard beim Schließen des Sheets, kein Minderjährigen-Block, kein Hinweis auf Kohlenhydrate unter 2 g/kg.
 - Texte "Profil › KI-Verbindung" in `fastfood-form.component.html` und `core/ai/ai-errors.ts` bleiben (Welle E).
+
+## Welle D (Bedienung und Barrierefreiheit)
+
+### Gemacht
+- Löschen und Doppelt eintragen sichtbar: jede Tagebuch-Zeile hat einen "Mehr"-Knopf (`data-testid="entry-more"`, 44 px) mit Action-Sheet Bearbeiten / Doppelt eintragen / Löschen / Abbrechen (`diary/entry-menu.ts`, Buttons rein und getestet). Wischen bleibt. Der Bearbeiten-Dialog hat zusätzlich "Doppelt eintragen". Einkaufsposition: "Position löschen" im Preis-Dialog (auf Touch war der Hover-Knopf unsichtbar). Mahlzeiten und Zutaten löschen weiter per Wischen.
+- Dynamic Type: alle `--nt-fs-*` und 54 weitere `font-size`-Angaben von px auf rem (Icons bleiben px). Ionic setzt auf iOS `-apple-system-body`, daher skaliert rem mit der Systemschrift. Hero, Tab-Labels, Segmente und Chips umbrechen oder werden begrenzt (`clamp`, `min`), geprüft mit `html{font-size:150%}`.
+- VoiceOver: E/KH/F in der Tagebuch-Zeile als `aria-hidden`-Kürzel plus unsichtbarer Volltext (Eiweiß, Kohlenhydrate, Fett); dasselbe bei "Kohlenh." und "Ballast." in Rezepten, Online-Suche und Wochenrezept.
+- Druck-Zustand global (`:active`: Deckkraft und leichtes Eindrücken) für Buttons, Tab- und Segmentknöpfe, `.ff-btn`, Karten-Links.
+- Abhaken im Einkauf: leichter Haptik-Impuls (`lightHaptic`) und weicher Übergang (Farbe, Deckkraft, Durchstreichen).
+- Reduced Motion zur Laufzeit: `core/motion/reduced-motion.ts` hört auf die Media-Query und setzt Ionic `animated` live (`AppComponent`); CSS-Regel gab es schon.
+
+## Welle E (Navigation, Einkauf, Texte)
+
+### Gemacht
+- Query-Parameter werden einmal gelesen und dann entfernt (`core/navigation/query-params.ts`: `pickParam`, `clearQueryParams`): `?view=` in Rezepte (`recipes|meals`) und Einkauf (`plan|list`), `?open=recipe-search` öffnet das Rezeptsuche-Sheet in den Einstellungen. Der Einkauf-Hinweis verlinkt dorthin.
+- Plan zur Liste: Schaltfläche "Einkaufsliste öffnen (n Positionen, m offen)" in der Plan-Zusammenfassung. "Erneut übersetzen" (`WeekPlanService.retryTranslation`) bei nicht übersetzten Rezepten.
+- Sackgasse im Plan: Wochenrezept-Sheet bekommt "In Tagebuch eintragen" (Essenszeit-Auswahl, eine Portion, Toast mit Rückgängig; `weekRecipeToDiaryEntry`).
+- Falsche Hinweise entfernt: "Profil > KI-Verbindung" (Fastfood-Formular, `ai-errors.ts`, Rezepte), jetzt "KI-Status ansehen". Spoonacular-Schlüsselhinweise bleiben, das Feld gibt es noch. Anleitung in den Einstellungen auf die fünf Tabs umgeschrieben.
+- Fehler- und Zustandskatalog `core/messages/state-messages.ts`: Satz 1 sagt, was los ist, Satz 2 (Du-Imperativ) was zu tun ist, nur Punkte. Genutzt von KI-, Lebensmittel-, Spoonacular- und Import-Fehlern. Bestehende Specs auf die neuen Texte angepasst.
+- `--nt-protein` durchgängig: Rezept-Makros, Online-Suche, Zutaten- und Portionswerte, Profil-Ziel, Eintragen-Vorschau.
+- Gemeinsamer Seitenkopf `nt-page-header` (SharedModule) auf Tagebuch, Rezepte, Einkauf und Profil; Heute behält die Datumsleiste als Kopf.
+
+### Bewusst unverändert
+Fünf Tabs, Fastfood-Block, Sheet-Breakpoints.
+
+### Offene Punkte
+- Nichts auf einem Gerät geprüft (Haptik, VoiceOver, echte Dynamic-Type-Stufen; Großschrift nur per `font-size:150%` simuliert).
+- Mahlzeiten- und Zutatenliste: Löschen auf Touch nur per Wischen.
+- `recipes.page.scss` liegt 28 Byte über dem Stilbudget (Warnung, kein Fehler).
+- Heute hat keinen `nt-page-header` (Datumsleiste statt Titel).
