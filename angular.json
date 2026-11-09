@@ -123,7 +123,7 @@
           "options": {
             "tsConfig": "tsconfig.spec.json",
             "buildTarget": "::development",
-            "setupFiles": ["src/test-setup.ts"]
+            "setupFiles": ["src/test-setup.ts", "src/test-modules.ts"]
           },
           "configurations": {
             "ci": {
