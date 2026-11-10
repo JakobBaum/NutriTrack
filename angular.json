@@ -54,7 +54,7 @@
                 "output": "assets/tesseract/lang"
               }
             ],
-            "styles": ["src/global.scss", "src/styles/overlays-and-polish.scss", "src/styles/ios-patterns-and-fixes.scss", "src/styles/foundation.scss", "src/theme/variables.scss"],
+            "styles": ["src/global.scss", "src/styles/overlays-and-polish.scss", "src/styles/ios-patterns-and-fixes.scss", "src/styles/foundation.scss", "src/styles/sheets.scss", "src/theme/variables.scss", "src/styles/compact-phone.scss"],
             "scripts": []
           },
           "configurations": {

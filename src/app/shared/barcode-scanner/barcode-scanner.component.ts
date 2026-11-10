@@ -10,6 +10,9 @@ import { BarcodeScannerService } from '../../core/scan/barcode-scanner.service';
 /** Pause vor dem erneuten Scan nach Fehlschlag, damit derselbe Code nicht sofort wieder abgefragt wird. */
 export const RESCAN_DELAY_MS = 1500;
 
+/** Obergrenze (Frames) für das Warten, bis Ionic das geschlossene Modal wirklich als beendet führt. */
+export const OVERLAY_MAX_WAIT_FRAMES = 60;
+
 /** Ein Treffer des Barcode-Scanners: Produkt samt gelesenem Code. */
 export interface BarcodeHit {
   item: FoodItem;
@@ -19,6 +22,9 @@ export interface BarcodeHit {
 /**
  * Vollbild-Barcode-Scanner (Kamera-Live-Scan mit Fallback auf Code-Eingabe).
  * Öffnet sich über `open`; meldet Treffer über `found` und das Schließen über `closed`.
+ * Ein Treffer wird erst gemeldet, wenn das Modal ganz geschlossen ist: Der Eltern-View wechselt
+ * dann auf das Formular und zerstört diese Komponente; ein dabei halb geschlossenes Modal ließ
+ * die Seite abstürzen bzw. hängen.
  */
 @Component({
   selector: 'nt-barcode-scanner',
@@ -43,36 +49,49 @@ export class NtBarcodeScannerComponent implements OnDestroy {
 
   private controls?: IScannerControls;
   private presented = false;
+  private starting = false;
+  private pendingHit: BarcodeHit | null = null;
   private rescanTimer?: ReturnType<typeof setTimeout>;
 
+  @ViewChild('scannerModal') private modal?: { dismiss(): Promise<boolean> };
   @ViewChild('barcodeVideo') private video?: ElementRef<HTMLVideoElement>;
 
   ngOnDestroy(): void {
     this.stop();
   }
 
-  /** ion-modal willPresent: Zustand zurücksetzen. */
+  /** ion-modal willPresent: Zustand zurücksetzen und die Kamera schon während der Einblend-Animation starten. */
   protected onWillPresent(): void {
     this.manualCode = '';
     this.error.set(null);
     this.looking.set(false);
     this.manualOpen.set(false);
     this.noCamera.set(false);
+    this.pendingHit = null;
+    this.presented = true;
+    setTimeout(() => void this.startScan(true));
   }
 
-  /** ion-modal didPresent → Live-Scan starten, sofern der Browser es kann. */
+  /** ion-modal didPresent → Live-Scan starten, falls der frühe Start noch kein Video-Element fand. */
   protected async onPresent(): Promise<void> {
     this.presented = true;
     await this.startScan();
   }
 
-  private async startScan(): Promise<void> {
-    const video =
-      this.video?.nativeElement ?? (document.querySelector('video#ntBarcodeVideo') as HTMLVideoElement | null);
+  private findVideo(): HTMLVideoElement | null {
+    return this.video?.nativeElement ?? (document.querySelector('video#ntBarcodeVideo') as HTMLVideoElement | null);
+  }
+
+  /** `early`: noch vor didPresent; fehlt das Video-Element, wird still abgewartet statt "keine Kamera" gemeldet. */
+  private async startScan(early = false): Promise<void> {
+    if (this.controls || this.starting) return;
+    const video = this.findVideo();
+    if (!video && early) return;
     if (!video || !this.scanner.isSupported()) {
       this.showWithoutCamera();
       return;
     }
+    this.starting = true;
     try {
       this.controls = await this.scanner.start(
         video,
@@ -81,14 +100,31 @@ export class NtBarcodeScannerComponent implements OnDestroy {
       );
     } catch {
       this.showWithoutCamera('Kamera nicht verfügbar — gib den Code manuell ein.');
+    } finally {
+      this.starting = false;
     }
   }
 
-  /** ion-modal didDismiss → Kamera freigeben und Schließen melden. */
+  /** ion-modal didDismiss → Kamera freigeben, Schließen melden, danach den wartenden Treffer. */
   protected onDismiss(): void {
     this.presented = false;
     this.stop();
+    const hit = this.pendingHit;
+    this.pendingHit = null;
     this.closed.emit();
+    if (hit) void this.whenOverlayGone().then(() => this.found.emit(hit));
+  }
+
+  /**
+   * Ionic führt das Modal noch kurz als präsentiert (Klasse `show-modal`), obwohl didDismiss schon kam. Fokussiert der
+   * Eltern-View in dieser Zeit ein Feld, ziehen Fokusfalle des Scanners und des Sheets den Fokus endlos hin und her
+   * (Seite stürzt ab). Darum erst melden, wenn die Klasse weg ist.
+   */
+  private async whenOverlayGone(): Promise<void> {
+    const el = (this.modal as { el?: HTMLElement } | undefined)?.el;
+    for (let frame = 0; el?.classList.contains('show-modal') && frame < OVERLAY_MAX_WAIT_FRAMES; frame++) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    }
   }
 
   protected toggleManual(): void {
@@ -118,6 +154,16 @@ export class NtBarcodeScannerComponent implements OnDestroy {
     this.rescanTimer = setTimeout(() => void this.startScan(), RESCAN_DELAY_MS);
   }
 
+  /** Modal erst schließen, dann melden (siehe Klassenkommentar). Ohne Modal (Tests) sofort melden. */
+  private async finishWith(hit: BarcodeHit): Promise<void> {
+    if (!this.modal) {
+      this.found.emit(hit);
+      return;
+    }
+    this.pendingHit = hit;
+    await this.modal.dismiss();
+  }
+
   private async lookup(code: string): Promise<void> {
     if (this.looking()) return;
     this.stop();
@@ -130,7 +176,7 @@ export class NtBarcodeScannerComponent implements OnDestroy {
         this.scheduleRescan();
         return;
       }
-      this.found.emit({ item, code });
+      await this.finishWith({ item, code });
     } catch (e: unknown) {
       this.error.set(foodErrorMessage(e));
       this.scheduleRescan();

@@ -10,6 +10,8 @@ type Internals = {
   onPresent(): Promise<void>;
   onDismiss(): void;
   error(): string | null;
+  modal?: { dismiss: () => Promise<boolean> };
+  found: { subscribe(fn: (hit: unknown) => void): unknown };
 };
 
 const lookupByBarcode = vi.fn();
@@ -87,5 +89,61 @@ describe('NtBarcodeScannerComponent — erneuter Scan (FDB-03)', () => {
     await vi.advanceTimersByTimeAsync(RESCAN_DELAY_MS + 1);
 
     expect(start).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("NtBarcodeScannerComponent — Treffer erst nach dem Schließen (Absturz nach Scan)", () => {
+  const ITEM = { id: "x", name: "Haferdrink" };
+
+  it("schließt zuerst das Modal und meldet den Treffer erst nach didDismiss", async () => {
+    // Arrange
+    lookupByBarcode.mockResolvedValue(ITEM);
+    const cmp = create();
+    const dismiss = vi.fn(async () => true);
+    cmp.modal = { dismiss };
+    const found = vi.fn();
+    cmp.found.subscribe(found);
+    await cmp.onPresent();
+
+    // Act
+    onCode("4000");
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Assert: noch kein Treffer, solange das Modal schließt
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    expect(found).not.toHaveBeenCalled();
+    cmp.onDismiss();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(found).toHaveBeenCalledWith({ item: ITEM, code: "4000" });
+  });
+
+  it("meldet den Treffer direkt, wenn kein Modal vorhanden ist", async () => {
+    lookupByBarcode.mockResolvedValue(ITEM);
+    const cmp = create();
+    const found = vi.fn();
+    cmp.found.subscribe(found);
+    await cmp.onPresent();
+
+    onCode("4000");
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(found).toHaveBeenCalledWith({ item: ITEM, code: "4000" });
+  });
+
+  it("meldet einen Treffer nur einmal", async () => {
+    lookupByBarcode.mockResolvedValue(ITEM);
+    const cmp = create();
+    cmp.modal = { dismiss: vi.fn(async () => true) };
+    const found = vi.fn();
+    cmp.found.subscribe(found);
+    await cmp.onPresent();
+    onCode("4000");
+    await vi.advanceTimersByTimeAsync(0);
+
+    cmp.onDismiss();
+    cmp.onDismiss();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(found).toHaveBeenCalledTimes(1);
   });
 });

@@ -33,7 +33,8 @@ ion-content {
   &__custom { display: flex; align-items: center; justify-content: space-between; gap: var(--nt-space-2); margin-top: var(--nt-space-2); }
   &__hint { font-size: var(--nt-fs-caption); color: var(--nt-secondary); }
   &__meals { margin-bottom: var(--nt-space-3); }
-  // Fallback „Aus meinen Rezepten planen“: abgesetzt unter dem Hauptweg.
+  &__source { margin-bottom: var(--nt-space-4); .generator__mode { margin: var(--nt-space-1) 0 0; } }
+  // Eigener Weg „Aus meinen Rezepten planen“: abgesetzt unter dem Hauptweg.
   &__alt {
     margin-top: var(--nt-space-5);
     padding-top: var(--nt-space-4);
@@ -149,7 +150,7 @@ ion-list.nt-grouped {
 }
 
 .qty { display: block; font-size: var(--nt-fs-caption); color: var(--nt-secondary); font-variant-numeric: tabular-nums; }
-.est-badge { margin-left: 4px; padding: 1px 6px; border-radius: 8px; font-size: 0.75rem; background: var(--ion-color-step-100, rgba(128, 128, 128, 0.15)); color: var(--nt-secondary); }
+.est-badge { margin-left: 4px; padding: 1px 6px; border-radius: 8px; font-size: 0.8125rem; background: var(--ion-color-step-100, rgba(128, 128, 128, 0.15)); color: var(--nt-secondary); }
 
 .cat-header {
   margin: var(--nt-space-6) var(--nt-space-4) var(--nt-space-2);

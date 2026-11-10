@@ -143,3 +143,114 @@ tsc sauber, Lint sauber, 127 Dateien / 1238 Unit-Tests grün, `ng build` nur Tes
 - Worker nicht deployt; fail-closed greift erst nach Deploy.
 - CI-YAML (Lint, E2E-Job) nie auf GitHub gelaufen.
 - Gerätetest weiterhin offen.
+
+## Bugs 1.1-1.4 (Scan, Etikett-Foto, KI-Antworten, UI-Größe) – 2026-11-10
+
+### 1.2 UI blockiert / Seite kaputt nach Barcode-Scan (Ursache gemessen)
+- Ursache: Der Treffer wurde gemeldet, solange das Scanner-Modal noch als präsentierter Overlay galt. Das Elternsheet wechselt dann auf das Formular, zerstört das Modal und fokussiert die Mengenzeile. Ionic hält dabei noch den Fokus-Trap des Scanners (`show-modal` ist bei `didDismiss` noch gesetzt, 2 Overlays). Zwei Fokus-Fallen ziehen den Fokus endlos hin und her, der Renderer stürzt ab ("Target crashed"). Fehlerklasse: Fokus-Trap / Overlay nicht vollständig weg.
+- Fix: erst `modal.dismiss()`, dann auf `didDismiss` warten und zusätzlich per `requestAnimationFrame` warten, bis die Klasse `show-modal` weg ist (max. 60 Frames), erst dann `found` melden. Die Kamera wird bei `didDismiss` gestoppt. Eine feste Wartezeit war nur Glückssache (50 ms stürzte einmal ab, 0/150/300/700 ms liefen zufällig durch).
+- Verifiziert: 8 von 8 Läufen ohne Absturz (Bisect-Skript), E2E `scan:` 3 mal hintereinander grün, Kamera-Tracks beendet, kein Video im DOM, UI danach bedienbar.
+- Andere Kamerastellen (Etikett-Foto, Rezept-Foto): Zustände werden in `finally` zurückgesetzt, Dateiinput wird geleert; dort gibt es keinen Kamera-Stream (nativer Datei-Dialog). Kein Handlungsbedarf gefunden.
+- Dateien: `shared/barcode-scanner/barcode-scanner.component.{ts,html,spec.ts}`, `e2e/specs/scan.spec.mjs`, `e2e/lib/fake-camera.mjs`.
+
+### 1.1 Barcode-Scan zu langsam
+- Gemessen (gefakter Stream, Chromium): Kamerastart nach dem Tippen von ca. 560 ms auf ca. 52 ms. Ursachen: Start erst nach `didPresent` (jetzt schon in `willPresent`), zxing-Chunk (570 kB) wurde erst beim Start geladen (jetzt `preload()` beim Tippen auf "Barcode"), Dekodierung versuchte alle Formate (jetzt nur EAN/UPC/Code128 per POSSIBLE_FORMATS-Hint), Versuchsabstand 100 ms, 1280x720-Constraints statt iOS-Default 640x480.
+- OFF-Abfrage selbst ist schnell (direkt ca. 140-180 ms, ein Ausreißer 1,6 s); kein Cache nötig.
+- E2E Ende-zu-Ende "Tippen bis Formular": ca. 2,1 s mit gemocktem OFF und Fake-Stream (Budget 3,5 s).
+- Dateien: `core/scan/barcode-scanner.service.ts` (+ Spec), `shared/food-sources/food-sources.component.ts`.
+- Ladezustand: Spinner neben "Produkt wird gesucht…"; Fehlermeldung als helle Schrift auf abgedunkeltem Grund (vorher rot auf Schwarz, 0,75 rem).
+
+### 1.3 Etikett-Foto zu langsam (Ursache gemessen)
+- Echte Worker-Aufrufe (3 Aufrufe, Foto zählt doppelt), synthetisches Etikett 3024x4032:
+  - Original 3870 kB: 413 "Anfrage zu groß" nach 3,2 s (Upload-Limit des Workers).
+  - 1600 px / JPEG 0,85 (vorher): 302 kB, 22,5 s.
+  - 1280 px / JPEG 0,7 (nachher): 108 kB, 20,8 s.
+  - Zum Vergleich ein triviales Text-Kommando (`translateSearchQuery`): 2,7 bis 6,3 s, `/health` 0,07 s.
+- Ergebnis: Die Zeit liegt nicht im Upload oder in der Bildgröße, sondern in der Modell-Antwortzeit (Gemini, vermutlich Denkzeit). Das Verkleinern spart Daten (-64 %, wichtig im Mobilfunk), aber nur ca. 1,7 s.
+- Umgesetzt: Upload-Konstanten `UPLOAD_MAX_EDGE_PX = 1280`, `UPLOAD_JPEG_QUALITY = 0.7` (gilt auch für den Rezept-Foto-Import; die OCR bleibt bei 1600 px). Fortschrittsanzeige im Eintragen-Sheet: "Foto wird vorbereitet…", "KI liest das Etikett…", nach 8 s "Das dauert länger als sonst — die KI arbeitet noch…" (`role="status"`, Spinner).
+- Worker (nur Code, nicht deployt): optionale Worker-Variable `GEMINI_THINKING_LEVEL` (z. B. `low`) setzt `generationConfig.thinkingConfig`; ohne Variable unverändert. Test in `worker.test.mjs` (78 Tests).
+- NICHT geprüft: ob `thinkingLevel` beim eingesetzten Modell akzeptiert wird und wie viel Zeit es spart. Das geht nur nach Deploy: Variable setzen und `recognizeLabel` erneut messen. Der Client-Timeout liegt bei 30 s, die gemessenen ca. 21 s liegen knapp darunter.
+- Dateien: `core/scan/label-image.ts`, `label-scan.spec.ts`, `shared/food-sources/*`, `src/styles/ios-patterns-and-fixes.scss`, `worker.js`, `worker.test.mjs`.
+
+### 1.4 KI-Antworten auf dem Phone unlesbar
+- Geprüft mit gemockten, langen Antworten bei 320 und 375 px (Fastfood-Vorschlag, Etikett-Ergebnis samt Hinweis, Einkaufsliste, Debug-Log der Verbindungsprüfung): kein horizontaler Überlauf, kein rohes JSON oder Markdown im UI (Antworten werden strukturiert gemappt). Nur der Debug-Log (nur mit `?debug=1`) zeigt Rohtext der Verbindungsprüfung.
+- Gefunden und behoben: zu kleine Schrift (12 px) bei `.ai-badge`, Fastfood-Untertitel, Debug-Log (0,75 rem auf 0,8125 rem), KI-Hinweise im Rezeptbereich (`%hint`, `__note`, `.unit-warn`) und `.est-badge` in der Einkaufsliste; fehlender Zeilenumbruch bei langen Wörtern (`overflow-wrap: anywhere` in `.ff-card`, Debug-Log, `.nt-source-error`); Sheet-Titel brach bei 320 px auf mehrere Zeilen um (Seitenspalten unter 375 px nach Inhalt statt 88 px fest).
+- Fastfood: Das Formular füllt auf dem Phone den Bildschirm, die Antwort lag unsichtbar darunter. Nach dem Laden wird jetzt zum ersten Vorschlag gescrollt.
+- E2E `e2e/specs/ai-readable.spec.mjs` (4 Tests, 320 und 375 px): Überlauf, Schrift >= 13 px, abgeschnittene Texte, Fortschrittstext, Sichtbarkeit der Antwort. Der Audit lieferte vor den Fixes die 12-px-Treffer (rot), danach grün.
+- Nicht geändert, nicht in den berührten Bereichen: Beschriftung der Tab-Leiste (10,88 px, Ionic-Standard) bleibt unter 0,8125 rem. Rezept-Import-Vorschau und Einkaufslisten-Notiz wurden nur per CSS-Durchsicht (Schriftgrößen), nicht mit gemockter KI-Antwort im Browser geprüft.
+
+### UI-Größe auf dem iPhone SE (moderat, nur berührte Bereiche)
+- Scanner: kleinere Abstände (Status 12 px Abstand, "Code eintippen" 28 px vom Rand, Eingabe-Panel mit weniger Innenabstand).
+- Sheets (`max-width: 374px` oder `max-height: 667px`): Hauptbutton 40 px statt 44 px Höhe, kleinere Außenabstände bei Karten, Hinweisen und Restkalorien-Zeile; Debug-Log-Button 40 px.
+- Untergrenzen eingehalten: Tippfläche >= 40 px (der Audit meldet keine kleineren Buttons in den geprüften Sheets), Schrift >= 0,8125 rem. Die rem-Skala für Dynamic Type bleibt unverändert; Schriftgrößen wurden nicht verkleinert, nur Abstände und der Hauptbutton.
+- Nicht verkleinert: globale Tokens (`--nt-touch`, Seiten-Layout). Das wäre ein App-weiter Eingriff und braucht einen Gerätetest.
+
+### Verifikation
+`tsc` sauber, Lint sauber, 128 Dateien / 1247 Unit-Tests grün, `ng build` nur Tesseract-ESM-Warnungen, Worker-Tests 78/78, E2E 43/43 gegen den Produktions-Build (u. a. `scan:` und `ki-lesbar`).
+
+### Offen / nicht geprüft
+- Echtes iPhone SE: Dekodierzeit des Barcodes, Kamera-Freigabe nach Scan, Haptik und tatsächliche Größenwirkung sind nicht gemessen (nur Chromium mit Fake-Stream).
+- Die Etikett-Dauer von ca. 21 s ist serverseitig; die Wirkung von `GEMINI_THINKING_LEVEL` ist nach Deploy zu messen.
+- Die Fokus-Falle wurde per Messung im Chromium nachgewiesen; Safari/WebKit kann sich beim Overlay-Abbau anders verhalten.
+
+## Bugs 1.5-1.9 (Nährwerte-Bereich, Sheet-Abstand, Sheet-Kopf, Übersetzung, Schalter) – 2026-11-10
+
+### 1.5 "Nährwerte anpassen" klappt zu (Ursache gemessen)
+- Ursache: Der `ion-accordion-group` hörte auf `(ionChange)`. Das Ereignis von `ion-input` (und `ion-toggle`) sprudelt zum Akkordeon hoch. Gemessen: beim Wechsel von Eiweiß zu Kohlenhydrate kommt am Akkordeon `ionChange` mit Ziel `ION-INPUT` und `detail.value = "21"`. Der Handler setzte den Öffnungszustand auf "21" (bei einem Schalter auf undefined), der Bereich schloss sich, die Eingaben waren unsichtbar. Kein ngIf/Re-Init-Problem. Fehlerklasse: gebubbeltes Ereignis eines Kindes wird als Ereignis des Containers gelesen.
+- Fix: `resolveAdjustOpen()` (`add-entry-logic.ts`) wertet nur Ereignisse, deren `target` das Akkordeon selbst ist. Das manuelle Formular startet weiterhin offen; nur die Kopfzeile schließt.
+- Weitere Stellen geprüft: es gibt nur diesen einen Akkordeon; `ionChange` an `ion-segment`/`ion-select` (Profil, Fastfood, Einkauf, Tagebuch, Rezepte, Einstellungen) umschließt keine Eingabefelder. Keine weitere Fundstelle.
+- Tests: Unit `resolveAdjustOpen` (3), E2E `sheets: Nährwerte anpassen bleibt offen ...` (Eiweiß, Kohlenhydrate, Fett, kcal-Schalter, Werte bleiben).
+
+### 1.6 Sheet bis ganz an den oberen Rand (gemessen)
+- Ursache: Ionic-Sheets ohne Breakpoints haben auf dem Phone `--height: 100%`; gemessen `top = 0` bei 375x667, 320x568 und 375x812.
+- Fix zentral in neuer `src/styles/sheets.scss` (in `angular.json` eingehängt; `overlays-and-polish.scss` wäre über 400 Zeilen gekommen): `--nt-sheet-top-gap = env(safe-area-inset-top) + 16px`; Phone (< 768 px) `--height: calc(100% - gap)` und `align-items: flex-end`. Vollbild-Modals (Scanner, Kochmodus), Datepicker-Sheet und Tablet-Regel bleiben unberührt.
+- Gemessen nachher: Abstand oben 16 px bei 375x667 und 320x568 (Chromium, Safe Area 0). Echte Safe Area nur über `env()` begründet, nicht gemessen.
+
+### 1.7 Sheet-Kopf: Titel und "Abbrechen" überlappen
+- Ursache: feste Seitenspalten (88 px, unter 375 px nach Inhalt), Titel ohne Kürzung (`overflow-wrap: anywhere`); die Mahlzeiten-Liste überschrieb das Raster zusätzlich mit 80 px.
+- Fix: `.nt-sheet-header` (`foundation.scss`): Raster `auto / 1fr / auto`, Titel einzeilig mit Ellipsis. Abbrechen/Schließen in allen 15 Sheet-Köpfen als X-Icon-Button `.nt-sheet-close` (aria-label "Schließen", 40x40 px). Im Eintragen-Sheet bleibt "Fertig" als Text, sobald Einträge hinzugefügt wurden. Alle Kopf-Aktionen mind. 40 px (vorher 36 px beim Zurück-Pfeil). "Speichern" und "Fertig" bleiben Text.
+- Tests: E2E `sheets: Abstand oben und Kopf ohne Überlappung` (375x667 und 320x568, Titel "Zu Abendessen", Boxen überlappen nicht, Tippfläche >= 40 px) und langer Rezepttitel mit Ellipsis bei 320 px. `app.spec` und `recipes.spec` klicken `ion-button.nt-sheet-close` (ion-button reicht `aria-label` an den inneren Knopf weiter, daher Klasse statt Attribut).
+
+### 1.8 Rezept-Übersetzung langsam (echte Worker-Aufrufe, 4 Aufrufe insgesamt)
+- Messung `translateRecipe` (12 Zutaten, 6 Schritte, Prompt ca. 950 Zeichen, Antwort ca. 950 Zeichen): einzeln 8,4 s und 17,0 s; 4 parallel: gesamt 21,4 s (Einzelzeiten 10,8 / 20,2 / 14,7 / 21,4 s, Summe 67 s). Bisher lief `translateAll` strikt nacheinander: bei 4 Rezepten ca. 35-67 s, bei 8 Rezepten ca. 1-2 Minuten.
+- Ursache: Zeit ist Modell-Antwortzeit (wie bei 1.3, vermutlich Denkzeit), nicht Prompt oder Netz; dazu serielle Aufrufe. Ein großer Sammelaufruf wurde nicht gemessen (Worker-Änderung nötig, nicht deployt).
+- Umgesetzt: `translateAll` mit bis zu 4 parallelen Aufrufen (`TRANSLATE_CONCURRENCY`), Reihenfolge und Fortschritt (n/m) bleiben. Cache-Schlüssel jetzt nur aus Sprache und Inhalts-Hash (vorher inklusive Rezept-Id, dasselbe Rezept unter neuer Id wurde neu übersetzt). Der persistente Cache (StorageService, 120 Einträge) und das Zusammenfassen gleichzeitiger Aufrufe bestanden schon. Ladezustand: Statuszeile im Wochenplan nennt die mögliche Dauer und dass Bekanntes sofort kommt. Alte Cache-Einträge (alter Schlüssel) werden einmal ignoriert.
+- Nachher (aus der Parallelmessung abgeleitet): 4 Rezepte ca. 21 s statt ca. 35-67 s; 8 Rezepte zwei Wellen, grob 30-40 s. Keine End-zu-End-Messung mit echtem Plan (Tagesdeckel).
+- Offen: `GEMINI_THINKING_LEVEL` im Worker (nicht deployt) ist vermutlich der größte Hebel; nach Deploy messen. Bei Rate-Limit durch 4 parallele Aufrufe fällt ein Rezept auf das Wörterbuch zurück ("Erneut übersetzen" bleibt); in den Testaufrufen kam kein Limit.
+- Tests: Unit `translateAll` parallel (max 4, Reihenfolge, Fortschritt); gleicher Inhalt unter anderer Id nur ein Aufruf.
+
+### 1.9 "Aus meinen Rezepten planen"
+- Befund: Im Code ist das ein reiner Aktions-Button ohne Zustand (ruft `generate()`), mit gleichlautender Überschrift darüber; ein An/Aus-Verhalten gab es nicht. Der Eindruck "aufklappbar, aber An/Aus" kommt vermutlich aus Überschrift plus Outline-Button plus Chips darunter. Die Stelle in der laufenden App habe ich nicht auf einem Gerät gesehen.
+- Umgesetzt (Annahme, bitte prüfen): `ion-toggle` "Aus meinen Rezepten planen" im Wochenplan-Formular mit Zustandstext ("An: ..." / "Aus: ..."). An: ein Hauptknopf "Plan aus meinen Rezepten erstellen" samt Budget/Markt. Aus: "Wochenplan erstellen" (online). Ohne Online-Rezeptsuche ist der Schalter erzwungen an und gesperrt. Beide Wege bleiben erreichbar, Testids `week-plan-btn` und `own-plan-btn` unverändert.
+- Tests: E2E `weekplan:` (Schalter-Rolle, `aria-checked`, Zustandstext, Knopfwechsel, Standardzustand). Der gesperrte Zustand ohne Zugang ist nicht E2E-geprüft (im Test gibt es immer den Standard-Proxy).
+
+### UI-Größe (moderat, berührte Bereiche)
+- Sheet-Kopf: Seitenspalten und Aktionen 40 px statt 44 px, Titel einzeilig; Schriftgrößen unverändert (rem-Skala, >= 0,8125 rem). Wochenplan-Schalter mit Standardmaßen. Tippflächen >= 40 px.
+
+### Dateien
+- 1.5: `diary/add-entry-sheet/add-entry-logic.{ts,spec.ts}`, `add-entry-sheet.component.{ts,html}`.
+- 1.6/1.7: `src/styles/sheets.scss` (neu), `foundation.scss`, `angular.json`, `meals/meals-list.component.scss`, 12 HTML-Dateien mit Sheet-Kopf.
+- 1.8: `core/recipes/translate/{recipe-translate,translation-cache}.ts`, `recipe-translate.spec.ts`, `shopping/week-plan/week-plan-cards.component.html`.
+- 1.9: `shopping/shopping.page.{html,ts,scss}`.
+- E2E: `e2e/specs/sheets.spec.mjs` (neu, 6 Tests), `e2e/run.mjs`, Anpassungen in `app.spec.mjs`, `recipes.spec.mjs`.
+
+### Verifikation
+`tsc` sauber, Lint sauber, 128 Dateien / 1252 Unit-Tests grün, `ng build` ohne Budget-Warnung (`shopping.page.scss` musste um ca. 100 Byte gekürzt werden), E2E 49/49 gegen den Produktions-Build.
+
+### Nicht geprüft
+- Echtes iPhone SE, echte Safe Area, WebKit-Verhalten von `align-items: flex-end` bei Ionic-Modals.
+- 1.5 als E2E gegen den alten Stand: Ursache per Ereignisprotokoll belegt (`ionChange` von `ION-INPUT` am Akkordeon); der erste Rot-Lauf hatte zusätzlich einen Testfehler (Kopfzeilen-Tipp schloss den schon offenen Bereich), danach nur grün gemessen.
+- Reale Gesamtzeit der Plan-Übersetzung nach dem Fix.
+
+## Teil 2: Fehlerklassen und kompakte UI (2026-11-10)
+Details und Funde mit Datei:Zeile: `docs/review-2/FEHLERKLASSEN.md`.
+
+### Behoben
+- Doppel-Tipp oeffnete zwei Sheets (recipes.page.ts `openOnlineSearch`, week-plan-cards `open`): Sperre mit try/finally.
+- open-prices.provider ohne Timeout: `timeout(FOOD_TIMEOUT_MS)`.
+- Layout klein: Drill-Down-Abstand, Rezept-Detail bei 320 px, Tippflaeche Rezepttitel, Schrift < 13 px.
+- UI kompakter auf iPhone SE: `src/styles/compact-phone.scss` (zuletzt geladen), `tabs.page.scss`, Hero-Clamp in `dashboard.page.scss`.
+
+### Tests
+- Neu: `e2e/specs/sheet-audit.spec.mjs` (13 Sheets + 5 Seiten, je 2 Viewports), `e2e/specs/klassen.spec.mjs` (2), Unit-Test open-prices Timeout, `e2e/shots-size.mjs`.
+- Offen: Wochenplan-Suche sequentiell, fastfood-sheet veraltetes Ergebnis, rohes fetch in settings.page.ts, echtes iPhone SE.

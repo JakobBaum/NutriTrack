@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
+import { FOOD_TIMEOUT_MS } from '../food/food-errors';
 
 const PRICES_URL = 'https://prices.openfoodfacts.org/api/v1/prices';
 
@@ -41,7 +42,7 @@ export class OpenPricesProvider {
       res = await firstValueFrom(
         this.http.get<OpenPricesResponse>(PRICES_URL, {
           params: { product_code: code, order_by: '-date', size: String(limit) },
-        }),
+        }).pipe(timeout(FOOD_TIMEOUT_MS)),
       );
     } catch {
       return null;

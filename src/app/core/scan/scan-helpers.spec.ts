@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { BarcodeScannerService } from './barcode-scanner.service';
+import {
+  BarcodeScannerService, SCAN_ATTEMPT_DELAY_MS, SCAN_FORMAT_NAMES, SCAN_VIDEO_CONSTRAINTS,
+} from './barcode-scanner.service';
 
 type DecodeCallback = (result: { getText(): string } | undefined, err: unknown) => void;
 
@@ -25,7 +27,16 @@ describe('BarcodeScannerService.start', () => {
     const video = document.createElement('video');
     const res = await service.start(video, () => undefined);
     expect(res).toBe(controls);
-    expect(decodeFromConstraints.mock.calls[0][0]).toEqual({ video: { facingMode: 'environment' } });
+    expect(decodeFromConstraints.mock.calls[0][0]).toEqual({ video: SCAN_VIDEO_CONSTRAINTS });
+  });
+
+  it('fragt Rückkamera in 720p an (iOS liefert sonst 640x480, zu grob für EAN)', () => {
+    expect(SCAN_VIDEO_CONSTRAINTS).toEqual({ facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } });
+  });
+
+  it('nennt nur Handelscode-Formate (EAN/UPC/Code 128), keine 2D-Codes', () => {
+    expect(SCAN_FORMAT_NAMES).toEqual(['EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'CODE_128']);
+    expect(SCAN_ATTEMPT_DELAY_MS).toBeLessThanOrEqual(150);
   });
 
   it('meldet erkannte Codes', async () => {

@@ -62,7 +62,7 @@
         <div class="nt-sheet-header__start"></div>
         <h2 class="nt-sheet-header__title" role="heading" aria-level="2">{{ editingId() ? 'Mahlzeit bearbeiten' : 'Mahlzeit anlegen' }}</h2>
         <div class="nt-sheet-header__end">
-          <ion-button fill="clear" (click)="closeCreate()">Abbrechen</ion-button>
+          <ion-button fill="clear" class="nt-sheet-close" (click)="closeCreate()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
         </div>
       </div>
     </ion-header>
@@ -152,7 +152,7 @@
         </div>
         <h2 class="nt-sheet-header__title" role="heading" aria-level="2">{{ pickerView() === 'manual' ? 'Manuell hinzufügen' : 'Lebensmittel' }}</h2>
         <div class="nt-sheet-header__end">
-          <ion-button fill="clear" (click)="closePicker()">Abbrechen</ion-button>
+          <ion-button fill="clear" class="nt-sheet-close" (click)="closePicker()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
         </div>
       </div>
     </ion-header>

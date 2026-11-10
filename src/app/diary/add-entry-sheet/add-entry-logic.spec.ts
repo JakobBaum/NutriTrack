@@ -5,6 +5,7 @@ import {
   entriesFromSavedMeal,
   entryFromRecent,
   entryFromRecipe,
+  resolveAdjustOpen,
   savedMealProtein,
   sumEntryTotals,
 } from './add-entry-logic';
@@ -120,6 +121,22 @@ describe('add-entry-logic', () => {
       const result = checkAddForm({ ...ok, hasFacts: false });
       expect(result?.openAdjust).toBe(true);
       expect(result?.message).toMatch(/Kalorien/);
+    });
+  });
+
+  describe('resolveAdjustOpen', () => {
+    const group = {};
+    it('übernimmt den Wert, wenn das Ereignis vom Akkordeon selbst kommt', () => {
+      expect(resolveAdjustOpen({ target: group, currentTarget: group, detail: { value: 'adjust' } }, undefined)).toBe('adjust');
+      expect(resolveAdjustOpen({ target: group, currentTarget: group, detail: { value: undefined } }, 'adjust')).toBeUndefined();
+    });
+    it('ignoriert ionChange eines Feldes im Bereich (sprudelt zum Akkordeon hoch)', () => {
+      const input = {};
+      expect(resolveAdjustOpen({ target: input, currentTarget: group, detail: { value: '21' } }, 'adjust')).toBe('adjust');
+    });
+    it('ignoriert den Schalter im Bereich (boolescher Wert)', () => {
+      const toggle = {};
+      expect(resolveAdjustOpen({ target: toggle, currentTarget: group, detail: { value: 'on' } }, 'adjust')).toBe('adjust');
     });
   });
 });

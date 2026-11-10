@@ -361,9 +361,18 @@ export class RecipesPage implements OnDestroy {
 
   /** Öffnet die Online-Rezeptsuche (spoonacular) als Sheet. */
   async openOnlineSearch(): Promise<void> {
-    const modal = await this.modals.create({ component: OnlineSearchComponent });
-    await modal.present();
+    // Doppel-Tipp: sonst lagen zwei Sheets uebereinander.
+    if (this.onlineSearchOpening) return;
+    this.onlineSearchOpening = true;
+    try {
+      const modal = await this.modals.create({ component: OnlineSearchComponent });
+      await modal.present();
+    } finally {
+      this.onlineSearchOpening = false;
+    }
   }
+
+  private onlineSearchOpening = false;
 
   // --- Import ---
   openImport(): void {

@@ -13,6 +13,7 @@
     </button>
   </div>
   <input #labelInput type="file" accept="image/*" capture="environment" hidden (change)="onLabelFile($event)" />
+  @if (scanStatus(); as status) { <p class="nt-source-status" role="status"><ion-spinner name="crescent"></ion-spinner> {{ status }}</p> }
   @if (error(); as message) { <p class="nt-source-error" role="alert">{{ message }}</p> }
 </nt-food-search>
 

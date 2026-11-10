@@ -119,7 +119,7 @@
         <div class="nt-sheet-header__start"></div>
         <h2 class="nt-sheet-header__title" role="heading" aria-level="2">{{ editId() ? 'Rezept bearbeiten' : 'Neues Rezept' }}</h2>
         <div class="nt-sheet-header__end">
-          <ion-button fill="clear" (click)="closeModal()">Abbrechen</ion-button>
+          <ion-button fill="clear" class="nt-sheet-close" (click)="closeModal()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
         </div>
       </div>
     </ion-header>
@@ -322,7 +322,7 @@
           <div class="nt-sheet-header__start"></div>
           <h2 class="nt-sheet-header__title" role="heading" aria-level="2">{{ r.title }}</h2>
           <div class="nt-sheet-header__end">
-            <ion-button fill="clear" (click)="closeDetail()">Schließen</ion-button>
+            <ion-button fill="clear" class="nt-sheet-close" (click)="closeDetail()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
           </div>
         </div>
       </ion-header>
@@ -376,7 +376,7 @@
         <div class="nt-sheet-header__start"></div>
         <h2 class="nt-sheet-header__title" role="heading" aria-level="2">Rezept importieren</h2>
         <div class="nt-sheet-header__end">
-          <ion-button fill="clear" (click)="closeImport()">Abbrechen</ion-button>
+          <ion-button fill="clear" class="nt-sheet-close" (click)="closeImport()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
         </div>
       </div>
     </ion-header>
@@ -470,7 +470,7 @@
         <div class="nt-sheet-header__start"></div>
         <h2 class="nt-sheet-header__title" role="heading" aria-level="2">Zutat hinzufügen</h2>
         <div class="nt-sheet-header__end">
-          <ion-button fill="clear" (click)="closePicker()">Abbrechen</ion-button>
+          <ion-button fill="clear" class="nt-sheet-close" (click)="closePicker()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
         </div>
       </div>
     </ion-header>

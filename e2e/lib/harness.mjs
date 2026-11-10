@@ -34,14 +34,14 @@ async function loadPlaywright() {
 }
 
 /** Startet Chromium (lokale ms-playwright-Installation, sonst Standard, sonst Edge). */
-export async function launchBrowser() {
+export async function launchBrowser(extraArgs = []) {
   const { chromium } = await loadPlaywright();
   const exe = process.env.CHROMIUM_PATH
     ?? path.join(process.env.LOCALAPPDATA ?? '', 'ms-playwright', 'chromium-1248', 'chrome-win64', 'chrome.exe');
   const attempts = [
-    () => (fs.existsSync(exe) ? chromium.launch({ headless: true, executablePath: exe }) : Promise.reject(new Error('no exe'))),
-    () => chromium.launch({ headless: true }),
-    () => chromium.launch({ headless: true, channel: 'msedge' }),
+    () => (fs.existsSync(exe) ? chromium.launch({ headless: true, executablePath: exe, args: extraArgs }) : Promise.reject(new Error('no exe'))),
+    () => chromium.launch({ headless: true, args: extraArgs }),
+    () => chromium.launch({ headless: true, channel: 'msedge', args: extraArgs }),
   ];
   let lastError;
   for (const attempt of attempts) {

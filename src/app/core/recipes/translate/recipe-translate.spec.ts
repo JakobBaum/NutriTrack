@@ -106,4 +106,34 @@ describe('RecipeTranslateService', () => {
     ai.translateSearchQuery.mockRejectedValueOnce(new Error('x'));
     expect((await service.translateQuery('Hähnchen')).query).toBe('Hähnchen');
   });
+
+  it('translates identical content only once, even under another recipe id', async () => {
+    const { service, translateRecipe } = setup(true);
+    await service.translate(BASE);
+    const again = await service.translate({ ...BASE, id: '999' });
+    expect(again.title).toBe('Linsensuppe');
+    expect(translateRecipe).toHaveBeenCalledTimes(1);
+  });
+
+  it('translateAll runs several recipes in parallel (max 4), keeps the order and reports progress', async () => {
+    let running = 0;
+    let peak = 0;
+    const translateRecipe = vi.fn(async (texts: { title: string }) => {
+      running++;
+      peak = Math.max(peak, running);
+      await new Promise((r) => setTimeout(r, 20));
+      running--;
+      return { ...GERMAN, title: 'DE ' + texts.title };
+    });
+    const { service } = setup(true, translateRecipe as never);
+    const recipes = Array.from({ length: 9 }, (_, i) => ({ ...BASE, id: 'r' + i, title: 'Soup ' + i }));
+    const progress: number[] = [];
+    const out = await service.translateAll(recipes, (done) => progress.push(done));
+    expect(out.map((r) => r.title)).toEqual(recipes.map((r) => 'DE ' + r.title));
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(4);
+    expect(progress.at(0)).toBe(0);
+    expect(progress.at(-1)).toBe(9);
+    expect(progress).toEqual([...progress].sort((a, b) => a - b));
+  });
 });

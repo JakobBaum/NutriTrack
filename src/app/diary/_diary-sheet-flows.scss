@@ -232,14 +232,23 @@ ion-searchbar.nt-searchbar {
     font-size: var(--nt-fs-headline);
   }
 
+  ion-card-title,
+  ion-card-subtitle,
+  p {
+    overflow-wrap: anywhere;
+  }
+
   ion-card-subtitle {
     color: var(--nt-secondary);
+    font-size: var(--nt-fs-caption);
+    letter-spacing: 0;
     text-transform: none;
   }
 
   p {
     margin: 0 0 6px;
     font-size: var(--nt-fs-caption);
+    line-height: 1.4;
     color: var(--nt-secondary);
   }
 }
@@ -254,4 +263,24 @@ ion-searchbar.nt-searchbar {
   color: var(--nt-secondary);
   font-size: var(--nt-fs-caption);
   font-weight: 600;
+}
+
+// iPhone SE (320 x 568 / 375 x 667): Sheets etwas kompakter. Tippflächen bleiben >= 40 px, Schrift >= 0,8125 rem.
+@media (max-width: 374px), (max-height: 667px) {
+  .sheet-action {
+    --padding-top: 0;
+    --padding-bottom: 0;
+    min-height: 40px;
+    margin: var(--nt-space-3) var(--nt-space-3) 0;
+  }
+
+  .ff-card {
+    margin: var(--nt-space-2) var(--nt-space-3);
+  }
+
+  .scan-hint,
+  .ff-remaining {
+    margin-left: var(--nt-space-4);
+    margin-right: var(--nt-space-4);
+  }
 }

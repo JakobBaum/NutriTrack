@@ -125,7 +125,7 @@ ion-content {
   }
 
   &__big {
-    font-size: clamp(1.875rem, 11vw, 3rem);
+    font-size: clamp(1.875rem, var(--nt-hero-vw, 11vw), var(--nt-hero-max, 3rem));
     font-weight: 700;
     line-height: 1;
     letter-spacing: -1.5px;
@@ -413,7 +413,7 @@ ion-content {
   }
 
   &__pct {
-    font-size: 0.75rem;
+    font-size: var(--nt-fs-caption);
     font-weight: 400;
     color: var(--nt-secondary);
     display: block;

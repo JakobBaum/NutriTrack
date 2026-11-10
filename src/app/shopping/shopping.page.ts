@@ -156,6 +156,9 @@ export class ShoppingPage implements OnDestroy {
   readonly onlineAvailable = computed(() => this.weekPlanService.isAvailable());
   /** Generator ausgeklappt; ohne Plan immer, mit Plan nur auf Wunsch. */
   readonly generatorOpen = signal(false);
+  /** Schalter "Aus meinen Rezepten planen"; ohne Online-Rezeptsuche ist er erzwungen an. */
+  private readonly ownRecipes = signal(false);
+  readonly ownMode = computed(() => this.ownRecipes() || !this.onlineAvailable());
   readonly showForm = computed(() => this.weekPlan() === null || this.generatorOpen());
   readonly planToastOpen = signal(false);
   readonly planToastMessage = signal('');
@@ -317,6 +320,10 @@ export class ShoppingPage implements OnDestroy {
   }
 
   /** Wochenplan aus Online-Rezepten erstellen; Zutaten landen in der Einkaufsliste. */
+  setOwnRecipes(checked: boolean): void {
+    this.ownRecipes.set(checked);
+  }
+
   async generateWeekPlan(): Promise<void> {
     if (!this.inputsValid()) return;
     this.deletion.flush();

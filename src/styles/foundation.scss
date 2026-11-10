@@ -137,15 +137,17 @@ ion-select::after {
   }
 }
 
-// Modal-Kopf (Sheet): links/rechts Aktionen, Titel mittig, 16 px Rand. Der Griff kommt vom ion-modal.
+// Modal-Kopf (Sheet): Start / Titel / Ende. Seitenspalten nach Inhalt (mind. 40 px Tippflaeche), der Titel
+// nimmt den Rest und kuerzt mit Ellipsis, damit er nie unter einer Schaltflaeche liegt (iPhone SE, 320 px).
+// Der Griff kommt vom ion-modal.
 .nt-sheet-header {
+  --nt-sheet-side: 40px;
   box-sizing: border-box;
   display: grid;
-  // Seitenspalten gleich breit (Titel exakt mittig), mind. 88 px fuer "Abbrechen"/"Speichern".
-  grid-template-columns: minmax(88px, 1fr) auto minmax(88px, 1fr);
+  grid-template-columns: minmax(var(--nt-sheet-side), auto) minmax(0, 1fr) minmax(var(--nt-sheet-side), auto);
   align-items: center;
   gap: var(--nt-space-2);
-  min-height: var(--nt-touch);
+  min-height: var(--nt-sheet-side);
   padding: var(--nt-space-2) var(--nt-page-gutter) 0;
 
   &__title {
@@ -155,15 +157,16 @@ ion-select::after {
     font-weight: 600;
     color: var(--nt-ink);
     text-align: center;
-    text-wrap: balance;
-    overflow-wrap: anywhere;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   &__start,
   &__end {
     display: flex;
     align-items: center;
-    min-width: var(--nt-touch);
+    min-width: var(--nt-sheet-side);
   }
 
   &__start { justify-self: start; }

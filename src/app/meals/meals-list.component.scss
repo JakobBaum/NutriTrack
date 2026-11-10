@@ -66,8 +66,6 @@ ion-modal ion-content {
   --padding-end: var(--nt-page-gutter);
 }
 
-// Sheet-Kopf: Seitenspalten mind. 80 px, damit der Titel nie unter "Abbrechen" liegt
-ion-modal .nt-sheet-header { grid-template-columns: minmax(80px, auto) minmax(0, 1fr) minmax(80px, auto); }
 
 // "Eintragen" als beschriftete Pille (44 px), ersetzt das bloße +-Symbol
 .meal-use {

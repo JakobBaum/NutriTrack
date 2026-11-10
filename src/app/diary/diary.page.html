@@ -136,7 +136,7 @@
     <ion-header class="ion-no-border sheet-header">
       <div class="nt-sheet-header">
         <div class="nt-sheet-header__start">
-          <ion-button fill="clear" (click)="requestCloseEdit()">Abbrechen</ion-button>
+          <ion-button fill="clear" class="nt-sheet-close" (click)="requestCloseEdit()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
         </div>
         <h2 class="nt-sheet-header__title" role="heading" aria-level="2">Eintrag bearbeiten</h2>
         <div class="nt-sheet-header__end">

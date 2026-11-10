@@ -610,6 +610,15 @@ describe('Gemini-Konfiguration und Fehlerklassen', () => {
     assert.equal(cfg.responseMimeType, 'application/json');
   });
 
+  it('sendet thinkingConfig nur, wenn GEMINI_THINKING_LEVEL gesetzt ist', async () => {
+    mockFetch(() => geminiReply({ name: 'x', facts: {} }));
+    await worker.fetch(post({ fn: 'recognizeLabel', payload: { imageBase64: 'QUJD' } }), ENV);
+    assert.equal(JSON.parse(upstream[0].init.body).generationConfig.thinkingConfig, undefined);
+    upstream = [];
+    await worker.fetch(post({ fn: 'recognizeLabel', payload: { imageBase64: 'QUJD' } }), { ...ENV, GEMINI_THINKING_LEVEL: 'low' });
+    assert.deepEqual(JSON.parse(upstream[0].init.body).generationConfig.thinkingConfig, { thinkingLevel: 'low' });
+  });
+
   it('meldet blockierte Antworten als 422, nicht als überlastet', async () => {
     mockFetch(() => new Response(JSON.stringify({ promptFeedback: { blockReason: 'SAFETY' } }), { status: 200 }));
     const res = await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), ENV);

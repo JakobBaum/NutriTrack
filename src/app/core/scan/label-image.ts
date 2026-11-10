@@ -34,8 +34,11 @@ export async function prepareLabelImage(base64: string): Promise<HTMLCanvasEleme
   return canvas;
 }
 
+/** Längste Kante für KI-Uploads: reicht für Etiketten und Rezepte, hält den Upload klein (mobiles Netz). */
+export const UPLOAD_MAX_EDGE_PX = 1280;
+
 /** JPEG-Qualität beim Verkleinern für KI-Uploads. */
-const UPLOAD_JPEG_QUALITY = 0.85;
+export const UPLOAD_JPEG_QUALITY = 0.7;
 
 /** Abhängigkeiten von {@link shrinkPhotoForUpload}; in Tests ersetzbar. */
 export interface PhotoShrinkDeps {
@@ -62,7 +65,7 @@ const browserDeps: PhotoShrinkDeps = {
  */
 export async function shrinkPhotoForUpload(
   base64: string,
-  maxEdge: number = OCR_MAX_EDGE_PX,
+  maxEdge: number = UPLOAD_MAX_EDGE_PX,
   deps: PhotoShrinkDeps = browserDeps,
 ): Promise<string> {
   try {

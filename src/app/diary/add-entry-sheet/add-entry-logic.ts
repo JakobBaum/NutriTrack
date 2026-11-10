@@ -111,3 +111,20 @@ export function checkAddForm(i: AddFormCheckInput): AddFormError | null {
   }
   return null;
 }
+
+/** Ionic-Ereignis eines Akkordeons (nur die benötigten Felder). */
+export interface AccordionChangeEvent {
+  readonly target: unknown;
+  readonly currentTarget: unknown;
+  readonly detail: { readonly value?: unknown };
+}
+
+/**
+ * Neuer Öffnungszustand des Akkordeons. `ionChange` von Feldern und Schaltern im Bereich sprudelt zum
+ * Akkordeon hoch (Wert z. B. "21" oder true) und würde es sonst schließen; nur Ereignisse vom Akkordeon selbst zählen.
+ */
+export function resolveAdjustOpen(event: AccordionChangeEvent, current: string | undefined): string | undefined {
+  if (event.target !== event.currentTarget) return current;
+  const value = event.detail.value;
+  return typeof value === 'string' ? value : undefined;
+}

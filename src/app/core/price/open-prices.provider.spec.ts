@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -26,6 +26,18 @@ async function priceFor(items: unknown) {
 }
 
 describe('OpenPricesProvider', () => {
+  it('gibt nach Zeitlimit null zurueck, statt ewig zu warten', async () => {
+    vi.useFakeTimers();
+    try {
+      const p = provider.priceByBarcode('400');
+      http.expectOne((r) => r.url === PRICES_URL);
+      await vi.advanceTimersByTimeAsync(11000);
+      expect(await p).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('fragt bei leerem Barcode nichts an', async () => {
     expect(await provider.priceByBarcode('  ')).toBeNull();
     http.expectNone(() => true);

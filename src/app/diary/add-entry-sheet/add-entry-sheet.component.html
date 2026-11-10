@@ -13,7 +13,11 @@
         </div>
         <h2 class="nt-sheet-header__title" role="heading" aria-level="2">{{ modalTitle() }}</h2>
         <div class="nt-sheet-header__end">
-          <ion-button fill="clear" data-testid="add-close" (click)="requestCloseAdd()">{{ addedCount() > 0 ? 'Fertig' : 'Abbrechen' }}</ion-button>
+          @if (addedCount() > 0) {
+            <ion-button fill="clear" data-testid="add-close" (click)="requestCloseAdd()">Fertig</ion-button>
+          } @else {
+            <ion-button fill="clear" class="nt-sheet-close" data-testid="add-close" (click)="requestCloseAdd()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
+          }
         </div>
       </div>
     </ion-header>
@@ -210,7 +214,7 @@
             <p class="preview__rest">Kohlenhydrate {{ form.carbsG | ntNum }} g · Fett {{ form.fatG | ntNum }} g</p>
           </div>
 
-          <ion-accordion-group class="diary-list diary-list--spaced adjust-group" [value]="adjustOpen()" (ionChange)="setAdjustOpen($event.detail.value)">
+          <ion-accordion-group class="diary-list diary-list--spaced adjust-group" [value]="adjustOpen()" (ionChange)="onAdjustChange($any($event))">
             <ion-accordion value="adjust">
               <ion-item slot="header" lines="none">
                 <ion-label>Nährwerte anpassen</ion-label>
