@@ -4,7 +4,7 @@
 %row { display: flex; align-items: center; gap: 6px; }
 %center { display: inline-flex; align-items: center; justify-content: center; }
 %tap-44 { min-width: var(--nt-touch); min-height: var(--nt-touch); }
-%note { margin: var(--nt-space-2) 0 0; font-size: var(--nt-fs-caption); color: var(--nt-secondary); }
+%note { margin: var(--nt-space-2) 0 0; font-size: .8125rem; color: var(--nt-secondary); }
 
 $footer-clearance: calc(var(--nt-touch) + var(--nt-space-6) + var(--nt-space-4) + env(safe-area-inset-bottom, 0px));
 
@@ -58,7 +58,7 @@ ion-modal ion-content {
   padding: var(--nt-space-4);
 
   &__title { margin: 0; font-size: var(--nt-fs-headline); font-weight: 600; color: var(--nt-ink); }
-  &__title-btn { padding: 0; background: none; border: 0; font: inherit; color: inherit; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+  &__title-btn { display: flex; align-items: center; min-height: var(--nt-touch); padding: 0; background: none; border: 0; font: inherit; color: inherit; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
   &__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--nt-space-2); }
   &__head-text { min-width: 0; flex: 1; }
   &__meta { @extend %note; margin-top: var(--nt-space-2); }
@@ -77,7 +77,7 @@ ion-modal ion-content {
     gap: var(--nt-space-2);
     margin: var(--nt-space-3) 0 0;
     > div { min-width: 0; padding: var(--nt-space-2) var(--nt-space-3); background: var(--nt-ground); border-radius: 12px; }
-    dt { font-size: 0.75rem; color: var(--nt-secondary); }
+    dt { font-size: .8125rem; color: var(--nt-secondary); }
     dd { margin: 2px 0 0; font-size: var(--nt-fs-body); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--nt-ink); }
   }
 
@@ -89,6 +89,9 @@ ion-modal ion-content {
     margin-top: var(--nt-space-3);
     ion-button.recipe__btn {
       flex: 1 1 0;
+      min-width: 0;
+      --padding-start: 8px;
+      --padding-end: 8px;
       height: var(--nt-touch);
       margin: 0;
       --border-radius: var(--nt-radius-pill);
@@ -110,7 +113,7 @@ ion-modal ion-content {
 }
 
 .form-error { margin: 0 0 var(--nt-space-2); font-weight: 600; }
-.field-label { display: block; margin: var(--nt-space-5) var(--nt-space-1) 6px; font-size: var(--nt-fs-caption); font-weight: 400; }
+.field-label { display: block; margin: var(--nt-space-5) var(--nt-space-1) 6px; font-size: .8125rem; font-weight: 400; }
 
 // Zutat: Name oben, darunter "Menge | Einheit" und Naehrwert-Toggle
 .ing { display: flex; flex-direction: column; gap: var(--nt-space-2); min-width: 0; padding: var(--nt-space-3) 0; }
@@ -123,7 +126,7 @@ ion-modal ion-content {
   padding: 0;
   background: none;
   border: none;
-  font-size: 0.75rem;
+  font-size: .8125rem;
   color: var(--nt-muted);
   cursor: pointer;
   &--missing { color: var(--nt-warning); font-weight: 600; }
@@ -143,7 +146,7 @@ ion-modal ion-content {
     gap: 8px 6px;
     div { display: flex; flex-direction: column; align-items: center; }
     strong { font-size: 0.9375rem; }
-    span { font-size: 0.75rem; color: var(--nt-muted); }
+    span { font-size: .8125rem; color: var(--nt-muted); }
   }
   &__note { @extend %hint; margin: 10px 0 6px; font-size: 0.8125rem; }
   &__hint { @extend %hint; @extend %row; align-items: flex-start; margin: 0 0 10px; font-size: 0.8125rem; ion-icon { font-size: 18px; flex-shrink: 0; color: var(--nt-warning); } }
@@ -180,7 +183,7 @@ ion-modal ion-content {
   padding: var(--nt-space-4);
   background: var(--nt-card);
   border-radius: var(--nt-radius-card);
-  &__head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--nt-muted); h2 { margin: 0; font: inherit; } }
+  &__head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; font-size: .8125rem; font-weight: 700; text-transform: uppercase; color: var(--nt-muted); h2 { margin: 0; font: inherit; } }
   &__total { color: var(--nt-accent); }
   &__note { @extend %hint; margin: 10px 0 0; font-size: 0.8125rem; }
 }

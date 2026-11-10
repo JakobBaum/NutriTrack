@@ -16,7 +16,7 @@ ion-content {
 .wp-macros {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--nt-space-2); margin: var(--nt-space-3) 0 0;
   > div { padding: var(--nt-space-2) var(--nt-space-3); background: var(--nt-card); border-radius: 12px; min-width: 0; }
-  dt { font-size: 0.75rem; color: var(--nt-secondary); }
+  dt { font-size: var(--nt-fs-caption); color: var(--nt-secondary); }
   dd { margin: 0; font-weight: 600; color: var(--nt-ink); font-variant-numeric: tabular-nums; }
   &__main dd { color: var(--nt-protein); }
 }

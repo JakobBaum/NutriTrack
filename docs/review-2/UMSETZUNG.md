@@ -241,3 +241,16 @@ tsc sauber, Lint sauber, 127 Dateien / 1238 Unit-Tests grün, `ng build` nur Tes
 - Echtes iPhone SE, echte Safe Area, WebKit-Verhalten von `align-items: flex-end` bei Ionic-Modals.
 - 1.5 als E2E gegen den alten Stand: Ursache per Ereignisprotokoll belegt (`ionChange` von `ION-INPUT` am Akkordeon); der erste Rot-Lauf hatte zusätzlich einen Testfehler (Kopfzeilen-Tipp schloss den schon offenen Bereich), danach nur grün gemessen.
 - Reale Gesamtzeit der Plan-Übersetzung nach dem Fix.
+
+## Teil 2: Fehlerklassen und kompakte UI (2026-11-10)
+Details und Funde mit Datei:Zeile: `docs/review-2/FEHLERKLASSEN.md`.
+
+### Behoben
+- Doppel-Tipp oeffnete zwei Sheets (recipes.page.ts `openOnlineSearch`, week-plan-cards `open`): Sperre mit try/finally.
+- open-prices.provider ohne Timeout: `timeout(FOOD_TIMEOUT_MS)`.
+- Layout klein: Drill-Down-Abstand, Rezept-Detail bei 320 px, Tippflaeche Rezepttitel, Schrift < 13 px.
+- UI kompakter auf iPhone SE: `src/styles/compact-phone.scss` (zuletzt geladen), `tabs.page.scss`, Hero-Clamp in `dashboard.page.scss`.
+
+### Tests
+- Neu: `e2e/specs/sheet-audit.spec.mjs` (13 Sheets + 5 Seiten, je 2 Viewports), `e2e/specs/klassen.spec.mjs` (2), Unit-Test open-prices Timeout, `e2e/shots-size.mjs`.
+- Offen: Wochenplan-Suche sequentiell, fastfood-sheet veraltetes Ergebnis, rohes fetch in settings.page.ts, echtes iPhone SE.

@@ -1,0 +1,29 @@
+// Kompakte Phones (iPhone SE und schmaler als 390 px, oder niedrige Phones): globale Tokens ca. 6-10 % kleiner.
+// Bleibt bewusst bei rem (Dynamic Type / Root-Schrift wirkt weiter). Untergrenzen: Tippflaeche >= 40 px,
+// Tab-Leiste >= 44 pt, Schrift >= 0,8125 rem (Tab-Beschriftung ab 11 px). Wird zuletzt geladen (nach variables.scss).
+// Dokumentation: DESIGN.md, Abschnitt "Kompakte Phones".
+
+@media (max-width: 389px), (max-width: 767px) and (max-height: 700px) {
+  :root {
+    // Schrift (--nt-fs-caption bleibt 0,8125 rem)
+    --nt-fs-large-title: 1.9375rem; // 31 px statt 34
+    --nt-fs-hero: 2.25rem; // 36 px statt 40
+    --nt-hero-vw: 9.5vw; // Heute-Hero: 36 px bei 375 px (statt 41)
+    --nt-hero-max: 2.625rem;
+    --nt-fs-title: 1.25rem; // 20 px statt 22
+    --nt-fs-headline: 1rem; // 16 px statt 17
+    --nt-fs-body: 0.875rem; // 14 px statt 15
+
+    // Abstaende und Tippflaechen
+    --nt-space-4: 14px;
+    --nt-space-5: 18px;
+    --nt-space-6: 20px;
+    --nt-touch: 40px;
+    --nt-field-height: 48px;
+    --nt-grouped-row-min: 40px;
+
+    // Tab-Leiste: aussen 56 px (Knoepfe 44), Inhalt bekommt 8 + 56 + 20 Luft.
+    --nt-tabbar-height: 56px;
+    --nt-tabbar-clearance: calc(var(--ion-safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 84px);
+  }
+}

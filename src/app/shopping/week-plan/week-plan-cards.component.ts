@@ -44,14 +44,23 @@ export class WeekPlanCardsComponent {
     return recipeMetaLine(recipe);
   }
 
+  private isOpening = false;
+
   async open(recipe: WeekPlanRecipe): Promise<void> {
-    const modal = await this.modals.create({
-      component: WeekRecipeSheetComponent,
-      componentProps: { recipe, persons: this.plan()?.persons ?? recipe.portions },
-      breakpoints: SHEET_BREAKPOINTS,
-      initialBreakpoint: SHEET_INITIAL_BREAKPOINT,
-      handle: true,
-    });
-    await modal.present();
+    // Doppel-Tipp: sonst lagen zwei Sheets uebereinander.
+    if (this.isOpening) return;
+    this.isOpening = true;
+    try {
+      const modal = await this.modals.create({
+        component: WeekRecipeSheetComponent,
+        componentProps: { recipe, persons: this.plan()?.persons ?? recipe.portions },
+        breakpoints: SHEET_BREAKPOINTS,
+        initialBreakpoint: SHEET_INITIAL_BREAKPOINT,
+        handle: true,
+      });
+      await modal.present();
+    } finally {
+      this.isOpening = false;
+    }
   }
 }

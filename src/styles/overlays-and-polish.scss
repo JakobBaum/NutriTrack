@@ -263,7 +263,7 @@ textarea {
 // Text --nt-muted (5.5:1 auf #f7f5f1), Link --nt-text-accent (4.8:1) + Unterstreichung.
 .data-credit {
   margin: -4px 20px 12px;
-  font-size: 0.75rem;
+  font-size: var(--nt-fs-caption);
   color: var(--nt-muted);
 
   a {
