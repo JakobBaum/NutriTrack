@@ -297,19 +297,21 @@ export class ShoppingPage implements OnDestroy {
     return true;
   }
 
-  private async confirmNewWeekPlan(): Promise<boolean> {
+  /** Fragt, ob die bisherige Liste ersetzt wird: 'replace' = komplett leeren, 'keep' = Abgehaktes/Eigenes behalten, null = abbrechen. */
+  private async confirmNewWeekPlan(): Promise<'replace' | 'keep' | null> {
     const alert = await this.alertCtrl.create({
       header: 'Neuen Wochenplan erstellen?',
       message:
-        'Der bisherige Wochenplan wird ersetzt. In der Einkaufsliste bleiben abgehakte und selbst hinzugefügte Positionen erhalten, alle anderen werden ersetzt.',
+        'Der bisherige Wochenplan wird ersetzt. Soll die Einkaufsliste komplett überschrieben werden oder sollen abgehakte und selbst hinzugefügte Positionen bleiben?',
       buttons: [
         { text: 'Abbrechen', role: 'cancel' },
-        { text: 'Neu erstellen', role: 'confirm' },
+        { text: 'Positionen behalten', role: 'keep' },
+        { text: 'Liste überschreiben', role: 'replace' },
       ],
     });
     await alert.present();
     const { role } = await alert.onDidDismiss();
-    return role === 'confirm';
+    return role === 'replace' || role === 'keep' ? role : null;
   }
 
   private selectedMeals(): MealType[] {
@@ -327,7 +329,13 @@ export class ShoppingPage implements OnDestroy {
   async generateWeekPlan(): Promise<void> {
     if (!this.inputsValid()) return;
     this.deletion.flush();
-    if (this.weekPlan() !== null && !(await this.confirmNewWeekPlan())) return;
+    const hasListItems = (this.list()?.items.length ?? 0) > 0;
+    let keepExisting = true;
+    if (this.weekPlan() !== null || hasListItems) {
+      const choice = await this.confirmNewWeekPlan();
+      if (choice === null) return;
+      keepExisting = choice === 'keep';
+    }
     this.error.set(null);
     this.loading.set(true);
     try {
@@ -335,6 +343,7 @@ export class ShoppingPage implements OnDestroy {
         persons: this.persons,
         days: this.days,
         meals: this.selectedMeals(),
+        keepExisting,
       });
       this.generatorOpen.set(false);
       this.planToastMessage.set(`Wochenplan erstellt, ${itemCount} Zutaten in der Liste`);

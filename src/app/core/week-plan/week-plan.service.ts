@@ -14,10 +14,16 @@ import { WeekPlan } from './week-plan.model';
 
 export const NO_RECIPES_FOUND_MESSAGE = 'Keine passenden Rezepte gefunden. Versuche es später oder mit weniger Essenszeiten.';
 
+export const NO_REPLACEMENT_FOUND_MESSAGE = 'Kein anderes passendes Rezept gefunden. Versuche es später noch einmal.';
+/** Beim Tauschen mehr Treffer anfragen, damit nach dem Ausschließen noch Auswahl bleibt. */
+const REPLACE_REQUEST_FLOOR = 10;
+
 export interface WeekPlanOptions {
   persons: number;
   days: number;
   meals: MealType[];
+  /** false: bisherige Einkaufsliste komplett ersetzen (Standard: abgehakte und eigene Positionen behalten). */
+  keepExisting?: boolean;
 }
 
 export interface WeekPlanResult {
@@ -66,6 +72,7 @@ export class WeekPlanService {
         meals: opts.meals,
         dailyKcal: target?.kcal ?? null,
         dailyProteinG: target?.proteinG ?? null,
+        excludeIds: this.planStore.blocked(),
       });
     } catch (e: unknown) {
       throw toOnlineSearchError(e, typeof navigator !== 'undefined' && navigator.onLine === false);
@@ -82,8 +89,56 @@ export class WeekPlanService {
       notices: draft.notices,
     };
     this.planStore.set(plan);
-    const list = this.shopping.applyWeekPlan(plan);
+    const list = this.shopping.applyWeekPlan(plan, opts.keepExisting ?? true);
     return { plan, itemCount: list.items.length };
+  }
+
+  /**
+   * Entfernt ein Rezept aus dem Plan und schreibt die Einkaufsliste neu (abgehakte/eigene Positionen bleiben).
+   * Mit `neverAgain` wird es auch bei künftigen Plänen nicht mehr vorgeschlagen.
+   */
+  removeRecipe(recipeId: string, neverAgain: boolean): void {
+    const plan = this.planStore.plan();
+    if (!plan?.recipes.some((r) => r.id === recipeId)) return;
+    if (neverAgain) this.planStore.block([recipeId]);
+    const next: WeekPlan = { ...plan, recipes: plan.recipes.filter((r) => r.id !== recipeId) };
+    this.planStore.set(next);
+    this.shopping.applyWeekPlan(next);
+  }
+
+  /**
+   * Tauscht ein Rezept gegen ein neues derselben Mahlzeit (gleiche Eiweiß-/Kalorienvorgaben), ohne Duplikate
+   * und ohne gesperrte Rezepte. Bei Fehlern bleibt alles unverändert; das alte wird erst nach Erfolg gesperrt.
+   */
+  async replaceRecipe(recipeId: string, neverAgain: boolean): Promise<void> {
+    if (!this.access.isAvailable()) throw new OnlineSearchError('no-key', ONLINE_SEARCH_MESSAGES['no-key']);
+    const plan = this.planStore.plan();
+    const old = plan?.recipes.find((r) => r.id === recipeId);
+    if (!plan || !old) return;
+    const target = this.profile.target();
+    let draft: WeekPlanDraft;
+    try {
+      draft = await buildWeekPlanRecipes((f, o, n) => this.provider.search(f, o, n), {
+        persons: plan.persons,
+        days: 1,
+        meals: [old.meal],
+        dailyKcal: target?.kcal ?? null,
+        dailyProteinG: target?.proteinG ?? null,
+        excludeIds: [...this.planStore.blocked(), ...plan.recipes.map((r) => r.id)],
+        requestFloor: REPLACE_REQUEST_FLOOR,
+      });
+    } catch (e: unknown) {
+      throw toOnlineSearchError(e, typeof navigator !== 'undefined' && navigator.onLine === false);
+    }
+    if (draft.recipes.length === 0) throw new Error(NO_REPLACEMENT_FOUND_MESSAGE);
+    const [fresh] = await this.translateRecipes(draft.recipes.slice(0, 1));
+    // Plan kann sich während der Suche geändert haben: auf dem aktuellen Stand ersetzen.
+    const current = this.planStore.plan();
+    if (!current?.recipes.some((r) => r.id === recipeId)) return;
+    if (neverAgain) this.planStore.block([recipeId]);
+    const next: WeekPlan = { ...current, recipes: current.recipes.map((r) => (r.id === recipeId ? fresh : r)) };
+    this.planStore.set(next);
+    this.shopping.applyWeekPlan(next);
   }
 
   /**

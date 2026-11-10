@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ActionSheetController } from '@ionic/angular';
 import { ModalController } from '@ionic/angular/lazy';
 import { WeekPlanStore } from '../../core/state/week-plan.store';
 import { WeekPlanRecipe } from '../../core/week-plan/week-plan.model';
@@ -22,6 +23,10 @@ export class WeekPlanCardsComponent {
   private readonly store = inject(WeekPlanStore);
   private readonly modals = inject(ModalController);
   private readonly service = inject(WeekPlanService);
+  private readonly actionSheet = inject(ActionSheetController);
+  /** Rezept, dessen Ersatz gerade geladen wird (sonst null). */
+  protected readonly busyId = signal<string | null>(null);
+  protected readonly error = signal<string | null>(null);
 
   /** "Übersetze Rezepte (n/m)" während der Übersetzung, sonst null. */
   readonly progress = this.service.translateProgress;
@@ -42,6 +47,36 @@ export class WeekPlanCardsComponent {
 
   meta(recipe: WeekPlanRecipe): string {
     return recipeMetaLine(recipe);
+  }
+
+  /** Menü je Rezept: tauschen oder entfernen, jeweils nur diese Woche oder „nie wieder vorschlagen“. */
+  async openMenu(recipe: WeekPlanRecipe): Promise<void> {
+    const sheet = await this.actionSheet.create({
+      header: recipe.title,
+      buttons: [
+        { text: 'Anderes Rezept laden', data: { act: 'replace', never: false } },
+        { text: 'Anderes laden, dieses nie wieder', data: { act: 'replace', never: true } },
+        { text: 'Aus dem Plan entfernen', role: 'destructive', data: { act: 'remove', never: false } },
+        { text: 'Entfernen und nie wieder vorschlagen', role: 'destructive', data: { act: 'remove', never: true } },
+        { text: 'Abbrechen', role: 'cancel' },
+      ],
+    });
+    await sheet.present();
+    const { data } = await sheet.onDidDismiss<{ act: 'replace' | 'remove'; never: boolean }>();
+    if (!data) return;
+    this.error.set(null);
+    if (data.act === 'remove') {
+      this.service.removeRecipe(recipe.id, data.never);
+      return;
+    }
+    this.busyId.set(recipe.id);
+    try {
+      await this.service.replaceRecipe(recipe.id, data.never);
+    } catch (e: unknown) {
+      this.error.set(e instanceof Error ? e.message : 'Rezept konnte nicht getauscht werden.');
+    } finally {
+      this.busyId.set(null);
+    }
   }
 
   private isOpening = false;

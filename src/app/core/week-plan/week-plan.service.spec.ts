@@ -75,3 +75,59 @@ describe('WeekPlanService.generate', () => {
     expect(TestBed.inject(WeekPlanStore).plan()).toBeNull();
   });
 });
+
+describe('WeekPlanService.removeRecipe / replaceRecipe', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  async function planned(search: ReturnType<typeof vi.fn>): Promise<WeekPlanService> {
+    const service = setup(search);
+    await service.generate(OPTS);
+    return service;
+  }
+  const page = (ids: string[]) => ({ recipes: ids.map(recipe), totalResults: ids.length, quotaLeft: null });
+
+  it('removes a recipe for this week only and rebuilds the shopping list', async () => {
+    const service = await planned(vi.fn().mockResolvedValue(page(['1', '2'])));
+
+    service.removeRecipe('1', false);
+
+    const store = TestBed.inject(WeekPlanStore);
+    expect(store.plan()?.recipes.map((r) => r.id)).toEqual(['2']);
+    expect(store.blocked()).toEqual([]);
+    expect(TestBed.inject(ShoppingStore).list()?.items.map((i) => i.name)).not.toContain('Zutat 1');
+  });
+
+  it('blocks a removed recipe so later plans never suggest it again', async () => {
+    const search = vi.fn().mockResolvedValue(page(['1', '2', '3']));
+    const service = await planned(search);
+
+    service.removeRecipe('1', true);
+    const { plan } = await service.generate(OPTS);
+
+    expect(TestBed.inject(WeekPlanStore).blocked()).toEqual(['1']);
+    expect(plan.recipes.map((r) => r.id)).not.toContain('1');
+  });
+
+  it('replaces a recipe with a new one of the same meal, never one already in the plan', async () => {
+    const search = vi.fn().mockResolvedValue(page(['1', '2']));
+    const service = await planned(search);
+    search.mockResolvedValue(page(['1', '2', '9']));
+
+    await service.replaceRecipe('1', false);
+
+    const ids = TestBed.inject(WeekPlanStore).plan()?.recipes.map((r) => r.id);
+    expect(ids).toEqual(['9', '2']);
+  });
+
+  it('keeps the plan and does not block when no replacement is found', async () => {
+    const search = vi.fn().mockResolvedValue(page(['1', '2']));
+    const service = await planned(search);
+    search.mockResolvedValue(page(['1', '2']));
+
+    await expect(service.replaceRecipe('1', true)).rejects.toThrow();
+
+    const store = TestBed.inject(WeekPlanStore);
+    expect(store.plan()?.recipes.map((r) => r.id)).toEqual(['1', '2']);
+    expect(store.blocked()).toEqual([]);
+  });
+});

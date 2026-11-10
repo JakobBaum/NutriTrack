@@ -22,6 +22,10 @@ export interface WeekPlanInput {
   dailyKcal: number | null;
   /** Proteinziel g je Tag (null = Fallback-Werte). */
   dailyProteinG: number | null;
+  /** Rezept-Ids, die nicht vorgeschlagen werden dürfen (gesperrt oder schon im Plan). */
+  excludeIds?: readonly string[];
+  /** Mindestzahl angefragter Treffer (z. B. beim Tauschen eines einzelnen Rezepts, damit Auswahl bleibt). */
+  requestFloor?: number;
 }
 
 export interface WeekPlanDraft {
@@ -124,8 +128,8 @@ export async function buildWeekPlanRecipes(
     const earlier = typeCount.get(type) ?? 0;
     typeCount.set(type, earlier + 1);
     // Mittag und Abend teilen den Typ: mehr anfragen, damit nach dem Entfernen von Duplikaten genug bleiben.
-    const number = Math.min(MAX_REQUEST_NUMBER, input.days * (1 + earlier));
-    const exclude = new Set(recipes.map((r) => r.id));
+    const number = Math.min(MAX_REQUEST_NUMBER, Math.max(input.requestFloor ?? 0, input.days * (1 + earlier)));
+    const exclude = new Set([...(input.excludeIds ?? []), ...recipes.map((r) => r.id)]);
     const found = await searchMeal(search, meal, input, exclude, number, rng);
     recipes = [...recipes, ...found.picked.map((r) => ({ ...r, meal, portions: input.persons }))];
     notices = [...notices, ...mealNotices(meal, input.days, found)];
