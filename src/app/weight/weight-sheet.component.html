@@ -2,7 +2,7 @@
   <ng-template>
     <div class="nt-sheet-header">
       <span class="nt-sheet-header__start">
-        <ion-button fill="clear" (click)="closed.emit()">Abbrechen</ion-button>
+        <ion-button fill="clear" class="nt-sheet-close" (click)="closed.emit()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
       </span>
       <h2 class="nt-sheet-header__title" role="heading" aria-level="2">Gewicht eintragen</h2>
       <span class="nt-sheet-header__end">

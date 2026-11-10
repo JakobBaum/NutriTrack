@@ -5,7 +5,7 @@
     </ul>
   }
   @if (progress(); as pr) {
-    <p class="wp-translate" role="status" data-testid="wp-translating">Rezepte werden übersetzt ({{ pr.done }}/{{ pr.total }})</p>
+    <p class="wp-translate" role="status" data-testid="wp-translating">Rezepte werden übersetzt ({{ pr.done }}/{{ pr.total }}). Das kann bis zu einer Minute dauern; bereits übersetzte Rezepte kommen sofort aus dem Speicher.</p>
   } @else if (untranslated() > 0) {
     <div class="wp-translate" role="status" data-testid="wp-untranslated">
       <span>{{ untranslated() }} {{ untranslated() === 1 ? 'Rezept ist' : 'Rezepte sind' }} noch auf Englisch.</span>

@@ -64,6 +64,8 @@ import {
   entriesFromSavedMeal,
   entryFromRecent,
   entryFromRecipe,
+  resolveAdjustOpen,
+  AccordionChangeEvent,
   savedMealProtein,
   sumEntryTotals,
 } from './add-entry-logic';
@@ -466,8 +468,8 @@ export class AddEntrySheetComponent implements OnChanges {
     this.rescale();
   }
 
-  setAdjustOpen(value: unknown): void {
-    this.adjustOpen.set(typeof value === 'string' ? value : undefined);
+  onAdjustChange(event: AccordionChangeEvent): void {
+    this.adjustOpen.set(resolveAdjustOpen(event, this.adjustOpen()));
   }
 
   /** Rechnet die Nährwert-Felder aus den Bezugswerten und der aktuellen Menge neu. */

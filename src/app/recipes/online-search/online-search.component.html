@@ -9,7 +9,7 @@
     </span>
     <h2 class="nt-sheet-header__title" role="heading" aria-level="2">{{ selected() ? 'Rezept' : 'Rezepte online' }}</h2>
     <span class="nt-sheet-header__end">
-      <ion-button fill="clear" (click)="close()">Schließen</ion-button>
+      <ion-button fill="clear" class="nt-sheet-close" (click)="close()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
     </span>
   </div>
 </ion-header>

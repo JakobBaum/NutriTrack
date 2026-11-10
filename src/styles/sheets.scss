@@ -1,0 +1,41 @@
+// Sheets (ion-modal ohne Vollbild): sichtbarer Abstand oben und einheitlicher Schliessen-Knopf.
+
+:root {
+  // Safe Area (Notch/Dynamic Island) plus Mindestabstand: auch auf dem iPhone SE (Safe Area 0) bleibt ein Streifen sichtbar.
+  --nt-sheet-top-gap: calc(env(safe-area-inset-top, 0px) + 16px);
+}
+
+// Phone: Sheet haengt unten und endet unter dem Abstand (Ionic fuellt sonst 100 % der Hoehe).
+// Spezifitaet (0,2,1) liegt unter `.nt-date-modal` (0,3,1) und der Tablet-Regel mit Mindestbreite 768 px.
+@media (max-width: 767px) {
+  ion-modal:not(.barcode-fullscreen-modal):not(.cook-fullscreen-modal) {
+    --height: calc(100% - var(--nt-sheet-top-gap));
+    align-items: flex-end;
+  }
+}
+
+// Schliessen als X-Icon (ersetzt "Abbrechen"/"Schliessen" im Sheet-Kopf), Tippflaeche 40 px.
+ion-button.nt-sheet-close {
+  --padding-start: 0;
+  --padding-end: 0;
+  --border-radius: 50%;
+  --color: var(--nt-secondary);
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  min-height: 40px;
+  margin: 0;
+
+  ion-icon {
+    font-size: 1.5rem;
+  }
+}
+
+// Alle Aktionen im Sheet-Kopf (Zurueck, Speichern, Fertig, X): Tippflaeche mindestens 40 px.
+.nt-sheet-header ion-button {
+  --padding-start: 8px;
+  --padding-end: 8px;
+  min-width: 40px;
+  min-height: 40px;
+  margin: 0;
+}

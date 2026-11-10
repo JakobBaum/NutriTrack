@@ -19,8 +19,9 @@ export function hashTexts(texts: RecipeTexts): string {
   return h.toString(36);
 }
 
-export function cacheKey(lang: string, recipeId: string, source: RecipeTexts): string {
-  return `${lang}:${recipeId}:${hashTexts(source)}`;
+/** Schlüssel nur aus Sprache und Inhalt: gleicher Text unter anderer Rezept-Id (z. B. erneut gesuchtes Rezept) trifft den Cache. */
+export function cacheKey(lang: string, source: RecipeTexts): string {
+  return `${lang}:${hashTexts(source)}`;
 }
 
 function isTexts(value: unknown): value is RecipeTexts {

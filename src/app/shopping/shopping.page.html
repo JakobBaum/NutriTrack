@@ -90,23 +90,22 @@
             </div>
           </div>
 
-          <ion-button expand="block" class="generate-btn" data-testid="week-plan-btn" (click)="generateWeekPlan()" [disabled]="loading() || !onlineAvailable()">
-            @if (loading()) {
-              <ion-spinner name="dots" slot="start"></ion-spinner>
-              @if (translateProgress(); as pr) { Übersetze Rezepte ({{ pr.done }}/{{ pr.total }})… } @else { Erstelle… }
-            } @else {
-              <ion-icon slot="start" name="sparkles-outline"></ion-icon> Wochenplan erstellen
-            }
-          </ion-button>
-          @if (weekPlan() !== null || list() !== null) {
-            <ion-button expand="block" fill="clear" class="cancel-btn" (click)="cancelGenerator()">Abbrechen</ion-button>
-          }
-          @if (error()) {
-            <ion-text color="danger"><p class="form-error" role="alert">{{ error() }}</p></ion-text>
-          }
+          <div class="generator__source">
+            <ion-toggle class="generator__toggle" data-testid="own-recipes-toggle" justify="space-between" labelPlacement="start"
+              [checked]="ownMode()" [disabled]="!onlineAvailable()" (ionChange)="setOwnRecipes($any($event).detail.checked)">
+              Aus meinen Rezepten planen
+            </ion-toggle>
+            <p class="generator__mode" role="status" data-testid="own-recipes-state">
+              @if (ownMode()) {
+                An: Die Einkaufsliste entsteht aus deinen eigenen Rezepten@if (!onlineAvailable()) { (Online-Rezeptsuche nicht eingerichtet)}.
+              } @else {
+                Aus: Die App sucht passende Rezepte online.
+              }
+            </p>
+          </div>
 
-          <div class="generator__alt">
-            <span class="generator__sub">Aus meinen Rezepten planen</span>
+          @if (ownMode()) {
+            <div class="generator__alt">
             @if (live()) {
               <p class="generator__mode" role="note">Mit KI-Verbindung: Preise werden geschätzt.</p>
               <div class="generator__field" role="group" aria-labelledby="budget-label">
@@ -134,10 +133,26 @@
                 <ion-button fill="outline" size="small" routerLink="/recipes">Zu meinen Rezepten</ion-button>
               </div>
             }
-            <ion-button expand="block" [fill]="onlineAvailable() ? 'outline' : 'solid'" class="own-btn" data-testid="own-plan-btn" (click)="generate()" [disabled]="loading() || noRecipesBlock()">
-              <ion-icon slot="start" name="book-outline"></ion-icon> Aus meinen Rezepten planen
+            </div>
+            <ion-button expand="block" class="own-btn" data-testid="own-plan-btn" (click)="generate()" [disabled]="loading() || noRecipesBlock()">
+              @if (loading()) { <ion-spinner name="dots" slot="start"></ion-spinner> Erstelle… } @else { <ion-icon slot="start" name="book-outline"></ion-icon> Plan aus meinen Rezepten erstellen }
             </ion-button>
-          </div>
+          } @else {
+            <ion-button expand="block" class="generate-btn" data-testid="week-plan-btn" (click)="generateWeekPlan()" [disabled]="loading() || !onlineAvailable()">
+              @if (loading()) {
+                <ion-spinner name="dots" slot="start"></ion-spinner>
+                @if (translateProgress(); as pr) { Übersetze Rezepte ({{ pr.done }}/{{ pr.total }})… } @else { Erstelle… }
+              } @else {
+                <ion-icon slot="start" name="sparkles-outline"></ion-icon> Wochenplan erstellen
+              }
+            </ion-button>
+          }
+          @if (weekPlan() !== null || list() !== null) {
+            <ion-button expand="block" fill="clear" class="cancel-btn" (click)="cancelGenerator()">Abbrechen</ion-button>
+          }
+          @if (error()) {
+            <ion-text color="danger"><p class="form-error" role="alert">{{ error() }}</p></ion-text>
+          }
         </ion-card-content>
       </ion-card>
     }

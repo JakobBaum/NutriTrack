@@ -192,3 +192,52 @@ tsc sauber, Lint sauber, 127 Dateien / 1238 Unit-Tests grün, `ng build` nur Tes
 - Echtes iPhone SE: Dekodierzeit des Barcodes, Kamera-Freigabe nach Scan, Haptik und tatsächliche Größenwirkung sind nicht gemessen (nur Chromium mit Fake-Stream).
 - Die Etikett-Dauer von ca. 21 s ist serverseitig; die Wirkung von `GEMINI_THINKING_LEVEL` ist nach Deploy zu messen.
 - Die Fokus-Falle wurde per Messung im Chromium nachgewiesen; Safari/WebKit kann sich beim Overlay-Abbau anders verhalten.
+
+## Bugs 1.5-1.9 (Nährwerte-Bereich, Sheet-Abstand, Sheet-Kopf, Übersetzung, Schalter) – 2026-11-10
+
+### 1.5 "Nährwerte anpassen" klappt zu (Ursache gemessen)
+- Ursache: Der `ion-accordion-group` hörte auf `(ionChange)`. Das Ereignis von `ion-input` (und `ion-toggle`) sprudelt zum Akkordeon hoch. Gemessen: beim Wechsel von Eiweiß zu Kohlenhydrate kommt am Akkordeon `ionChange` mit Ziel `ION-INPUT` und `detail.value = "21"`. Der Handler setzte den Öffnungszustand auf "21" (bei einem Schalter auf undefined), der Bereich schloss sich, die Eingaben waren unsichtbar. Kein ngIf/Re-Init-Problem. Fehlerklasse: gebubbeltes Ereignis eines Kindes wird als Ereignis des Containers gelesen.
+- Fix: `resolveAdjustOpen()` (`add-entry-logic.ts`) wertet nur Ereignisse, deren `target` das Akkordeon selbst ist. Das manuelle Formular startet weiterhin offen; nur die Kopfzeile schließt.
+- Weitere Stellen geprüft: es gibt nur diesen einen Akkordeon; `ionChange` an `ion-segment`/`ion-select` (Profil, Fastfood, Einkauf, Tagebuch, Rezepte, Einstellungen) umschließt keine Eingabefelder. Keine weitere Fundstelle.
+- Tests: Unit `resolveAdjustOpen` (3), E2E `sheets: Nährwerte anpassen bleibt offen ...` (Eiweiß, Kohlenhydrate, Fett, kcal-Schalter, Werte bleiben).
+
+### 1.6 Sheet bis ganz an den oberen Rand (gemessen)
+- Ursache: Ionic-Sheets ohne Breakpoints haben auf dem Phone `--height: 100%`; gemessen `top = 0` bei 375x667, 320x568 und 375x812.
+- Fix zentral in neuer `src/styles/sheets.scss` (in `angular.json` eingehängt; `overlays-and-polish.scss` wäre über 400 Zeilen gekommen): `--nt-sheet-top-gap = env(safe-area-inset-top) + 16px`; Phone (< 768 px) `--height: calc(100% - gap)` und `align-items: flex-end`. Vollbild-Modals (Scanner, Kochmodus), Datepicker-Sheet und Tablet-Regel bleiben unberührt.
+- Gemessen nachher: Abstand oben 16 px bei 375x667 und 320x568 (Chromium, Safe Area 0). Echte Safe Area nur über `env()` begründet, nicht gemessen.
+
+### 1.7 Sheet-Kopf: Titel und "Abbrechen" überlappen
+- Ursache: feste Seitenspalten (88 px, unter 375 px nach Inhalt), Titel ohne Kürzung (`overflow-wrap: anywhere`); die Mahlzeiten-Liste überschrieb das Raster zusätzlich mit 80 px.
+- Fix: `.nt-sheet-header` (`foundation.scss`): Raster `auto / 1fr / auto`, Titel einzeilig mit Ellipsis. Abbrechen/Schließen in allen 15 Sheet-Köpfen als X-Icon-Button `.nt-sheet-close` (aria-label "Schließen", 40x40 px). Im Eintragen-Sheet bleibt "Fertig" als Text, sobald Einträge hinzugefügt wurden. Alle Kopf-Aktionen mind. 40 px (vorher 36 px beim Zurück-Pfeil). "Speichern" und "Fertig" bleiben Text.
+- Tests: E2E `sheets: Abstand oben und Kopf ohne Überlappung` (375x667 und 320x568, Titel "Zu Abendessen", Boxen überlappen nicht, Tippfläche >= 40 px) und langer Rezepttitel mit Ellipsis bei 320 px. `app.spec` und `recipes.spec` klicken `ion-button.nt-sheet-close` (ion-button reicht `aria-label` an den inneren Knopf weiter, daher Klasse statt Attribut).
+
+### 1.8 Rezept-Übersetzung langsam (echte Worker-Aufrufe, 4 Aufrufe insgesamt)
+- Messung `translateRecipe` (12 Zutaten, 6 Schritte, Prompt ca. 950 Zeichen, Antwort ca. 950 Zeichen): einzeln 8,4 s und 17,0 s; 4 parallel: gesamt 21,4 s (Einzelzeiten 10,8 / 20,2 / 14,7 / 21,4 s, Summe 67 s). Bisher lief `translateAll` strikt nacheinander: bei 4 Rezepten ca. 35-67 s, bei 8 Rezepten ca. 1-2 Minuten.
+- Ursache: Zeit ist Modell-Antwortzeit (wie bei 1.3, vermutlich Denkzeit), nicht Prompt oder Netz; dazu serielle Aufrufe. Ein großer Sammelaufruf wurde nicht gemessen (Worker-Änderung nötig, nicht deployt).
+- Umgesetzt: `translateAll` mit bis zu 4 parallelen Aufrufen (`TRANSLATE_CONCURRENCY`), Reihenfolge und Fortschritt (n/m) bleiben. Cache-Schlüssel jetzt nur aus Sprache und Inhalts-Hash (vorher inklusive Rezept-Id, dasselbe Rezept unter neuer Id wurde neu übersetzt). Der persistente Cache (StorageService, 120 Einträge) und das Zusammenfassen gleichzeitiger Aufrufe bestanden schon. Ladezustand: Statuszeile im Wochenplan nennt die mögliche Dauer und dass Bekanntes sofort kommt. Alte Cache-Einträge (alter Schlüssel) werden einmal ignoriert.
+- Nachher (aus der Parallelmessung abgeleitet): 4 Rezepte ca. 21 s statt ca. 35-67 s; 8 Rezepte zwei Wellen, grob 30-40 s. Keine End-zu-End-Messung mit echtem Plan (Tagesdeckel).
+- Offen: `GEMINI_THINKING_LEVEL` im Worker (nicht deployt) ist vermutlich der größte Hebel; nach Deploy messen. Bei Rate-Limit durch 4 parallele Aufrufe fällt ein Rezept auf das Wörterbuch zurück ("Erneut übersetzen" bleibt); in den Testaufrufen kam kein Limit.
+- Tests: Unit `translateAll` parallel (max 4, Reihenfolge, Fortschritt); gleicher Inhalt unter anderer Id nur ein Aufruf.
+
+### 1.9 "Aus meinen Rezepten planen"
+- Befund: Im Code ist das ein reiner Aktions-Button ohne Zustand (ruft `generate()`), mit gleichlautender Überschrift darüber; ein An/Aus-Verhalten gab es nicht. Der Eindruck "aufklappbar, aber An/Aus" kommt vermutlich aus Überschrift plus Outline-Button plus Chips darunter. Die Stelle in der laufenden App habe ich nicht auf einem Gerät gesehen.
+- Umgesetzt (Annahme, bitte prüfen): `ion-toggle` "Aus meinen Rezepten planen" im Wochenplan-Formular mit Zustandstext ("An: ..." / "Aus: ..."). An: ein Hauptknopf "Plan aus meinen Rezepten erstellen" samt Budget/Markt. Aus: "Wochenplan erstellen" (online). Ohne Online-Rezeptsuche ist der Schalter erzwungen an und gesperrt. Beide Wege bleiben erreichbar, Testids `week-plan-btn` und `own-plan-btn` unverändert.
+- Tests: E2E `weekplan:` (Schalter-Rolle, `aria-checked`, Zustandstext, Knopfwechsel, Standardzustand). Der gesperrte Zustand ohne Zugang ist nicht E2E-geprüft (im Test gibt es immer den Standard-Proxy).
+
+### UI-Größe (moderat, berührte Bereiche)
+- Sheet-Kopf: Seitenspalten und Aktionen 40 px statt 44 px, Titel einzeilig; Schriftgrößen unverändert (rem-Skala, >= 0,8125 rem). Wochenplan-Schalter mit Standardmaßen. Tippflächen >= 40 px.
+
+### Dateien
+- 1.5: `diary/add-entry-sheet/add-entry-logic.{ts,spec.ts}`, `add-entry-sheet.component.{ts,html}`.
+- 1.6/1.7: `src/styles/sheets.scss` (neu), `foundation.scss`, `angular.json`, `meals/meals-list.component.scss`, 12 HTML-Dateien mit Sheet-Kopf.
+- 1.8: `core/recipes/translate/{recipe-translate,translation-cache}.ts`, `recipe-translate.spec.ts`, `shopping/week-plan/week-plan-cards.component.html`.
+- 1.9: `shopping/shopping.page.{html,ts,scss}`.
+- E2E: `e2e/specs/sheets.spec.mjs` (neu, 6 Tests), `e2e/run.mjs`, Anpassungen in `app.spec.mjs`, `recipes.spec.mjs`.
+
+### Verifikation
+`tsc` sauber, Lint sauber, 128 Dateien / 1252 Unit-Tests grün, `ng build` ohne Budget-Warnung (`shopping.page.scss` musste um ca. 100 Byte gekürzt werden), E2E 49/49 gegen den Produktions-Build.
+
+### Nicht geprüft
+- Echtes iPhone SE, echte Safe Area, WebKit-Verhalten von `align-items: flex-end` bei Ionic-Modals.
+- 1.5 als E2E gegen den alten Stand: Ursache per Ereignisprotokoll belegt (`ionChange` von `ION-INPUT` am Akkordeon); der erste Rot-Lauf hatte zusätzlich einen Testfehler (Kopfzeilen-Tipp schloss den schon offenen Bereich), danach nur grün gemessen.
+- Reale Gesamtzeit der Plan-Übersetzung nach dem Fix.

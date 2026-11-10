@@ -167,7 +167,7 @@ export function register({ test }) {
     assert.equal(saved.ingredients[0].name, 'Rote Linsen');
     assert.equal(saved.factsPerServing?.kcal, 320);
 
-    await modal.locator('ion-button', { hasText: 'Schließen' }).click();
+    await modal.locator('ion-button.nt-sheet-close').click();
     await settle(page, 800);
     const listCard = page.locator('article.recipe', { hasText: 'Mock Lentil Soup' });
     await listCard.waitFor();

@@ -165,7 +165,7 @@
             <span class="drill-title__total"> — {{ drill.total | ntNum }} {{ drill.unit }}</span>
           </h2>
           <div class="nt-sheet-header__end">
-            <ion-button fill="clear" (click)="closeDrill()">Schließen</ion-button>
+            <ion-button fill="clear" class="nt-sheet-close" (click)="closeDrill()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
           </div>
         </div>
       </ion-header>
