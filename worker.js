@@ -761,6 +761,8 @@ async function gemini(prompt, env, imageBase64 = null, { maxOutputTokens = TOKEN
       temperature,
       maxOutputTokens,
       ...(responseSchema ? { responseSchema } : {}),
+      // Optional (Worker-Variable GEMINI_THINKING_LEVEL, z. B. "low"): weniger Denkzeit bei reiner Extraktion.
+      ...(env.GEMINI_THINKING_LEVEL ? { thinkingConfig: { thinkingLevel: env.GEMINI_THINKING_LEVEL } } : {}),
     },
   });
   const resp = await geminiWithFallback(body, env);

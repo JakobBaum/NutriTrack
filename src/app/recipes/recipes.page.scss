@@ -1,6 +1,6 @@
 // Rezepte-Seite. Rand, Kopf, Felder und Sheet-Kopf kommen aus der globalen Grundlage (global.scss).
 
-%hint { font-size: 0.75rem; color: var(--nt-muted); }
+%hint { font-size: 0.8125rem; color: var(--nt-muted); }
 %row { display: flex; align-items: center; gap: 6px; }
 %center { display: inline-flex; align-items: center; justify-content: center; }
 %tap-44 { min-width: var(--nt-touch); min-height: var(--nt-touch); }
@@ -130,7 +130,7 @@ ion-modal ion-content {
   ion-icon { font-size: 14px; }
 }
 
-.unit-warn { @extend %row; gap: 4px; font-size: 0.75rem; color: var(--nt-warning); }
+.unit-warn { @extend %row; gap: 4px; font-size: 0.8125rem; color: var(--nt-warning); }
 
 .ing-detail {
   margin: 0 12px 10px;
@@ -145,7 +145,7 @@ ion-modal ion-content {
     strong { font-size: 0.9375rem; }
     span { font-size: 0.75rem; color: var(--nt-muted); }
   }
-  &__note { @extend %hint; margin: 10px 0 6px; font-size: 0.75rem; }
+  &__note { @extend %hint; margin: 10px 0 6px; font-size: 0.8125rem; }
   &__hint { @extend %hint; @extend %row; align-items: flex-start; margin: 0 0 10px; font-size: 0.8125rem; ion-icon { font-size: 18px; flex-shrink: 0; color: var(--nt-warning); } }
   &__inputs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 }

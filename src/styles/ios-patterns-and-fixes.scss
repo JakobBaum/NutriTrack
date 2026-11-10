@@ -405,8 +405,23 @@ ion-item {
 .nt-source-error {
   margin: var(--nt-space-2) var(--nt-space-5) 0;
   font-size: var(--nt-fs-body);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
   font-weight: 600;
   color: var(--nt-danger);
+}
+
+/* Fortschritt der Etikett-Erkennung (die KI braucht bis zu rund 20 s) */
+.nt-source-status {
+  display: flex;
+  align-items: center;
+  gap: var(--nt-space-2);
+  margin: var(--nt-space-2) var(--nt-space-5) 0;
+  font-size: var(--nt-fs-caption);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ion-text-color);
+  ion-spinner { flex: none; width: 18px; height: 18px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

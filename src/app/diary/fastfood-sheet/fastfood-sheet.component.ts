@@ -1,12 +1,14 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   OnChanges,
   SimpleChanges,
   inject,
   input,
   output,
   signal,
+  ViewChild,
 } from '@angular/core';
 import { ToastController } from '@ionic/angular';
 import { FastFoodSuggestion } from '../../core/models';
@@ -33,6 +35,9 @@ export class FastfoodSheetComponent implements OnChanges {
   private readonly ai = inject(AiService);
   private readonly diary = inject(DiaryStore);
   private readonly toastCtrl = inject(ToastController);
+
+  /** Anker über den Vorschlägen: Das Formular füllt auf dem Phone den Bildschirm, die Antwort liegt darunter. */
+  @ViewChild('ffAnchor') private ffAnchor?: ElementRef<HTMLElement>;
 
   readonly isOpen = input(false);
   /** ISO-Tag, auf den ein Vorschlag eingetragen wird. */
@@ -85,6 +90,7 @@ export class FastfoodSheetComponent implements OnChanges {
         }),
       );
       this.ffSearched.set(true);
+      setTimeout(() => this.ffAnchor?.nativeElement.scrollIntoView({ block: 'start', behavior: 'smooth' }));
     } catch (e: unknown) {
       this.error.set(
         e instanceof Error

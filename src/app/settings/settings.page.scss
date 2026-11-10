@@ -170,16 +170,16 @@ ion-item {
     color: #d4d4d4;
     border: none;
     border-radius: 4px;
-    min-height: 44px;
+    min-height: 40px;
     padding: 4px 14px;
-    font-size: 0.75rem;
+    font-size: var(--nt-fs-caption);
     margin-bottom: 8px;
     cursor: pointer;
   }
 
   &__empty {
     color: #9ca3af;
-    font-size: 0.75rem;
+    font-size: var(--nt-fs-caption);
     text-align: center;
     margin: 8px 0;
   }
@@ -187,7 +187,7 @@ ion-item {
   &__entry {
     display: flex;
     gap: 8px;
-    font-size: 0.75rem;
+    font-size: var(--nt-fs-caption);
     font-family: monospace;
     padding: 2px 0;
     border-bottom: 1px solid #1e1e1e;
@@ -203,7 +203,8 @@ ion-item {
   }
 
   &__msg {
-    word-break: break-all;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 }
 

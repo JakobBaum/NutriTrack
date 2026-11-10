@@ -143,3 +143,52 @@ tsc sauber, Lint sauber, 127 Dateien / 1238 Unit-Tests grün, `ng build` nur Tes
 - Worker nicht deployt; fail-closed greift erst nach Deploy.
 - CI-YAML (Lint, E2E-Job) nie auf GitHub gelaufen.
 - Gerätetest weiterhin offen.
+
+## Bugs 1.1-1.4 (Scan, Etikett-Foto, KI-Antworten, UI-Größe) – 2026-11-10
+
+### 1.2 UI blockiert / Seite kaputt nach Barcode-Scan (Ursache gemessen)
+- Ursache: Der Treffer wurde gemeldet, solange das Scanner-Modal noch als präsentierter Overlay galt. Das Elternsheet wechselt dann auf das Formular, zerstört das Modal und fokussiert die Mengenzeile. Ionic hält dabei noch den Fokus-Trap des Scanners (`show-modal` ist bei `didDismiss` noch gesetzt, 2 Overlays). Zwei Fokus-Fallen ziehen den Fokus endlos hin und her, der Renderer stürzt ab ("Target crashed"). Fehlerklasse: Fokus-Trap / Overlay nicht vollständig weg.
+- Fix: erst `modal.dismiss()`, dann auf `didDismiss` warten und zusätzlich per `requestAnimationFrame` warten, bis die Klasse `show-modal` weg ist (max. 60 Frames), erst dann `found` melden. Die Kamera wird bei `didDismiss` gestoppt. Eine feste Wartezeit war nur Glückssache (50 ms stürzte einmal ab, 0/150/300/700 ms liefen zufällig durch).
+- Verifiziert: 8 von 8 Läufen ohne Absturz (Bisect-Skript), E2E `scan:` 3 mal hintereinander grün, Kamera-Tracks beendet, kein Video im DOM, UI danach bedienbar.
+- Andere Kamerastellen (Etikett-Foto, Rezept-Foto): Zustände werden in `finally` zurückgesetzt, Dateiinput wird geleert; dort gibt es keinen Kamera-Stream (nativer Datei-Dialog). Kein Handlungsbedarf gefunden.
+- Dateien: `shared/barcode-scanner/barcode-scanner.component.{ts,html,spec.ts}`, `e2e/specs/scan.spec.mjs`, `e2e/lib/fake-camera.mjs`.
+
+### 1.1 Barcode-Scan zu langsam
+- Gemessen (gefakter Stream, Chromium): Kamerastart nach dem Tippen von ca. 560 ms auf ca. 52 ms. Ursachen: Start erst nach `didPresent` (jetzt schon in `willPresent`), zxing-Chunk (570 kB) wurde erst beim Start geladen (jetzt `preload()` beim Tippen auf "Barcode"), Dekodierung versuchte alle Formate (jetzt nur EAN/UPC/Code128 per POSSIBLE_FORMATS-Hint), Versuchsabstand 100 ms, 1280x720-Constraints statt iOS-Default 640x480.
+- OFF-Abfrage selbst ist schnell (direkt ca. 140-180 ms, ein Ausreißer 1,6 s); kein Cache nötig.
+- E2E Ende-zu-Ende "Tippen bis Formular": ca. 2,1 s mit gemocktem OFF und Fake-Stream (Budget 3,5 s).
+- Dateien: `core/scan/barcode-scanner.service.ts` (+ Spec), `shared/food-sources/food-sources.component.ts`.
+- Ladezustand: Spinner neben "Produkt wird gesucht…"; Fehlermeldung als helle Schrift auf abgedunkeltem Grund (vorher rot auf Schwarz, 0,75 rem).
+
+### 1.3 Etikett-Foto zu langsam (Ursache gemessen)
+- Echte Worker-Aufrufe (3 Aufrufe, Foto zählt doppelt), synthetisches Etikett 3024x4032:
+  - Original 3870 kB: 413 "Anfrage zu groß" nach 3,2 s (Upload-Limit des Workers).
+  - 1600 px / JPEG 0,85 (vorher): 302 kB, 22,5 s.
+  - 1280 px / JPEG 0,7 (nachher): 108 kB, 20,8 s.
+  - Zum Vergleich ein triviales Text-Kommando (`translateSearchQuery`): 2,7 bis 6,3 s, `/health` 0,07 s.
+- Ergebnis: Die Zeit liegt nicht im Upload oder in der Bildgröße, sondern in der Modell-Antwortzeit (Gemini, vermutlich Denkzeit). Das Verkleinern spart Daten (-64 %, wichtig im Mobilfunk), aber nur ca. 1,7 s.
+- Umgesetzt: Upload-Konstanten `UPLOAD_MAX_EDGE_PX = 1280`, `UPLOAD_JPEG_QUALITY = 0.7` (gilt auch für den Rezept-Foto-Import; die OCR bleibt bei 1600 px). Fortschrittsanzeige im Eintragen-Sheet: "Foto wird vorbereitet…", "KI liest das Etikett…", nach 8 s "Das dauert länger als sonst — die KI arbeitet noch…" (`role="status"`, Spinner).
+- Worker (nur Code, nicht deployt): optionale Worker-Variable `GEMINI_THINKING_LEVEL` (z. B. `low`) setzt `generationConfig.thinkingConfig`; ohne Variable unverändert. Test in `worker.test.mjs` (78 Tests).
+- NICHT geprüft: ob `thinkingLevel` beim eingesetzten Modell akzeptiert wird und wie viel Zeit es spart. Das geht nur nach Deploy: Variable setzen und `recognizeLabel` erneut messen. Der Client-Timeout liegt bei 30 s, die gemessenen ca. 21 s liegen knapp darunter.
+- Dateien: `core/scan/label-image.ts`, `label-scan.spec.ts`, `shared/food-sources/*`, `src/styles/ios-patterns-and-fixes.scss`, `worker.js`, `worker.test.mjs`.
+
+### 1.4 KI-Antworten auf dem Phone unlesbar
+- Geprüft mit gemockten, langen Antworten bei 320 und 375 px (Fastfood-Vorschlag, Etikett-Ergebnis samt Hinweis, Einkaufsliste, Debug-Log der Verbindungsprüfung): kein horizontaler Überlauf, kein rohes JSON oder Markdown im UI (Antworten werden strukturiert gemappt). Nur der Debug-Log (nur mit `?debug=1`) zeigt Rohtext der Verbindungsprüfung.
+- Gefunden und behoben: zu kleine Schrift (12 px) bei `.ai-badge`, Fastfood-Untertitel, Debug-Log (0,75 rem auf 0,8125 rem), KI-Hinweise im Rezeptbereich (`%hint`, `__note`, `.unit-warn`) und `.est-badge` in der Einkaufsliste; fehlender Zeilenumbruch bei langen Wörtern (`overflow-wrap: anywhere` in `.ff-card`, Debug-Log, `.nt-source-error`); Sheet-Titel brach bei 320 px auf mehrere Zeilen um (Seitenspalten unter 375 px nach Inhalt statt 88 px fest).
+- Fastfood: Das Formular füllt auf dem Phone den Bildschirm, die Antwort lag unsichtbar darunter. Nach dem Laden wird jetzt zum ersten Vorschlag gescrollt.
+- E2E `e2e/specs/ai-readable.spec.mjs` (4 Tests, 320 und 375 px): Überlauf, Schrift >= 13 px, abgeschnittene Texte, Fortschrittstext, Sichtbarkeit der Antwort. Der Audit lieferte vor den Fixes die 12-px-Treffer (rot), danach grün.
+- Nicht geändert, nicht in den berührten Bereichen: Beschriftung der Tab-Leiste (10,88 px, Ionic-Standard) bleibt unter 0,8125 rem. Rezept-Import-Vorschau und Einkaufslisten-Notiz wurden nur per CSS-Durchsicht (Schriftgrößen), nicht mit gemockter KI-Antwort im Browser geprüft.
+
+### UI-Größe auf dem iPhone SE (moderat, nur berührte Bereiche)
+- Scanner: kleinere Abstände (Status 12 px Abstand, "Code eintippen" 28 px vom Rand, Eingabe-Panel mit weniger Innenabstand).
+- Sheets (`max-width: 374px` oder `max-height: 667px`): Hauptbutton 40 px statt 44 px Höhe, kleinere Außenabstände bei Karten, Hinweisen und Restkalorien-Zeile; Debug-Log-Button 40 px.
+- Untergrenzen eingehalten: Tippfläche >= 40 px (der Audit meldet keine kleineren Buttons in den geprüften Sheets), Schrift >= 0,8125 rem. Die rem-Skala für Dynamic Type bleibt unverändert; Schriftgrößen wurden nicht verkleinert, nur Abstände und der Hauptbutton.
+- Nicht verkleinert: globale Tokens (`--nt-touch`, Seiten-Layout). Das wäre ein App-weiter Eingriff und braucht einen Gerätetest.
+
+### Verifikation
+`tsc` sauber, Lint sauber, 128 Dateien / 1247 Unit-Tests grün, `ng build` nur Tesseract-ESM-Warnungen, Worker-Tests 78/78, E2E 43/43 gegen den Produktions-Build (u. a. `scan:` und `ki-lesbar`).
+
+### Offen / nicht geprüft
+- Echtes iPhone SE: Dekodierzeit des Barcodes, Kamera-Freigabe nach Scan, Haptik und tatsächliche Größenwirkung sind nicht gemessen (nur Chromium mit Fake-Stream).
+- Die Etikett-Dauer von ca. 21 s ist serverseitig; die Wirkung von `GEMINI_THINKING_LEVEL` ist nach Deploy zu messen.
+- Die Fokus-Falle wurde per Messung im Chromium nachgewiesen; Safari/WebKit kann sich beim Overlay-Abbau anders verhalten.

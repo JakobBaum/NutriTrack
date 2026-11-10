@@ -1,4 +1,4 @@
-<ion-modal [isOpen]="open()" cssClass="barcode-fullscreen-modal" (willPresent)="onWillPresent()" (didPresent)="onPresent()" (didDismiss)="onDismiss()">
+<ion-modal #scannerModal [isOpen]="open()" cssClass="barcode-fullscreen-modal" (willPresent)="onWillPresent()" (didPresent)="onPresent()" (didDismiss)="onDismiss()">
   <ng-template>
     <div class="bc-fullscreen">
       <video id="ntBarcodeVideo" #barcodeVideo class="bc-video" muted autoplay playsinline></video>
@@ -6,7 +6,7 @@
       <div class="bc-overlay">
         @if (!noCamera()) { <div class="bc-frame"></div> }
         @if (looking()) {
-          <p class="bc-status" role="status">Produkt wird gesucht…</p>
+          <p class="bc-status" role="status"><ion-spinner name="crescent" color="light"></ion-spinner> Produkt wird gesucht…</p>
         } @else if (!noCamera()) {
           <p class="bc-status" role="status">Barcode in den Rahmen halten</p>
         }

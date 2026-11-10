@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseNutritionLabel } from './nutrition-label-parser';
-import { downscaleFactor, shrinkPhotoForUpload, type PhotoShrinkDeps } from './label-image';
+import { UPLOAD_JPEG_QUALITY, UPLOAD_MAX_EDGE_PX, downscaleFactor, shrinkPhotoForUpload, type PhotoShrinkDeps } from './label-image';
 import { LABEL_FAILED_MESSAGE, LABEL_READ_HINT, blankFieldsFor, evaluateLabelParse } from './label-scan';
 
 describe('evaluateLabelParse', () => {
@@ -70,6 +70,20 @@ describe('shrinkPhotoForUpload', () => {
     expect(await shrinkPhotoForUpload('ORIGINAL', 1600, d)).toBe('SMALL');
     expect(canvas.width).toBe(1600);
     expect(canvas.height).toBe(1200);
+  });
+
+  it('uses a 1280 px edge and JPEG quality 0.7 by default for AI uploads', async () => {
+    const calls: unknown[][] = [];
+    const canvas = { width: 0, height: 0, toDataURL: (...a: unknown[]) => { calls.push(a); return 'data:image/jpeg;base64,SMALL'; } };
+    const d: PhotoShrinkDeps = {
+      load: async () => ({ width: 4000, height: 3000, draw: () => undefined }),
+      createCanvas: () => canvas as unknown as HTMLCanvasElement,
+    };
+    await shrinkPhotoForUpload('ORIGINAL', undefined, d);
+    expect(UPLOAD_MAX_EDGE_PX).toBe(1280);
+    expect(UPLOAD_JPEG_QUALITY).toBe(0.7);
+    expect(canvas.width).toBe(1280);
+    expect(calls[0]).toEqual(['image/jpeg', 0.7]);
   });
 
   it('falls back to the original when the image cannot be processed', async () => {

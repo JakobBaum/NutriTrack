@@ -11,7 +11,11 @@ import * as week from './specs/week.spec.mjs';
 import * as favorites from './specs/favorites.spec.mjs';
 import * as search from './specs/search.spec.mjs';
 import * as csp from './specs/csp.spec.mjs';
+import * as scan from './specs/scan.spec.mjs';
+import * as aiReadable from './specs/ai-readable.spec.mjs';
 
+/** Chromium liefert für getUserMedia ein Testbild; Berechtigungsdialog entfällt. */
+const FAKE_MEDIA_ARGS = ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'];
 const filter = process.argv[2] ?? '';
 
 async function assertServerUp() {
@@ -25,13 +29,13 @@ async function assertServerUp() {
 }
 
 await assertServerUp();
-const browser = await launchBrowser();
+const browser = await launchBrowser(FAKE_MEDIA_ARGS);
 const runner = createRunner(browser);
 const test = (name, seed, fn) => (name.includes(filter) ? runner.test(name, seed, fn) : Promise.resolve());
 
 // Tests registrieren und nacheinander ausführen
 const queue = [];
-for (const spec of [app, diary, recipes, weekplan, weight, week, favorites, search, csp]) spec.register({ test: (...args) => queue.push(args) });
+for (const spec of [app, diary, recipes, weekplan, weight, week, favorites, search, csp, scan, aiReadable]) spec.register({ test: (...args) => queue.push(args) });
 for (const args of queue) await test(...args);
 await browser.close();
 

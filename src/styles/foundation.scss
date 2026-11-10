@@ -170,6 +170,11 @@ ion-select::after {
   &__end { justify-self: end; }
 }
 
+// Schmale Phones (iPhone SE, 320 px): Seitenspalten nach Inhalt, damit der Titel nicht auf drei Zeilen umbricht.
+@media (max-width: 374px) {
+  .nt-sheet-header { grid-template-columns: minmax(var(--nt-touch), auto) minmax(0, 1fr) minmax(var(--nt-touch), auto); }
+}
+
 // Datepicker-Sheet: Phone volle Breite, Tablet/Desktop an den Inhalt angepasst (kein halb gefuelltes Sheet).
 // Spezifitaet (0,3,1) schlaegt die globale Tablet-Hoehenregel oben.
 ion-modal:not(.barcode-fullscreen-modal):not(.cook-fullscreen-modal).nt-date-modal {

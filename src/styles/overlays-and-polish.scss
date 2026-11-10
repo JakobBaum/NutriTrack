@@ -42,21 +42,34 @@
 }
 
 .bc-status {
-  margin-top: 16px;
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: #fff;
   font-size: 0.8125rem;
   font-weight: 600;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
 
+.bc-status ion-spinner {
+  width: 18px;
+  height: 18px;
+}
+
+/* Fehlermeldung auf dunklem Kamerabild: heller Text auf abgedunkeltem Grund, umbrechend, nie abgeschnitten */
 .bc-error {
-  margin-top: 8px;
-  color: var(--ion-color-danger);
-  font-size: 0.75rem;
+  margin: 8px 16px 0;
+  max-width: calc(100% - 32px);
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 0.8125rem;
   font-weight: 600;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  line-height: 1.35;
   text-align: center;
-  padding: 0 16px;
+  overflow-wrap: anywhere;
 }
 
 .bc-close-fab {
@@ -67,7 +80,7 @@
 
 .bc-manual-btn-wrap {
   position: absolute;
-  bottom: 40px;
+  bottom: 28px;
   left: 0;
   right: 0;
   display: flex;
@@ -81,7 +94,7 @@
   right: 0;
   background: var(--ion-background-color);
   border-radius: 20px 20px 0 0;
-  padding: 16px 8px 32px;
+  padding: 12px 8px 24px;
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3);
 }
 
@@ -329,7 +342,7 @@ ion-tab-button.ion-focused::part(native) {
   border-radius: 999px;
   background: var(--nt-accent-tint);
   color: var(--ion-color-primary-shade);
-  font-size: 0.75rem;
+  font-size: var(--nt-fs-caption);
   font-weight: 600;
   line-height: 1.4;
   white-space: nowrap;

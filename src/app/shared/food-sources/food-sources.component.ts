@@ -3,6 +3,7 @@ import {
 } from '@angular/core';
 import { FoodItem, NutritionFacts } from '../../core/models';
 import { AiService } from '../../core/ai/ai.service';
+import { BarcodeScannerService } from '../../core/scan/barcode-scanner.service';
 import { CameraService } from '../../core/scan/camera.service';
 import { LabelOcrService } from '../../core/scan/label-ocr.service';
 import { blankFieldsFor, readLabelOffline } from '../../core/scan/label-scan';
@@ -32,6 +33,10 @@ export interface FoodSourceResult {
 const AI_LABEL_HINT = 'Werte pro 100 g erkannt — bitte mit dem Etikett vergleichen.';
 const FILE_ERROR = 'Die Datei konnte nicht gelesen werden — wähle sie erneut aus.';
 const CAMERA_ERROR = 'Kamera nicht verfügbar — nutze die Suche oder trage manuell ein.';
+export const SLOW_AI_HINT_MS = 8000;
+export const STATUS_PREPARING = 'Foto wird vorbereitet…';
+export const STATUS_READING = 'KI liest das Etikett…';
+export const STATUS_SLOW = 'Das dauert länger als sonst — die KI arbeitet noch…';
 const LABEL_ERROR = 'Das Etikett konnte nicht gelesen werden — mach ein schärferes Foto oder trage manuell ein.';
 
 function fromItem(item: FoodItem): Pick<FoodSourceResult, 'name' | 'brand' | 'facts' | 'foodItemId' | 'servingG'> {
@@ -51,6 +56,7 @@ function fromItem(item: FoodItem): Pick<FoodSourceResult, 'name' | 'brand' | 'fa
 export class NtFoodSourcesComponent {
   private readonly ai = inject(AiService);
   private readonly camera = inject(CameraService);
+  private readonly scanner = inject(BarcodeScannerService);
   private readonly labelOcr = inject(LabelOcrService);
 
   readonly placeholder = input('Lebensmittel suchen…');
@@ -65,6 +71,8 @@ export class NtFoodSourcesComponent {
 
   protected readonly barcodeOpen = signal(false);
   protected readonly scanning = signal(false);
+  /** Fortschrittstext während der Etikett-Erkennung (null, wenn nichts läuft). */
+  protected readonly scanStatus = signal<string | null>(null);
   protected readonly error = signal<string | null>(null);
   private readonly nativeCamera = this.camera.isNativeCameraAvailable();
 
@@ -93,6 +101,7 @@ export class NtFoodSourcesComponent {
 
   protected openBarcode(): void {
     this.error.set(null);
+    this.scanner.preload();
     this.barcodeOpen.set(true);
   }
 
@@ -120,19 +129,27 @@ export class NtFoodSourcesComponent {
   private async run(getImage: () => Promise<string>, fallbackMessage: string): Promise<void> {
     this.error.set(null);
     this.scanning.set(true);
+    this.scanStatus.set(STATUS_PREPARING);
+    let slowTimer: ReturnType<typeof setTimeout> | undefined;
     try {
-      await this.recognize(await getImage());
+      const image = await getImage();
+      slowTimer = setTimeout(() => this.scanStatus.set(STATUS_SLOW), SLOW_AI_HINT_MS);
+      await this.recognize(image);
     } catch (e: unknown) {
       this.fail(e instanceof Error ? e.message : fallbackMessage);
     } finally {
+      clearTimeout(slowTimer);
       this.scanning.set(false);
+      this.scanStatus.set(null);
     }
   }
 
   /** Etikett lesen: mit KI per Vision, sonst On-Device-OCR. */
   private async recognize(base64: string): Promise<void> {
     if (this.ai.isLive()) {
-      const res = await this.ai.recognizeLabel(await shrinkPhotoForUpload(base64), 'per100g');
+      const small = await this.shrink(base64);
+      this.scanStatus.set(STATUS_READING);
+      const res = await this.ai.recognizeLabel(small, 'per100g');
       this.result.emit({ source: 'label', name: res.name, facts: res.facts, isAi: true, hint: AI_LABEL_HINT });
       return;
     }
@@ -144,6 +161,11 @@ export class NtFoodSourcesComponent {
     this.result.emit({
       source: 'label', name: '', facts: out.facts, hint: out.hint, blankFields: blankFieldsFor(out.missing),
     });
+  }
+
+  /** Foto vor dem KI-Upload verkleinern (in Tests ersetzbar). */
+  protected shrink(base64: string): Promise<string> {
+    return shrinkPhotoForUpload(base64);
   }
 
   private fail(message: string): void {
