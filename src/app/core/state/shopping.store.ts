@@ -211,14 +211,15 @@ export class ShoppingStore {
 
   /**
    * Schreibt die Zutaten ALLER Wochenplan-Rezepte (auf `persons` skaliert, gleiche Name+Einheit
-   * addiert) in die Liste. Abgehakte und manuelle Positionen bleiben erhalten.
+   * addiert) in die Liste. Standardmäßig bleiben abgehakte und manuelle Positionen erhalten;
+   * mit `keepExisting = false` wird die bisherige Liste komplett ersetzt.
    */
-  applyWeekPlan(plan: WeekPlan): ShoppingListView {
+  applyWeekPlan(plan: WeekPlan, keepExisting = true): ShoppingListView {
     const live = this.ai.isLive();
     const { items: raw, suggestedDishes } = buildShoppingList(weekPlanToRecipes(plan), plan.recipes.length, plan.persons);
     const generated = withCategories(roundItemsToPackages(raw)).map((it) => ({ ...it, manual: false }));
     const priced = fillMissingPrices(generated);
-    const items = withCategories(mergeKept(this._list()?.items ?? [], priced));
+    const items = withCategories(mergeKept(keepExisting ? (this._list()?.items ?? []) : [], priced));
     const list: ShoppingListView = {
       id: makeId('shopping'),
       dishes: plan.recipes.length,

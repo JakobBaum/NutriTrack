@@ -14,11 +14,12 @@
       </button>
     </div>
   }
+  @if (error(); as err) { <p class="wp-error" role="alert" data-testid="wp-error">{{ err }}</p> }
   @for (group of groups(); track group.meal) {
     <h2 class="nt-section-header wp-group">{{ group.label }}</h2>
     <ul class="wp-list" [attr.data-testid]="'wp-group-' + group.meal">
       @for (r of group.recipes; track r.id) {
-        <li>
+        <li class="wp-item">
           <button type="button" class="wp-card" (click)="open(r)" [attr.aria-label]="r.title + ' ansehen'">
             <span class="wp-card__thumb">
               @if (r.imageUrl) { <img [src]="r.imageUrl" alt="" width="64" height="64" loading="lazy" /> } @else { <ion-icon name="restaurant-outline" aria-hidden="true"></ion-icon> }
@@ -27,7 +28,14 @@
               <span class="wp-card__title">{{ r.title }}</span>
               <span class="wp-card__meta">{{ meta(r) }}</span>
             </span>
-            <ion-icon name="chevron-forward" class="wp-card__chev" aria-hidden="true"></ion-icon>
+            @if (busyId() === r.id) {
+              <ion-spinner name="crescent" class="wp-card__spin" aria-label="Neues Rezept wird geladen"></ion-spinner>
+            } @else {
+              <ion-icon name="chevron-forward" class="wp-card__chev" aria-hidden="true"></ion-icon>
+            }
+          </button>
+          <button type="button" class="wp-more" data-testid="wp-more" [disabled]="busyId() !== null" (click)="openMenu(r)" [attr.aria-label]="'Optionen für ' + r.title">
+            <ion-icon name="ellipsis-horizontal" aria-hidden="true"></ion-icon>
           </button>
         </li>
       }

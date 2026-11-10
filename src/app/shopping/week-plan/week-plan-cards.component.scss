@@ -28,6 +28,24 @@
   &__chev { flex: none; color: var(--nt-secondary); }
 }
 
+.wp-item { display: flex; align-items: stretch; gap: var(--nt-space-1); }
+.wp-item .wp-card { flex: 1; min-width: 0; }
+.wp-card__spin { flex: none; width: 20px; height: 20px; color: var(--nt-secondary); }
+
+.wp-more {
+  flex: none; width: var(--nt-touch); border: 0; border-radius: var(--nt-radius-card);
+  background: var(--nt-card); color: var(--nt-secondary); font: inherit; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  &:focus-visible { outline: 2px solid var(--nt-focus); }
+  &:disabled { opacity: 0.5; }
+}
+
+.wp-error {
+  margin: var(--nt-space-2) var(--nt-space-1) 0; padding: var(--nt-space-3) var(--nt-space-4);
+  background: var(--nt-card); border-radius: var(--nt-radius-card);
+  font-size: var(--nt-fs-caption); color: var(--nt-ink);
+}
+
 .wp-translate {
   margin: var(--nt-space-2) var(--nt-space-1) 0;
   font-size: var(--nt-fs-caption);

@@ -56,6 +56,17 @@ describe('ShoppingStore.applyWeekPlan', () => {
     expect(names).not.toContain('Brokkoli');
   });
 
+  it('replaces the whole list when keepExisting is false', () => {
+    const store = TestBed.inject(ShoppingStore);
+    store.applyWeekPlan(plan([wp('1', 2, [{ name: 'Reis', amount: 100, unit: 'g' }])]));
+    store.addItem({ name: 'Kaffee', amount: 1, unit: 'Pck', checked: false, manual: true });
+    store.toggleItem(store.list()!.items.findIndex((i) => i.name === 'Reis'));
+
+    const list = store.applyWeekPlan(plan([wp('2', 2, [{ name: 'Hirse', amount: 100, unit: 'g' }])]), false);
+
+    expect(list.items.map((i) => i.name)).toEqual(['Hirse']);
+  });
+
   it('marks generated items so unchecked ones without price are replaced', () => {
     const store = TestBed.inject(ShoppingStore);
 
