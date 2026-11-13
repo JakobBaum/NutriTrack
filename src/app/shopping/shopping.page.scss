@@ -146,10 +146,12 @@ ion-list.nt-grouped {
     transition: color 200ms ease, opacity 200ms ease, text-decoration-color 200ms ease;
     &.checked { text-decoration-color: currentcolor; color: var(--nt-secondary); opacity: 0.75; }
   }
-  &__name { font-size: var(--nt-fs-headline); }
+  &__name { font-size: var(--nt-fs-headline); white-space: normal; overflow-wrap: anywhere; }
 }
 
-.qty { display: block; font-size: var(--nt-fs-caption); color: var(--nt-secondary); font-variant-numeric: tabular-nums; }
+// Umbrechen erlaubt (ion-checkbox erbt nowrap); Betrag und Tag brechen nie mittendrin.
+.qty { display: block; white-space: normal; font-size: var(--nt-fs-caption); color: var(--nt-secondary); font-variant-numeric: tabular-nums; }
+.qty__sum, .est-badge { display: inline-block; white-space: nowrap; }
 .est-badge { margin-left: 4px; padding: 1px 6px; border-radius: 8px; font-size: 0.8125rem; background: var(--ion-color-step-100, rgba(128, 128, 128, 0.15)); color: var(--nt-secondary); }
 
 .cat-header {
@@ -186,16 +188,6 @@ ion-item-option { --padding-start: 0; --padding-end: 0; width: 56px; }
 }
 
 .price-note { margin: var(--nt-space-3) 0 0; font-size: var(--nt-fs-caption); color: var(--nt-secondary); }
-
-.suggested {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--nt-space-1);
-  padding: var(--nt-space-2) 0 0;
-  &__label { font-size: var(--nt-fs-caption); color: var(--nt-secondary); }
-  ion-chip { --background: var(--nt-accent-tint); --color: var(--nt-accent); }
-}
 
 .empty {
   display: flex;

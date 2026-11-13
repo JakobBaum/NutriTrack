@@ -1,3 +1,4 @@
+import { TOAST_SWIPE_GESTURE } from '../../shared/toast-options';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { ModalController } from '@ionic/angular/lazy';
@@ -66,6 +67,7 @@ export class OnlineSearchComponent {
   private readonly translations = signal<ReadonlyMap<string, OnlineRecipe>>(new Map());
   private readonly savedIds = signal<ReadonlySet<string>>(new Set());
   readonly toast = signal<string | null>(null);
+  readonly toastSwipe = TOAST_SWIPE_GESTURE;
 
   /** Nur ohne eigenen Schlüssel und ohne globalen Server ist die Einrichtung nötig. */
   readonly needsSetup = computed(() => !this.access.isAvailable());

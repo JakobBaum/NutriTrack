@@ -222,7 +222,7 @@
                   @let hasPrice = shownPrice(item) !== undefined;
                   @if (hasAmount) { {{ qty(item) }} }
                   @if (hasAmount && hasPrice) { · }
-                  @if (hasPrice) { ca. {{ shownPrice(item)! | ntNum:2:2 }} € <span class="est-badge">{{ typeof item.userPrice === 'number' ? 'eigener Preis' : 'geschätzt' }}</span> }
+                  @if (hasPrice) { <span class="qty__sum">ca. {{ shownPrice(item)! | ntNum:2:2 }} €</span> <span class="est-badge">{{ typeof item.userPrice === 'number' ? 'eigener Preis' : 'geschätzt' }}</span> }
                   @if (!hasAmount && !hasPrice) { ohne Menge }
                   @else if (!hasAmount) { ohne Menge }
                 </span>
@@ -300,6 +300,7 @@
     [duration]="undoDuration"
     [buttons]="undoButtons"
     position="bottom"
+    [swipeGesture]="toastSwipe"
     (didDismiss)="onUndoDismiss($any($event))"
   ></ion-toast>
   <ion-toast
@@ -308,6 +309,7 @@
     [duration]="planToastDuration"
     [buttons]="planToastButtons"
     position="bottom"
+    [swipeGesture]="toastSwipe"
     (didDismiss)="onPlanToastDismiss($any($event))"
   ></ion-toast>
   <ion-toast
@@ -315,6 +317,7 @@
     [message]="shareToastMessage()"
     [duration]="shareToastDuration"
     position="bottom"
+    [swipeGesture]="toastSwipe"
     (didDismiss)="onShareToastDismiss()"
   ></ion-toast>
 
@@ -337,7 +340,6 @@
   [initialBreakpoint]="addInitialBreakpoint"
   [handle]="true"
   [backdropDismiss]="true"
-  [backdropBreakpoint]="0.5"
   (didPresent)="focusName()"
   (didDismiss)="closeAdd()"
 >

@@ -35,6 +35,7 @@ import {
   toRecipeIngredients,
 } from './recipe-form';
 import { askPortionsSheet, cardMenuSheet, mealLabel, pickMealSheet } from './recipe-sheets';
+import { TOAST_SWIPE_GESTURE } from '../shared/toast-options';
 import { confirmDiscard } from '../meals/confirm-discard';
 import { MealType, NutritionFacts, Recipe, RecipeIngredient } from '../core/models';
 import { AiService } from '../core/ai/ai.service';
@@ -103,6 +104,7 @@ export class RecipesPage implements OnDestroy {
   private readonly deletion = new UndoableDelete((id) => this.store.remove(id));
   readonly undoOpen = signal(false);
   readonly undoDuration = UNDO_TOAST_MS;
+  readonly toastSwipe = TOAST_SWIPE_GESTURE;
   readonly undoButtons = UNDO_TOAST_BUTTONS;
 
   readonly nativeCamera = this.camera.isNativeCameraAvailable();
@@ -352,6 +354,13 @@ export class RecipesPage implements OnDestroy {
     this.editId.set(recipe.id);
     this.error.set(null);
     this.isModalOpen.set(true);
+  }
+
+  /** X-Taste: erst fragen (canDismiss-Logik), nur bei Ja schließen; bei „Weiter bearbeiten“ bleibt der Zustand offen. */
+  async requestCloseModal(): Promise<void> {
+    if (!(await this.canDismissRecipe())) return;
+    this.allowClose = true;
+    this.isModalOpen.set(false);
   }
 
   closeModal(): void {

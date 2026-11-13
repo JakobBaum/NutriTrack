@@ -57,4 +57,14 @@ describe('UndoableDelete', () => {
     settleUndoToast(second.del, 'timeout');
     expect(second.committed).toEqual(['b']);
   });
+
+  it('löscht endgültig, wenn der Hinweis weggewischt wird (Ionic-Rolle "gesture")', () => {
+    const { committed, del } = setup();
+    del.start('c');
+
+    settleUndoToast(del, 'gesture');
+
+    expect(committed).toEqual(['c']);
+    expect(del.pendingId()).toBeNull();
+  });
 });

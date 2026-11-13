@@ -98,6 +98,7 @@
     [message]="toastMessage() ?? ''"
     [duration]="2200"
     position="bottom"
+    [swipeGesture]="toastSwipe"
     (didDismiss)="onToastDismiss()"
   ></ion-toast>
 
@@ -107,6 +108,7 @@
     [duration]="undoDuration"
     [buttons]="undoButtons"
     position="bottom"
+    [swipeGesture]="toastSwipe"
     (didDismiss)="onUndoDismiss($any($event))"
   ></ion-toast>
 </ion-content>
@@ -119,7 +121,7 @@
         <div class="nt-sheet-header__start"></div>
         <h2 class="nt-sheet-header__title" role="heading" aria-level="2">{{ editId() ? 'Rezept bearbeiten' : 'Neues Rezept' }}</h2>
         <div class="nt-sheet-header__end">
-          <ion-button fill="clear" class="nt-sheet-close" (click)="closeModal()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
+          <ion-button fill="clear" class="nt-sheet-close" (click)="requestCloseModal()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
         </div>
       </div>
     </ion-header>

@@ -29,6 +29,16 @@ describe('NtFoodRowComponent', () => {
     expect(el.querySelector('.own-tag')).toBeNull();
   });
 
+  it('setzt den Nutri-Score direkt hinter die Nährwert-Zeile (gleiche Zeile)', () => {
+    const el = render(item);
+    const row = el.querySelector('.meta-row');
+    expect(row?.querySelector('.meta')).not.toBeNull();
+    const score = row?.querySelector('.score');
+    expect(score?.getAttribute('role')).toBe('img');
+    expect(score?.previousElementSibling?.classList.contains('meta')).toBe(true);
+    expect(el.querySelector('.text > .score')).toBeNull();
+  });
+
   it('zeigt keine Bilder und keine Platzhalter-Icons', () => {
     const el = render({ ...item, imageUrl: 'https://img/x.jpg' } as FoodItem);
     expect(el.querySelector('img')).toBeNull();

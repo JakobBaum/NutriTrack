@@ -34,7 +34,7 @@ export class UndoableDelete {
 const UNDO_ROLE = 'undo';
 
 /** Dauer des „Gelöscht“-Hinweises in ms. */
-export const UNDO_TOAST_MS = 5000;
+export const UNDO_TOAST_MS = 3500;
 
 /** Toast-Button „Rückgängig“. */
 export const UNDO_TOAST_BUTTONS = [{ text: 'Rückgängig', role: UNDO_ROLE }];

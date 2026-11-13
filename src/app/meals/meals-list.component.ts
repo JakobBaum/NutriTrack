@@ -11,6 +11,7 @@ import { FoodSourceResult } from '../shared/food-sources/food-sources.component'
 import { formatDecimal, parseDecimal, parseNutrientInput } from '../core/util/number-input';
 import { selectAllOnFocus } from '../core/keyboard/select-all';
 import { toDateISO } from '../core/util/date';
+import { TOAST_SWIPE_GESTURE } from '../shared/toast-options';
 import { confirmDiscard } from './confirm-discard';
 import { isMealDraftChanged, mealSaveBlockReason, rescaleEntryAmount } from './meal-draft';
 import { UNDO_TOAST_BUTTONS, UNDO_TOAST_MS, UndoableDelete, settleUndoToast } from './undoable-delete';
@@ -68,6 +69,7 @@ export class MealsListComponent implements OnDestroy {
   readonly toastMessage = signal<string | null>(null);
   readonly undoOpen = signal(false);
   readonly undoDuration = UNDO_TOAST_MS;
+  readonly toastSwipe = TOAST_SWIPE_GESTURE;
   readonly undoButtons = UNDO_TOAST_BUTTONS;
 
   // --- Create modal ---
@@ -119,6 +121,13 @@ export class MealsListComponent implements OnDestroy {
     this.baseline = { name, entries: [...entries] };
     this.rawAmounts.clear();
     this.createOpen.set(true);
+  }
+
+  /** X-Taste: erst fragen (canDismiss-Logik), nur bei Ja schließen; bei „Weiter bearbeiten“ bleibt der Zustand offen. */
+  async requestCloseCreate(): Promise<void> {
+    if (!(await this.canDismissCreate())) return;
+    this.allowClose = true;
+    this.createOpen.set(false);
   }
 
   closeCreate(): void {

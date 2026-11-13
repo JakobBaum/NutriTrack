@@ -153,6 +153,7 @@
     [message]="savedToast() ?? ''"
     [duration]="2000"
     position="bottom"
+    [swipeGesture]="toastSwipe"
     (didDismiss)="onToastDismiss()"
   ></ion-toast>
 </ion-content>
