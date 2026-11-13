@@ -160,5 +160,5 @@
     </div>
   }
 
-  <ion-toast [isOpen]="toast() !== null" [message]="toast() ?? ''" [duration]="2500" position="bottom" (didDismiss)="onToastDismiss()"></ion-toast>
+  <ion-toast [isOpen]="toast() !== null" [message]="toast() ?? ''" [duration]="2500" position="bottom" [swipeGesture]="toastSwipe" (didDismiss)="onToastDismiss()"></ion-toast>
 </ion-content>

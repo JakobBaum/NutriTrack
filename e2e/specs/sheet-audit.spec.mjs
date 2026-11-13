@@ -5,6 +5,8 @@ import { DIARY_NORMAL, WEIGHT_HISTORY, seed } from '../lib/fixtures.mjs';
 
 const VIEWPORTS = [{ width: 375, height: 667 }, { width: 320, height: 568 }];
 const MIN_FONT_PX = 13;
+/** iOS zoomt beim Fokus in Felder unter 16 px hinein (Capacitor sperrt Pinch-Zoom): jedes Textfeld mindestens 16 px. */
+const MIN_FIELD_FONT_PX = 16;
 const MIN_TAP_PX = 40;
 const MIN_TOP_GAP_PX = 12;
 /** Kompakte Phones: Tab-Leiste mindestens 44 pt, hoechstens 64 px (vorher 76 gemessen); Tab-Beschriftung lesbar; Titel kleiner als vorher (34 px). */
@@ -22,6 +24,7 @@ const SEED = () => seed({ diary: DIARY_NORMAL, weight: WEIGHT_HISTORY, recipes: 
 /** Name, Route, Oeffnen. */
 const SHEETS = [
   ['Drill-Down', 'dashboard', (p) => p.locator('.hero__main').first().click()],
+  ['Eintragen', 'diary', (p) => p.locator('.page-head__add').click()],
   ['Fastfood', 'diary', (p) => p.locator('.ff-btn').click()],
   ['Eintrag bearbeiten', 'diary', (p) => p.locator('ion-item[button]').first().click()],
   ['Rezept neu', 'recipes', (p) => p.locator('.page-head__add').click()],
@@ -80,6 +83,30 @@ function audit(page, limits) {
   }, limits);
 }
 
+/** Sichtbare Textfelder (input/textarea/select, auch in Shadow-DOM) im obersten Modal bzw. auf der Seite; ion-select-Hosts zaehlen mit. */
+function fieldFontProblems(page, minField) {
+  return page.evaluate((min) => {
+    const SKIP_TYPES = new Set(['checkbox', 'radio', 'hidden', 'range', 'file', 'button', 'submit', 'image', 'color']);
+    const modal = [...document.querySelectorAll('ion-modal.show-modal')].at(-1);
+    const root = modal ?? document.querySelector('ion-router-outlet .ion-page:not(.ion-page-hidden)') ?? document.body;
+    const found = [];
+    const collect = (node) => {
+      for (const el of node.querySelectorAll('input, textarea, select, ion-select')) found.push(el);
+      for (const host of node.querySelectorAll('*')) if (host.shadowRoot) collect(host.shadowRoot);
+    };
+    collect(root);
+    const problems = [];
+    for (const el of found) {
+      if (el.tagName === 'INPUT' && SKIP_TYPES.has(el.type)) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) continue;
+      const font = parseFloat(getComputedStyle(el).fontSize);
+      if (font < min) problems.push(`Feldschrift ${font}px <${el.tagName.toLowerCase()}> ${(el.getAttribute('aria-label') ?? el.id ?? el.className).toString().slice(0, 24)}`);
+    }
+    return problems;
+  }, minField);
+}
+
 const PAGES = ['dashboard', 'diary', 'recipes', 'shopping', 'settings'];
 
 /** Seite (ohne Tab-Leiste): Ueberlauf, Schrift >= 13 px, Tippflaechen >= 40 px, Tab-Leiste >= 44 px hoch. */
@@ -126,6 +153,8 @@ export function register({ test }) {
         await settle(page, 600);
         const problems = [...new Set(await auditPage(page, { minFont: MIN_FONT_PX, minTap: MIN_TAP_PX, minBar: MIN_TABBAR_PX, maxBar: MAX_TABBAR_PX, minTabLabel: MIN_TAB_LABEL_PX, maxTitle: MAX_TITLE_PX }))];
         assert.deepEqual(problems, [], `${route}: ${problems.join('; ')}`);
+        const fieldProblems = [...new Set(await fieldFontProblems(page, MIN_FIELD_FONT_PX))];
+        assert.deepEqual(fieldProblems, [], `${route}: ${fieldProblems.join('; ')}`);
       });
     }
   }
@@ -139,6 +168,8 @@ export function register({ test }) {
         await settle(page, 1000);
         const problems = await audit(page, { minFont: MIN_FONT_PX, minTap: MIN_TAP_PX, minGap: MIN_TOP_GAP_PX });
         assert.deepEqual(problems, [], `${name}: ${problems.join('; ')}`);
+        const fieldProblems = [...new Set(await fieldFontProblems(page, MIN_FIELD_FONT_PX))];
+        assert.deepEqual(fieldProblems, [], `${name}: ${fieldProblems.join('; ')}`);
       });
     }
   }

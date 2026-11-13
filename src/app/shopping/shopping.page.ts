@@ -1,3 +1,4 @@
+import { TOAST_SWIPE_GESTURE } from '../shared/toast-options';
 import { selectAllOnFocus } from '../core/keyboard/select-all';
 import { ChangeDetectionStrategy, Component, ElementRef, OnDestroy, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -52,7 +53,7 @@ const QUERY_VIEWS: Readonly<Record<string, ShoppingView>> = { plan: 'recipes', l
 
 /** Dauer des Hinweises nach „Liste teilen“ in ms. */
 const SHARE_TOAST_MS = 2500;
-/** Dauer des Hinweises nach „Wochenplan erstellt“ (länger, damit „Zur Liste“ erreichbar bleibt). */
+/** Dauer des Hinweises nach „Wochenplan erstellt“: länger, damit die Aktion „Zur Liste“ erreichbar bleibt (kein Rückgängig-Hinweis). */
 const PLAN_TOAST_MS = 6000;
 const PLAN_TOAST_LIST_ROLE = 'list';
 
@@ -164,6 +165,7 @@ export class ShoppingPage implements OnDestroy {
   readonly planToastMessage = signal('');
   readonly planToastButtons = [{ text: 'Zur Liste', role: PLAN_TOAST_LIST_ROLE }];
   readonly planToastDuration = PLAN_TOAST_MS;
+  readonly toastSwipe = TOAST_SWIPE_GESTURE;
 
   /** Vorbelegung aus dem Profil, sonst aus der letzten generierten Liste. */
   persons = defaultPersonsInRange(this.profileStore.profile(), this.lastGeneratedPersons());
@@ -186,8 +188,9 @@ export class ShoppingPage implements OnDestroy {
   /** Feldfehler im Hinzufügen-Sheet (null = gültig). */
   readonly addAmountError = signal<string | null>(null);
   readonly addPriceError = signal<string | null>(null);
-  readonly addBreakpoints = [0, 0.5, 1];
-  readonly addInitialBreakpoint = 0.5;
+  /** Volle Höhe (Abstand oben kommt aus sheets.scss): Felder bleiben über der iOS-Tastatur (216 + 44 + 44 pt). */
+  readonly addBreakpoints = [0, 1];
+  readonly addInitialBreakpoint = 1;
   readonly categoryLabel = categoryLabel;
   readonly parseDecimal = parseDecimal;
   readonly formatDecimal = formatDecimal;

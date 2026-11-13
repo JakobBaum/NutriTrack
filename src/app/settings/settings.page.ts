@@ -1,3 +1,4 @@
+import { TOAST_SWIPE_GESTURE } from '../shared/toast-options';
 import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -71,6 +72,7 @@ export class SettingsPage implements OnInit {
   /** Das Tagesziel ist ganz oder teilweise manuell festgelegt (Karte zeigt „manuell“). */
   readonly isManualTarget = computed(() => hasManualTarget(this.profileStore.profile()));
   readonly savedToast = signal<string | null>(null);
+  readonly toastSwipe = TOAST_SWIPE_GESTURE;
 
   readonly profileOpen = signal(false);
   /** Gewicht, das das Profil-Sheet beim Öffnen vorbelegt (Hinweis „Ziel neu berechnen“). */
