@@ -6,7 +6,7 @@ import { FoodItem, NutritionFacts } from '../models';
 import { makeId } from '../util/id';
 import { parseDecimal } from '../util/number-input';
 import { FoodProvider } from './food-provider';
-import { FOOD_TIMEOUT_MS, toFoodLookupError } from './food-errors';
+import { FOOD_TIMEOUT_MS, FoodLookupError, toFoodLookupError } from './food-errors';
 import { plausibleServingG } from './serving';
 import { environment } from '../../../environments/environment';
 import { DebugLogService } from '../debug/debug-log.service';
@@ -100,7 +100,7 @@ export class OpenFoodFactsProvider implements FoodProvider {
         }).pipe(timeout(FOOD_TIMEOUT_MS)),
       );
       const entries = (res.hits ?? []).flatMap((p): RankEntry[] => {
-        const item = this.toFoodItem(p);
+        const item = this.toFoodItem(p, (code) => this.log.info(`Unplausible Nährwerte verworfen (Barcode ${code})`));
         return item ? [{ item, locale: localeScore(p), categories: p.categories_tags }] : [];
       });
       const items = dedupe(rank(entries, q).map((e) => e.item)).slice(0, limit);
@@ -130,7 +130,9 @@ export class OpenFoodFactsProvider implements FoodProvider {
         ).pipe(timeout(FOOD_TIMEOUT_MS)),
       );
       if (!res.product || res.status === 'failure') return null;
-      return this.toFoodItem(res.product);
+      return this.toFoodItem(res.product, () => {
+        throw new FoodLookupError('implausible', `Unplausible Nährwerte (Barcode ${code})`);
+      });
     } catch (e: unknown) {
       if (isNotFound(e)) return null;
       const err = toFoodLookupError(e);
@@ -158,7 +160,8 @@ export class OpenFoodFactsProvider implements FoodProvider {
     return kj !== null ? Math.max(0, kj / KJ_PER_KCAL) : null;
   }
 
-  private toFoodItem(p: OffProduct): FoodItem | null {
+  /** `onImplausible` entscheidet: still verwerfen (Suche) oder Fehler melden (Barcode). */
+  private toFoodItem(p: OffProduct, onImplausible: (code: string) => void): FoodItem | null {
     const rawName = (p.product_name ?? '').trim();
     if (!rawName) return null;
     const stripped = stripSize(rawName);
@@ -181,7 +184,7 @@ export class OpenFoodFactsProvider implements FoodProvider {
       basis: 'per100g',
     };
     if (!isPlausiblePer100g(facts)) {
-      this.log.error(`Unplausible Nährwerte verworfen (Barcode ${p.code ?? 'ohne'})`);
+      onImplausible(p.code ?? 'ohne');
       return null;
     }
     return {

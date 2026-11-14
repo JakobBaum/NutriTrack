@@ -1,4 +1,4 @@
-import { Injectable, Injector, inject } from '@angular/core';
+import { Injectable, Injector, computed, inject } from '@angular/core';
 import { ModalController } from '@ionic/angular/lazy';
 import { ProfileStore } from '../state/profile.store';
 import { ConsentDialogComponent } from '../../shared/consent-dialog/consent-dialog.component';
@@ -18,19 +18,24 @@ export class ConsentService {
   private readonly injector = inject(Injector);
   private pending: Promise<boolean> | null = null;
 
+  /** Das gespeicherte Profil hat ein Alter unter 18: eine Zustimmung ist dann nicht möglich. */
+  readonly minor = computed(() => isUnderAge(this.profile.profile()?.age));
+
+  /** Die eine Wahrheit: zugestimmt und nicht unter 18. Alle Stellen lesen diese Angabe. */
+  readonly granted = computed(() => this.store.granted() && !this.minor());
+
   /** Sofortige Prüfung ohne Dialog (für Hintergrundaufrufe). */
   isGranted(): boolean {
-    return this.store.granted();
+    return this.granted();
   }
 
-  /** Das gespeicherte Profil hat ein Alter unter 18: eine Zustimmung ist dann nicht möglich. */
   isMinor(): boolean {
-    return isUnderAge(this.profile.profile()?.age);
+    return this.minor();
   }
 
   /** `true`, sobald zugestimmt ist; sonst Dialog und dessen Ergebnis. */
   ensure(): Promise<boolean> {
-    if (this.store.granted()) return Promise.resolve(true);
+    if (this.granted()) return Promise.resolve(true);
     if (this.pending) return this.pending;
     const job = this.askUser().finally(() => {
       this.pending = null;
@@ -51,7 +56,7 @@ export class ConsentService {
       });
       await modal.present();
       const { role } = await modal.onWillDismiss();
-      return role === 'confirm' && this.store.granted();
+      return role === 'confirm' && this.granted();
     } catch (e: unknown) {
       console.error('NutriTrack: Zustimmungsdialog konnte nicht geöffnet werden', e);
       return false;

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+import { CUSTOM_ELEMENTS_SCHEMA, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { ModalController } from '@ionic/angular/lazy';
@@ -14,7 +14,7 @@ const recipe = (id: string, title: string, ingredient = 'Salz'): OnlineRecipe =>
   id, title, servings: 2, steps: ['x'], ingredients: [{ name: ingredient, amount: 1, unit: 'g' }],
 });
 
-function setup(search: ReturnType<typeof vi.fn>, withProfile = true): OnlineSearchComponent {
+function setup(search: ReturnType<typeof vi.fn>, withProfile = true, canTranslate: () => boolean = () => false): OnlineSearchComponent {
   localStorage.clear();
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
@@ -23,7 +23,7 @@ function setup(search: ReturnType<typeof vi.fn>, withProfile = true): OnlineSear
     providers: [
       { provide: SpoonacularProvider, useValue: { search, quotaLeft: () => null } },
       { provide: RecipeSearchAccessService, useValue: { isAvailable: () => true } },
-      { provide: RecipeTranslateService, useValue: { canTranslate: () => false, translateQuery: async (q: string) => ({ query: q, viaAi: false }) } },
+      { provide: RecipeTranslateService, useValue: { canTranslate, translateQuery: async (q: string) => ({ query: q, viaAi: false }) } },
       { provide: ModalController, useValue: { dismiss: vi.fn() } },
       { provide: Router, useValue: { navigate: vi.fn() } },
     ],
@@ -170,5 +170,15 @@ describe('OnlineSearchComponent Unverträglichkeiten und Nachladen', () => {
     await component.toggleProfileFilter();
 
     expect(search).not.toHaveBeenCalled();
+  });
+});
+
+describe('OnlineSearchComponent canTranslate', () => {
+  it('folgt der Zustimmung, auch wenn sie nach dem Öffnen erteilt wird', () => {
+    const consent = signal(false);
+    const component = setup(vi.fn(), true, () => consent());
+    expect(component.canTranslate()).toBe(false);
+    consent.set(true);
+    expect(component.canTranslate()).toBe(true);
   });
 });

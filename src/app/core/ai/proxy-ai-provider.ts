@@ -18,6 +18,7 @@ import { normalizeTranslatedTexts } from '../recipes/translate/translate-normali
 import { DebugLogService } from '../debug/debug-log.service';
 import { AI_ERROR_MESSAGES, AI_TIMEOUT_MS, friendlyAiErrorMessage, isTimeoutError, mapTimeoutError } from './ai-errors';
 import { defaultAiProxyUrl } from './ai-endpoint';
+import { buildShoppingPayload } from './shopping-payload';
 import { ConsentService } from '../consent/consent.service';
 import { ConsentRequiredError } from '../consent/consent.errors';
 import { normalizeRecipeImport } from './recipe-import-normalize';
@@ -76,7 +77,7 @@ export class ProxyAiProvider implements AiProvider {
   }
 
   generateShoppingList(req: ShoppingPlanRequest): Promise<ShoppingPlanResult> {
-    return this.call<ShoppingPlanResult>('generateShoppingList', req);
+    return this.call<ShoppingPlanResult>('generateShoppingList', buildShoppingPayload(req));
   }
 
   recognizeLabel(imageBase64: string, basis: 'per100g' | 'perPortion'): Promise<LabelResult> {

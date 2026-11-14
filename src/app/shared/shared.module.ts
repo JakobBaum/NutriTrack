@@ -15,14 +15,16 @@ import { NtCookModeComponent } from './cook-mode/cook-mode.component';
 import { NtBackupReminderComponent } from './backup-reminder/backup-reminder.component';
 import { NtPageHeaderComponent } from './page-header/page-header.component';
 import { ConsentDialogComponent } from './consent-dialog/consent-dialog.component';
+import { PrivacyModalComponent } from './consent-dialog/privacy-modal.component';
+import { LegalInfoComponent } from '../settings/legal-info/legal-info.component';
 
 /**
  * Bündelt wiederverwendbare UI-Bausteine und die üblichen Standard-Module,
  * damit Feature-Module nur `SharedModule` importieren müssen.
  */
 @NgModule({
-  declarations: [ProgressRingComponent, NtFoodRowComponent, NtStepperComponent, NtDateNavComponent, NtFoodSearchComponent, AmountRowComponent, NtBarcodeScannerComponent, NtFoodSourcesComponent, NtCookModeComponent, NtBackupReminderComponent, NtPageHeaderComponent, ConsentDialogComponent],
+  declarations: [ProgressRingComponent, NtFoodRowComponent, NtStepperComponent, NtDateNavComponent, NtFoodSearchComponent, AmountRowComponent, NtBarcodeScannerComponent, NtFoodSourcesComponent, NtCookModeComponent, NtBackupReminderComponent, NtPageHeaderComponent, ConsentDialogComponent, PrivacyModalComponent, LegalInfoComponent],
   imports: [CommonModule, FormsModule, IonicModule],
-  exports: [CommonModule, FormsModule, IonicModule, ProgressRingComponent, NtFoodRowComponent, NtStepperComponent, NtDateNavComponent, NtFoodSearchComponent, AmountRowComponent, NtBarcodeScannerComponent, NtFoodSourcesComponent, NtCookModeComponent, NtBackupReminderComponent, NtPageHeaderComponent],
+  exports: [CommonModule, FormsModule, IonicModule, ProgressRingComponent, NtFoodRowComponent, NtStepperComponent, NtDateNavComponent, NtFoodSearchComponent, AmountRowComponent, NtBarcodeScannerComponent, NtFoodSourcesComponent, NtCookModeComponent, NtBackupReminderComponent, NtPageHeaderComponent, LegalInfoComponent],
 })
 export class SharedModule {}

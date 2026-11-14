@@ -18,7 +18,8 @@ export function backupStatusLabel(formattedDate: string | null): string {
 }
 
 /** Statuszeile zur Zustimmung für KI- und Online-Funktionen. */
-export function consentStatusLabel(granted: boolean, dateLabel: string | null): string {
+export function consentStatusLabel(granted: boolean, dateLabel: string | null, isMinor = false): string {
+  if (isMinor) return 'Erst ab 18 nutzbar.';
   if (!granted) return 'Nicht zugestimmt. Es wird nichts an Dritte gesendet.';
   return dateLabel ? `Zugestimmt am ${dateLabel}` : 'Zugestimmt';
 }

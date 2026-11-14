@@ -186,3 +186,13 @@ ion-item {
   }
 }
 
+.consent-actions {
+  --inner-padding-end: var(--nt-card-pad);
+  --padding-start: var(--nt-card-pad);
+
+  .nt-btn {
+    max-width: 100%;
+    white-space: normal;
+    text-align: center;
+  }
+}

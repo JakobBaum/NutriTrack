@@ -94,3 +94,36 @@ describe('ConsentService.isGranted', () => {
     expect(service.isGranted()).toBe(true);
   });
 });
+
+describe('ConsentService mit Alter unter 18', () => {
+  const profileWithAge = (age: number) => ({
+    weightKg: 60, heightCm: 170, age, sex: 'female' as const, activityLevel: 'moderate' as const, goal: 'maintain' as const, rateKgPerWeek: 0, updatedAt: '',
+  });
+
+  it('sperrt eine erteilte Zustimmung, sobald das Profil unter 18 ist', () => {
+    const { service, store } = setup('cancel');
+    store.grant(new Date(), true);
+    TestBed.inject(ProfileStore).setProfile(profileWithAge(16));
+    expect(service.isGranted()).toBe(false);
+    expect(service.granted()).toBe(false);
+  });
+
+  it('gilt wieder, wenn das Profil später 18 oder älter ist', () => {
+    const { service, store } = setup('cancel');
+    store.grant(new Date(), true);
+    const profiles = TestBed.inject(ProfileStore);
+    profiles.setProfile(profileWithAge(16));
+    profiles.setProfile(profileWithAge(18));
+    expect(service.isGranted()).toBe(true);
+  });
+
+  it('öffnet bei gesperrter Zustimmung den Dialog statt true zu liefern', async () => {
+    const { service, store, create, finish } = setup('cancel');
+    store.grant(new Date(), true);
+    TestBed.inject(ProfileStore).setProfile(profileWithAge(16));
+    const result = service.ensure();
+    finish();
+    await expect(result).resolves.toBe(false);
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+});

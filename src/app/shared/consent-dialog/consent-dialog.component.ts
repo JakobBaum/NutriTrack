@@ -1,13 +1,11 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
 import { ModalController } from '@ionic/angular/lazy';
 import { ConsentStore } from '../../core/consent/consent.store';
-import { PRIVACY_INFO_URL } from '../../settings/info-link';
+import { PrivacyModalComponent } from './privacy-modal.component';
 
 /** Rollen, mit denen der Dialog schließt. */
 export const CONSENT_ROLE_CONFIRM = 'confirm';
 export const CONSENT_ROLE_CANCEL = 'cancel';
-export const CONSENT_ROLE_PRIVACY = 'privacy';
 
 /** Dialog "KI- und Online-Funktionen": Einwilligung mit 18+-Bestätigung. Wird nur über den ConsentService geöffnet. */
 @Component({
@@ -18,9 +16,8 @@ export const CONSENT_ROLE_PRIVACY = 'privacy';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ConsentDialogComponent {
-  private readonly modal = inject(ModalController);
+  private readonly modals = inject(ModalController);
   private readonly store = inject(ConsentStore);
-  private readonly router = inject(Router);
 
   /** Das Profil hat ein Alter unter 18: Zustimmung nicht möglich. */
   isMinor = false;
@@ -33,15 +30,16 @@ export class ConsentDialogComponent {
 
   accept(): void {
     if (this.isMinor || !this.store.grant(new Date(), this.isAdult())) return;
-    void this.modal.dismiss(null, CONSENT_ROLE_CONFIRM);
+    void this.modals.dismiss(null, CONSENT_ROLE_CONFIRM);
   }
 
   decline(): void {
-    void this.modal.dismiss(null, CONSENT_ROLE_CANCEL);
+    void this.modals.dismiss(null, CONSENT_ROLE_CANCEL);
   }
 
+  /** Die Erklärung öffnet über dem Dialog; der Dialog bleibt offen und die Anfrage wartet weiter. */
   async openPrivacy(): Promise<void> {
-    await this.modal.dismiss(null, CONSENT_ROLE_PRIVACY);
-    await this.router.navigateByUrl(PRIVACY_INFO_URL);
+    const privacy = await this.modals.create({ component: PrivacyModalComponent });
+    await privacy.present();
   }
 }

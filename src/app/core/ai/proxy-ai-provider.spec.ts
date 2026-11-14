@@ -145,3 +145,14 @@ describe('ProxyAiProvider Zeitlimit', () => {
     }
   });
 });
+
+describe('ProxyAiProvider Einkaufsliste', () => {
+  it('sendet nur die Titel der Rezepte an den Worker', async () => {
+    const recipe = { id: 'r1', title: 'Pasta', servings: 2, ingredients: [{ name: 'Mehl' }], steps: ['Kochen'] };
+    const p = provider.generateShoppingList({ persons: 2, days: 1, meals: ['dinner'], recipes: [recipe as never] });
+    const req = http.expectOne(PROXY);
+    expect(req.request.body.payload.recipes).toEqual([{ title: 'Pasta' }]);
+    req.flush({ items: [], suggestedDishes: [], estTotal: 0 });
+    await p;
+  });
+});

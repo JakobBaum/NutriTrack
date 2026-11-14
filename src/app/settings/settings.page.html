@@ -49,13 +49,13 @@
           <p class="row-sub" data-testid="consent-status">{{ consentStatus() }}</p>
         </ion-label>
       </ion-item>
-      @if (consentGranted()) {
-        <ion-item button detail="false" data-testid="consent-revoke" (click)="revokeConsent()">
-          <ion-label class="ion-text-wrap" color="danger">Zustimmung widerrufen</ion-label>
+      @if (consentStored()) {
+        <ion-item lines="none" class="consent-actions">
+          <button type="button" class="nt-btn nt-btn--text" data-testid="consent-revoke" (click)="revokeConsent()">Zustimmung widerrufen</button>
         </ion-item>
-      } @else {
-        <ion-item button detail="false" data-testid="consent-grant" (click)="grantConsent()">
-          <ion-label class="ion-text-wrap">Zustimmen</ion-label>
+      } @else if (!consentMinor()) {
+        <ion-item lines="none" class="consent-actions">
+          <button type="button" class="nt-btn nt-btn--tonal" data-testid="consent-grant" (click)="grantConsent()">Zustimmen</button>
         </ion-item>
       }
     </ion-list>

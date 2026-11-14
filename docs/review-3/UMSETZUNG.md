@@ -118,3 +118,43 @@ Soll vom Nutzer freigegeben; Navigation Variante B. Die Regeln stehen in `DESIGN
 
 ### Offen
 - Im Fastfood-Helfer stehen "Weitere Vorschläge" und "Vorschläge holen" direkt übereinander; Design-Entscheidung offen.
+
+## Rechtliche Absicherung (Branch `recht-absicherung`, nicht gemergt, Worker nicht ausgerollt)
+
+Grundlage: `RECHT-BESTANDSAUFNAHME.md` (28 Befunde). Keine Rechtsberatung; die Texte sind nicht anwaltlich geprüft.
+
+### Geändert
+- **Einwilligung:** KI (Gemini) und Rezeptsuche (Spoonacular) laufen erst nach einmaliger Zustimmung mit Bestätigung 18+. Durchgesetzt an zwei zentralen Stellen (`core/ai/proxy-ai-provider.ts`, `core/recipes/online/spoonacular.provider.ts`); Hintergrundaufrufe (Übersetzung) weichen ohne Zustimmung still auf das Wörterbuch aus, der Etikett-Scan auf die Texterkennung am Gerät. Widerruf unter Profil. Ein Profilalter unter 18 sperrt die Funktionen, auch bei früher erteilter Zustimmung. Die Zustimmung steht nie im Backup, "Alle lokalen Daten zurücksetzen" löscht sie. Logik in `core/consent/`.
+- **Texte:** Datenschutzerklärung neu (je Datenfluss Zweck, Inhalt, Empfänger, Land; Art. 9 für Unverträglichkeiten; Bilder direkt von Anbietern; Backup unverschlüsselt), Nutzungsbedingungen ergänzt (ab 18, nicht für Schwangere, Stillende, bei Erkrankungen oder Essstörung; Filter sind keine Allergiesicherung; KI-Werte sind Schätzungen; Marken), neuer Abschnitt "Quellen und Lizenzen". Alles in `settings/legal-info/`.
+- **Hinweise am Ort:** Profil (Orientierungswerte, Warnung bei manuellem Ziel unter der Mindestzufuhr, Hinweis bei Abnehmen unter 18), Fastfood-Helfer (KI-Schätzung, Allergene nicht geprüft), Online-Suche und Wochenplan (keine Allergiesicherung), Backup-Export (unverschlüsselt).
+- **Quellen:** gespeicherte Online-Rezepte zeigen Quelle mit Link und "Rezeptdaten von spoonacular.com"; Link-Import speichert die Quelle; Barcode- und Suchtreffer zeigen "Daten: Open Food Facts (ODbL)", Preise "Open Prices".
+- **Fotos:** jedes Foto wird vor dem Versand neu kodiert (EXIF und Standort entfallen); schlägt das fehl, wird nichts gesendet.
+- **Datensparsamkeit:** die Einkaufslisten-KI bekommt nur noch Rezepttitel (höchstens 30) statt ganzer Rezepte.
+- **Worker (nur im Code):** Rezept-Cache 1 Stunde statt 6; Logs ohne Inhalte; `/health` nur noch `{ok:true}`; Link-Import mit ehrlichem User-Agent, Sperre für TikTok, Instagram, Facebook, X und Beachtung von robots.txt (Antwort 422, App zeigt "Kopiere den Rezepttext und füge ihn ein").
+- **iOS und Doku:** Kamera-Texte in `Info.plist`, `PrivacyInfo.xcprivacy`, `docs/STORE-PRIVACY.md`, `README.md`, `docs/KI-WORKER.md` an die echten Datenflüsse angepasst.
+- **Aus der Gesamtprüfung (hoch):** Nährwerte von Open Food Facts werden auf harte Grenzen geprüft (`core/food/facts-plausibility.ts`); beim Barcode erscheint dann ein eigener Hinweis, in der Suche fällt der Treffer weg.
+
+### Annahmen (ohne Rückfrage entschieden)
+- Strengster Fall angenommen, weil Repo und Web-Version öffentlich sind.
+- Auch du siehst den Zustimmungsdialog einmal.
+- Lebensmittelsuche, Barcode und Preise bleiben ohne Zustimmung nutzbar (keine Profildaten), stehen aber im Datenschutztext.
+- Im Privacy Manifest ist zusätzlich "Health" angegeben (Unverträglichkeiten); die vorsichtigere Angabe.
+- `NSPhotoLibraryAddUsageDescription` bleibt mit korrigiertem Text, weil das Kamera-Plugin den Schlüssel verlangt.
+- Kein Impressum, kein Umbau gespeicherter Online-Rezepte, keine Origin-Pflicht am Worker: deine Entscheidungen, siehe `OFFENE-FRAGEN.md` 7 bis 14.
+
+### Geprüft
+- Code-Review durch eigenen Agenten: 0 kritisch, 1 hoch (Zustimmung galt trotz Alter unter 18), 4 mittel, 8 niedrig. Hoch und mittel behoben, dazu L2, L5, L8.
+- Gesamt-QA nach den Korrekturen: `tsc` 0 Fehler, Lint sauber, 1621 Unit-Tests grün, Build ok, E2E gegen den Produktions-Build 288/288, Worker-Tests 149/149.
+- Screenshots Dialog und Profilzeile bei 375 und 320 px angesehen.
+
+### Nicht geprüft
+- Echtes iPhone, Safari/WebKit; echte Dienste (alles gegen Mocks); Wirkung der Sperrliste und von robots.txt gegen echte Seiten.
+- Speicherdauern bei Google und Cloudflare, Gemini-Tarif, Spoonacular-Plan, Cloudflare-Logs: nur im Dashboard des Betreibers prüfbar.
+- Rechtliche Richtigkeit der Texte (kein Anwalt).
+- Tests zu einigen Korrekturen wurden nicht vorab rot gesehen (Unter-18, Einkaufslisten-Kürzung, Übersetzungshinweis).
+
+### Offen (niedrig, zur Entscheidung)
+- Jeder 422 beim Link-Import zeigt denselben Text, auch bei leerer KI-Antwort.
+- `worker.js` hat 1123 Zeilen (Regel: höchstens 800); der robots-Teil ließe sich auslagern.
+- Abneigungen, deren Übersetzung ohne Zustimmung ausfiel, werden nach späterer Zustimmung nicht automatisch nachgeholt.
+- Im Profil ist die Spalte "KI-Status" bei 320 px sehr schmal (bestand schon vorher).

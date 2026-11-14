@@ -21,3 +21,9 @@ Fakt: Repo `JakobBaum/NutriTrack` und die Web-Version unter https://jakobbaum.gi
 12. **Link-Import und TikTok:** Der Worker ruft fremde Seiten automatisiert ab. TikTok verbietet das Auslesen. Import auf Seiten mit Rezept-Daten (JSON-LD) beschränken und TikTok sperren? Annahme bis zur Antwort: TikTok-Abruf durch den Worker wird nicht gebaut (betrifft Welle 4 B).
 13. **Worker absichern:** Anfragen ohne Origin ablehnen? Schützt nicht vollständig, hält aber einfache Fremdnutzung ab. Braucht ein Deploy.
 14. **Einwilligung:** Ich baue ein, dass KI- und Online-Funktionen erst nach einmaliger Zustimmung (mit Bestätigung 18+) laufen. Du siehst den Dialog einmal. Einverstanden, oder für dich allein wieder ausbauen?
+
+## Gesamtprüfung (Welle 5)
+
+15. **Mittlere Befunde beheben?** `GESAMTPRUEFUNG.md` listet 15 mittlere und 8 niedrige Befunde (0 kritisch, der eine hohe ist behoben). Vorschlag: zuerst Nr. 2 und 3 (Erfolgsmeldung trotz Fehler bei Zurücksetzen und Import), Nr. 4 (ältere App überschreibt neuere Daten), Nr. 5 (KI-Antworten für Einkaufsliste und Etikett ungeprüft), Nr. 9 (Online-Suche mischt Filtersätze). Alle oder nur diese?
+16. **Abneigungen mit gleichem Wort in beiden Sprachen** (z. B. "Avocado") lösen den Hinweis "konnten nicht übersetzt werden" aus. Hinweis für solche Fälle unterdrücken?
+17. **Fastfood-Helfer:** "Weitere Vorschläge" und "Vorschläge holen" stehen direkt übereinander. So lassen oder nach der ersten Runde nur noch eine Schaltfläche zeigen?

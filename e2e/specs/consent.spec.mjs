@@ -1,7 +1,7 @@
 // Zustimmung zu KI- und Online-Funktionen: ohne Zustimmung geht keine Anfrage an den Worker hinaus.
 import { assert, go, settle, readStore } from '../lib/harness.mjs';
 import { topModal } from '../lib/ionic.mjs';
-import { seed } from '../lib/fixtures.mjs';
+import { PROFILE, seed } from '../lib/fixtures.mjs';
 
 const VIEWPORTS = [{ width: 375, height: 667 }, { width: 320, height: 568 }];
 const MIN_TOUCH_PX = 44;
@@ -145,6 +145,65 @@ export function register({ test }) {
     await startOnlineSearch(page);
     await waitForDialog(page);
     assert.deepEqual(sent, [], 'nach dem Widerruf geht nichts mehr hinaus');
+  });
+
+  test('consent: Nicht jetzt im Wochenplan setzt den Ladezustand zurück', seed({ consent: null }), async (page) => {
+    const sent = await mockWorker(page);
+    await go(page, 'shopping');
+    await page.locator('ion-segment-button', { hasText: 'Wochenplan' }).first().click();
+    await settle(page);
+    const planBtn = page.locator('[data-testid="week-plan-btn"]');
+    await planBtn.click();
+    await waitForDialog(page);
+    await page.locator('[data-testid="consent-decline"]').click();
+    await settle(page, 600);
+    assert.equal(await isDisabled(planBtn), false, 'Wochenplan erstellen muss wieder bedienbar sein');
+    assert.equal(await planBtn.locator('ion-spinner').count(), 0, 'es darf kein Ladekreisel hängen bleiben');
+    assert.deepEqual(sent, []);
+  });
+
+  test('consent: Datenschutzerklärung öffnet sich sichtbar über dem Dialog, der Dialog bleibt offen', seed({ consent: null }), async (page) => {
+    await mockWorker(page);
+    await go(page, 'diary');
+    await page.locator('.ff-btn').click();
+    await topModal(page).locator('[data-testid="ff-run"]').waitFor();
+    await settle(page, 500);
+    await topModal(page).locator('[data-testid="ff-run"]').click({ force: true });
+    await waitForDialog(page);
+    await page.locator('[data-testid="consent-privacy"]').click();
+    const privacy = page.locator('[data-testid="privacy-modal"]');
+    await privacy.waitFor();
+    await settle(page, 600);
+    const topmost = await privacy.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + Math.min(r.height / 2, 200));
+      return hit !== null && el.closest('ion-modal')?.contains(hit) === true;
+    });
+    assert.equal(topmost, true, 'die Datenschutzerklärung darf nicht von einem anderen Sheet verdeckt sein');
+    assert.match(await privacy.innerText(), /Datenschutz/);
+    await page.locator('[data-testid="privacy-close"]').click();
+    await settle(page, 600);
+    assert.equal(await consentDialog(page).isVisible(), true, 'der Zustimmungsdialog muss offen bleiben');
+  });
+
+  test('consent: Alle lokalen Daten zurücksetzen löscht auch die Zustimmung', seed(), async (page) => {
+    await go(page, 'settings');
+    assert.notEqual(await readStore(page, 'consent'), null, 'Ausgangslage: Zustimmung liegt vor');
+    await page.locator('.danger-row').click();
+    await page.locator('ion-alert button', { hasText: 'Löschen' }).click();
+    await settle(page, 600);
+    assert.equal(await readStore(page, 'consent'), null, 'die Zustimmung muss mit allen Daten gelöscht sein');
+    assert.match(await page.locator('[data-testid="consent-status"]').innerText(), /Nicht zugestimmt/);
+  });
+
+  test('consent: Profil mit Alter unter 18 sperrt eine erteilte Zustimmung', seed({ profile: { ...PROFILE, age: 16 } }), async (page) => {
+    const sent = await mockWorker(page);
+    await go(page, 'settings');
+    assert.match(await page.locator('[data-testid="consent-status"]').innerText(), /Erst ab 18 nutzbar/);
+    await startOnlineSearch(page);
+    await waitForDialog(page);
+    assert.equal(await page.locator('[data-testid="consent-minor"]').count(), 1, 'der Dialog muss die Altersgrenze nennen');
+    assert.deepEqual(sent, [], 'bei Alter unter 18 darf nichts hinausgehen');
   });
 
   for (const vp of VIEWPORTS) {

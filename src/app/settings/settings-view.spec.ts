@@ -48,4 +48,9 @@ describe('consentStatusLabel', () => {
   it('sagt ohne Zustimmung, dass nichts an Dritte gesendet wird', () => {
     expect(consentStatusLabel(false, null)).toBe('Nicht zugestimmt. Es wird nichts an Dritte gesendet.');
   });
+
+  it("nennt die Altersgrenze, wenn das Profil unter 18 ist", () => {
+    expect(consentStatusLabel(false, null, true)).toBe("Erst ab 18 nutzbar.");
+    expect(consentStatusLabel(true, "10.11.2026", true)).toBe("Erst ab 18 nutzbar.");
+  });
 });

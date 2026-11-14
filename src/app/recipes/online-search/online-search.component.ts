@@ -73,7 +73,7 @@ export class OnlineSearchComponent {
   readonly quotaLeft = this.provider.quotaLeft;
 
   /** Ohne KI-Verbindung gibt es nur das Wörterbuch: Suche und Rezepttexte bleiben dann überwiegend Englisch. */
-  readonly canTranslate = this.translator.canTranslate();
+  readonly canTranslate = computed(() => this.translator.canTranslate());
   readonly nameFilterNote = HEALTH_NOTES.nameFilter;
   readonly translating = signal(false);
   private readonly translations = signal<ReadonlyMap<string, OnlineRecipe>>(new Map());

@@ -69,7 +69,7 @@
           type="search"
           enterkeyhint="search"
           aria-label="Rezept suchen"
-          [placeholder]="canTranslate ? 'Rezept suchen, z. B. Hähnchen, Pasta' : 'Rezept suchen (auf Englisch), z. B. chicken'"
+          [placeholder]="canTranslate() ? 'Rezept suchen, z. B. Hähnchen, Pasta' : 'Rezept suchen (auf Englisch), z. B. chicken'"
           [ngModel]="query()"
           (ngModelChange)="query.set($event)"
           [ngModelOptions]="{ standalone: true }"
@@ -86,7 +86,7 @@
         </button>
         @if (profileFilterOn()) { <p class="os-note" data-testid="os-filter-note">{{ nameFilterNote }}</p> }
       }
-      @if (!canTranslate) { <p class="os-note" data-testid="os-search-hint">Ohne KI-Verbindung bitte auf Englisch suchen (bekannte deutsche Wörter werden übersetzt).</p> }
+      @if (!canTranslate()) { <p class="os-note" data-testid="os-search-hint">Ohne KI-Verbindung bitte auf Englisch suchen (bekannte deutsche Wörter werden übersetzt).</p> }
 
       <div class="os-filters">
         <div class="os-filter os-filter--kcal">

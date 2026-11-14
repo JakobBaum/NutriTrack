@@ -33,10 +33,10 @@ const base = { product_name: 'Joghurt', nutriments: { 'energy-kcal_100g': 60 } }
 
 // Mapping-Randfälle der OpenFoodFacts-Antworten.
 describe('OpenFoodFactsProvider — Mapping', () => {
-  it('verwirft ein Produkt mit unmöglichen Kalorien statt es anzubieten', async () => {
-    const item = await mapProduct({ ...base, nutriments: { 'energy-kcal_100g': 9999 } });
+  it('meldet ein Produkt mit unmöglichen Kalorien als fehlerhaft statt es anzubieten', async () => {
+    const result = mapProduct({ ...base, nutriments: { 'energy-kcal_100g': 9999 } });
 
-    expect(item).toBeNull();
+    await expect(result).rejects.toMatchObject({ reason: 'implausible' });
   });
 
   it('mappt alle Nährwerte per100g', async () => {

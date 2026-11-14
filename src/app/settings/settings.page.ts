@@ -90,8 +90,11 @@ export class SettingsPage implements OnInit {
 
   private readonly consentStore = inject(ConsentStore);
   private readonly consentService = inject(ConsentService);
-  readonly consentGranted = this.consentStore.granted;
-  readonly consentStatus = computed(() => consentStatusLabel(this.consentGranted(), consentDateLabel(this.consentStore.acceptedAt())));
+  readonly consentStored = this.consentStore.granted;
+  readonly consentMinor = this.consentService.minor;
+  readonly consentStatus = computed(() =>
+    consentStatusLabel(this.consentStore.granted(), consentDateLabel(this.consentStore.acceptedAt()), this.consentMinor()),
+  );
 
   private readonly backup = inject(BackupService);
   readonly backupBusy = signal(false);
