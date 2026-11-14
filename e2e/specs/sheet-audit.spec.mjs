@@ -24,20 +24,19 @@ const SEED = () => seed({ diary: DIARY_NORMAL, weight: WEIGHT_HISTORY, recipes: 
 /** Name, Route, Oeffnen. */
 const SHEETS = [
   ['Drill-Down', 'dashboard', (p) => p.locator('.hero__main').first().click()],
-  ['Eintragen', 'diary', (p) => p.locator('.page-head__add').click()],
+  ['Eintragen', 'diary', (p) => p.locator('[data-testid="diary-add"]').click()],
   ['Fastfood', 'diary', (p) => p.locator('.ff-btn').click()],
   ['Eintrag bearbeiten', 'diary', (p) => p.locator('ion-item[button]').first().click()],
-  ['Rezept neu', 'recipes', (p) => p.locator('.page-head__add').click()],
+  ['Rezept neu', 'recipes', (p) => p.getByRole('button', { name: 'Neues Rezept' }).click()],
   ['Rezept Detail', 'recipes', (p) => p.locator('.recipe__title-btn').first().click()],
-  ['Rezept importieren', 'recipes', (p) => p.locator('button.page-head__import[aria-label^="Rezept importieren"]').click()],
+  ['Rezept importieren', 'recipes', (p) => p.locator('[data-testid="import-btn"]').click()],
   ['Online-Suche', 'recipes', (p) => p.locator('[data-testid="online-search-btn"]').click()],
   ['Mahlzeit anlegen', 'recipes', async (p) => {
     await p.locator('ion-segment-button', { hasText: 'Mahlzeiten' }).click();
     await settle(p, 400);
-    await p.locator('.page-head__add').click();
+    await p.getByRole('button', { name: 'Neue Mahlzeit' }).click();
   }],
   ['Profil', 'settings', (p) => p.locator('[data-testid="open-profile"]').click()],
-  ['Rezeptsuche-Zugang', 'settings', (p) => p.locator('[data-testid="recipe-search-row"]').click()],
   ['Anleitung', 'settings', (p) => p.locator('ion-item[button]', { hasText: 'Anleitung' }).first().click()],
   ['Gewicht eintragen', 'settings', (p) => p.locator('[data-testid="weight-add"]').click()],
   ['Artikel hinzufuegen', 'shopping', (p) => p.locator('ion-fab-button').click()],

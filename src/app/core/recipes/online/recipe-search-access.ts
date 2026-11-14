@@ -1,50 +1,27 @@
-import { Injectable, computed, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { defaultAiProxyUrl } from '../../ai/ai-endpoint';
-import { RecipeSearchConfig, RecipeSearchConfigStore } from '../../state/recipe-search-config.store';
-
-/** Zugangsart zur Rezept-Suche: eigener Schlüssel (direkt), globaler Worker oder nichts. */
-export type RecipeSearchMode = 'ownKey' | 'worker' | 'none';
 
 export interface RecipeSearchAccess {
-  mode: RecipeSearchMode;
-  /** Basis-URL ohne abschließenden Schrägstrich ('' bei mode 'none'). */
+  /** Ob die Online-Suche über den globalen Worker erreichbar konfiguriert ist. */
+  available: boolean;
+  /** Basis-URL des Workers ohne abschließenden Schrägstrich ('' wenn nicht verfügbar). */
   baseUrl: string;
-  /** Eigener Schlüssel; nur bei mode 'ownKey' gesetzt, sonst ''. */
-  apiKey: string;
 }
 
-function trimSlash(url: string): string {
-  return url.trim().replace(/\/+$/, '');
+/** Die Suche läuft ausschließlich über den globalen Worker (kein eigener Schlüssel im Client). */
+export function resolveRecipeSearchAccess(workerUrl: string): RecipeSearchAccess {
+  const baseUrl = workerUrl.trim().replace(/\/+$/, '');
+  return { available: baseUrl !== '', baseUrl };
 }
 
-/** Eigener Schlüssel hat Vorrang; ohne ihn der globale Worker; ohne beides 'none'. */
-export function resolveRecipeSearchAccess(
-  cfg: Pick<RecipeSearchConfig, 'apiKey' | 'baseUrl'>,
-  workerUrl: string,
-): RecipeSearchAccess {
-  const apiKey = cfg.apiKey.trim();
-  if (apiKey) return { mode: 'ownKey', baseUrl: trimSlash(cfg.baseUrl), apiKey };
-  const worker = trimSlash(workerUrl);
-  if (worker) return { mode: 'worker', baseUrl: worker, apiKey: '' };
-  return { mode: 'none', baseUrl: '', apiKey: '' };
-}
-
-/** Entscheidet anhand von Rezept-Suche- und KI-Einstellungen, wie die Online-Suche erreicht wird. */
+/** Entscheidet, ob und wie die Online-Suche erreicht wird. */
 @Injectable({ providedIn: 'root' })
 export class RecipeSearchAccessService {
-  private readonly config = inject(RecipeSearchConfigStore);
-
-  /** Aktueller Zugang (reagiert auf Änderungen der Einstellungen). */
-  readonly access = computed(() => this.resolve());
-  readonly mode = computed(() => this.access().mode);
-
   isAvailable(): boolean {
-    return this.mode() !== 'none';
+    return this.resolve().available;
   }
 
-  /** Zugang mit optional überschriebener Konfiguration (z. B. ungespeicherter Key beim Verbindungstest). */
-  resolve(override?: Partial<RecipeSearchConfig>): RecipeSearchAccess {
-    const cfg = { ...this.config.config(), ...override };
-    return resolveRecipeSearchAccess(cfg, defaultAiProxyUrl());
+  resolve(): RecipeSearchAccess {
+    return resolveRecipeSearchAccess(defaultAiProxyUrl());
   }
 }

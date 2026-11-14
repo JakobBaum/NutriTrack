@@ -10,8 +10,8 @@
       <p class="reminder__error" role="alert">{{ failed }}</p>
     }
     <div class="reminder__actions">
-      <button type="button" class="reminder__btn" [disabled]="busy()" (click)="backupNow()">Jetzt sichern</button>
-      <button type="button" class="reminder__btn reminder__btn--ghost" (click)="later()">Später</button>
+      <button type="button" class="nt-btn reminder__btn" [disabled]="busy()" (click)="backupNow()">Jetzt sichern</button>
+      <button type="button" class="nt-btn nt-btn--text reminder__btn reminder__btn--ghost" (click)="later()">Später</button>
     </div>
   </section>
 }

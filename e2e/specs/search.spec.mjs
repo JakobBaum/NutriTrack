@@ -30,7 +30,7 @@ async function mockOffSearch(page) {
 
 async function openDiarySearch(page) {
   await go(page, 'diary');
-  await page.locator('.page-head__add').click();
+  await page.locator('[data-testid="diary-add"]').click();
   return topModal(page);
 }
 
@@ -94,7 +94,7 @@ export function register({ test }) {
 
   test('suche: eigene Lebensmittel erscheinen bei Rezept-Zutaten', seed({ customFoods: [OWN] }), async (page) => {
     await go(page, 'recipes');
-    await page.locator('.page-head__add').click();
+    await page.getByRole('button', { name: 'Neues Rezept' }).click();
     const modal = topModal(page);
     await modal.locator('.nt-add-btn', { hasText: 'Zutat hinzufügen' }).click();
     const picker = topModal(page);

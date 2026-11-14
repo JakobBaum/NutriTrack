@@ -4,8 +4,7 @@
  * - GET  /recipes/complexSearch → spoonacular-Rezeptsuche (Key nur als Secret SPOONACULAR_API_KEY)
  * - POST /            → KI-Proxy für Gemini (fn + payload)
  *
- * - GET  /health      → Statusprüfung {ok, hasKey, hasRecipeKey, hasRateLimiter, hasDailyCap, model,
- *                       fallbackModel, warning?} (kein Key-Wert)
+ * - GET  /health      → Statusprüfung {ok: true} (bewusst ohne Konfigurationsdetails)
  *
  * Deploy (im Projektordner):
  *   npx wrangler login
@@ -22,7 +21,7 @@
  *   AI_LIMITER       Rate-Limiting-Binding (wrangler.toml [[ratelimits]]) für POST / und die Rezept-Suche
  *   OFF_LIMITER      eigenes Rate-Limiting-Binding für /off-search (Fallback: AI_LIMITER)
  *   DAILY_KV         KV-Namespace-Binding für den globalen Tageszähler der KI-Aufrufe
- *                    (ohne Binding: kein Deckel, /health meldet hasDailyCap=false + warning;
+ *                    (ohne Binding: kein Deckel;
  *                    mit Binding aber KV-Ausfall: fail-closed, 503; Foto-Aufrufe zählen doppelt)
  *   DAILY_AI_CAP     Deckel pro UTC-Tag (Standard 2000)
  *
@@ -47,7 +46,15 @@ const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const OFF_SEARCH_URL = 'https://search.openfoodfacts.org/search';
 // OFF verlangt einen User-Agent mit App-Name + Kontakt (Browser dürfen ihn nicht setzen).
 const OFF_USER_AGENT = 'NutriTrack/1.0 (+https://github.com/JakobBaum/NutriTrack)';
-const PAGE_USER_AGENT = 'Mozilla/5.0 (compatible; NutriTrack/1.0; +https://github.com/JakobBaum/NutriTrack)';
+// Ehrlicher User-Agent für den Link-Import (Seite und robots.txt); der Produktname ist der robots.txt-Gruppenname.
+const PAGE_AGENT_NAME = 'NutriTrackRecipeImport';
+const PAGE_USER_AGENT = `${PAGE_AGENT_NAME}/1.0 (+https://jakobbaum.github.io/NutriTrack/)`;
+// Plattformen, deren Bedingungen automatisiertes Auslesen untersagen (jeweils samt Subdomains).
+const BLOCKED_PAGE_HOSTS = ['tiktok.com', 'instagram.com', 'facebook.com', 'x.com', 'twitter.com'];
+const PAGE_NOT_ALLOWED_MESSAGE = 'Von dieser Seite können wir keine Rezepte abrufen. Kopiere den Rezepttext und füge ihn ein.';
+const PAGE_NOT_ALLOWED_STATUS = 422;
+const ROBOTS_TIMEOUT_MS = 5000;
+const ROBOTS_MAX_BYTES = 512 * 1024; // RFC 9309: mindestens 500 KiB auswerten
 
 const DEFAULT_ORIGINS = [
   'https://jakobbaum.github.io',
@@ -74,6 +81,11 @@ const RECIPE_ENUM_PARAMS = {
   sort: ['healthiness', 'popularity', 'random'],
   sortDirection: ['asc', 'desc'],
 };
+// Listenparameter (Spiegel: spoonacular.query.ts): nur Buchstaben, Leerzeichen, Komma und Bindestrich, begrenzte Länge.
+const RECIPE_LIST_PARAMS = ['intolerances', 'excludeIngredients'];
+const RECIPE_LIST_MAX_CHARS = 200; // gleicher Wert wie MAX_FILTER_PARAM_CHARS in der App (diet-options.ts)
+const RECIPE_INTOLERANCES = ['dairy', 'egg', 'gluten', 'peanut', 'seafood', 'shellfish', 'soy', 'tree nut', 'wheat', 'sesame'];
+const RECIPE_LIST_PATTERN = /^[\p{L} ,-]+$/u;
 const RECIPE_MAX_NUMBER = 20;
 const RECIPE_DEFAULT_NUMBER = 10;
 const RECIPE_TIMEOUT_MS = 12000;
@@ -86,7 +98,7 @@ const MAX_QUERY_CHARS = 200;
 const MAX_PAGE_SIZE = 50;
 const SEARCH_CACHE_TTL_S = 3600;
 const PREFLIGHT_MAX_AGE_S = 86400;
-const RECIPE_CACHE_TTL_S = 6 * 3600;
+const RECIPE_CACHE_TTL_S = 3600; // Spoonacular-Bedingungen: Cache höchstens 1 Stunde
 const RECIPE_CACHED_HEADERS = ['Content-Type', 'X-Api-Quota-Left'];
 
 const DEFAULT_DAILY_CAP = 2000;
@@ -94,7 +106,6 @@ const DAILY_KEY_TTL_S = 2 * 86400;
 const DAILY_LIMIT_MESSAGE = 'Das Tageslimit für KI-Anfragen ist erreicht — bitte morgen erneut versuchen.';
 const DAILY_UNAVAILABLE_MESSAGE = 'Der Tageszähler für KI-Anfragen ist gerade nicht erreichbar — bitte später erneut versuchen.';
 const PHOTO_CALL_WEIGHT = 2;
-const NO_DAILY_CAP_WARNING = 'Kein Tageslimit aktiv (KV-Binding DAILY_KV fehlt).';
 const RATE_LIMIT_RETRY_AFTER_S = '60';
 const GENERIC_ERROR_MESSAGE = 'Interner Fehler.';
 const BLOCKED_MESSAGE = 'Die KI hat diese Anfrage aus Sicherheitsgründen abgelehnt.';
@@ -160,7 +171,7 @@ export default {
         return await recipeSearch(request, url, env, cors);
       }
       if (request.method === 'GET' && url.pathname === '/health') {
-        return json(healthStatus(env), 200, cors);
+        return json(healthStatus(), 200, cors);
       }
       if (request.method === 'POST' && url.pathname === '/') {
         return await aiProxy(request, env, cors);
@@ -172,7 +183,7 @@ export default {
       }
       if (e instanceof ClientError) return json({ error: e.message }, e.status, cors);
       // Details nur ins Log: Upstream-Meldungen können interne Hinweise enthalten.
-      console.error('Worker-Fehler:', e);
+      console.error('Worker-Fehler:', errorSummary(e));
       return json({ error: GENERIC_ERROR_MESSAGE }, 500, cors);
     }
   },
@@ -182,18 +193,15 @@ function hasBinding(binding, method) {
   return typeof binding?.[method] === 'function';
 }
 
-function healthStatus(env) {
-  const hasDailyCap = hasBinding(env.DAILY_KV, 'get');
-  return {
-    ok: true,
-    hasKey: Boolean(env.GEMINI_API_KEY),
-    hasRecipeKey: Boolean(env.SPOONACULAR_API_KEY),
-    hasRateLimiter: hasBinding(env.AI_LIMITER, 'limit'),
-    hasDailyCap,
-    ...(hasDailyCap ? {} : { warning: NO_DAILY_CAP_WARNING }),
-    model: env.GEMINI_MODEL || GEMINI_MODEL,
-    fallbackModel: env.GEMINI_FALLBACK_MODEL || GEMINI_FALLBACK_MODEL,
-  };
+/** Öffentlich erreichbar: verrät bewusst keine Konfiguration (Schlüssel, Bindings, Modelle). */
+function healthStatus() {
+  return { ok: true };
+}
+
+/** Nur Art des Fehlers (und Upstream-Status) fürs Log: Meldungen können Nutzereingaben oder Schlüssel enthalten. */
+function errorSummary(e) {
+  const status = Number.isInteger(e?.upstreamStatus) ? ` (Upstream-HTTP ${e.upstreamStatus})` : '';
+  return `${e?.name ?? typeof e}${status}`;
 }
 
 // ── CORS ───────────────────────────────────────────────────────────────
@@ -279,11 +287,26 @@ function withHeaders(response, extra) {
 
 // ── spoonacular-Proxy ──────────────────────────────────────────────────
 
+/** Behält nur Werte der festen Unverträglichkeiten-Liste (unbekannte fallen weg); '' wenn nichts übrig bleibt. */
+function onlyKnownIntolerances(value) {
+  return value
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter((item) => RECIPE_INTOLERANCES.includes(item))
+    .join(',');
+}
+
 function buildRecipeUrl(url) {
   const target = new URL(SPOONACULAR_URL);
   for (const key of RECIPE_PARAMS) {
     const value = url.searchParams.get(key);
     if (value !== null) target.searchParams.set(key, value.slice(0, MAX_QUERY_CHARS));
+  }
+  for (const key of RECIPE_LIST_PARAMS) {
+    const value = (url.searchParams.get(key) ?? '').trim();
+    if (value.length === 0 || value.length > RECIPE_LIST_MAX_CHARS || !RECIPE_LIST_PATTERN.test(value)) continue;
+    const accepted = key === 'intolerances' ? onlyKnownIntolerances(value) : value;
+    if (accepted !== '') target.searchParams.set(key, accepted);
   }
   for (const [key, allowed] of Object.entries(RECIPE_ENUM_PARAMS)) {
     const value = (url.searchParams.get(key) ?? '').trim().toLowerCase();
@@ -313,7 +336,7 @@ async function cacheRecipeResponse(cache, cacheKey, body, resp) {
   try {
     await cache.put(cacheKey, new Response(body, { status: 200, headers }));
   } catch (e) {
-    console.warn('Rezept-Cache nicht beschreibbar:', e);
+    console.warn('Rezept-Cache nicht beschreibbar:', errorSummary(e));
   }
 }
 
@@ -415,7 +438,7 @@ function rateLimitedResponse(message, cors) {
 
 /**
  * Globaler Tageszähler (UTC) über KV. Ergebnis: 'ok' | 'limit' (Deckel erreicht) | 'unavailable'.
- * Ohne Binding: fail-open ('ok', /health meldet hasDailyCap=false + warning).
+ * Ohne Binding: fail-open ('ok', kein Deckel).
  * Binding konfiguriert, KV aber nicht erreichbar: fail-closed ('unavailable'), damit ein
  * KV-Ausfall den Kostenschutz nicht aushebelt. KV ist nicht atomar, bei gleichzeitigen
  * Anfragen kann der Deckel daher knapp überschritten werden.
@@ -432,7 +455,7 @@ async function takeDailySlot(env, weight = 1) {
     await env.DAILY_KV.put(key, String(used + weight), { expirationTtl: DAILY_KEY_TTL_S });
     return 'ok';
   } catch (e) {
-    console.error('Tageszähler (KV) nicht verfügbar — Aufruf wird abgelehnt:', e);
+    console.error('Tageszähler (KV) nicht verfügbar — Aufruf wird abgelehnt:', errorSummary(e));
     return 'unavailable';
   }
 }
@@ -493,12 +516,38 @@ function validateLabelRequest(p) {
   return { imageBase64: image(p.imageBase64), basis: oneOf(p.basis ?? 'per100g', ['per100g', 'perPortion'], 'Basis') };
 }
 
+// Fastfood-Helfer: Obergrenzen und feste Länderliste (Sortiment gilt je Land).
+const FASTFOOD_MAX_PREFERENCES = 4;
+const FASTFOOD_PREFERENCE_CHARS = 30;
+const FASTFOOD_MAX_EXCLUDE = 20;
+const FASTFOOD_EXCLUDE_CHARS = 60;
+const FASTFOOD_COUNTRIES = [
+  'Österreich', 'Deutschland', 'Schweiz', 'Italien', 'Spanien', 'Frankreich', 'Niederlande', 'Vereinigtes Königreich', 'USA',
+];
+const FASTFOOD_DEFAULT_COUNTRY = FASTFOOD_COUNTRIES[0];
+
+/** Einzeiliger Freitext für Prompts: alle Steuerzeichen (auch Zeilenumbrüche) werden zu Leerzeichen. */
+function lineText(value, maxChars) {
+  return text(String(value ?? '').replace(/[\u0000-\u001f\u007f\u2028\u2029]/g, ' ').replace(/\s+/g, ' '), maxChars);
+}
+
+/** Liste aus Kurztexten: fehlt sie, ist sie leer; kein Array ist ein Fehler; leere Einträge entfallen. */
+function lineList(value, maxItems, maxChars, name) {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) throw new ClientError(400, `${name} ungültig.`);
+  return value.slice(0, maxItems).map((v) => lineText(v, maxChars)).filter(Boolean);
+}
+
 function validateFastfoodRequest(p) {
   return {
-    restaurant: text(p.restaurant, 60),
+    restaurant: lineText(p.restaurant, 60),
     kcalBudget: num(p.kcalBudget, 50, 5000, 'Kalorienbudget'),
     moneyBudget: optNum(p.moneyBudget, 0, 200, 'Geldbudget'),
-    preference: text(p.preference, 60),
+    preference: lineText(p.preference, 60),
+    preferences: lineList(p.preferences, FASTFOOD_MAX_PREFERENCES, FASTFOOD_PREFERENCE_CHARS, 'Kriterien'),
+    country: FASTFOOD_COUNTRIES.includes(p.country) ? p.country : FASTFOOD_DEFAULT_COUNTRY,
+    // Die jüngsten Namen zählen: die App hängt neue Runden hinten an.
+    exclude: lineList(Array.isArray(p.exclude) ? p.exclude.slice(-FASTFOOD_MAX_EXCLUDE) : p.exclude, FASTFOOD_MAX_EXCLUDE, FASTFOOD_EXCLUDE_CHARS, 'Ausschlussliste'),
   };
 }
 
@@ -602,29 +651,154 @@ async function readCapped(resp, maxBytes) {
   return new TextDecoder().decode(all);
 }
 
-/** Holt eine Rezeptseite; jede Weiterleitung wird erneut gegen SSRF geprüft. */
-async function fetchPublicPage(startUrl) {
+// ── Link-Import: Sperrliste, robots.txt, Abruf ─────────────────────────
+
+function normalizedHost(raw) {
+  return new URL(raw).hostname.toLowerCase().replace(/\.+$/, '');
+}
+
+/** Host-Vergleich (kein Teilstring): "tiktok.com" und "*.tiktok.com", nicht "nottiktok.com". */
+function isBlockedPageHost(raw) {
+  const host = normalizedHost(raw);
+  return BLOCKED_PAGE_HOSTS.some((blocked) => host === blocked || host.endsWith(`.${blocked}`));
+}
+
+function pageNotAllowed() {
+  return new ClientError(PAGE_NOT_ALLOWED_STATUS, PAGE_NOT_ALLOWED_MESSAGE);
+}
+
+/**
+ * Holt eine URL und folgt Weiterleitungen manuell: jede Station wird erneut gegen SSRF geprüft.
+ * `beforeHop(url)` darf werfen, um eine Station abzulehnen (Sperrliste, robots.txt).
+ */
+async function fetchFollowingRedirects(startUrl, { headers, timeoutMs, beforeHop }) {
   let current = startUrl;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     if (!isPublicHttpUrl(current)) throw new ClientError(400, 'Diese URL kann nicht importiert werden.');
-    const resp = await fetch(current, {
-      headers: { 'User-Agent': PAGE_USER_AGENT, Accept: 'text/html,application/xhtml+xml,text/plain' },
-      redirect: 'manual',
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
+    if (beforeHop) await beforeHop(current);
+    const resp = await fetch(current, { headers, redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
     const location = resp.headers.get('Location');
     if (resp.status >= 300 && resp.status < 400 && location) {
       current = new URL(location, current).toString();
       continue;
     }
-    if (!resp.ok) throw new ClientError(422, `Rezeptseite antwortet mit HTTP ${resp.status}.`);
-    const type = resp.headers.get('Content-Type') ?? '';
-    if (!/text\/html|application\/xhtml|text\/plain/i.test(type)) {
-      throw new ClientError(422, 'Link zeigt auf keine Webseite.');
-    }
-    return readCapped(resp, MAX_PAGE_BYTES);
+    return resp;
   }
   throw new ClientError(422, 'Zu viele Weiterleitungen.');
+}
+
+// robots.txt nach RFC 9309 (Gruppen je User-Agent, längste Übereinstimmung gewinnt, bei Gleichstand Allow).
+// Unterstützt `*` und `$`. Nicht umgesetzt: Prozent-Normalisierung beim Pfadvergleich.
+
+/** Zerlegt robots.txt in Gruppen { agents, rules }; Regeln vor der ersten User-agent-Zeile werden ignoriert. */
+function parseRobotsGroups(text) {
+  const groups = [];
+  let isCollectingAgents = false;
+  for (const rawLine of text.split(/\r\n|\r|\n/)) {
+    const line = rawLine.replace(/#.*/, '').trim();
+    const separator = line.indexOf(':');
+    if (separator < 0) continue;
+    const field = line.slice(0, separator).trim().toLowerCase();
+    const value = line.slice(separator + 1).trim();
+    if (field === 'user-agent') {
+      if (!isCollectingAgents) groups.push({ agents: [], rules: [] });
+      groups[groups.length - 1].agents.push(value.toLowerCase());
+      isCollectingAgents = true;
+    } else if (field === 'allow' || field === 'disallow') {
+      isCollectingAgents = false;
+      const group = groups[groups.length - 1];
+      if (group && value !== '') group.rules.push({ isAllow: field === 'allow', pattern: value });
+    }
+  }
+  return groups;
+}
+
+/** Eigene Gruppe(n) haben Vorrang vor `*`. */
+function rulesForAgent(groups) {
+  const own = groups.filter((g) => g.agents.includes(PAGE_AGENT_NAME.toLowerCase()));
+  const chosen = own.length > 0 ? own : groups.filter((g) => g.agents.includes('*'));
+  return chosen.flatMap((g) => g.rules);
+}
+
+/** Präfix-Vergleich mit `*` (beliebig viele Zeichen) und `$` (Ende); iterativ, damit viele `*` nicht explodieren. */
+function matchesRobotsPattern(pattern, path) {
+  const isAnchored = pattern.endsWith('$');
+  const glob = isAnchored ? pattern.slice(0, -1) : pattern;
+  let g = 0;
+  let i = 0;
+  let starG = -1;
+  let starI = 0;
+  for (;;) {
+    if (g === glob.length && (!isAnchored || i === path.length)) return true;
+    if (g < glob.length && glob[g] === '*') {
+      starG = g++;
+      starI = i;
+      continue;
+    }
+    if (g < glob.length && i < path.length && glob[g] === path[i]) {
+      g++;
+      i++;
+      continue;
+    }
+    if (starG < 0 || starI >= path.length) return false;
+    g = starG + 1;
+    i = ++starI;
+  }
+}
+
+function isPathAllowedByRules(rules, path) {
+  const matching = rules.filter((r) => matchesRobotsPattern(r.pattern, path));
+  if (matching.length === 0) return true;
+  const best = matching.reduce((a, b) => {
+    if (b.pattern.length !== a.pattern.length) return b.pattern.length > a.pattern.length ? b : a;
+    return b.isAllow ? b : a;
+  });
+  return best.isAllow;
+}
+
+/** Auswertung einer robots.txt für unseren User-Agent und einen Pfad (inkl. Query). */
+function robotsAllows(robotsText, path) {
+  return isPathAllowedByRules(rulesForAgent(parseRobotsGroups(robotsText)), path);
+}
+
+/**
+ * Darf die Seite abgerufen werden? robots.txt vom selben Ursprung (gleicher SSRF-Schutz, auch bei Weiterleitungen).
+ * 2xx: auswerten. 4xx: nicht vorhanden, erlaubt. 5xx, Netzfehler, Zeitüberschreitung, abgelehnte Weiterleitung,
+ * zu viele Weiterleitungen: gesperrt (RFC 9309, bewusst konservativ).
+ */
+async function isAllowedByRobots(pageUrl) {
+  const target = new URL(pageUrl);
+  try {
+    const resp = await fetchFollowingRedirects(`${target.origin}/robots.txt`, {
+      headers: { 'User-Agent': PAGE_USER_AGENT, Accept: 'text/plain' },
+      timeoutMs: ROBOTS_TIMEOUT_MS,
+    });
+    if (resp.status >= 500) return false;
+    if (!resp.ok) return true;
+    return robotsAllows(await readCapped(resp, ROBOTS_MAX_BYTES), `${target.pathname}${target.search}`);
+  } catch (e) {
+    console.warn('robots.txt nicht abrufbar — Abruf wird nicht durchgeführt:', errorSummary(e));
+    return false;
+  }
+}
+
+async function assertPageAllowed(url) {
+  if (isBlockedPageHost(url) || !(await isAllowedByRobots(url))) throw pageNotAllowed();
+}
+
+/** Holt eine Rezeptseite (Sperrliste und robots.txt je Station, SSRF-Schutz je Weiterleitung). */
+async function fetchPublicPage(startUrl) {
+  const resp = await fetchFollowingRedirects(startUrl, {
+    headers: { 'User-Agent': PAGE_USER_AGENT, Accept: 'text/html,application/xhtml+xml,text/plain' },
+    timeoutMs: FETCH_TIMEOUT_MS,
+    beforeHop: assertPageAllowed,
+  });
+  if (!resp.ok) throw new ClientError(422, `Rezeptseite antwortet mit HTTP ${resp.status}.`);
+  const type = resp.headers.get('Content-Type') ?? '';
+  if (!/text\/html|application\/xhtml|text\/plain/i.test(type)) {
+    throw new ClientError(422, 'Link zeigt auf keine Webseite.');
+  }
+  return readCapped(resp, MAX_PAGE_BYTES);
 }
 
 function findRecipeNode(node) {
@@ -713,7 +887,7 @@ async function geminiWithFallback(body, env) {
           // Body war kein JSON — Rohtext reicht
         }
         lastTransient = TRANSIENT_STATUSES.has(resp.status);
-        lastError = new Error(`Gemini ${resp.status}: ${msg}`);
+        lastError = Object.assign(new Error(`Gemini ${resp.status}: ${msg}`), { upstreamStatus: resp.status });
         if (!lastTransient) {
           // Modell unbekannt (404 bzw. 400 "model"): sofort das nächste Modell probieren.
           if (isModelError(resp.status, msg) && model !== models[models.length - 1]) break;
@@ -780,7 +954,7 @@ async function gemini(prompt, env, imageBase64 = null, { maxOutputTokens = TOKEN
   try {
     return JSON.parse(answer);
   } catch {
-    console.warn('Gemini-Antwort kein JSON:', answer.slice(0, 200));
+    console.warn('Gemini-Antwort kein JSON, Länge:', answer.length);
     throw new ClientError(422, EMPTY_ANSWER_MESSAGE);
   }
 }
@@ -824,12 +998,21 @@ Antworte NUR mit gültigem JSON:
   return gemini(prompt, env, req.imageBase64, { maxOutputTokens: TOKENS_LABEL });
 }
 
+/** Kriterien als Text: neue Liste, sonst das alte Einzelfeld, sonst proteinreich. */
+function fastfoodCriteria(req) {
+  if (req.preferences.length > 0) return req.preferences.join('; ');
+  return req.preference || 'proteinreich';
+}
+
 async function suggestFastfood(req, env) {
+  const exclude = req.exclude.length > 0 ? `Diese Produkte wurden schon vorgeschlagen und dürfen NICHT erneut vorkommen: ${req.exclude.join('; ')}.` : '';
   const prompt = `Du bist ein Ernährungs-Coach. Schlage 3 Fastfood-Optionen vor.
 Restaurant: ${req.restaurant || 'beliebig'}.
+Land: ${req.country}. Nenne nur Produkte, die es in ${req.country} bei diesem Restaurant gibt; Preise in der Landeswährung als EUR-Schätzung.
 Kalorienbudget: ${req.kcalBudget} kcal.
 ${req.moneyBudget ? `Geldbudget: ${req.moneyBudget} €.` : ''}
-Priorität: ${req.preference || 'proteinreich'}.
+Kriterien (alle gleichzeitig berücksichtigen): ${fastfoodCriteria(req)}.
+${exclude}
 
 Antworte NUR mit gültigem JSON-Array:
 [{

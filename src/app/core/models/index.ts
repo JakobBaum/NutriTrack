@@ -18,6 +18,13 @@ export type ActivityLevel =
   | 'active'
   | 'veryActive';
 
+/** Ernährungsform des Profils (Spoonacular-Wert); '' = keine Vorgabe. */
+export type DietForm = '' | 'vegetarian' | 'vegan' | 'pescetarian' | 'gluten free' | 'ketogenic';
+
+/** Unverträglichkeiten nach Spoonacular. */
+export type Intolerance =
+  | 'dairy' | 'egg' | 'gluten' | 'peanut' | 'seafood' | 'shellfish' | 'soy' | 'tree nut' | 'wheat' | 'sesame';
+
 /** Nutzerprofil als Basis der Bedarfsberechnung. */
 export interface UserProfile {
   weightKg: number;
@@ -34,6 +41,14 @@ export interface UserProfile {
   manualKcal?: number;
   /** Manuelles Eiweißziel in g pro kg Körpergewicht; ersetzt die Formel, solange gesetzt. */
   manualProteinGPerKg?: number;
+  /** Ernährungsform für Rezeptsuche und Wochenplan; fehlt = keine Vorgabe. */
+  diet?: DietForm;
+  /** Unverträglichkeiten (feste Liste); fehlt = keine. */
+  intolerances?: Intolerance[];
+  /** Abneigungen als Freitext des Nutzers (max. 15, je max. 30 Zeichen). */
+  dislikes?: string[];
+  /** Englische Entsprechungen zu `dislikes` (parallel, '' = keine Übersetzung) für die Suche. */
+  dislikesEn?: string[];
   updatedAt: string;
 }
 
@@ -190,8 +205,14 @@ export interface FastFoodRequest {
   restaurant: string;
   /** Optionales Geld-Budget in EUR. */
   moneyBudget?: number;
-  /** Priorität, z.B. "high protein". */
+  /** Priorität als Kurztext (für ältere Worker, die nur dieses Feld kennen). */
   preference?: string;
+  /** Alle gewählten Kriterien (höchstens 4). */
+  preferences?: string[];
+  /** Land, dessen Sortiment gilt (z. B. "Österreich"). */
+  country?: string;
+  /** Bereits gezeigte Produktnamen, die nicht erneut vorgeschlagen werden sollen. */
+  exclude?: string[];
 }
 
 export interface FastFoodSuggestion {

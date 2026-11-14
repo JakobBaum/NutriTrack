@@ -113,3 +113,27 @@ describe('withManualEnabled', () => {
     expect(withManualEnabled(start, { kcal: 2209, proteinG: 144 }).manualKcalText).toBe('2000');
   });
 });
+
+describe('Ernährungsangaben im Formular', () => {
+  it('übernimmt Ernährungsangaben aus dem Profil und schreibt sie wieder zurück', () => {
+    const profile: UserProfile = {
+      ...saved, diet: 'vegan', intolerances: ['soy'], dislikes: ['Pilze'], dislikesEn: ['mushrooms'],
+    };
+    const state = formStateFromProfile(profile);
+    expect(state.dietPrefs).toMatchObject({ diet: 'vegan', intolerances: ['soy'], dislikes: ['Pilze'], dislikesEn: ['mushrooms'] });
+    expect(profileFromFormState(state, 'x')).toMatchObject({
+      diet: 'vegan', intolerances: ['soy'], dislikes: ['Pilze'], dislikesEn: ['mushrooms'],
+    });
+  });
+
+  it('lässt leere Ernährungsangaben im Profil weg', () => {
+    const result = profileFromFormState(formStateFromProfile(saved), 'x');
+    expect(result).not.toBeNull();
+    expect(Object.keys(result as object)).not.toContain('diet');
+    expect(Object.keys(result as object)).not.toContain('dislikes');
+  });
+
+  it('startet ohne Profil mit leeren Ernährungsangaben', () => {
+    expect(formStateFromProfile(null).dietPrefs).toEqual({ diet: '', intolerances: [], dislikes: [], dislikesEn: [] });
+  });
+});

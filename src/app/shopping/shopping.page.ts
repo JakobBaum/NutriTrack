@@ -130,9 +130,9 @@ export class ShoppingPage implements OnDestroy {
 
   /** Echte KI-Verbindung aktiv (nur dann gibt es geschätzte Preise, Budget und Markt). */
   readonly live = computed(() => this.ai.isLive());
-  /** Ohne KI keine Rezepte = nichts zu generieren. */
+  /** Ohne eigene Rezepte gibt es nichts zu planen, auch mit KI nicht (keine Anfrage mit leerer Rezeptliste). */
   readonly hasRecipes = computed(() => this.recipeStore.recipes().length > 0);
-  readonly noRecipesBlock = computed(() => !this.live() && !this.hasRecipes());
+  readonly noRecipesBlock = computed(() => !this.hasRecipes());
   /** Summen zeigen, sobald die Liste Positionen hat (Preise werden immer geschätzt). */
   readonly showTotals = computed(() => this.totals().priced > 0);
 
@@ -360,7 +360,7 @@ export class ShoppingPage implements OnDestroy {
 
   /** Fallback: Wocheneinkauf aus den eigenen Rezepten (ShoppingStore.generatePlan). */
   async generate(): Promise<void> {
-    if (!this.inputsValid()) return;
+    if (!this.inputsValid() || this.noRecipesBlock()) return;
     this.deletion.flush();
     const existing = this.list();
     if (existing && existing.items.length > 0 && !(await this.confirmRegenerate())) return;

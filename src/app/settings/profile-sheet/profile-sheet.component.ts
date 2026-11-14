@@ -1,7 +1,11 @@
+import { HEALTH_NOTES } from '../../core/messages/health-notes';
 import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
-import { ActivityLevel, DailyTarget, Goal, Sex, UserProfile } from '../../core/models';
-import { PROTEIN_NOTE_ABOVE_G_PER_KG } from '../../core/nutrition/manual-target';
+import { DIET_FORM_OPTIONS, DIET_HINT, INTOLERANCE_HINT, INTOLERANCE_OPTIONS, MAX_DISLIKES, MAX_DISLIKE_LENGTH } from '../../core/diet/diet-options';
+import { addDislike, removeDislike, toggleIntolerance } from '../../core/diet/diet-prefs';
+import { DietTranslateService } from '../../core/diet/diet-translate.service';
+import { ActivityLevel, DailyTarget, DietForm, Goal, Intolerance, Sex, UserProfile } from '../../core/models';
+import { PROTEIN_NOTE_ABOVE_G_PER_KG, manualKcalWarning } from '../../core/nutrition/manual-target';
 import { NutritionCalcService } from '../../core/nutrition/nutrition-calc.service';
 import { ProfileNote, profileNotes } from '../../core/nutrition/profile-plausibility';
 import { ProfileStore } from '../../core/state/profile.store';
@@ -21,6 +25,9 @@ type FocusField = ProfileField | 'manualKcal' | 'manualProtein';
 
 /** Bestätigung nach dem Speichern (Toast der Einstellungsseite). */
 const SAVED_MESSAGE = 'Profil gespeichert — Tagesziel aktualisiert.';
+/** Variante, wenn Abneigungen nicht ins Englische übersetzt werden konnten. */
+export const SAVED_UNTRANSLATED_MESSAGE =
+  'Profil gespeichert — Tagesziel aktualisiert. Abneigungen konnten nicht übersetzt werden; die Suche filtert sie nur auf Deutsch.';
 
 /**
  * Profil-Sheet: lädt das Formular bei jedem Öffnen frisch aus dem gespeicherten Profil,
@@ -37,6 +44,7 @@ export class ProfileSheetComponent {
   private readonly profileStore = inject(ProfileStore);
   private readonly calc = inject(NutritionCalcService);
   private readonly doc = inject(DOCUMENT);
+  private readonly dietTranslate = inject(DietTranslateService);
 
   readonly isOpen = input(false);
   /** Gewicht, mit dem das Formular beim Öffnen vorbelegt wird (Hinweis „Ziel neu berechnen“). */
@@ -49,6 +57,16 @@ export class ProfileSheetComponent {
   /** Felder, die der Nutzer schon verlassen hat (Fehler erst danach zeigen). */
   readonly touched = signal<Partial<Record<FocusField, boolean>>>({});
   readonly submitted = signal(false);
+  /** True, solange das Speichern läuft (Übersetzung der Abneigungen). */
+  readonly saving = signal(false);
+  readonly dislikeInput = signal('');
+
+  readonly dietOptions = DIET_FORM_OPTIONS;
+  readonly intoleranceOptions = INTOLERANCE_OPTIONS;
+  readonly dietHint = DIET_HINT;
+  readonly intoleranceHint = INTOLERANCE_HINT;
+  readonly maxDislikeLength = MAX_DISLIKE_LENGTH;
+  readonly dislikeLimitReached = computed(() => this.form().dietPrefs.dislikes.length >= MAX_DISLIKES);
 
   readonly sexes: { value: Sex; label: string }[] = [
     { value: 'male', label: 'Männlich' },
@@ -81,6 +99,8 @@ export class ProfileSheetComponent {
     this.form.set(prefill === null ? base : { ...base, weightKg: prefill });
     this.touched.set(prefill === null ? {} : { weightKg: true });
     this.submitted.set(false);
+    this.saving.set(false);
+    this.dislikeInput.set('');
   }
 
   // --- abgeleitete Werte ---
@@ -168,12 +188,12 @@ export class ProfileSheetComponent {
   });
 
   /** Hinweis, wenn das manuelle Kalorienziel unter der Mindestzufuhr liegt (Warnung, keine Sperre). */
-  readonly manualKcalWarning = computed(() => {
+  readonly healthNote = HEALTH_NOTES.profile;
+
+  readonly manualKcalNote = computed(() => {
     const f = this.form();
     const kcal = f.manual ? parseDecimal(f.manualKcalText) : null;
-    if (kcal === null || kcal < 1000) return null;
-    const min = this.calc.minimumKcal({ sex: f.sex });
-    return kcal < min ? `Unter der üblichen Mindestzufuhr von ${min.toLocaleString('de-DE')} kcal. Das ist nur ein Hinweis.` : null;
+    return manualKcalWarning(kcal, this.calc.minimumKcal({ sex: f.sex }));
   });
   /** Gramm Eiweiß pro Tag, die das g/kg-Ziel ergibt (null bei ungültiger Eingabe oder ohne Gewicht). */
   readonly manualProteinGrams = computed(() => {
@@ -241,6 +261,19 @@ export class ProfileSheetComponent {
   setManualProtein(text: string): void {
     this.form.update((f) => ({ ...f, manualProteinText: text }));
   }
+  setDiet(diet: DietForm): void {
+    this.form.update((f) => ({ ...f, dietPrefs: { ...f.dietPrefs, diet } }));
+  }
+  toggleIntolerance(value: Intolerance): void {
+    this.form.update((f) => ({ ...f, dietPrefs: toggleIntolerance(f.dietPrefs, value) }));
+  }
+  addDislike(): void {
+    this.form.update((f) => ({ ...f, dietPrefs: addDislike(f.dietPrefs, this.dislikeInput()) }));
+    this.dislikeInput.set('');
+  }
+  removeDislike(index: number): void {
+    this.form.update((f) => ({ ...f, dietPrefs: removeDislike(f.dietPrefs, index) }));
+  }
   markTouched(field: FocusField): void {
     this.touch(field);
   }
@@ -257,15 +290,35 @@ export class ProfileSheetComponent {
     else el.querySelector<HTMLElement>('button')?.focus();
   }
 
-  save(): void {
+  async save(): Promise<void> {
+    if (this.saving()) return;
     this.submitted.set(true);
-    const profile = profileFromFormState(this.form(), new Date().toISOString());
-    if (!this.isValid() || profile === null) {
+    const state = this.form();
+    if (!this.isValid() || profileFromFormState(state, '') === null) {
       this.focusFirstInvalid();
       return;
     }
-    this.profileStore.setProfile(profile);
-    this.saved.emit(SAVED_MESSAGE);
-    this.closed.emit();
+    this.saving.set(true);
+    try {
+      const translation = await this.dietTranslate.translateDislikes(state.dietPrefs.dislikes, this.knownTranslations());
+      const dietPrefs = { ...state.dietPrefs, dislikesEn: translation.dislikesEn };
+      const profile = profileFromFormState({ ...state, dietPrefs }, new Date().toISOString());
+      if (profile === null) return;
+      this.profileStore.setProfile(profile);
+      this.saved.emit(translation.failedCount > 0 ? SAVED_UNTRANSLATED_MESSAGE : SAVED_MESSAGE);
+      this.closed.emit();
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  /** Bereits vorhandene Übersetzungen (Formular und gespeichertes Profil), damit sie nicht erneut angefragt werden. */
+  private knownTranslations(): { dislikes: readonly string[]; dislikesEn: readonly string[] } {
+    const { dislikes, dislikesEn } = this.form().dietPrefs;
+    const stored = this.profileStore.profile();
+    return {
+      dislikes: [...dislikes, ...(stored?.dislikes ?? [])],
+      dislikesEn: [...dislikesEn, ...(stored?.dislikesEn ?? [])],
+    };
   }
 }

@@ -1,13 +1,14 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, inject } from '@angular/core';
 import { Router } from '@angular/router';
+import { FASTFOOD_COUNTRIES } from '../core/ai/fastfood-countries';
 import {
-  FASTFOOD_CHAINS, FastFoodForm, KCAL_RANGE, MONEY_RANGE, OTHER_RESTAURANT, PREFERENCE_OPTIONS,
-  defaultKcalBudget, formatMoney, preferenceValue, resolveRestaurant, restaurantChoice, snapToRange,
+  FASTFOOD_CHAINS, FastFoodForm, KCAL_RANGE, MAX_PREFERENCES, MONEY_RANGE, OTHER_RESTAURANT, PREFERENCE_OPTIONS,
+  defaultKcalBudget, formatMoney, resolveRestaurant, restaurantChoice, snapToRange, togglePreference,
 } from './fastfood-options';
 
 let nextId = 0;
 
-/** Eingabeformular des Fastfood-Helfers: Restaurant-Picker, Budget-Slider, Priorität. */
+/** Eingabeformular des Fastfood-Helfers: Restaurant- und Land-Picker, Budget-Slider, Kriterien als Chips. */
 @Component({
   selector: 'app-fastfood-form',
   templateUrl: './fastfood-form.component.html',
@@ -29,7 +30,9 @@ export class FastfoodFormComponent implements OnChanges {
 
   readonly chains = FASTFOOD_CHAINS;
   readonly other = OTHER_RESTAURANT;
-  readonly preferences = PREFERENCE_OPTIONS;
+  readonly options = PREFERENCE_OPTIONS;
+  readonly countries = FASTFOOD_COUNTRIES;
+  readonly maxPreferences = MAX_PREFERENCES;
   readonly kcalRange = KCAL_RANGE;
   readonly moneyRange = MONEY_RANGE;
   readonly ids = { kcal: `ff-kcal-${nextId}`, money: `ff-money-${nextId++}` };
@@ -60,8 +63,8 @@ export class FastfoodFormComponent implements OnChanges {
     return this.noMoneyLimit ? 'kein Limit' : `${formatMoney(this.money)} €`;
   }
 
-  get preference(): string {
-    return preferenceValue(this.form.preference);
+  isSelected(value: string): boolean {
+    return this.form.preferences.includes(value);
   }
 
   /** True, wenn ein Tagesziel existiert und nichts mehr übrig ist. */
@@ -93,8 +96,12 @@ export class FastfoodFormComponent implements OnChanges {
     this.emit({ moneyBudget: checked ? null : this.lastMoney });
   }
 
-  onPreference(value: unknown): void {
-    this.emit({ preference: preferenceValue(String(value ?? '')) });
+  onTogglePreference(value: string): void {
+    this.emit({ preferences: togglePreference(this.form.preferences, value) });
+  }
+
+  onCountry(value: unknown): void {
+    this.emit({ country: String(value ?? this.form.country) });
   }
 
   readonly formatPin = (value: number): string => `${value}`;

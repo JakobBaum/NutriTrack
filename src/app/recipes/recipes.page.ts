@@ -36,6 +36,7 @@ import {
 } from './recipe-form';
 import { askPortionsSheet, cardMenuSheet, mealLabel, pickMealSheet } from './recipe-sheets';
 import { TOAST_SWIPE_GESTURE } from '../shared/toast-options';
+import { recipeCookIngredients } from '../core/cook/recipe-cook-ingredients';
 import { confirmDiscard } from '../meals/confirm-discard';
 import { MealType, NutritionFacts, Recipe, RecipeIngredient } from '../core/models';
 import { AiService } from '../core/ai/ai.service';
@@ -52,6 +53,7 @@ import {
 import { toDateISO } from '../core/util/date';
 import { MealsListComponent } from '../meals/meals-list.component';
 import { UNDO_TOAST_BUTTONS, UNDO_TOAST_MS, UndoableDelete, settleUndoToast } from '../meals/undoable-delete';
+import { recipeSourceView } from './recipe-source';
 import { shrinkPhotoForUpload } from '../core/scan/label-image';
 import {
   APPROX_UNITS,
@@ -136,6 +138,7 @@ export class RecipesPage implements OnDestroy {
   readonly recipes = computed(() => this.store.recipes().filter((r) => r.id !== this.deletion.pendingId()));
   readonly approxUnits = APPROX_UNITS;
   readonly isAiOrigin = isAiOrigin;
+  readonly sourceOf = recipeSourceView;
   readonly countMissingFacts = countMissingFacts;
   readonly missingFactsLabel = missingFactsLabel;
   readonly lowerBoundPrefix = lowerBoundPrefix;
@@ -238,6 +241,7 @@ export class RecipesPage implements OnDestroy {
     if (res.ingredients.length === 0) throw new Error('Auf dem Foto wurden keine Zutaten erkannt.');
     this.form = formFromImport(res);
     this._importOrigin = 'photo';
+    this._importSourceUrl = undefined;
     this.baseline = '';
     this.editId.set(null);
     this.error.set(null);
@@ -338,6 +342,7 @@ export class RecipesPage implements OnDestroy {
   // --- Modal öffnen/schließen ---
   openAdd(): void {
     this._importOrigin = 'own';
+    this._importSourceUrl = undefined;
     this.form = emptyForm();
     this.baseline = JSON.stringify(this.form);
     this.allowClose = false;
@@ -349,6 +354,7 @@ export class RecipesPage implements OnDestroy {
   openEdit(recipe: Recipe): void {
     this.form = formFromRecipe(recipe);
     this._importOrigin = recipe.origin ?? 'own';
+    this._importSourceUrl = undefined;
     this.baseline = JSON.stringify(this.form);
     this.allowClose = false;
     this.editId.set(recipe.id);
@@ -422,6 +428,7 @@ export class RecipesPage implements OnDestroy {
       if (res.ingredients.length === 0) throw new Error('Keine Zutaten erkannt.');
       this.form = formFromImport(res);
       this._importOrigin = isTikTok ? 'tiktok' : (url ? 'url' : 'text');
+      this._importSourceUrl = url ? res.sourceUrl : undefined;
       this.baseline = '';
       this.editId.set(null);
       this.error.set(null);
@@ -443,6 +450,8 @@ export class RecipesPage implements OnDestroy {
     return typeof navigator !== 'undefined' && navigator.onLine === false;
   }
 
+  /** Adresse eines Link-Imports; wird beim Speichern als Quelle am Rezept abgelegt. */
+  private _importSourceUrl: string | undefined;
   private _importOrigin: 'own' | 'url' | 'tiktok' | 'photo' | 'text' | 'online' = 'own';
 
   // --- Zutaten ---
@@ -552,8 +561,9 @@ export class RecipesPage implements OnDestroy {
       return;
     }
     this.error.set(null);
-    const draft = result.draft;
+    const draft = this._importSourceUrl ? { ...result.draft, sourceUrl: this._importSourceUrl } : result.draft;
     this._importOrigin = 'own';
+    this._importSourceUrl = undefined;
 
     const id = this.editId();
     if (id) this.store.update(id, draft);
@@ -628,6 +638,7 @@ export class RecipesPage implements OnDestroy {
 
   // --- Kochmodus ---
   readonly cookRecipe = signal<Recipe | null>(null);
+  readonly cookIngredients = computed(() => recipeCookIngredients(this.cookRecipe()?.ingredients ?? []));
 
   startCook(recipe: Recipe): void {
     // Offene Hinweise würden „Weiter“ verdecken.

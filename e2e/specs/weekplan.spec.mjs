@@ -36,7 +36,7 @@ function mockRecipe(id, type) {
 
 async function mockSpoonacular(page) {
   const requests = [];
-  await page.route('https://api.spoonacular.com/**', async (route) => {
+  await page.route('https://*.workers.dev/recipes/**', async (route) => {
     const req = route.request();
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
     const url = new URL(req.url());
@@ -64,7 +64,7 @@ async function createPlan(page) {
   await page.locator('.wp-card').first().waitFor();
 }
 
-const SEEDED = () => seed({ 'recipe-search-config': { apiKey: 'test-key', baseUrl: 'https://api.spoonacular.com' } });
+const SEEDED = () => seed({});
 
 export function register({ test }) {
   test('weekplan: erstellen zeigt Rezeptkarten, Anfragen mit Protein-Filter', SEEDED(), async (page) => {
@@ -133,7 +133,7 @@ export function register({ test }) {
   });
 
   test('weekplan: Kontingent erschöpft zeigt Fehlermeldung, kein Plan', SEEDED(), async (page) => {
-    await page.route('https://api.spoonacular.com/**', async (route) => {
+    await page.route('https://*.workers.dev/recipes/**', async (route) => {
       if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
       return route.fulfill({ status: 402, headers: CORS, body: '{}' });
     });

@@ -49,6 +49,24 @@ describe('ProfileStore', () => {
     expect(reloaded.hasProfile()).toBe(true);
   });
 
+  it('lässt alte Profile ohne Ernährungsfelder gültig und ohne neue Felder', () => {
+    localStorage.setItem('nutritrack:profile', JSON.stringify(profile));
+    const store = TestBed.inject(ProfileStore);
+    expect(store.profile()).toEqual(profile);
+    expect('diet' in (store.profile() as object)).toBe(false);
+  });
+
+  it('bereinigt Ernährungsfelder beim Laden', () => {
+    localStorage.setItem('nutritrack:profile', JSON.stringify({
+      ...profile, diet: 'carnivore', intolerances: ['gluten', 'banana'], dislikes: [' Pilze ', 'pilze'], dislikesEn: ['mushrooms', 'x; y'],
+    }));
+    const loaded = TestBed.inject(ProfileStore).profile();
+    expect(loaded?.diet).toBeUndefined();
+    expect(loaded?.intolerances).toEqual(['gluten']);
+    expect(loaded?.dislikes).toEqual(['Pilze']);
+    expect(loaded?.dislikesEn).toEqual(['mushrooms']);
+  });
+
   it('löscht Profil und Ziel bei clear()', () => {
     const store = TestBed.inject(ProfileStore);
     store.setProfile(profile);

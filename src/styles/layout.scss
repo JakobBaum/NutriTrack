@@ -1,0 +1,178 @@
+/* =========================================================================
+ * Welle 2: Seitenlayout und Einheitlichkeit. Dokumentation: DESIGN.md, "Layout-Bausteine (Welle 2)".
+ * Eine Quelle fuer den Seitenrand: --nt-page-gutter, gesetzt NUR von .nt-page (Inhalt) und .nt-page-header (Kopf).
+ * Karten, Gruppen und Ueberschriften haben nie einen eigenen Seitenrand.
+ * ========================================================================= */
+
+// Seitencontainer: 720 px Maximum, zentriert, Seitenrand = Gutter.
+.nt-page {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--nt-page-max);
+  margin: 0 auto;
+  padding-inline: var(--nt-page-gutter);
+}
+
+// Stapel: vertikaler Rhythmus im Seitencontainer. Karte -> Karte 12, vor Abschnittsueberschrift 24,
+// Ueberschrift -> Gruppe 8. Der erste Block liegt direkt am Kopf (der Kopf traegt den Abstand).
+// Komponenten-Hosts haben selbst KEINEN margin-top; Hosts, die mit einer Ueberschrift beginnen, tragen .nt-stack__section.
+.nt-stack {
+  > * + * { margin-top: var(--nt-card-gap); }
+  > .nt-section-header,
+  > .nt-stack__section { margin-top: var(--nt-section-gap); }
+  > .nt-section-header + * { margin-top: var(--nt-space-2); }
+  > :first-child { margin-top: 0; }
+  > .nt-stack__section > .nt-section-header:first-child { margin-top: 0; }
+}
+
+// Seitenkopf: Titel links, rechts nur Symbol-Buttons. Gleiche Hoehe auf allen Tabs
+// (Titelzeile = --nt-header-row, nie umbrechend). Der Abstand zum ersten Inhalt (--nt-header-gap) steckt im Kopf.
+// Markup: <ion-header class="ion-no-border"><nt-page-header title="Tagebuch"> [Symbol-Buttons] </nt-page-header></ion-header>
+// Symbol-Button: <ion-button fill="clear" class="nt-icon-btn" aria-label="..."><ion-icon slot="icon-only" name="..."></ion-icon></ion-button>
+.nt-page-header {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nt-space-2);
+  width: 100%;
+  max-width: var(--nt-page-max);
+  margin: 0 auto;
+  padding: max(var(--nt-space-3), env(safe-area-inset-top, 0px)) var(--nt-page-gutter) var(--nt-header-gap);
+
+  > .nt-large-title {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    min-height: var(--nt-header-row);
+    font-size: min(var(--nt-fs-large-title), 11vw);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  > .nt-page-header__actions,
+  > .nt-icon-btn {
+    flex: none;
+  }
+}
+
+.nt-page-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--nt-space-1);
+}
+
+// Symbol-Button (Kopf, Zeilen): 44x44 Tippflaeche, kein Text. Sichtbares Symbol 24 px.
+.nt-icon-btn {
+  --padding-start: 0;
+  --padding-end: 0;
+  --border-radius: var(--nt-radius-pill);
+  --color: var(--nt-accent);
+  box-sizing: border-box;
+  width: var(--nt-icon-btn);
+  min-width: var(--nt-icon-btn);
+  height: var(--nt-icon-btn);
+  min-height: var(--nt-icon-btn);
+  margin: 0;
+
+  ion-icon { font-size: 24px; }
+}
+
+.nt-large-title {
+  margin: 0;
+  font-size: var(--nt-fs-large-title);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--nt-ink);
+}
+
+.nt-subtitle {
+  margin: 2px 0 0;
+  font-size: var(--nt-fs-body);
+  color: var(--nt-secondary);
+}
+
+// Abschnittsueberschrift: 13 px, Grossbuchstaben, secondary, Einzug = --nt-space-4 gegenueber der Karte. Ueberall gleich.
+.nt-section-header {
+  margin: var(--nt-section-gap) 0 var(--nt-space-2);
+  padding-inline: var(--nt-space-4);
+  font-size: var(--nt-fs-caption);
+  font-weight: 400;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--nt-secondary);
+}
+
+// Freistehende Karte: Padding 16 (Kompakt 14), kein eigener Seitenrand.
+.nt-card {
+  padding: var(--nt-card-pad);
+  background: var(--nt-card);
+  border-radius: var(--nt-radius-card);
+  box-sizing: border-box;
+}
+
+// Innenradius fuer Kacheln/Flaechen INNERHALB einer Karte (S8). Buttons: .nt-btn--inner.
+.nt-inner {
+  border-radius: var(--nt-radius-inner);
+}
+
+// Kennzahl: Zahl und Einheit in EINER Zeile (nie umbrechend), Zusatz darunter.
+// <span class="nt-stat"><span class="nt-stat__value"><span class="nt-stat__num">1 650</span><span class="nt-stat__unit">kcal</span></span><span class="nt-stat__extra">gegessen</span></span>
+.nt-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+
+  &__value {
+    display: flex;
+    align-items: baseline;
+    gap: var(--nt-space-1);
+    white-space: nowrap;
+  }
+
+  &__num {
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  &__unit {
+    font-size: var(--nt-fs-headline);
+    font-weight: 600;
+    color: var(--nt-ink);
+  }
+
+  &__extra {
+    margin-top: var(--nt-space-1);
+    font-size: var(--nt-fs-headline);
+    font-weight: 500;
+    color: var(--nt-ink);
+  }
+}
+
+// Schwebender Button (Eintragen, Neu ...): rechts unten, 16 px ueber der Tab-Bar, 56 px.
+// <ion-fab slot="fixed" vertical="bottom" horizontal="end" class="nt-fab"><ion-fab-button aria-label="Eintragen" (click)="..."><ion-icon name="add"></ion-icon></ion-fab-button></ion-fab>
+// Muss direktes Kind von ion-content sein: dann bekommt der Inhalt unten automatisch Platz (--nt-fab-clearance).
+:root {
+  --nt-fab-clearance: calc(var(--nt-fab-bottom) + var(--nt-fab-size) + var(--nt-space-4));
+}
+
+:root ion-fab.nt-fab {
+  bottom: var(--nt-fab-bottom);
+  inset-inline-end: var(--nt-fab-end);
+  margin: 0;
+
+  ion-fab-button {
+    --size: var(--nt-fab-size);
+    margin: 0;
+    width: var(--nt-fab-size);
+    height: var(--nt-fab-size);
+  }
+}
+
+ion-content:has(> ion-fab.nt-fab) {
+  --padding-bottom: var(--nt-fab-clearance);
+}

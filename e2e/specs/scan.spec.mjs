@@ -29,7 +29,7 @@ async function openScanner(page) {
   await page.addInitScript(fakeCameraInit({ code: CODE }));
   await mockLookups(page);
   await go(page, 'diary');
-  await page.locator('.page-head__add').click();
+  await page.locator('[data-testid="diary-add"]').click();
   const sheet = topModal(page);
   await sheet.locator('.nt-source-btn', { hasText: 'Barcode' }).waitFor();
   return sheet;
@@ -69,7 +69,7 @@ export function register({ test }) {
       status: 404, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"status":"failure"}',
     }));
     await go(page, 'diary');
-    await page.locator('.page-head__add').click();
+    await page.locator('[data-testid="diary-add"]').click();
     await topModal(page).locator('.nt-source-btn', { hasText: 'Barcode' }).click();
     await page.locator('.bc-error').waitFor();
     assert.match(await page.locator('.bc-error').innerText(), /Kein Produkt/);

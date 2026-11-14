@@ -1,20 +1,32 @@
-<section class="week" data-testid="week-view" aria-label="Die letzten 7 Tage">
+<section class="week nt-stack" data-testid="week-view" aria-label="Die letzten 7 Tage">
   <div class="week__stats nt-card">
-    <div class="stat">
-      <span class="stat__value stat__value--kcal" data-testid="week-avg-kcal">{{ summary().loggedDays ? (summary().avgKcal | ntNum:0) : '–' }}</span>
-      <span class="stat__label">Ø kcal pro Tag</span>
+    <div class="nt-stat">
+      <span class="nt-stat__value stat__value--kcal" data-testid="week-avg-kcal">
+        <span class="nt-stat__num week-num">{{ summary().loggedDays ? (summary().avgKcal | ntNum:0) : '–' }}</span>
+        @if (summary().loggedDays) { <span class="nt-stat__unit">kcal</span> }
+      </span>
+      <span class="nt-stat__extra">Ø pro Tag</span>
     </div>
-    <div class="stat">
-      <span class="stat__value stat__value--protein" data-testid="week-avg-protein">{{ summary().loggedDays ? (summary().avgProteinG | ntNum:0) : '–' }}</span>
-      <span class="stat__label">Ø g Eiweiß pro Tag</span>
+    <div class="nt-stat">
+      <span class="nt-stat__value stat__value--protein" data-testid="week-avg-protein">
+        <span class="nt-stat__num week-num">{{ summary().loggedDays ? (summary().avgProteinG | ntNum:0) : '–' }}</span>
+        @if (summary().loggedDays) { <span class="nt-stat__unit">g</span> }
+      </span>
+      <span class="nt-stat__extra">Ø Eiweiß pro Tag</span>
     </div>
-    <div class="stat">
-      <span class="stat__value" data-testid="week-in-goal">{{ hasTarget() ? summary().daysInGoal + ' von 7' : '–' }}</span>
-      <span class="stat__label">Tage im Ziel</span>
+    <div class="nt-stat">
+      <span class="nt-stat__value" data-testid="week-in-goal">
+        <span class="nt-stat__num week-num">{{ hasTarget() ? summary().daysInGoal : '–' }}</span>
+        @if (hasTarget()) { <span class="nt-stat__unit">von 7</span> }
+      </span>
+      <span class="nt-stat__extra">Tage im Ziel</span>
     </div>
-    <div class="stat">
-      <span class="stat__value" data-testid="week-streak">{{ hasTarget() ? streak() + ' ' + daysWord(streak()) : '–' }}</span>
-      <span class="stat__label">Serie im Ziel</span>
+    <div class="nt-stat">
+      <span class="nt-stat__value" data-testid="week-streak">
+        <span class="nt-stat__num week-num">{{ hasTarget() ? streak() : '–' }}</span>
+        @if (hasTarget()) { <span class="nt-stat__unit">{{ daysWord(streak()) }}</span> }
+      </span>
+      <span class="nt-stat__extra">Serie im Ziel</span>
     </div>
   </div>
   <p class="week__note">

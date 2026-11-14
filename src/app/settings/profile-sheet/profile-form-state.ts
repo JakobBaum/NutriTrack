@@ -6,6 +6,7 @@ import {
   manualProteinError,
   manualProteinPerKgOf,
 } from '../../core/nutrition/manual-target';
+import { DietPrefs, EMPTY_DIET_PREFS, dietFieldsForProfile, dietPrefsOf } from '../../core/diet/diet-prefs';
 import { formatDecimal, parseDecimal } from '../../core/util/number-input';
 
 /** Unveränderlicher Zustand des Profilformulars; Änderungen erzeugen immer ein neues Objekt. */
@@ -24,6 +25,8 @@ export interface ProfileFormState {
   readonly manualKcalText: string;
   /** Eiweißziel in g pro kg Körpergewicht als Text (Dezimalkomma). */
   readonly manualProteinText: string;
+  /** Ernährungsform, Unverträglichkeiten und Abneigungen. */
+  readonly dietPrefs: DietPrefs;
 }
 
 export interface RateChoice {
@@ -72,6 +75,7 @@ export function emptyFormState(): ProfileFormState {
     weightKg: null, heightCm: null, age: null, sex: DEFAULT_SEX, activityLevel: DEFAULT_ACTIVITY,
     goal: 'maintain', targetWeightKg: null, rateKgPerWeek: DEFAULT_RATE_KG_PER_WEEK.lose,
     manual: false, manualKcalText: '', manualProteinText: '',
+    dietPrefs: EMPTY_DIET_PREFS,
   };
 }
 
@@ -92,6 +96,7 @@ export function formStateFromProfile(p: UserProfile | null): ProfileFormState {
     manual: kcal !== null || protein !== null,
     manualKcalText: kcal === null ? '' : formatDecimal(kcal),
     manualProteinText: protein === null ? '' : formatDecimal(protein),
+    dietPrefs: dietPrefsOf(p),
   };
 }
 
@@ -132,6 +137,7 @@ export function profileFromFormState(state: ProfileFormState, updatedAt: string)
     rateKgPerWeek: state.goal === 'maintain' ? 0 : state.rateKgPerWeek,
     ...(state.targetWeightKg !== null ? { targetWeightKg: state.targetWeightKg } : {}),
     updatedAt,
+    ...dietFieldsForProfile(state.dietPrefs),
   };
   const withKcal = kcal !== null && manualKcalError(state.manualKcalText) === null ? { ...base, manualKcal: kcal } : base;
   return protein !== null && manualProteinError(state.manualProteinText) === null

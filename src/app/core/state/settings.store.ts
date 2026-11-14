@@ -1,6 +1,5 @@
 import { Injectable, inject } from '@angular/core';
 import { StorageService } from '../storage/storage.service';
-import { RecipeSearchConfigStore } from './recipe-search-config.store';
 
 /** Frühere Speicherschlüssel der KI-Verbindung (eigener Key, Server-Adresse, Modell). */
 const LEGACY_KEY_AI = 'ai-config';
@@ -13,15 +12,13 @@ const LEGACY_KEY_AI = 'ai-config';
 @Injectable({ providedIn: 'root' })
 export class SettingsStore {
   private readonly storage = inject(StorageService);
-  private readonly recipeSearch = inject(RecipeSearchConfigStore);
 
   constructor() {
     this.storage.remove(LEGACY_KEY_AI);
   }
 
-  /** Setzt die Einstellungen zurück (Rezept-Suche-Konfiguration inklusive). */
+  /** Setzt die Einstellungen zurück (KI-Verbindung). */
   clear(): void {
     this.storage.remove(LEGACY_KEY_AI);
-    this.recipeSearch.clear();
   }
 }

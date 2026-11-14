@@ -63,6 +63,12 @@ describe('MockAiProvider — suggestFastfood Budgets', () => {
     expect(res.every((s) => (s.estPrice ?? 0) <= 4)).toBe(true);
   });
 
+  it('laesst bereits gezeigte Vorschlaege (exclude) weg, ohne Gross-/Kleinschreibung', async () => {
+    const res = await provider.suggestFastfood({ restaurant: 'X', kcalBudget: 5000, exclude: ['grilled chicken (ohne mayo)'] });
+    expect(res.map((s) => s.itemName)).not.toContain('Grilled Chicken (ohne Mayo)');
+    expect(res.length).toBeGreaterThan(0);
+  });
+
   it('liefert leere Liste statt Vorschlaegen ueber dem kcal-Budget', async () => {
     const res = await provider.suggestFastfood({ restaurant: 'X', kcalBudget: 100 });
     expect(res).toEqual([]);

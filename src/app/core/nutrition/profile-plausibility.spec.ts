@@ -26,6 +26,12 @@ describe('profileNotes', () => {
     expect(notes[0].text).toContain('Erwachsene');
   });
 
+  it('rät Minderjährigen mit Ziel Abnehmen deutlich ab und nennt nur diesen einen Hinweis', () => {
+    const notes = profileNotes({ ...adult, age: 16, goal: 'lose' });
+    expect(notes.map((n) => n.code)).toEqual(['minorLose']);
+    expect(notes[0].text).toContain('Abnehmen');
+  });
+
   it('weist bei BMI über 30 auf das Referenzgewicht für Eiweiß hin', () => {
     const notes = profileNotes({ ...adult, weightKg: 110 });
     expect(notes.map((n) => n.code)).toEqual(['referenceWeight']);

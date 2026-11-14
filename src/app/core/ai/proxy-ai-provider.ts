@@ -18,9 +18,15 @@ import { normalizeTranslatedTexts } from '../recipes/translate/translate-normali
 import { DebugLogService } from '../debug/debug-log.service';
 import { AI_ERROR_MESSAGES, AI_TIMEOUT_MS, friendlyAiErrorMessage, isTimeoutError, mapTimeoutError } from './ai-errors';
 import { defaultAiProxyUrl } from './ai-endpoint';
+import { buildShoppingPayload } from './shopping-payload';
+import { ConsentService } from '../consent/consent.service';
+import { ConsentRequiredError } from '../consent/consent.errors';
 import { normalizeRecipeImport } from './recipe-import-normalize';
+import { FASTFOOD_INVALID_MESSAGE, sanitizeFastfoodSuggestions } from './fastfood-sanitize';
 
 const PING_FN = 'ping';
+/** Läuft ohne Zutun des Nutzers im Hintergrund: öffnet nie den Zustimmungsdialog, sondern weicht auf lokale Wege aus. */
+const BACKGROUND_FUNCTIONS: ReadonlySet<string> = new Set(['translateRecipe', 'translateSearchQuery']);
 const UNKNOWN_FUNCTION_PATTERN = /^Unbekannte Funktion/;
 
 /**
@@ -34,8 +40,21 @@ const UNKNOWN_FUNCTION_PATTERN = /^Unbekannte Funktion/;
 export class ProxyAiProvider implements AiProvider {
   private readonly http = inject(HttpClient);
   private readonly log = inject(DebugLogService);
+  private readonly consent = inject(ConsentService);
 
-  private async call<T>(fn: string, payload: unknown): Promise<T> {
+  /** Ohne Zustimmung geht nichts an den Worker: Hintergrundaufrufe scheitern still, Nutzeraufrufe fragen nach. */
+  private async requireConsent(fn: string): Promise<void> {
+    if (this.consent.isGranted()) return;
+    if (BACKGROUND_FUNCTIONS.has(fn) || !(await this.consent.ensure())) throw new ConsentRequiredError();
+  }
+
+  /** Bei vorhandener Zustimmung geht der Aufruf ohne Umweg hinaus; sonst erst nach der Prüfung. */
+  private call<T>(fn: string, payload: unknown): Promise<T> {
+    if (this.consent.isGranted()) return this.send<T>(fn, payload);
+    return this.requireConsent(fn).then(() => this.send<T>(fn, payload));
+  }
+
+  private async send<T>(fn: string, payload: unknown): Promise<T> {
     const url = defaultAiProxyUrl();
     if (!url) throw new Error('Keine KI-Proxy-URL konfiguriert.');
     this.log.info(`→ ${fn}`);
@@ -48,7 +67,7 @@ export class ProxyAiProvider implements AiProvider {
       return result;
     } catch (err) {
       if (err instanceof HttpErrorResponse) {
-        const msg = friendlyAiErrorMessage(err.status);
+        const msg = friendlyAiErrorMessage(err.status, isLinkImport(fn, payload));
         this.log.error(`✗ ${fn}: HTTP ${err.status} ${err.error?.error ?? err.statusText ?? ''}`.trim());
         throw new Error(msg);
       }
@@ -58,15 +77,20 @@ export class ProxyAiProvider implements AiProvider {
   }
 
   generateShoppingList(req: ShoppingPlanRequest): Promise<ShoppingPlanResult> {
-    return this.call<ShoppingPlanResult>('generateShoppingList', req);
+    return this.call<ShoppingPlanResult>('generateShoppingList', buildShoppingPayload(req));
   }
 
   recognizeLabel(imageBase64: string, basis: 'per100g' | 'perPortion'): Promise<LabelResult> {
     return this.call<LabelResult>('recognizeLabel', { imageBase64, basis });
   }
 
-  suggestFastfood(req: FastFoodRequest): Promise<FastFoodSuggestion[]> {
-    return this.call<FastFoodSuggestion[]>('suggestFastfood', req);
+  /** Die Antwort wird nie ungeprüft übernommen: nur plausible Einträge, sonst verständlicher Fehler. */
+  async suggestFastfood(req: FastFoodRequest): Promise<FastFoodSuggestion[]> {
+    const raw = await this.call<unknown>('suggestFastfood', req);
+    if (Array.isArray(raw) && raw.length === 0) return [];
+    const suggestions = sanitizeFastfoodSuggestions(raw);
+    if (suggestions.length === 0) throw new Error(FASTFOOD_INVALID_MESSAGE);
+    return suggestions;
   }
 
   async importRecipe(input: RecipeImportInput): Promise<RecipeImportResult> {
@@ -104,6 +128,12 @@ export class ProxyAiProvider implements AiProvider {
       throw new Error(friendlyAiErrorMessage(status));
     }
   }
+}
+
+/** Rezept-Import über eine Adresse (nicht über Text oder Foto). */
+function isLinkImport(fn: string, payload: unknown): boolean {
+  const url = (payload as { url?: unknown } | null)?.url;
+  return fn === 'importRecipe' && typeof url === 'string' && url.length > 0;
 }
 
 function isUnknownFunctionResponse(err: unknown): boolean {

@@ -12,6 +12,7 @@
       </div>
     </ion-header>
     <ion-content class="sheet-content">
+      <div class="nt-page ff-sheet">
       @if (targetKcal() > 0) {
         <p class="ff-remaining"><strong>{{ remainingKcal() | ntNum:0 }} kcal</strong> übrig</p>
       }
@@ -19,24 +20,20 @@
       @if (error()) {
         <p class="form-error" role="alert">{{ error() }}</p>
       }
-      <app-fastfood-form [form]="ff" [live]="ffLive()" [remainingKcal]="targetKcal() > 0 ? remainingKcal() : null" (formChange)="ff = $event" (connectAi)="closeFastfood()"></app-fastfood-form>
-      <ion-button expand="block" class="sheet-action" (click)="runFastfood()" [disabled]="ffLoading() || !ffLive()">
-        @if (ffLoading()) {
-          <ion-spinner name="dots" slot="start"></ion-spinner> Suche (bis zu 30 s)…
-        } @else {
-          <ion-icon slot="start" name="sparkles-outline"></ion-icon> Vorschläge holen
-        }
-      </ion-button>
-
+      <app-fastfood-form [form]="ff" [live]="ffLive()" [remainingKcal]="targetKcal() > 0 ? remainingKcal() : null" (formChange)="onFormChange($event)" (connectAi)="closeFastfood()"></app-fastfood-form>
       @if (ffSearched() && !ffLoading() && ffResults().length === 0) {
         <p class="scan-hint" role="status">Keine Vorschläge im Budget. Budget erhöhen oder später erneut versuchen.</p>
       }
 
+      @if (ffResults().length > 0) { <p class="scan-hint" role="note" data-testid="ff-note">{{ ffNote }}</p> }
       <div #ffAnchor></div>
       @for (s of ffResults(); track s.itemName) {
         <ion-card class="ff-card">
           <ion-card-header>
             <span class="ai-badge">KI-Schätzung</span>
+            @if (overBudget(s)) {
+              <span class="ff-over" data-testid="ff-over">über Budget</span>
+            }
             <ion-card-title>{{ s.itemName }}</ion-card-title>
             <ion-card-subtitle>
               {{ s.facts.kcal | ntNum:0 }} kcal · {{ s.facts.proteinG | ntNum }} g Eiweiß
@@ -51,6 +48,41 @@
           </ion-card-content>
         </ion-card>
       }
+      @if (ffResults().length > 0) {
+        <div class="ff-more">
+          @if (moreError()) {
+            <p class="form-error" role="alert">{{ moreError() }}</p>
+          }
+          @if (moreNote()) {
+            <p class="scan-hint" role="status">{{ moreNote() }}</p>
+          }
+          @if (canLoadMore()) {
+            <ion-button expand="block" class="nt-btn nt-btn--tonal nt-btn--block" data-testid="ff-more" (click)="moreFastfood()" [disabled]="moreLoading() || ffLoading()">
+              @if (moreLoading()) {
+                <ion-spinner name="dots" slot="start"></ion-spinner> Suche…
+              } @else {
+                <ion-icon slot="start" name="add-outline"></ion-icon> Weitere Vorschläge
+              }
+            </ion-button>
+          } @else if (roundsExhausted()) {
+            <p class="scan-hint" role="status" data-testid="ff-rounds-done">Mehr Vorschläge gibt es nicht. Ändere die Auswahl für neue Ideen.</p>
+          }
+        </div>
+      }
+      </div>
     </ion-content>
+    <ion-footer class="ion-no-border add-footer">
+      <div class="nt-page">
+        <div class="nt-sheet-footer">
+          <ion-button expand="block" class="nt-btn nt-btn--block" data-testid="ff-run" (click)="runFastfood()" [disabled]="ffLoading() || moreLoading() || !ffLive()">
+            @if (ffLoading()) {
+              <ion-spinner name="dots" slot="start"></ion-spinner> Suche (bis zu 30 s)…
+            } @else {
+              <ion-icon slot="start" name="sparkles-outline"></ion-icon> Vorschläge holen
+            }
+          </ion-button>
+        </div>
+      </div>
+    </ion-footer>
   </ng-template>
 </ion-modal>

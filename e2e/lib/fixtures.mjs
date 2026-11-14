@@ -54,4 +54,7 @@ export const WEIGHT_HISTORY = [14, 10, 7, 3, 0].map((ago, i) => ({ dateISO: days
 export const entryOn = (dateISO, id, label, f) =>
   ({ id, dateISO, meal: 'lunch', label, ref: { kind: 'manual' }, facts: f, createdAt: ISO, servings: 1 });
 
-export const seed = (overrides = {}) => ({ profile: PROFILE, diary: [], recipes: [], ...overrides });
+/** Zustimmung zu KI- und Online-Funktionen (Version wie CONSENT_VERSION): Standard in allen Tests, damit kein Dialog dazwischenkommt. */
+export const CONSENT = { version: 1, acceptedAt: ISO, isAdultConfirmed: true };
+
+export const seed = (overrides = {}) => ({ profile: PROFILE, diary: [], recipes: [], consent: CONSENT, ...overrides });

@@ -1,0 +1,53 @@
+.consent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nt-space-3);
+  padding-bottom: var(--nt-space-4);
+  color: var(--nt-ink);
+  overflow-wrap: anywhere;
+
+  &__lead,
+  &__note,
+  &__minor {
+    margin: 0;
+  }
+
+  &__note {
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+  }
+
+  &__minor {
+    color: var(--nt-over);
+    font-weight: 600;
+  }
+
+  &__list {
+    margin: 0;
+    padding-left: var(--nt-space-5, 20px);
+    display: flex;
+    flex-direction: column;
+    gap: var(--nt-space-2);
+  }
+
+  &__adult {
+    min-height: var(--nt-btn-height);
+  }
+
+  &__privacy {
+    align-self: flex-start;
+  }
+
+  &__actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--nt-space-2);
+  }
+}
+
+/* Die Überschrift bleibt auf schmalen Geräten vollständig lesbar (umbrechen statt kürzen). */
+.nt-sheet-header__title {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}

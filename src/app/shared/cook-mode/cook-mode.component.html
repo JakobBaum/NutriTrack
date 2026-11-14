@@ -2,13 +2,13 @@
   <ng-template>
     <div class="cook">
       <div class="cook__header">
-        <button class="cook__close" (click)="close()" aria-label="Kochmodus beenden">
-          <ion-icon name="close-outline"></ion-icon>
-        </button>
         <span class="cook__title">{{ title() }}</span>
         @if (total() > 0) {
           <span class="cook__counter">{{ page() + 1 }} / {{ total() }}</span>
         }
+        <button class="cook__close" (click)="close()" aria-label="Kochmodus beenden">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
       </div>
 
       <div class="cook__progress">
@@ -19,15 +19,37 @@
         @if (total() === 0) {
           <div class="cook__step-text">Keine Anleitung hinterlegt.</div>
         } @else if (stepIndex() < 0) {
-          <div class="cook__step-num">Zutaten</div>
-          <ul class="cook__ingredients" data-testid="cook-ingredients">
-            @for (ing of ingredients(); track $index) {
-              <li><span class="cook__ing-amount">{{ ingredientAmount(ing) }}</span> {{ ing.name }}</li>
-            }
-          </ul>
+          <div class="cook__step-num">{{ ingredients().length > 0 ? 'Zutaten' : 'Vorbereitung' }}</div>
+          @if (utensils().length > 0) {
+            <section class="cook__block" data-testid="cook-utensils" aria-labelledby="cook-utensils-title">
+              <h3 class="cook__block-title" id="cook-utensils-title">Du brauchst</h3>
+              <ul class="cook__chips">
+                @for (u of utensils(); track u) {
+                  <li class="cook__chip">{{ u }}</li>
+                }
+              </ul>
+            </section>
+          }
+          @if (ingredients().length > 0) {
+            <ul class="cook__ingredients" data-testid="cook-ingredients">
+              @for (ing of ingredients(); track $index) {
+                <li><span class="cook__ing-amount">{{ ingredientAmount(ing) }}</span> {{ ing.name }}</li>
+              }
+            </ul>
+          }
         } @else {
           <div class="cook__step-num">Schritt {{ stepIndex() + 1 }}</div>
           <div class="cook__step-text" data-testid="cook-step">{{ stepText(steps()[stepIndex()]) }}</div>
+          @if (currentStepIngredients().length > 0) {
+            <section class="cook__block cook__block--step" data-testid="cook-step-ingredients" aria-labelledby="cook-step-ing-title">
+              <h3 class="cook__block-title" id="cook-step-ing-title">Dafür brauchst du</h3>
+              <ul class="cook__step-ingredients">
+                @for (ing of currentStepIngredients(); track $index) {
+                  <li><span class="cook__ing-amount">{{ ingredientAmount(ing) }}</span> {{ ing.name }}</li>
+                }
+              </ul>
+            </section>
+          }
         }
       </div>
 

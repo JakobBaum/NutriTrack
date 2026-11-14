@@ -1,5 +1,6 @@
 import { DOCUMENT } from '@angular/common';
 import { Injectable, inject, signal } from '@angular/core';
+import { CONSENT_KEY } from '../consent/consent.model';
 import { StorageService } from '../storage/storage.service';
 import {
   AUTO_SNAPSHOT_KEY,
@@ -73,7 +74,7 @@ export class BackupService {
   restore(backup: BackupFile, cleanup?: BackupCleanup, reason: SafetyReason = 'import'): RestoreResult {
     const current = this.storage.snapshot();
     const safety = buildSafetySnapshot(current, reason, new Date());
-    const base = this.keepMeta(prepareRestore(backup.data, current), current);
+    const base = this.keepMeta(prepareRestore(backup.data), current);
     const withSafety = safety ? { ...base, [AUTO_SNAPSHOT_KEY]: safety } : base;
     let safetySaved = safety !== null;
     let ok = this.storage.replaceAll(withSafety);
@@ -119,14 +120,16 @@ export class BackupService {
     return this.storage.flush();
   }
 
-  /** Meta-Schlüssel, die ein Import nicht überschreiben soll: Datum des letzten Exports und bestehende Auto-Sicherung. */
+  /** Meta-Schlüssel, die ein Import nicht überschreiben soll: Datum des letzten Exports, bestehende Auto-Sicherung und die Zustimmung dieses Geräts. */
   private keepMeta(data: Data, current: Data): Record<string, unknown> {
     const last = this._lastBackup();
     const existing = current[AUTO_SNAPSHOT_KEY];
+    const consent = current[CONSENT_KEY];
     return {
       ...data,
       ...(last ? { [LAST_BACKUP_KEY]: last } : {}),
       ...(existing !== undefined ? { [AUTO_SNAPSHOT_KEY]: existing } : {}),
+      ...(consent !== undefined ? { [CONSENT_KEY]: consent } : {}),
     };
   }
 

@@ -103,6 +103,20 @@
   --nt-grouped-row-min: 44px;
 
   // ---------------------------------------------------------------------------
+  // Layout (Welle 2): je Ebene ein Wert, siehe DESIGN.md "Layout-Bausteine"
+  // ---------------------------------------------------------------------------
+  --nt-card-pad: var(--nt-space-4);
+  --nt-card-gap: var(--nt-space-3);
+  --nt-section-gap: var(--nt-space-6);
+  --nt-header-row: 44px;
+  --nt-header-gap: var(--nt-space-3);
+  --nt-btn-height: 44px;
+  --nt-icon-btn: 44px;
+  --nt-fab-size: 56px;
+  --nt-fab-end: 16px;
+  --nt-radius-inner: max(8px, calc(var(--nt-radius-card) - var(--nt-card-pad)));
+
+  // ---------------------------------------------------------------------------
   // Alt-Aliase (bestehende Seiten): zeigen auf die neuen Werte
   // ---------------------------------------------------------------------------
   --nt-radius: var(--nt-radius-card);

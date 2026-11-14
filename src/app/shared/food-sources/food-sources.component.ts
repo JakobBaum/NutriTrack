@@ -3,6 +3,7 @@ import {
 } from '@angular/core';
 import { FoodItem, NutritionFacts } from '../../core/models';
 import { AiService } from '../../core/ai/ai.service';
+import { ConsentService } from '../../core/consent/consent.service';
 import { BarcodeScannerService } from '../../core/scan/barcode-scanner.service';
 import { CameraService } from '../../core/scan/camera.service';
 import { LabelOcrService } from '../../core/scan/label-ocr.service';
@@ -55,6 +56,7 @@ function fromItem(item: FoodItem): Pick<FoodSourceResult, 'name' | 'brand' | 'fa
 })
 export class NtFoodSourcesComponent {
   private readonly ai = inject(AiService);
+  private readonly consent = inject(ConsentService);
   private readonly camera = inject(CameraService);
   private readonly scanner = inject(BarcodeScannerService);
   private readonly labelOcr = inject(LabelOcrService);
@@ -144,9 +146,9 @@ export class NtFoodSourcesComponent {
     }
   }
 
-  /** Etikett lesen: mit KI per Vision, sonst On-Device-OCR. */
+  /** Etikett lesen: mit KI per Vision (nur mit Zustimmung), sonst On-Device-OCR. */
   private async recognize(base64: string): Promise<void> {
-    if (this.ai.isLive()) {
+    if (this.ai.isLive() && this.consent.isGranted()) {
       const small = await this.shrink(base64);
       this.scanStatus.set(STATUS_READING);
       const res = await this.ai.recognizeLabel(small, 'per100g');

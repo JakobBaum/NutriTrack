@@ -105,8 +105,10 @@ export class MockAiProvider implements AiProvider {
       },
     ];
     // Beide Budgets strikt einhalten; kein Treffer -> leere Liste (UI zeigt Leerzustand).
+    const excluded = new Set((req.exclude ?? []).map((n) => n.trim().toLowerCase()));
     const within = base.filter(
       (s) =>
+        !excluded.has(s.itemName.toLowerCase()) &&
         (req.kcalBudget == null || s.facts.kcal <= req.kcalBudget) &&
         (!req.moneyBudget || (s.estPrice ?? 0) <= req.moneyBudget),
     );

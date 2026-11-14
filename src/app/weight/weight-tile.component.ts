@@ -16,8 +16,8 @@ import { toDateISO } from '../core/util/date';
     <app-weight-sheet [isOpen]="sheetOpen()" (closed)="sheetOpen.set(false)"></app-weight-sheet>
   `,
   styles: [`
-    :host { display: block; margin-top: var(--nt-space-4); }
-    .weight-tile { display: flex; align-items: center; gap: var(--nt-space-3); width: 100%; min-height: var(--nt-touch); padding: var(--nt-space-3) var(--nt-space-4); border: 0; font: inherit; text-align: left; cursor: pointer; color: var(--nt-ink); }
+    :host { display: block; }
+    .weight-tile { display: flex; align-items: center; gap: var(--nt-space-3); width: 100%; min-height: var(--nt-touch); border: 0; font: inherit; text-align: left; cursor: pointer; color: var(--nt-ink); }
     .weight-tile:focus-visible { outline: 2px solid var(--nt-focus); outline-offset: 2px; }
     .weight-tile__label { font-weight: 600; }
     .weight-tile__value { flex: 1; color: var(--nt-secondary); font-variant-numeric: tabular-nums; }

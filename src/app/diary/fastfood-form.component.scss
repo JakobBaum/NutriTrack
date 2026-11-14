@@ -54,7 +54,7 @@ ion-range {
 }
 
 .ff-connect {
-  margin: var(--nt-space-4) var(--nt-space-4) 0;
+  margin: var(--nt-space-4) 0 0;
   padding: var(--nt-space-3) var(--nt-space-4);
   background: var(--nt-card);
   border-radius: var(--nt-radius-card);
@@ -63,5 +63,41 @@ ion-range {
     margin: 0;
     color: var(--nt-ink);
     font-size: var(--nt-fs-body);
+  }
+}
+
+// Kriterien als Mehrfachauswahl: Chips in der Karte, Innenradius, 44 px, umbrechend.
+.ff-criteria {
+  display: block;
+  padding: var(--nt-space-3) var(--nt-space-4);
+}
+
+.ff-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nt-space-2);
+  margin-top: var(--nt-space-2);
+}
+
+.ff-chip {
+  min-height: var(--nt-btn-height);
+  padding: 0 var(--nt-space-4);
+  max-width: 100%;
+  font: inherit;
+  font-size: var(--nt-fs-body);
+  color: var(--nt-ink);
+  background: var(--ion-color-light);
+  border: 1px solid transparent;
+  border-radius: var(--nt-radius-inner);
+  cursor: pointer;
+
+  &--on {
+    color: var(--nt-on-accent);
+    background: var(--nt-accent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--nt-accent);
+    outline-offset: 2px;
   }
 }

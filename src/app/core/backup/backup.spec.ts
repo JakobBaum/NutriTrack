@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CONSENT_KEY } from '../consent/consent.model';
 import {
   BACKUP_ERRORS,
   BACKUP_FORMAT,
@@ -7,6 +8,7 @@ import {
   backupFileName,
   buildBackup,
   countBackup,
+  isNeverBackedUp,
   describeCounts,
   formatBackupDate,
   parseBackup,
@@ -43,6 +45,12 @@ const sampleData = {
   shopping: { id: 's', items: [{ name: 'Milch', amount: 1, unit: 'l', checked: false }] },
 };
 
+describe('Zustimmung im Backup', () => {
+  it('gehört nicht zu den gesicherten Schlüsseln', () => {
+    expect(isNeverBackedUp(CONSENT_KEY)).toBe(true);
+  });
+});
+
 describe('backupFileName', () => {
   it('uses the local date with zero padding', () => {
     expect(backupFileName(new Date(2026, 0, 3))).toBe('nutritrack-backup-2026-01-03.json');
@@ -68,10 +76,11 @@ describe('buildBackup', () => {
     expect(Object.keys(backup.data)).toEqual(['diary']);
   });
 
-  it('blanks the recipe search API key without mutating the input', () => {
-    const input = { 'recipe-search-config': { apiKey: 'geheim', baseUrl: '' } };
+  it('exportiert den früheren Rezeptsuche-Key (recipe-search-config) nicht', () => {
+    const input = { diary: [], 'recipe-search-config': { apiKey: 'geheim', baseUrl: '' } };
     const backup = buildBackup(input, NOW);
-    expect(backup.data['recipe-search-config']).toEqual({ apiKey: '', baseUrl: '' });
+    expect(Object.keys(backup.data)).toEqual(['diary']);
+    expect(JSON.stringify(backup)).not.toContain('geheim');
     expect(input['recipe-search-config'].apiKey).toBe('geheim');
   });
 
@@ -223,7 +232,7 @@ describe('validateBackup Inhaltsprüfung (QAE-01, Welle A)', () => {
   it('lässt Geräte-interne Schlüssel (Version, Auto-Sicherung, Quarantäne) beim Export und Import weg', () => {
     const data = { diary: [], schemaVersion: 1, autosnapshot: { x: 1 }, 'quarantine.diary.1': {}, backupReminderSnooze: 'x' };
     expect(Object.keys(buildBackup(data, new Date()).data)).toEqual(['diary']);
-    expect(Object.keys(prepareRestore(data, {}))).toEqual(['diary']);
+    expect(Object.keys(prepareRestore(data))).toEqual(['diary']);
   });
 });
 
@@ -290,35 +299,17 @@ describe('Gewicht und Favoriten im Backup', () => {
 
 describe('prepareRestore', () => {
   it('ignoriert ai-config aus dem Backup vollständig', () => {
-    const restored = prepareRestore({ diary: [], 'ai-config': { provider: 'gemini', apiKey: 'fremd', proxyUrl: 'https://evil.example' } }, { 'ai-config': { apiKey: 'lokal' } });
+    const restored = prepareRestore({ diary: [], 'ai-config': { provider: 'gemini', apiKey: 'fremd', proxyUrl: 'https://evil.example' } });
     expect(restored).toEqual({ diary: [] });
   });
 
-  it('keeps the local recipe search key when the backup has none', () => {
-    const restored = prepareRestore({ 'recipe-search-config': { apiKey: '' } }, { 'recipe-search-config': { apiKey: 'lokal' } });
-    expect(restored['recipe-search-config']).toEqual({ apiKey: 'lokal' });
-  });
-
-  it('verwirft baseUrl aus dem Backup und behält die lokale (SEC-01)', () => {
-    const restored = prepareRestore(
-      { 'recipe-search-config': { apiKey: '', baseUrl: 'https://evil.example' } },
-      { 'recipe-search-config': { apiKey: 'lokal', baseUrl: 'https://mein.example' } },
-    );
-    expect(restored['recipe-search-config']).toEqual({ apiKey: 'lokal', baseUrl: 'https://mein.example' });
-  });
-
-  it('entfernt baseUrl ganz, wenn lokal keine existiert (SEC-01)', () => {
-    const restored = prepareRestore(
-      {
-        'recipe-search-config': { apiKey: 'k', baseUrl: 'https://evil.example' },
-      },
-      {},
-    );
-    expect(restored['recipe-search-config']).toEqual({ apiKey: 'k' });
+  it('importiert den früheren Rezeptsuche-Key aus einem alten Backup nicht', () => {
+    const restored = prepareRestore({ diary: [], 'recipe-search-config': { apiKey: 'fremd', baseUrl: 'https://evil.example' } });
+    expect(restored).toEqual({ diary: [] });
   });
 
   it('drops the last-backup key and leaves other data untouched', () => {
-    const restored = prepareRestore({ diary: [entry('d')], [LAST_BACKUP_KEY]: 'x' }, {});
+    const restored = prepareRestore({ diary: [entry('d')], [LAST_BACKUP_KEY]: 'x' });
     expect(restored).toEqual({ diary: [entry('d')] });
   });
 });

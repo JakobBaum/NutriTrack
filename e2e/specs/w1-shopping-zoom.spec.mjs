@@ -102,7 +102,7 @@ export function register({ test }) {
         status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(OFF_HITS),
       }));
       await go(page, 'diary');
-      await page.locator('.page-head__add').click();
+      await page.locator('[data-testid="diary-add"]').click();
       const modal = page.locator('ion-modal.show-modal').last();
       await modal.locator('ion-searchbar input').first().fill('joghurt');
       await modal.locator('nt-food-row .score').first().waitFor({ timeout: 5000 });

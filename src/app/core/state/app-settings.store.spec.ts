@@ -35,6 +35,41 @@ describe('AppSettingsStore', () => {
     expect(store.unitSystem()).toBe('metric');
   });
 
+  it('startet mit Österreich als Fastfood-Land', () => {
+    expect(TestBed.inject(AppSettingsStore).fastfoodCountry()).toBe('Österreich');
+  });
+
+  it('speichert das Fastfood-Land, ohne das Einheitensystem zu verlieren, und lädt es neu', () => {
+    const store = TestBed.inject(AppSettingsStore);
+    store.setUnitSystem('imperial');
+    store.setFastfoodCountry('Italien');
+    store.setUnitSystem('metric');
+    TestBed.resetTestingModule();
+    const reloaded = TestBed.inject(AppSettingsStore);
+    expect(reloaded.fastfoodCountry()).toBe('Italien');
+    expect(reloaded.unitSystem()).toBe('metric');
+  });
+
+  it('bereinigt ein unbekanntes gespeichertes Fastfood-Land beim Laden', () => {
+    TestBed.inject(StorageService).set('app-settings', { unitSystem: 'metric', fastfoodCountry: 'Atlantis' });
+    TestBed.resetTestingModule();
+    expect(TestBed.inject(AppSettingsStore).fastfoodCountry()).toBe('Österreich');
+  });
+
+  it('lehnt ein unbekanntes Land beim Setzen ab und behält das alte', () => {
+    const store = TestBed.inject(AppSettingsStore);
+    store.setFastfoodCountry('Schweiz');
+    store.setFastfoodCountry('Mordor');
+    expect(store.fastfoodCountry()).toBe('Schweiz');
+  });
+
+  it('setzt beim Zurücksetzen auch das Fastfood-Land zurück', () => {
+    const store = TestBed.inject(AppSettingsStore);
+    store.setFastfoodCountry('USA');
+    store.clear();
+    expect(store.fastfoodCountry()).toBe('Österreich');
+  });
+
   it('ist im Backup enthalten', () => {
     TestBed.inject(AppSettingsStore).setUnitSystem('imperial');
     const snapshot = TestBed.inject(StorageService).snapshot();

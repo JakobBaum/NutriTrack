@@ -1,4 +1,5 @@
-// Tagebuch im S1-Look "Sanft iOS" (siehe DESIGN.md). Nur Tokens aus src/theme/variables.scss.
+// Tagebuch (Welle 2): Seitenrand, Abstaende und Kopf kommen aus .nt-page / .nt-stack / nt-page-header (src/styles/layout.scss).
+// Hier nur Tagebuch-Eigenes. Nur Tokens aus src/theme/variables.scss.
 // Modals werden ausserhalb des Hosts gerendert, daher keine :host-Properties.
 @use 'diary-sheets';
 
@@ -7,15 +8,13 @@ ion-content {
   --color: var(--nt-ink);
 }
 
-// Pill im gemeinsamen Seitenkopf darf bei 320 px nicht überlaufen.
-.page-head__add {
+// Kleiner kcal-Wert (Mahlzeit-Kopf, Eintrag, Fastfood-Hinweis): ein Stil.
+.diary-kcal {
   flex: none;
-  white-space: nowrap;
-  padding-inline: var(--nt-space-3);
-
-  ion-icon {
-    font-size: 20px;
-  }
+  font-size: var(--nt-fs-body);
+  font-weight: 600;
+  color: var(--nt-ink);
+  font-variant-numeric: tabular-nums;
 }
 
 // --- Tages-Summe ------------------------------------------------------------
@@ -23,35 +22,23 @@ ion-content {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--nt-space-3);
-  margin-top: var(--nt-space-2);
 
-  &__col {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  &__kcal--protein {
-    color: var(--nt-protein);
-  }
-
-  &__kcal {
+  &__num {
     font-size: clamp(1.875rem, 9vw, var(--nt-fs-hero));
     font-weight: 700;
     letter-spacing: -0.5px;
-    line-height: 1.1;
-    color: var(--nt-kcal);
-    font-variant-numeric: tabular-nums;
-  }
 
-  &__unit {
-    font-size: var(--nt-fs-body);
-    font-weight: 600;
-    color: var(--nt-secondary);
+    &--kcal {
+      color: var(--nt-kcal);
+    }
+
+    &--protein {
+      color: var(--nt-protein);
+    }
   }
 
   &__target {
+    margin-top: var(--nt-space-1);
     font-size: var(--nt-fs-caption);
     color: var(--nt-secondary);
   }
@@ -62,8 +49,9 @@ ion-content {
     font-weight: 700;
   }
 }
+
 // Eintragszeile: sichtbares „Mehr“-Menü (Bearbeiten, Doppelt eintragen, Löschen) neben dem Wischen,
-// auf Touch-Geräten wie am Desktop erreichbar.
+// auf Touch-Geräten wie am Desktop erreichbar. Nur Symbol, Tippfläche 44x44, keine eigene Fläche.
 .entry-row {
   display: flex;
   align-items: center;
@@ -73,13 +61,18 @@ ion-content {
     min-width: 0;
   }
 
+  // Letzte Zeile einer Karte ohne Trennlinie (ion-item:last-child trifft wegen des Wrappers nicht).
+  &:last-child ion-item {
+    --inner-border-width: 0;
+  }
+
   &__more {
-    width: var(--nt-touch);
-    height: var(--nt-touch);
+    flex: none;
+    width: var(--nt-icon-btn);
+    height: var(--nt-icon-btn);
     padding: 0;
     border: 0;
-    border-radius: var(--nt-radius-pill);
-    background: var(--nt-card);
+    background: transparent;
     color: var(--nt-secondary);
     cursor: pointer;
 
@@ -89,43 +82,26 @@ ion-content {
 
     &:focus-visible {
       outline: 2px solid var(--nt-focus);
-      outline-offset: 2px;
+      outline-offset: -2px;
     }
   }
 }
 
-.kcal-note {
-  font-size: var(--nt-fs-body);
-  font-weight: 600;
-  color: var(--nt-ink);
-  font-variant-numeric: tabular-nums;
-}
-
 // --- Mahlzeiten -------------------------------------------------------------
+// Kopf: Ueberschrift (.nt-section-header, Einzug wie ueberall), kcal-Summe, Plus als Symbol-Button.
 .meal {
+  display: flex;
+  flex-direction: column;
+
   &__head {
     display: flex;
     align-items: center;
     gap: var(--nt-space-2);
-    margin: var(--nt-space-4) var(--nt-space-4) 0 var(--nt-space-5);
-  }
-
-  &__icon {
-    flex: none;
-    font-size: 18px;
-    color: var(--nt-secondary);
   }
 
   &__label {
     flex: 1;
     margin: 0;
-  }
-
-  &__kcal {
-    font-size: var(--nt-fs-caption);
-    font-weight: 600;
-    color: var(--nt-secondary);
-    font-variant-numeric: tabular-nums;
   }
 
   &__empty {
@@ -138,25 +114,12 @@ ion-content {
     color: var(--nt-secondary);
   }
 
+  // Textbutton in der leeren Karte: .nt-btn--text, linksbuendig ueber die ganze Zeile.
   &__empty-add {
-    display: flex;
-    align-items: center;
-    gap: var(--nt-space-1);
+    justify-content: flex-start;
     width: 100%;
-    min-height: var(--nt-touch);
-    padding: 0 var(--nt-space-4);
-    background: transparent;
-    border: 0;
-    color: var(--nt-accent);
-    font: inherit;
-    font-size: var(--nt-fs-body);
-    font-weight: 600;
-    cursor: pointer;
-
-    &:focus-visible {
-      outline: 2px solid var(--nt-focus);
-      outline-offset: -2px;
-    }
+    padding-inline: var(--nt-space-4);
+    border-radius: 0;
   }
 
   // "Wie gestern": zweite Zeile mit eingeruecktem Trenner (wie .nt-grouped)
@@ -186,7 +149,6 @@ ion-content {
 .day-actions {
   display: flex;
   justify-content: center;
-  padding: var(--nt-space-1) var(--nt-space-4) 0;
 
   &__copy ion-icon {
     font-size: 18px;
@@ -226,15 +188,18 @@ ion-content {
     }
   }
 
-  &__text {
+  &__body {
+    display: flex;
     flex: 1;
-    font-size: var(--nt-fs-headline);
-    font-weight: 600;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-width: 0;
   }
 
-  &__hint {
-    font-size: var(--nt-fs-caption);
-    color: var(--nt-secondary);
+  &__text {
+    font-size: var(--nt-fs-headline);
+    font-weight: 600;
   }
 
   &__arrow {
@@ -244,69 +209,14 @@ ion-content {
   }
 }
 
-// Platz am Seitenende (Tab-Leiste bekommt globalen Abstand über ion-tabs ion-content)
-.content-spacer {
-  height: var(--nt-space-4);
-}
-
-// Bearbeiten-Sheet: Sichern rechts im Kopf, Löschen als ruhiger Text-Button mit Abstand
-.sheet-header__save {
-  font-weight: 600;
-}
-
-.view-switch {
-  margin: var(--nt-space-3) var(--nt-space-4) 0;
-  width: auto;
-}
-
-.edit-fav {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--nt-space-1);
-  min-height: var(--nt-touch);
-  margin: var(--nt-space-4) auto 0;
-  padding: 0 var(--nt-space-4);
-  background: transparent;
-  border: 0;
-  color: var(--nt-accent);
-  font: inherit;
-  font-size: var(--nt-fs-headline);
-  font-weight: 600;
-  cursor: pointer;
-
-  &:focus-visible {
-    outline: 2px solid var(--nt-focus);
-    outline-offset: 2px;
-  }
-}
-
+// Bearbeiten-Sheet: Speichern im .nt-sheet-footer, Zusatzaktionen als Text-Buttons (.nt-btn--text)
 .edit-delete {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--nt-space-1);
-  min-height: var(--nt-touch);
-  margin: 32px auto 0;
-  padding: 0 var(--nt-space-4);
-  background: transparent;
-  border: 0;
   color: var(--nt-danger);
-  font: inherit;
-  font-size: var(--nt-fs-headline);
-  font-weight: 600;
-  cursor: pointer;
-
-  &:focus-visible {
-    outline: 2px solid var(--nt-focus);
-    outline-offset: 2px;
-  }
 }
 
 .macro-legend {
-  margin: var(--nt-space-3) var(--nt-space-4) 0;
+  padding-inline: var(--nt-space-4);
   color: var(--nt-secondary);
   font-size: var(--nt-fs-caption);
   text-align: center;
 }
-

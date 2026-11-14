@@ -18,6 +18,13 @@ describe('friendlyAiErrorMessage', () => {
   it('maps 422 to the unreadable-answer message', () => {
     expect(friendlyAiErrorMessage(422)).toBe(AI_ERROR_MESSAGES.unreadable);
   });
+  it('maps 422 beim Link-Import auf den Hinweis, den Rezepttext einzufügen', () => {
+    expect(friendlyAiErrorMessage(422, true)).toBe(AI_ERROR_MESSAGES.linkBlocked);
+    expect(AI_ERROR_MESSAGES.linkBlocked).toContain('Kopiere den Rezepttext');
+  });
+  it('lässt andere Status beim Link-Import unverändert', () => {
+    expect(friendlyAiErrorMessage(429, true)).toBe(AI_ERROR_MESSAGES.rateLimited);
+  });
   it('falls back to the generic message', () => {
     expect(friendlyAiErrorMessage(418)).toBe(AI_ERROR_MESSAGES.generic);
   });

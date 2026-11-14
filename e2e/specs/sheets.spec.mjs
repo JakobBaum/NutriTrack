@@ -15,7 +15,7 @@ const LONG_RECIPE = {
 
 async function openAddSheet(page) {
   await go(page, 'diary');
-  await page.locator('.page-head__add').click();
+  await page.locator('[data-testid="diary-add"]').click();
   const modal = topModal(page);
   await modal.locator('.nt-source-btn', { hasText: 'Manuell' }).waitFor();
   return modal;
@@ -135,7 +135,7 @@ export function register({ test }) {
   };
   const sw = (page) => page.locator('[data-testid="own-recipes-toggle"] input[role="switch"]');
 
-  test('weekplan: "Aus meinen Rezepten planen" ist ein Schalter mit sichtbarem Zustand', seed({ 'recipe-search-config': { apiKey: 'test-key', baseUrl: 'https://api.spoonacular.com' } }), async (page) => {
+  test('weekplan: "Aus meinen Rezepten planen" ist ein Schalter mit sichtbarem Zustand', seed({}), async (page) => {
     await OPEN_PLAN(page);
     const toggle = page.locator('[data-testid="own-recipes-toggle"]');
     const state = page.locator('[data-testid="own-recipes-state"]');

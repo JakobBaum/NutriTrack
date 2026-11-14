@@ -9,7 +9,7 @@ const byAria = (scope, label) => scope.locator(`ion-input input[aria-label="${la
 /** Legt das Rezept an: 1 Zutat (300 g, 100 kcal/100 g → 300 kcal), ergibt 1,5 Portionen. */
 async function createRecipe(page) {
   await go(page, 'recipes');
-  await page.locator('.page-head__add').click();
+  await page.getByRole('button', { name: 'Neues Rezept' }).click();
   const modal = topModal(page);
   await modal.locator('.nt-sheet-header__title', { hasText: 'Neues Rezept' }).waitFor();
   await fillAndBlur(byAria(modal, 'Name'), TITLE);
@@ -52,7 +52,7 @@ export function register({ test }) {
   test('recipes: halbe Portion über Tagebuch loggen', seed(), async (page) => {
     await createRecipe(page);
     await go(page, 'diary');
-    await page.locator('.page-head__add').click();
+    await page.locator('[data-testid="diary-add"]').click();
     const modal = topModal(page);
     await modal.locator('.nt-source-btn', { hasText: 'Rezept' }).click();
     await modal.locator('ion-item', { hasText: TITLE }).click();
@@ -93,7 +93,7 @@ export function register({ test }) {
     await topModal(page).locator('.nt-sheet-header__title', { hasText: 'Rezept bearbeiten' }).waitFor();
   });
 
-  test('recipes: Online-Suche ohne eigenen Schlüssel nutzt den Worker (503 → Hinweis, keine Einrichtung)', seed(), async (page) => {
+  test('recipes: Online-Suche: Worker nicht erreichbar (503) zeigt eine verständliche Meldung, keine Einrichtung', seed(), async (page) => {
     const hits = [];
     await page.route('https://*.workers.dev/recipes/complexSearch**', async (route) => {
       const req = route.request();
@@ -115,17 +115,17 @@ export function register({ test }) {
     await modal.locator('ion-input input[aria-label="Rezept suchen"]').fill('lentil');
     await modal.locator('.os-search-btn').click();
     await modal.locator('.os-error').waitFor();
-    assert.match(await modal.locator('.os-error').innerText(), /nicht eingerichtet/);
+    assert.match(await modal.locator('.os-error').innerText(), /gerade nicht verfügbar/);
     assert.deepEqual(hits, [null], 'genau eine Worker-Anfrage ohne x-api-key');
   });
 
-  test('recipes: Online-Suche (gemockt) finden, öffnen, speichern', seed({ 'recipe-search-config': { apiKey: 'test-key', baseUrl: 'https://api.spoonacular.com' } }), async (page) => {
+  test('recipes: Online-Suche (gemockt) finden, öffnen, speichern', seed(), async (page) => {
     const requests = [];
     const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-expose-headers': 'X-Api-Quota-Left' };
-    await page.route('https://api.spoonacular.com/**', async (route) => {
+    await page.route('https://*.workers.dev/recipes/complexSearch**', async (route) => {
       const req = route.request();
       if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
-      requests.push({ url: req.url(), key: req.headers()['x-api-key'] });
+      requests.push({ url: req.url(), key: req.headers()['x-api-key'] ?? null });
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -145,7 +145,7 @@ export function register({ test }) {
     assert.match(await card.innerText(), /320 kcal/);
     assert.match(await card.innerText(), /2 Portionen/);
     assert.equal(requests.length, 1);
-    assert.equal(requests[0].key, 'test-key');
+    assert.equal(requests[0].key, null, 'kein eigener Schlüssel im Header');
     assert.match(requests[0].url, /query=lentil/);
     assert.match(await modal.innerText(), /noch 41 Punkte heute/);
 
@@ -175,6 +175,34 @@ export function register({ test }) {
     await listCard.locator('.recipe__title-btn').click();
     const sheet = topModal(page);
     await eventually(async () => assert.match(await sheet.innerText(), /Simmer the lentils|Linsen/));
+  });
+
+  // Welle 2: Kochen ist getoent (nicht wie Eintragen gefuellt), der FAB legt je Reiter das Richtige an.
+  const STAMP = new Date().toISOString();
+  const COOKABLE = {
+    id: 'r-c', title: 'Kochbares Dal', servings: 2, origin: 'manual', createdAt: STAMP, updatedAt: STAMP,
+    ingredients: [{ id: 'i1', name: 'Linsen', amount: 200, unit: 'g' }], steps: ['Kochen'],
+  };
+  const nativeBg = (button) => button.evaluate((el) => getComputedStyle(el.shadowRoot.querySelector('.button-native')).backgroundColor);
+
+  test('recipes: Kochen ist getoent, Eintragen gefuellt (verschiedene Flaechen)', seed({ recipes: [COOKABLE] }), async (page) => {
+    await go(page, 'recipes');
+    const card = page.locator('article.recipe', { hasText: COOKABLE.title });
+    const log = await nativeBg(card.locator('ion-button', { hasText: 'Eintragen' }));
+    const cook = await nativeBg(card.locator('ion-button', { hasText: 'Kochen' }));
+    assert.notEqual(cook, log, `Kochen ${cook} gleich Eintragen ${log}`);
+  });
+
+  test('recipes: FAB oeffnet je Reiter das richtige Sheet', seed(), async (page) => {
+    await go(page, 'recipes');
+    await page.getByRole('button', { name: 'Neues Rezept' }).click();
+    await topModal(page).locator('.nt-sheet-header__title', { hasText: 'Neues Rezept' }).waitFor();
+    await topModal(page).locator('ion-button.nt-sheet-close').click();
+    await settle(page, 800);
+    await page.locator('ion-segment-button', { hasText: 'Mahlzeiten' }).click();
+    await settle(page, 400);
+    await page.getByRole('button', { name: 'Neue Mahlzeit' }).click();
+    await topModal(page).locator('.nt-sheet-header__title', { hasText: 'Mahlzeit anlegen' }).waitFor();
   });
 }
 

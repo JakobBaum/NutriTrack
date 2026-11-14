@@ -45,7 +45,7 @@ export function register({ test }) {
   test('shopping: Artikel mit Enter hinzufügen', seed({ shopping: SHOPPING }), async (page) => {
     await go(page, 'shopping');
     // "+" öffnet das Bottom Sheet
-    await page.locator('ion-fab.add-fab ion-fab-button').click();
+    await page.locator('ion-fab.nt-fab ion-fab-button').click();
     await page.locator('ion-modal.add-sheet').waitFor({ state: 'visible' });
     const name = page.locator('ion-modal.add-sheet ion-input.add-name input');
     await name.fill('Hafermilch');
@@ -70,7 +70,7 @@ export function register({ test }) {
     const eaten = toInt(await page.locator('.hero__item:not(.hero__item--protein) .hero__eaten').innerText());
     const target = toInt(await page.locator('.hero__item:not(.hero__item--protein) .hero__target').innerText());
     assert.equal(eaten, sumKcal(DIARY_NORMAL));
-    assert.match(await page.locator('.hero__item:not(.hero__item--protein) .hero__unit').innerText(), /kcal noch/);
+    assert.match(await page.locator('.hero__item:not(.hero__item--protein) .hero__main').innerText(), /kcal\s+noch/);
     assert.equal(toInt(await page.locator('.hero__item:not(.hero__item--protein) .hero__big').innerText()), target - eaten);
     assert.equal(await page.locator('.hero__item--over').count(), 0);
     const lunch = page.locator('.row__btn', { hasText: 'Mittagessen' });

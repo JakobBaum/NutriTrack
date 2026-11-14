@@ -3,7 +3,7 @@ import { isTimeoutError } from '../ai/ai-errors';
 import { STATE_MESSAGES } from '../messages/state-messages';
 
 /** Warum eine Lebensmittel-Abfrage fehlschlug (für passende Nutzer-Meldungen). */
-export type FoodLookupFailure = 'offline' | 'rate-limit' | 'server' | 'timeout';
+export type FoodLookupFailure = 'offline' | 'rate-limit' | 'server' | 'timeout' | 'implausible';
 
 /** Zeitlimit für eine Lebensmittel-Abfrage (Suche und Barcode), danach Abbruch mit Meldung. */
 export const FOOD_TIMEOUT_MS = 10000;
@@ -52,6 +52,8 @@ export function foodErrorMessage(e: unknown): string {
       return STATE_MESSAGES.foodTimeout;
     case 'offline':
       return STATE_MESSAGES.offline;
+    case 'implausible':
+      return STATE_MESSAGES.foodImplausible;
     default:
       return STATE_MESSAGES.foodServer;
   }

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AiService } from '../../ai/ai.service';
 import { OnlineRecipe } from '../online/online-recipe.model';
 import { RecipeTranslateService, applyTranslation, recipeTexts } from './recipe-translate';
+import { ConsentStore } from '../../consent/consent.store';
 import { TranslationCache } from './translation-cache';
 
 const BASE: OnlineRecipe = {
@@ -13,7 +14,7 @@ const BASE: OnlineRecipe = {
 
 const GERMAN = { title: 'Linsensuppe', ingredients: ['Rote Linsen', 'Rosmarin, frisch'], steps: ['Schneiden.', 'Kochen.'] };
 
-function setup(live: boolean, translateRecipe = vi.fn().mockResolvedValue(GERMAN)) {
+function setup(live: boolean, translateRecipe = vi.fn().mockResolvedValue(GERMAN), consented = true) {
   localStorage.clear();
   TestBed.resetTestingModule();
   const ai = {
@@ -22,6 +23,7 @@ function setup(live: boolean, translateRecipe = vi.fn().mockResolvedValue(GERMAN
     translateSearchQuery: vi.fn().mockResolvedValue('chicken'),
   };
   TestBed.configureTestingModule({ providers: [{ provide: AiService, useValue: ai }] });
+  if (consented) TestBed.inject(ConsentStore).grant(new Date(), true);
   return { service: TestBed.inject(RecipeTranslateService), ai, translateRecipe, cache: TestBed.inject(TranslationCache) };
 }
 
@@ -135,5 +137,20 @@ describe('RecipeTranslateService', () => {
     expect(progress.at(0)).toBe(0);
     expect(progress.at(-1)).toBe(9);
     expect(progress).toEqual([...progress].sort((a, b) => a - b));
+  });
+});
+
+describe('RecipeTranslateService ohne Zustimmung', () => {
+  it('bietet keine KI-Übersetzung an und ruft die KI nie auf', async () => {
+    const { service, translateRecipe, ai } = setup(true, undefined, false);
+
+    expect(service.canTranslate()).toBe(false);
+    const out = await service.translate(BASE);
+    const query = await service.translateQuery('Hähnchen');
+
+    expect(translateRecipe).not.toHaveBeenCalled();
+    expect(ai.translateSearchQuery).not.toHaveBeenCalled();
+    expect(out.lang).toBe('en');
+    expect(query.viaAi).toBe(false);
   });
 });

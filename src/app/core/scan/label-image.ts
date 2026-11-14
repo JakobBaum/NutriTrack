@@ -58,10 +58,13 @@ const browserDeps: PhotoShrinkDeps = {
   createCanvas: () => document.createElement('canvas'),
 };
 
+/** Meldung, wenn das Foto nicht aufbereitet werden kann; das Original wird dann nie gesendet. */
+export const PHOTO_PREPARE_ERROR = 'Das Foto konnte nicht vorbereitet werden. Bitte nimm es noch einmal auf.';
+
 /**
- * Verkleinert ein Foto (Base64 ohne Präfix) vor dem KI-Upload auf höchstens `maxEdge` px
- * längste Kante (JPEG). Kleinere Fotos kommen unverändert zurück; schlägt die Aufbereitung
- * fehl, wird das Original verwendet (der Upload darf daran nicht scheitern).
+ * Bereitet ein Foto (Base64 ohne Präfix) für den KI-Upload auf: höchstens `maxEdge` px längste Kante,
+ * immer über ein Canvas neu als JPEG kodiert. Das entfernt EXIF-Daten (z. B. den Aufnahmeort), auch bei
+ * kleinen Fotos. Schlägt das fehl, wirft die Funktion; das Original wird nie gesendet.
  */
 export async function shrinkPhotoForUpload(
   base64: string,
@@ -72,14 +75,15 @@ export async function shrinkPhotoForUpload(
     const src = base64.startsWith('data:') ? base64 : `data:image/jpeg;base64,${base64}`;
     const img = await deps.load(src);
     const factor = downscaleFactor(img.width, img.height, maxEdge);
-    if (factor >= 1) return base64;
     const canvas = deps.createCanvas();
     canvas.width = Math.max(1, Math.round(img.width * factor));
     canvas.height = Math.max(1, Math.round(img.height * factor));
     img.draw(canvas);
     const out = canvas.toDataURL('image/jpeg', UPLOAD_JPEG_QUALITY);
-    return out.includes(',') ? out.split(',')[1] : base64;
+    const data = out.includes(',') ? out.split(',')[1] : '';
+    if (!data) throw new Error('Leeres Ergebnis');
+    return data;
   } catch {
-    return base64;
+    throw new Error(PHOTO_PREPARE_ERROR);
   }
 }

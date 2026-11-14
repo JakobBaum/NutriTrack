@@ -4,7 +4,7 @@
 
 // Inset-gruppierte Karte: weisse Flaeche, Radius 20, Zeilen >= 44 px, 0.5px Trenner (inset).
 .nt-grouped {
-  margin: 0 var(--nt-space-4);
+  margin: 0;
   padding: 0;
   list-style: none;
   background: var(--nt-card);
@@ -55,73 +55,6 @@
   flex: none;
   color: var(--nt-secondary);
   font-size: 14px;
-}
-
-// Abschnittskopf ueber einer Gruppe: 13 px, Grossbuchstaben, secondary.
-.nt-section-header {
-  margin: var(--nt-space-6) calc(var(--nt-space-4) + var(--nt-space-5)) var(--nt-space-2);
-  font-size: var(--nt-fs-caption);
-  font-weight: 400;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-  color: var(--nt-secondary);
-}
-
-.nt-large-title {
-  margin: 0;
-  font-size: var(--nt-fs-large-title);
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  color: var(--nt-ink);
-}
-
-.nt-subtitle {
-  margin: 2px 0 0;
-  font-size: var(--nt-fs-body);
-  color: var(--nt-secondary);
-}
-
-// Karte (freistehend)
-.nt-card {
-  margin: 0 var(--nt-space-4);
-  padding: var(--nt-space-5);
-  background: var(--nt-card);
-  border-radius: var(--nt-radius-card);
-  box-sizing: border-box;
-}
-
-// Pills: Hoehe 44 px, Radius = Hoehe/2
-.nt-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: var(--nt-touch);
-  padding: 0 18px;
-  border: 0;
-  border-radius: var(--nt-radius-pill);
-  background: var(--nt-accent);
-  color: var(--nt-on-accent);
-  font: inherit;
-  font-size: var(--nt-fs-headline);
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 120ms ease;
-
-  &:active {
-    opacity: 0.8;
-  }
-
-  &--secondary,
-  &.nt-pill--secondary {
-    background: var(--nt-accent-tint);
-    color: var(--ion-color-primary-shade); // 5.4:1 auf Tint
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--nt-focus);
-    outline-offset: 2px;
-  }
 }
 
 // Eingabefelder im iOS-Stil: Radius 12, Fokus mit Akzent-Ring
@@ -426,4 +359,11 @@ ion-item {
 
 @media (prefers-reduced-motion: reduce) {
   .nt-source-btn { transition: none; }
+}
+
+// Löschen-Kreuz der Suchleiste: Ionic-Standard ist 30 x 36 px, zu klein zum Tippen.
+ion-searchbar.nt-searchbar .searchbar-clear-button {
+  width: var(--nt-touch);
+  min-height: var(--nt-touch);
+  height: 100%;
 }

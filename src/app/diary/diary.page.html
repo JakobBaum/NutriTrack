@@ -1,13 +1,9 @@
 <ion-header class="ion-no-border">
-  <nt-page-header title="Tagebuch">
-    <button type="button" class="nt-pill page-head__add" (click)="openAdd()" aria-label="Neuen Eintrag eintragen">
-      <ion-icon name="add" aria-hidden="true"></ion-icon> Eintragen
-    </button>
-  </nt-page-header>
+  <nt-page-header title="Tagebuch"></nt-page-header>
 </ion-header>
 
 <ion-content>
-
+  <div class="nt-page nt-stack">
   <ion-segment class="view-switch" [value]="view()" aria-label="Ansicht" (ionChange)="setView($any($event).detail.value)">
     <ion-segment-button value="day"><ion-label>Tag</ion-label></ion-segment-button>
     <ion-segment-button value="week"><ion-label>Woche</ion-label></ion-segment-button>
@@ -19,68 +15,75 @@
   <nt-date-nav [date]="selectedDate()" (dateChange)="setDate($event)"></nt-date-nav>
   @if (daySources().length) {
     <div class="day-actions">
-      <button type="button" class="nt-pill nt-pill--secondary day-actions__copy" (click)="copyDay()" [attr.aria-label]="'Tag kopieren: einen früheren Tag in ' + dateLabel() + ' eintragen'">
+      <button type="button" class="nt-btn nt-btn--tonal day-actions__copy" (click)="copyDay()" [attr.aria-label]="'Tag kopieren: einen früheren Tag in ' + dateLabel() + ' eintragen'">
         <ion-icon name="copy-outline" aria-hidden="true"></ion-icon> Tag kopieren
       </button>
     </div>
   }
 
   <div class="summary nt-card" data-testid="diary-summary">
-    <div class="summary__col">
-      <span class="summary__kcal">{{ totalKcal() | ntNum:0 }}</span>
-      <span class="summary__unit">kcal gegessen</span>
+    <div class="nt-stat summary__col">
+      <span class="nt-stat__value">
+        <span class="nt-stat__num summary__num summary__num--kcal">{{ totalKcal() | ntNum:0 }}</span>
+        <span class="nt-stat__unit">kcal</span>
+      </span>
+      <span class="nt-stat__extra">gegessen</span>
       @if (overKcal() > 0) {
         <span class="summary__target"><strong class="summary__over">{{ overKcal() | ntNum:0 }}</strong> kcal über Ziel ({{ targetKcal() | ntNum:0 }} kcal)</span>
       } @else if (targetKcal() > 0) {
         <span class="summary__target">von {{ targetKcal() | ntNum:0 }} kcal</span>
       }
     </div>
-    <div class="summary__col">
-      <span class="summary__kcal summary__kcal--protein">{{ totalProtein() | ntNum:0 }}</span>
-      <span class="summary__unit">g Eiweiß gegessen</span>
+    <div class="nt-stat summary__col">
+      <span class="nt-stat__value">
+        <span class="nt-stat__num summary__num summary__num--protein">{{ totalProtein() | ntNum:0 }}</span>
+        <span class="nt-stat__unit">g</span>
+      </span>
+      <span class="nt-stat__extra">Eiweiß gegessen</span>
       @if (targetProtein() > 0) {
         <span class="summary__target">von {{ targetProtein() | ntNum:0 }} g@if (remainingProtein() > 0) { · noch {{ remainingProtein() | ntNum:0 }} g }</span>
       }
     </div>
   </div>
 
-  <div class="diary-list diary-list--spaced">
+  <div class="diary-list diary-list--page">
     <button type="button" class="ff-btn" (click)="openFastfood()">
       <span class="tint-circle" aria-hidden="true"><ion-icon name="fast-food-outline"></ion-icon></span>
-      <span class="ff-btn__text">Fastfood-Helfer</span>
-      @if (remainingKcal() > 0) {
-        <span class="ff-btn__hint">{{ remainingKcal() | ntNum:0 }} kcal übrig</span>
-      }
+      <span class="ff-btn__body">
+        <span class="ff-btn__text">Fastfood-Helfer</span>
+        @if (remainingKcal() > 0) {
+          <span class="diary-kcal">{{ remainingKcal() | ntNum:0 }} kcal übrig</span>
+        }
+      </span>
       <ion-icon name="chevron-forward-outline" class="ff-btn__arrow" aria-hidden="true"></ion-icon>
     </button>
   </div>
 
   @for (group of groups(); track group.type) {
-    <section class="meal" [id]="'meal-' + group.type">
+    <section class="meal nt-stack__section" [id]="'meal-' + group.type">
       <div class="meal__head">
-        <ion-icon [name]="group.icon" class="meal__icon" aria-hidden="true"></ion-icon>
         <h2 class="meal__label nt-section-header">{{ group.label }}</h2>
-        <span class="meal__kcal">{{ group.kcal | ntNum:0 }} kcal</span>
-        <ion-button fill="clear" class="touch-btn meal__add" (click)="openAdd(group.type)" [attr.aria-label]="'In ' + group.label + ' eintragen'">
+        <span class="diary-kcal">{{ group.kcal | ntNum:0 }} kcal</span>
+        <ion-button fill="clear" class="nt-icon-btn meal__add" (click)="openAdd(group.type)" [attr.aria-label]="'In ' + group.label + ' eintragen'">
           <ion-icon slot="icon-only" name="add-circle-outline"></ion-icon>
         </ion-button>
       </div>
 
       @if (group.entries.length === 0) {
-        <div class="diary-list meal__empty-card">
+        <div class="diary-list diary-list--page meal__empty-card">
           <p class="meal__empty">Noch nichts eingetragen.</p>
-          <button type="button" class="meal__empty-add" (click)="openAdd(group.type)">
+          <button type="button" class="nt-btn nt-btn--text meal__empty-add" (click)="openAdd(group.type)">
             <ion-icon name="add" aria-hidden="true"></ion-icon> In {{ group.label }} eintragen
           </button>
           @if (group.copySource; as src) {
-            <button type="button" class="meal__empty-add meal__empty-copy" (click)="copyMeal(group)" [attr.aria-label]="group.label + ' ' + copyFromButtonText(src.dateISO).toLowerCase() + ' übernehmen: ' + src.entries.length + ' Einträge'">
+            <button type="button" class="nt-btn nt-btn--text meal__empty-add meal__empty-copy" (click)="copyMeal(group)" [attr.aria-label]="group.label + ' ' + copyFromButtonText(src.dateISO).toLowerCase() + ' übernehmen: ' + src.entries.length + ' Einträge'">
               <ion-icon name="copy-outline" aria-hidden="true"></ion-icon> {{ copyFromButtonText(src.dateISO) }}
               <span class="meal__empty-count">{{ src.entries.length }} {{ src.entries.length === 1 ? 'Eintrag' : 'Einträge' }}</span>
             </button>
           }
         </div>
       } @else {
-        <ion-list class="diary-list" lines="none">
+        <ion-list class="diary-list diary-list--page" lines="none">
           @for (entry of group.entries; track entry.id) {
             <div class="entry-row">
             <ion-item-sliding #sliding>
@@ -93,11 +96,11 @@
                     @if (entry.isEstimate) { · @if (ffLive()) { <span class="ai-badge">KI-Schätzung</span> } }
                   </p>
                 </ion-label>
-                <ion-note slot="end" class="kcal-note">{{ entry.isPartial ? 'mind. ' : '' }}{{ entry.facts.kcal | ntNum:0 }} kcal</ion-note>
+                <ion-note slot="end" class="diary-kcal">{{ entry.isPartial ? 'mind. ' : '' }}{{ entry.facts.kcal | ntNum:0 }} kcal</ion-note>
               </ion-item>
               <ion-item-options side="end">
                 <ion-item-option color="medium" (click)="duplicate(entry); sliding.close()" [attr.aria-label]="'Doppelt eintragen: ' + entry.label">
-                  <ion-icon slot="top" name="copy-outline"></ion-icon> Doppelt
+                  <ion-icon slot="icon-only" name="copy-outline"></ion-icon>
                 </ion-item-option>
                 <ion-item-option color="primary" (click)="openEdit(entry)" aria-label="Eintrag bearbeiten">
                   <ion-icon slot="icon-only" name="create-outline"></ion-icon>
@@ -119,8 +122,13 @@
 
   <p class="macro-legend">E = Eiweiß · KH = Kohlenhydrate · F = Fett</p>
   }
+  </div>
 
-  <div class="content-spacer"></div>
+  <ion-fab slot="fixed" vertical="bottom" horizontal="end" class="nt-fab">
+    <ion-fab-button aria-label="Eintragen" data-testid="diary-add" (click)="openAdd()">
+      <ion-icon name="add" aria-hidden="true"></ion-icon>
+    </ion-fab-button>
+  </ion-fab>
 </ion-content>
 
 <!-- Eintragen-Sheet (Suche → Menge → Speichern); Diary und Heute nutzen dieselbe Komponente -->
@@ -135,20 +143,20 @@
     <div class="sheet-grabber" aria-hidden="true"></div>
     <ion-header class="ion-no-border sheet-header">
       <div class="nt-sheet-header">
-        <div class="nt-sheet-header__start">
-          <ion-button fill="clear" class="nt-sheet-close" (click)="requestCloseEdit()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
-        </div>
+        <div class="nt-sheet-header__start"></div>
         <h2 class="nt-sheet-header__title" role="heading" aria-level="2">Eintrag bearbeiten</h2>
         <div class="nt-sheet-header__end">
-          <ion-button fill="clear" class="sheet-header__save" (click)="saveEdit()">Speichern</ion-button>
+          <ion-button fill="clear" class="nt-sheet-close" (click)="requestCloseEdit()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
         </div>
       </div>
     </ion-header>
     <ion-content class="sheet-content">
+      <div class="nt-page edit-sheet">
+      <div class="nt-stack">
       @if (editError) {
         <p class="form-error" role="alert">{{ editError }}</p>
       }
-      <ion-list class="diary-list" lines="none">
+      <ion-list class="diary-list diary-list--page" lines="none">
         <ion-item lines="none">
           <ion-input label="Name" labelPlacement="stacked" [(ngModel)]="editForm.label" autocapitalize="words" autocorrect="off" enterkeyhint="done" (keyup.enter)="dismissKeyboard()"></ion-input>
         </ion-item>
@@ -164,15 +172,20 @@
           <ion-note slot="end">{{ mealLabelOf(editForm.meal) }}</ion-note>
         </ion-item>
       </ion-list>
-      <button type="button" class="edit-fav" data-testid="edit-favorite" (click)="toggleEditFavorite()" [attr.aria-pressed]="isEditFavorite()">
+      <button type="button" class="nt-btn nt-btn--text nt-btn--block edit-fav" data-testid="edit-favorite" (click)="toggleEditFavorite()" [attr.aria-pressed]="isEditFavorite()">
         <ion-icon [name]="isEditFavorite() ? 'star' : 'star-outline'" aria-hidden="true"></ion-icon> {{ isEditFavorite() ? 'Favorit entfernen' : 'Als Favorit merken' }}
       </button>
-      <button type="button" class="edit-fav" data-testid="edit-duplicate" (click)="duplicateFromEdit()">
+      <button type="button" class="nt-btn nt-btn--text nt-btn--block edit-fav" data-testid="edit-duplicate" (click)="duplicateFromEdit()">
         <ion-icon name="copy-outline" aria-hidden="true"></ion-icon> Doppelt eintragen
       </button>
-      <button type="button" class="edit-delete" (click)="deleteFromEdit()">
+      <button type="button" class="nt-btn nt-btn--text nt-btn--block edit-delete" (click)="deleteFromEdit()">
         <ion-icon name="trash-outline" aria-hidden="true"></ion-icon> Eintrag löschen
       </button>
+      </div>
+      <div class="nt-sheet-footer">
+        <ion-button class="nt-btn nt-btn--block" expand="block" data-testid="edit-save" (click)="saveEdit()">Speichern</ion-button>
+      </div>
+      </div>
     </ion-content>
   </ng-template>
 </ion-modal>

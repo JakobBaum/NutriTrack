@@ -20,7 +20,7 @@ export function register({ test }) {
 
   test('favorites: Favorit im Eintragen-Sheet trägt mit einem Tipp ein', seed({ favorites: [SKYR] }), async (page) => {
     await go(page, 'diary');
-    await page.locator('.page-head__add').click();
+    await page.locator('[data-testid="diary-add"]').click();
     const modal = topModal(page);
     await modal.locator('[data-testid="favorites-list"]').waitFor();
     await modal.locator('[data-testid="favorite-add"]').click();

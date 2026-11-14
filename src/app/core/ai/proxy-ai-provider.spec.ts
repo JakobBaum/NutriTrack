@@ -5,6 +5,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ProxyAiProvider } from './proxy-ai-provider';
 import { environment } from '../../../environments/environment';
+import { ConsentStore } from '../consent/consent.store';
 import { DebugLogService } from '../debug/debug-log.service';
 
 const PROXY = 'https://proxy.test/ai';
@@ -24,11 +25,37 @@ beforeEach(() => {
   TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
   http = TestBed.inject(HttpTestingController);
   provider = TestBed.inject(ProxyAiProvider);
+  TestBed.inject(ConsentStore).grant(new Date(), true);
   log = TestBed.inject(DebugLogService);
   setProxy(` ${PROXY} `);
 });
 
 afterEach(() => http.verify());
+
+const GOOD = {
+  restaurant: 'KFC', itemName: 'Wrap', rationale: 'ok', estPrice: 4,
+  facts: { kcal: 440, proteinG: 25, carbsG: 34, fatG: 23, basis: 'perPortion' },
+};
+
+describe('ProxyAiProvider — suggestFastfood prueft die Antwort', () => {
+  it('filtert ungueltige Eintraege heraus', async () => {
+    const p = provider.suggestFastfood(REQ);
+    http.expectOne(PROXY).flush([GOOD, { ...GOOD, itemName: '' }, { ...GOOD, facts: { ...GOOD.facts, kcal: 5 } }]);
+    expect((await p).map((s) => s.itemName)).toEqual(['Wrap']);
+  });
+
+  it('wirft eine verstaendliche Meldung, wenn kein Eintrag brauchbar ist', async () => {
+    const p = provider.suggestFastfood(REQ);
+    http.expectOne(PROXY).flush([{ ...GOOD, itemName: '' }]);
+    await expect(p).rejects.toThrow(/unbrauchbar/);
+  });
+
+  it('wirft bei einer Antwort, die kein Array ist', async () => {
+    const p = provider.suggestFastfood(REQ);
+    http.expectOne(PROXY).flush({ error: 'x' });
+    await expect(p).rejects.toThrow(/unbrauchbar/);
+  });
+});
 
 describe('ProxyAiProvider', () => {
   it('wirft ohne Proxy-URL', async () => {
@@ -54,7 +81,7 @@ describe('ProxyAiProvider', () => {
     const reqs = http.match(PROXY);
     expect(reqs.map((r) => r.request.body.fn)).toEqual(cases.map(([, fn]) => fn));
     expect(reqs[1].request.body.payload).toEqual({ imageBase64: 'b64', basis: 'per100g' });
-    reqs.forEach((r) => r.flush({}));
+    reqs.forEach((r) => r.flush(r.request.body.fn === 'suggestFastfood' ? [] : {}));
     await Promise.all(cases.map(([p]) => p));
   });
 
@@ -90,6 +117,20 @@ describe('ProxyAiProvider', () => {
   });
 });
 
+describe('ProxyAiProvider Link-Import 422', () => {
+  it('zeigt beim Link-Import den Hinweis zum Einfügen des Rezepttexts', async () => {
+    const p = provider.importRecipe({ url: 'https://www.tiktok.com/x' });
+    http.expectOne(PROXY).flush({ error: 'gesperrt' }, { status: 422, statusText: 'x' });
+    await expect(p).rejects.toThrow(AI_ERROR_MESSAGES.linkBlocked);
+  });
+
+  it('behält bei einem unlesbaren Rezeptfoto den bisherigen Text', async () => {
+    const p = provider.importRecipe({ imageBase64: 'abc' });
+    http.expectOne(PROXY).flush({ error: 'x' }, { status: 422, statusText: 'x' });
+    await expect(p).rejects.toThrow(AI_ERROR_MESSAGES.unreadable);
+  });
+});
+
 describe('ProxyAiProvider Zeitlimit', () => {
   it('meldet nach 30 s eine klare deutsche Meldung', async () => {
     vi.useFakeTimers();
@@ -102,5 +143,16 @@ describe('ProxyAiProvider Zeitlimit', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('ProxyAiProvider Einkaufsliste', () => {
+  it('sendet nur die Titel der Rezepte an den Worker', async () => {
+    const recipe = { id: 'r1', title: 'Pasta', servings: 2, ingredients: [{ name: 'Mehl' }], steps: ['Kochen'] };
+    const p = provider.generateShoppingList({ persons: 2, days: 1, meals: ['dinner'], recipes: [recipe as never] });
+    const req = http.expectOne(PROXY);
+    expect(req.request.body.payload.recipes).toEqual([{ title: 'Pasta' }]);
+    req.flush({ items: [], suggestedDishes: [], estTotal: 0 });
+    await p;
   });
 });

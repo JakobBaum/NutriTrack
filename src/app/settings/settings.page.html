@@ -1,13 +1,15 @@
+<ion-header class="ion-no-border">
+  <nt-page-header title="Profil"></nt-page-header>
+</ion-header>
+
 <ion-content>
-  <div class="nt-page settings-page">
-    <nt-page-header title="Profil"></nt-page-header>
+  <div class="nt-page nt-stack settings-page">
 
     <!-- Aktuelles Tagesziel -->
     @if (target(); as t) {
-      <ion-card class="target-card">
-        <ion-card-content>
-          <div class="target-card__kcal">
-            <span class="num">{{ t.kcal | ntNum:0 }}</span><span class="unit">kcal / Tag</span>
+      <section class="nt-card target-card" aria-label="Tagesziel">
+          <div class="nt-stat target-card__kcal">
+            <span class="nt-stat__value"><span class="nt-stat__num num">{{ t.kcal | ntNum:0 }}</span><span class="nt-stat__unit unit">kcal / Tag</span></span>
           </div>
           @if (savedMinKcalApplied) {
             <p class="target-card__note">Mindestzufuhr aktiv (nur beim Abnehmen): Die Formel läge darunter, das Ziel wurde auf den Mindestwert angehoben.</p>
@@ -23,11 +25,10 @@
             <span><strong>{{ t.fiberG | ntNum:0 }}</strong> g Ballaststoffe</span>
             <span><strong>{{ t.sugarG | ntNum:0 }}</strong> g Zucker gesamt (Richtwert)</span>
           </div>
-        </ion-card-content>
-      </ion-card>
+      </section>
     }
 
-    <app-weight-card (recalculate)="recalculateWithWeight($event)"></app-weight-card>
+    <app-weight-card class="nt-stack__section" (recalculate)="recalculateWithWeight($event)"></app-weight-card>
 
     <h2 class="nt-section-header">Ziele &amp; KI</h2>
     <ion-list class="nt-grouped" lines="full">
@@ -36,13 +37,28 @@
         <ion-label>
           Mein Profil
           @if (profileGoalLabel(); as goal) { <p class="row-sub">Ziel: {{ goal }}</p> }
+          @if (dietSummary(); as diet) { <p class="row-sub" data-testid="diet-summary">Ernährung: {{ diet }}</p> }
         </ion-label>
         <ion-note slot="end" class="row-note">{{ target() ? (target()!.kcal | ntNum:0) + ' kcal/Tag' : 'Einrichten' }}</ion-note>
       </ion-item>
       <app-ai-status-row></app-ai-status-row>
+      <ion-item lines="none" data-testid="consent-row">
+        <ion-icon slot="start" name="shield-checkmark-outline"></ion-icon>
+        <ion-label class="ion-text-wrap">
+          Online- und KI-Funktionen
+          <p class="row-sub" data-testid="consent-status">{{ consentStatus() }}</p>
+        </ion-label>
+      </ion-item>
+      @if (consentStored()) {
+        <ion-item lines="none" class="consent-actions">
+          <button type="button" class="nt-btn nt-btn--text" data-testid="consent-revoke" (click)="revokeConsent()">Zustimmung widerrufen</button>
+        </ion-item>
+      } @else if (!consentMinor()) {
+        <ion-item lines="none" class="consent-actions">
+          <button type="button" class="nt-btn nt-btn--tonal" data-testid="consent-grant" (click)="grantConsent()">Zustimmen</button>
+        </ion-item>
+      }
     </ion-list>
-
-    <app-recipe-search-settings></app-recipe-search-settings>
 
     <h2 class="nt-section-header">Einheiten</h2>
     <ion-list class="nt-grouped" lines="none">
@@ -77,6 +93,10 @@
         <ion-icon slot="start" name="document-text-outline"></ion-icon>
         <ion-label>Nutzungsbedingungen</ion-label>
       </ion-item>
+      <ion-item button detail="true" data-testid="open-sources" (click)="infoSection.set('quellen')">
+        <ion-icon slot="start" name="library-outline"></ion-icon>
+        <ion-label>Quellen und Lizenzen</ion-label>
+      </ion-item>
     </ion-list>
 
     <h2 class="nt-section-header">Daten</h2>
@@ -87,6 +107,9 @@
           Backup exportieren
           <p class="row-sub">{{ lastBackupLabel() }}</p>
         </ion-label>
+      </ion-item>
+      <ion-item lines="none" data-testid="backup-warning">
+        <ion-label class="ion-text-wrap"><p class="row-sub">Die Datei ist nicht verschlüsselt und enthält dein Profil und alle Einträge. Teile sie nur mit Menschen, denen du vertraust.</p></ion-label>
       </ion-item>
       <ion-item button detail="false" [disabled]="backupBusy()" (click)="backupInput.click()">
         <ion-icon slot="start" name="cloud-upload-outline"></ion-icon>
@@ -171,6 +194,7 @@
           @case ('anleitung') { Anleitung }
           @case ('datenschutz') { Datenschutzerklärung }
           @case ('agb') { Nutzungsbedingungen }
+          @case ('quellen') { Quellen und Lizenzen }
           @case ('hilfe') { Hilfe & Kontakt }
         }
       </h2>
@@ -190,24 +214,9 @@
             <p>5. <strong>Einkauf</strong> — „Wochenplan“ sucht eiweißreiche Rezepte und setzt alle Zutaten auf die „Liste“. Dort hakst du beim Einkaufen ab.</p>
             <p>6. <strong>Backup</strong> — alle Daten liegen nur auf diesem Gerät. Exportiere unter „Profil“ regelmäßig ein Backup.</p>
           }
-          @case ('datenschutz') {
-            <h3>Datenschutzerklärung</h3>
-            <p><strong>Verantwortlich:</strong> Jakob Baumgartner, baumgartner.jakob12&#64;gmail.com</p>
-            <p><strong>Lokal gespeichert:</strong> Profil (Gewicht, Größe, Alter, Ziel), Tagebuch, Rezepte und Einstellungen liegen <strong>nur auf deinem Gerät</strong> (Browser-Speicher). Wir haben keinen Zugriff darauf. „Alle lokalen Daten zurücksetzen“ löscht alles auf diesem Gerät, auch gespeicherte Mahlzeiten und eigene Lebensmittel.</p>
-            <p><strong>Lebensmittelsuche:</strong> Dein Suchbegriff geht über unseren Proxy (Cloudflare Worker, Cloudflare Inc. als Auftragsverarbeiter, USA) an Open Food Facts. Dabei werden technisch deine IP-Adresse und der Suchbegriff verarbeitet. Suchergebnisse werden bis zu 1 Stunde zwischengespeichert, ohne Bezug zu deiner Person. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Bereitstellung der Funktion).</p>
-            <p><strong>Barcode &amp; Preise:</strong> Barcode-Abfragen gehen direkt an Open Food Facts bzw. Open Prices (openfoodfacts.org, gemeinnützig, Frankreich). Dabei wird deine IP-Adresse übertragen.</p>
-            <p><strong>Rezeptsuche (spoonacular) &amp; Wochenplan:</strong> Dein Suchbegriff und die gewählten Filter (z. B. Kalorien, Diät, Zubereitungszeit, Mindest-Eiweiß, ggf. aus deinem Eiweißziel abgeleitet) gehen über unseren Proxy (Cloudflare Worker) an spoonacular (spoonacular API). Dabei werden technisch deine IP-Adresse und diese Suchparameter verarbeitet; Antworten werden bis zu 6 Stunden ohne Bezug zu deiner Person zwischengespeichert. Hinterlegst du einen eigenen spoonacular-Key, geht die Anfrage direkt von deinem Gerät an spoonacular. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO.</p>
-            <p><strong>KI-Funktionen (optional):</strong> Nur wenn du sie nutzt, werden die jeweiligen Inhalte (Rezepttext oder -link, Etikett- oder Rezeptfoto, Einkaufs- und Fastfood-Wünsche) über den Proxy an Google Gemini (Google LLC, Gemini API) gesendet; im kostenlosen Kontingent darf Google diese Eingaben laut seinen Bedingungen zur Produktverbesserung nutzen; beim Fastfood-Helfer wird zusätzlich das verbleibende Kalorien-Budget übertragen. Google und Cloudflare sitzen in den USA, es kann also eine Übermittlung in ein Drittland stattfinden. Gesundheitsdaten wie Gewicht oder Größe werden dabei <strong>nicht</strong> übertragen. KI-Ergebnisse sind automatisch erzeugt und können falsch sein — bitte prüfen.</p>
-            <p><strong>Hosting:</strong> Die Web-App wird über GitHub Pages (GitHub Inc.) ausgeliefert. Dabei fallen Server-Logs mit IP-Adressen an.</p>
-            <p><strong>Deine Rechte:</strong> Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch und Datenübertragbarkeit (Art. 15–21 DSGVO). Kontakt per E-Mail. Beschwerden kannst du bei der österreichischen Datenschutzbehörde (dsb.gv.at) einreichen.</p>
-          }
-          @case ('agb') {
-            <h3>Nutzungsbedingungen</h3>
-            <p>NutriTrack ist ein persönliches Ernährungstagebuch und dient ausschließlich zur Information. Es ist <strong>kein Medizinprodukt</strong> und ersetzt keine professionelle Ernährungs-, Gesundheits- oder ärztliche Beratung.</p>
-            <p>Die berechneten Kalorienbedarfe sind Schätzwerte auf Basis anerkannter Formeln (Mifflin-St Jeor). Individuelle Abweichungen sind möglich.</p>
-            <p>Nährwertdaten stammen von <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (Lizenz: Open Database License, ODbL; Produktfotos: CC BY-SA). Sie werden von Freiwilligen gepflegt und können unvollständig oder fehlerhaft sein.</p>
-            <p>Die App wird ohne Gewähr bereitgestellt. Die Haftung für leichte Fahrlässigkeit ist ausgeschlossen, soweit gesetzlich zulässig.</p>
-          }
+          @case ('datenschutz') { <app-legal-info section="datenschutz"></app-legal-info> }
+          @case ('agb') { <app-legal-info section="agb"></app-legal-info> }
+          @case ('quellen') { <app-legal-info section="quellen"></app-legal-info> }
           @case ('hilfe') {
             <h3>Hilfe &amp; Kontakt</h3>
             <p>Bei Fragen oder Problemen wende dich an:</p>

@@ -1,16 +1,5 @@
-// Klickfläche >= 44x44; das sichtbare Icon bleibt kompakt.
-.touch-btn {
-  --padding-start: 0;
-  --padding-end: 0;
-  min-width: 44px;
-  height: 44px;
-  margin: 0;
-}
-
 ion-content {
   --background: var(--nt-ground);
-  --padding-start: var(--nt-space-4);
-  --padding-end: var(--nt-space-4);
 }
 
 /* --- Empty state --- */
@@ -20,7 +9,7 @@ ion-content {
   align-items: center;
   text-align: center;
   gap: 10px;
-  padding: 48px 20px;
+  padding: 48px var(--nt-space-4);
 
   &__icon {
     font-size: 56px;
@@ -47,55 +36,13 @@ ion-content {
   }
 }
 
-/* --- Kopf: Grosstitel + Eintragen-Pille --- */
-.head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--nt-space-3);
-  flex-wrap: wrap;
-  padding: var(--nt-space-2) 4px var(--nt-space-4);
-
-  &__text {
-    min-width: 0;
-
-    .nt-large-title {
-      font-size: min(var(--nt-fs-large-title), 11vw);
-    }
-  }
-
-  &__add {
-    flex: none;
-
-    ion-icon {
-      font-size: 20px;
-    }
-  }
-}
-
-// Gruppen/Header sitzen im Content-Padding; die globalen Seitenränder entfallen hier.
-.nt-grouped {
-  margin-left: 0;
-  margin-right: 0;
-}
-
-.nt-section-header {
-  margin-left: var(--nt-space-5);
-  margin-right: var(--nt-space-5);
-}
-
-.nav-date {
-  font-size: var(--nt-fs-body);
-  font-weight: 600;
-}
-
 /* --- Hero: kcal übrig, ohne Karte auf dem Grund --- */
 .hero {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
   gap: var(--nt-space-3);
-  padding: var(--nt-space-2) 4px var(--nt-space-4);
+  padding: 0;
 
   &__item {
     min-width: 0;
@@ -106,9 +53,6 @@ ion-content {
   }
 
   &__main {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
     min-height: var(--nt-touch);
     padding: 0;
     border: 0;
@@ -141,19 +85,12 @@ ion-content {
     display: inline-block;
     margin-top: var(--nt-space-1);
     padding: 2px 10px;
-    border-radius: 999px;
+    border-radius: var(--nt-radius-pill);
     font-size: var(--nt-fs-caption);
     font-weight: 600;
     color: var(--nt-over);
     background: color-mix(in srgb, var(--nt-over) 12%, transparent);
     vertical-align: middle;
-  }
-
-  &__unit {
-    margin-top: 6px;
-    font-size: var(--nt-fs-headline);
-    font-weight: 500;
-    color: var(--nt-ink);
   }
 
   &__meta {
@@ -187,8 +124,6 @@ ion-content {
   display: flex;
   flex-direction: column;
   gap: var(--nt-space-4);
-  margin: 0;
-  padding: var(--nt-space-4) var(--nt-space-1);
 
   &__primary {
     display: grid;
@@ -199,12 +134,10 @@ ion-content {
     display: flex;
     flex-direction: column;
     gap: var(--nt-space-1);
-    padding: 0 var(--nt-space-3);
   }
 
   &__share {
     margin: 0;
-    padding: 0 var(--nt-space-3);
     text-align: center;
     font-size: var(--nt-fs-caption);
     line-height: 18px;
@@ -427,13 +360,6 @@ ion-content {
 }
 
 /* --- Breite Screens: Inhalt begrenzen, im Querformat zwei Spalten (Ringe | Mahlzeiten) --- */
-@media (min-width: 768px) {
-  .page {
-    max-width: 720px;
-    margin: 0 auto;
-  }
-}
-
 @media (min-width: 768px) and (orientation: landscape) {
   .page {
     display: grid;
@@ -441,14 +367,15 @@ ion-content {
     column-gap: var(--nt-space-5);
     align-items: start;
 
-    > .head,
+    > nt-date-nav,
+    > nt-backup-reminder,
     > .hero {
       grid-column: 1 / -1;
     }
 
     > .macros {
       grid-column: 1;
-      grid-row: 3 / span 10;
+      grid-row: 4 / span 10;
     }
 
     > .nt-section-header,

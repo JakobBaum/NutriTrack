@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseNutritionLabel } from './nutrition-label-parser';
-import { UPLOAD_JPEG_QUALITY, UPLOAD_MAX_EDGE_PX, downscaleFactor, shrinkPhotoForUpload, type PhotoShrinkDeps } from './label-image';
+import { PHOTO_PREPARE_ERROR, UPLOAD_JPEG_QUALITY, UPLOAD_MAX_EDGE_PX, downscaleFactor, shrinkPhotoForUpload, type PhotoShrinkDeps } from './label-image';
 import { LABEL_FAILED_MESSAGE, LABEL_READ_HINT, blankFieldsFor, evaluateLabelParse } from './label-scan';
 
 describe('evaluateLabelParse', () => {
@@ -60,9 +60,16 @@ describe('shrinkPhotoForUpload', () => {
     };
   }
 
-  it('returns photos within the limit unchanged', async () => {
-    const { deps: d } = deps(1200, 900);
-    expect(await shrinkPhotoForUpload('ORIGINAL', 1600, d)).toBe('ORIGINAL');
+  it('re-encodes photos within the limit too, so EXIF data (location) is dropped', async () => {
+    const { deps: d, canvas } = deps(1200, 900);
+    expect(await shrinkPhotoForUpload('ORIGINAL', 1600, d)).toBe('SMALL');
+    expect(canvas.width).toBe(1200);
+    expect(canvas.height).toBe(900);
+  });
+
+  it('never returns the original base64 for a small photo', async () => {
+    const { deps: d } = deps(100, 80);
+    expect(await shrinkPhotoForUpload('ORIGINAL', 1600, d)).not.toBe('ORIGINAL');
   });
 
   it('scales large photos to the max edge and returns the re-encoded JPEG', async () => {
@@ -86,8 +93,17 @@ describe('shrinkPhotoForUpload', () => {
     expect(calls[0]).toEqual(['image/jpeg', 0.7]);
   });
 
-  it('falls back to the original when the image cannot be processed', async () => {
+  it('throws a clear error instead of sending the original when the image cannot be processed', async () => {
     const failing: PhotoShrinkDeps = { load: async () => { throw new Error('bad'); }, createCanvas: () => document.createElement('canvas') };
-    expect(await shrinkPhotoForUpload('ORIGINAL', 1600, failing)).toBe('ORIGINAL');
+    await expect(shrinkPhotoForUpload('ORIGINAL', 1600, failing)).rejects.toThrow(PHOTO_PREPARE_ERROR);
+  });
+
+  it('throws when the canvas yields no JPEG data', async () => {
+    const canvas = { width: 0, height: 0, toDataURL: () => 'data:,' };
+    const empty: PhotoShrinkDeps = {
+      load: async () => ({ width: 10, height: 10, draw: () => undefined }),
+      createCanvas: () => canvas as unknown as HTMLCanvasElement,
+    };
+    await expect(shrinkPhotoForUpload('ORIGINAL', 1600, empty)).rejects.toThrow(PHOTO_PREPARE_ERROR);
   });
 });

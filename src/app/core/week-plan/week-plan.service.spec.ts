@@ -5,6 +5,7 @@ import { RecipeSearchAccessService } from '../recipes/online/recipe-search-acces
 import { OnlineSearchError } from '../recipes/online/spoonacular.errors';
 import { OnlineRecipe } from '../recipes/online/online-recipe.model';
 import { SpoonacularProvider } from '../recipes/online/spoonacular.provider';
+import { ProfileStore } from '../state/profile.store';
 import { ShoppingStore } from '../state/shopping.store';
 import { WeekPlanStore } from '../state/week-plan.store';
 import { NO_RECIPES_FOUND_MESSAGE, WeekPlanService } from './week-plan.service';
@@ -42,6 +43,19 @@ describe('WeekPlanService.generate', () => {
     expect(TestBed.inject(WeekPlanStore).plan()?.id).toBe(plan.id);
     expect(itemCount).toBe(TestBed.inject(ShoppingStore).list()?.items.length);
     expect(itemCount).toBeGreaterThanOrEqual(3);
+  });
+
+  it('reicht Ernährungsform, Unverträglichkeiten und Abneigungen aus dem Profil an die Suche', async () => {
+    const search = vi.fn().mockResolvedValue({ recipes: [recipe('1'), recipe('2')], totalResults: 2, quotaLeft: null });
+    const service = setup(search);
+    TestBed.inject(ProfileStore).setProfile({
+      weightKg: 70, heightCm: 175, age: 30, sex: 'male', activityLevel: 'moderate', goal: 'maintain', updatedAt: '',
+      diet: 'vegetarian', intolerances: ['gluten'], dislikes: ['Pilze'], dislikesEn: ['mushrooms'],
+    });
+
+    await service.generate(OPTS);
+
+    expect(search.mock.calls[0][0]).toMatchObject({ diet: 'vegetarian', intolerances: ['gluten'], excludeIngredients: ['mushrooms'] });
   });
 
   it('throws the "not set up" error without any request when online search is unavailable', async () => {

@@ -17,7 +17,8 @@
   // Freiraum unten, damit Inhalt nicht unter der Kapsel-Tab-Bar verschwindet (Bar 64 + 8 + 24 Luft).
   --nt-tabbar-clearance: calc(var(--ion-safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 96px);
   // FAB: 16 px ueber der Tab-Bar (Bar-Oberkante = Safe-Area + 8 + 64).
-  --nt-fab-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px + var(--nt-tabbar-height) + var(--nt-space-4));
+  --nt-fab-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px + var(--nt-tabbar-height) + var(--nt-fab-lift));
+  --nt-fab-lift: 16px; // Abstand FAB -> Tab-Bar, auch auf Kompaktphones 16
 }
 
 // Einheitliches Eingabefeld: ion-input, ion-select, ion-textarea mit Klasse .nt-field.
@@ -113,41 +114,7 @@ ion-select::after {
   .nt-field { transition: none; }
 }
 
-// Seitencontainer: 720 px Maximum, zentriert, 16 px Seitenrand.
-.nt-page {
-  box-sizing: border-box;
-  width: 100%;
-  max-width: var(--nt-page-max);
-  margin: 0 auto;
-  padding-inline: var(--nt-page-gutter);
-}
-
-// Seitenkopf: Titel und Aktion in einer Zeile, oben mit Safe-Area (nie weniger als 12 px).
-.nt-page-header {
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--nt-space-3);
-  flex-wrap: wrap;
-  width: 100%;
-  max-width: var(--nt-page-max);
-  margin: 0 auto;
-  padding: max(var(--nt-space-3), env(safe-area-inset-top, 0px)) var(--nt-page-gutter) var(--nt-space-2);
-
-  > .nt-large-title {
-    flex: 1 1 auto;
-    min-width: 0;
-    // Bei großer Systemschrift auf schmalen Phones nie mitten im Wort umbrechen.
-    font-size: min(var(--nt-fs-large-title), 11vw);
-    overflow-wrap: break-word;
-  }
-
-  > ion-button,
-  > .nt-page-header__action {
-    flex: none;
-  }
-}
+// Seitencontainer, Seitenkopf, Stapel, Karten, FAB, Kennzahl: src/styles/layout.scss. Buttons: src/styles/buttons.scss.
 
 // Modal-Kopf (Sheet): Start / Titel / Ende. Seitenspalten nach Inhalt (mind. 40 px Tippflaeche), der Titel
 // nimmt den Rest und kuerzt mit Ellipsis, damit er nie unter einer Schaltflaeche liegt (iPhone SE, 320 px).
@@ -205,55 +172,9 @@ ion-modal:not(.barcode-fullscreen-modal):not(.cook-fullscreen-modal).nt-date-mod
   }
 }
 
-// Einheitlicher Sekundaer-Button "Hinzufuegen" (button und ion-button).
-.nt-add-btn {
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  min-height: var(--nt-touch);
-  padding: 0 var(--nt-page-gutter);
-  border: 0;
-  border-radius: var(--nt-radius-pill);
-  background: var(--nt-accent-tint);
-  color: var(--ion-color-primary-shade);
-  font: inherit;
-  font-size: var(--nt-fs-headline);
-  font-weight: 600;
-  cursor: pointer;
-
-  &:active { opacity: 0.7; }
-  &:disabled { opacity: 0.4; cursor: default; }
-  &:focus-visible { outline: 2px solid var(--nt-focus); outline-offset: 2px; }
-}
-
-ion-button.nt-add-btn {
-  --background: var(--nt-accent-tint);
-  --background-activated: var(--nt-accent-tint);
-  --background-hover: var(--nt-accent-tint);
-  --background-focused: var(--nt-accent-tint);
-  --color: var(--ion-color-primary-shade);
-  --box-shadow: none;
-  --border-radius: var(--nt-radius-pill);
-  width: 100%;
-  font-weight: 600;
-
-  &::part(native) {
-    background: var(--background);
-    color: var(--color);
-  }
-}
-
 // Tab-Bar-Freiraum fuer Scroll-Container ausserhalb von ion-content.
 .nt-tab-clearance {
   padding-bottom: var(--nt-tabbar-clearance);
-}
-
-// FAB ueber der Tab-Bar (16 px Abstand). Auf der Seite zusaetzlich ausblenden, wenn ein Generator/Sheet offen ist.
-:root ion-fab.nt-fab-offset {
-  bottom: var(--nt-fab-bottom);
 }
 
 // Preis-Dialog (ion-alert mit Eingabe): Feld im Stil von .nt-field statt Ionic-Standardrahmen.

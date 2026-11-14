@@ -17,7 +17,7 @@
     height: 36px;
     padding: 0;
     border: none;
-    border-radius: var(--nt-radius-pill);
+    border-radius: var(--nt-radius-inner); // sitzt in Karten: abgerundetes Rechteck statt Kreis
     background: var(--nt-accent-tint);
     color: var(--nt-accent);
     font-size: 20px;

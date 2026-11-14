@@ -189,6 +189,7 @@
             <p class="form-note"><span class="ai-badge">mind.</span> Einige Zutaten haben keine Nährwerte — die Summe ist eine Untergrenze.</p>
           }
           @if (formHint()) { <p class="scan-hint">{{ formHint() }}</p> }
+          @if (sourceNote()) { <p class="scan-hint" data-testid="source-note">{{ sourceNote() }}</p> }
 
           <ion-list class="diary-list" lines="none">
             <ion-item lines="none">
@@ -258,9 +259,11 @@
 
     @if (view() === 'form') {
       <ion-footer class="ion-no-border add-footer">
-        <ion-toolbar>
-          <ion-button expand="block" class="add-footer__save" (click)="save()">Eintragen</ion-button>
-        </ion-toolbar>
+        <div class="nt-page">
+          <div class="nt-sheet-footer">
+            <ion-button expand="block" class="nt-btn nt-btn--block add-footer__save" (click)="save()">Eintragen</ion-button>
+          </div>
+        </div>
       </ion-footer>
     }
   </ng-template>

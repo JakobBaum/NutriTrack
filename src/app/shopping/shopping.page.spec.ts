@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
+import { AiService } from '../core/ai/ai.service';
 import { RecipeStore } from '../core/state/recipe.store';
 import { ShoppingStore } from '../core/state/shopping.store';
 import { ShoppingPage } from './shopping.page';
@@ -350,6 +351,23 @@ describe('ShoppingPage manual add sanity', () => {
     page.newItemName = '   ';
     page.addManual();
     expect(store.list()).toBeNull();
+  });
+});
+
+describe('ShoppingPage mit KI, aber ohne eigene Rezepte', () => {
+  it('sperrt den Plan und sendet keine Anfrage mit leerer Rezeptliste', async () => {
+    // Arrange
+    vi.spyOn(TestBed.inject(AiService), 'isLive').mockReturnValue(true);
+    const { page, store } = createPage();
+    const generatePlan = vi.spyOn(store, 'generatePlan');
+
+    // Act
+    await page.generate();
+
+    // Assert
+    expect(page.live()).toBe(true);
+    expect(page.noRecipesBlock()).toBe(true);
+    expect(generatePlan).not.toHaveBeenCalled();
   });
 });
 

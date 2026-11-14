@@ -87,6 +87,11 @@
   justify-content: center;
 }
 
+// Einziger Weg zur Eingabe von Hand: volle Tippfläche.
+.bc-manual-btn {
+  min-height: var(--nt-touch);
+}
+
 .bc-manual-panel {
   position: absolute;
   bottom: 0;
@@ -276,7 +281,7 @@ textarea {
 /* --- Primäre Buttons: vollflächiges Akzent-Teal, weißer Text (5.2:1), kein Verlauf/Glow --- */
 // „Primär“ = ohne color-Attribut, color="primary" oder .ion-color-primary.
 // Toolbar-Buttons (ion-buttons) bleiben Text-Buttons und werden unten behandelt.
-ion-button:not([fill='outline']):not([fill='clear']):not(ion-buttons ion-button):not(.nt-add-btn):is(
+ion-button:not([fill='outline']):not([fill='clear']):not(ion-buttons ion-button):not(.nt-add-btn):not(.nt-btn--tonal):not(.nt-btn--text):is(
     :not([color]),
     [color='primary'],
     .ion-color-primary

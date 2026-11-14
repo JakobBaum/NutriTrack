@@ -187,3 +187,47 @@ ion-item {
 .form-actions {
   padding: var(--nt-space-6) 0;
 }
+
+// Tippflaeche im Ernaehrungsabschnitt: immer 44 px, auch auf kompakten Telefonen (dort ist --nt-touch kleiner).
+.profile-sheet {
+  --diet-tap-min: 44px;
+}
+
+.diet-chip {
+  min-height: var(--diet-tap-min);
+}
+
+// Abneigungen: Eingabe (min. 16 px gegen iOS-Zoom, 44 px Tippflaeche) und entfernbare Chips.
+.dislike-add {
+  display: flex;
+  align-items: center;
+  gap: var(--nt-space-2);
+  margin-top: var(--nt-space-2);
+  min-width: 0;
+}
+
+ion-input.dislike-input {
+  --min-height: var(--diet-tap-min);
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: var(--diet-tap-min);
+  font-size: max(16px, var(--nt-fs-body));
+  --background: var(--nt-card);
+  --padding-start: var(--nt-space-3);
+  --padding-end: var(--nt-space-3);
+  border-radius: var(--nt-radius-inner);
+}
+
+.dislike-add__btn {
+  flex: 0 0 auto;
+  min-height: var(--diet-tap-min);
+}
+
+.dislike-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nt-space-1);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: start;
+}
