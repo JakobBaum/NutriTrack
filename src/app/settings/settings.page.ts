@@ -5,6 +5,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
 import { AlertController } from '@ionic/angular';
 import { filter } from 'rxjs';
+import { describeDietPrefs } from '../core/diet/diet-search';
+import { dietPrefsOf } from '../core/diet/diet-prefs';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { RecipeStore } from '../core/state/recipe.store';
@@ -68,6 +70,7 @@ export class SettingsPage implements OnInit {
 
   readonly target = this.profileStore.target;
   /** Ziel des gespeicherten Profils als Lesetext (z. B. „Abnehmen“), sonst null. */
+  readonly dietSummary = computed(() => describeDietPrefs(dietPrefsOf(this.profileStore.profile())));
   readonly profileGoalLabel = computed(() => goalLabel(this.profileStore.profile()?.goal));
   /** Das Tagesziel ist ganz oder teilweise manuell festgelegt (Karte zeigt „manuell“). */
   readonly isManualTarget = computed(() => hasManualTarget(this.profileStore.profile()));

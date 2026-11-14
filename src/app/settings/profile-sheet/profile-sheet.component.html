@@ -147,6 +147,37 @@
           <ion-button fill="clear" size="small" data-testid="target-reset" (click)="resetToFormula()">Auf Formel zurücksetzen</ion-button>
         }
 
+        <h2 class="nt-section-header">Ernährung</h2>
+        <ion-list class="nt-grouped settings-form">
+          <ion-item class="form-row" lines="none">
+            <ion-select label="Ernährungsform" labelPlacement="stacked" data-testid="diet-select" [value]="form().dietPrefs.diet" (ionChange)="setDiet($any($event).detail.value ?? '')" interface="action-sheet" cancelText="Abbrechen">
+              @for (d of dietOptions; track d.value) {
+                <ion-select-option [value]="d.value">{{ d.label }}</ion-select-option>
+              }
+            </ion-select>
+          </ion-item>
+        </ion-list>
+        <p class="row-sub row-sub--block" id="intolerance-label">Unverträglichkeiten</p>
+        <div class="rate-chips" role="group" aria-labelledby="intolerance-label" data-testid="intolerances">
+          @for (o of intoleranceOptions; track o.value) {
+            <button type="button" class="rate-chip diet-chip" [class.rate-chip--on]="form().dietPrefs.intolerances.includes(o.value)" [attr.aria-pressed]="form().dietPrefs.intolerances.includes(o.value)" [attr.data-testid]="'intolerance-' + o.value" (click)="toggleIntolerance(o.value)">{{ o.label }}</button>
+          }
+        </div>
+        <p class="hint" data-testid="intolerance-hint">{{ intoleranceHint }}</p>
+        <p class="row-sub row-sub--block" id="dislike-label">Mag ich nicht</p>
+        <div class="dislike-add">
+          <ion-input class="dislike-input" type="text" enterkeyhint="done" autocomplete="off" aria-label="Zutat, die du nicht magst" placeholder="z. B. Pilze" data-testid="dislike-input"
+            [maxlength]="maxDislikeLength" [value]="dislikeInput()" [disabled]="dislikeLimitReached()"
+            (ionInput)="dislikeInput.set($any($event).detail.value ?? '')" (keydown.enter)="addDislike()"></ion-input>
+          <ion-button class="nt-btn nt-btn--tonal nt-btn--inner dislike-add__btn" data-testid="dislike-add" [disabled]="dislikeLimitReached() || dislikeInput().trim() === ''" (click)="addDislike()">Hinzufügen</ion-button>
+        </div>
+        <div class="rate-chips" role="list" aria-labelledby="dislike-label" data-testid="dislike-chips">
+          @for (d of form().dietPrefs.dislikes; track d; let i = $index) {
+            <button type="button" role="listitem" class="rate-chip rate-chip--on diet-chip dislike-chip" [attr.aria-label]="d + ' entfernen'" (click)="removeDislike(i)">{{ d }}<ion-icon name="close-outline" aria-hidden="true"></ion-icon></button>
+          }
+        </div>
+        <p class="hint" data-testid="diet-hint">{{ dietHint }}</p>
+
         @for (note of notes(); track note.code) {
           <p class="hint hint--warn" role="status">{{ note.text }}</p>
         }
@@ -166,8 +197,8 @@
           <p class="hint" role="status">Bitte Gewicht, Größe und Alter angeben.</p>
         }
         <div class="nt-sheet-footer">
-          <ion-button class="nt-btn nt-btn--block" expand="block" data-testid="profile-save" (click)="save()">
-            Speichern
+          <ion-button class="nt-btn nt-btn--block" expand="block" data-testid="profile-save" [disabled]="saving()" (click)="save()">
+            {{ saving() ? 'Speichern …' : 'Speichern' }}
           </ion-button>
         </div>
       </div>

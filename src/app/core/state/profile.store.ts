@@ -1,5 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { DailyTarget, UserProfile } from '../models';
+import { sanitizeProfileDiet } from '../diet/diet-prefs';
 import { NutritionCalcService } from '../nutrition/nutrition-calc.service';
 import { StorageService } from '../storage/storage.service';
 
@@ -15,9 +16,7 @@ export class ProfileStore {
   private readonly storage = inject(StorageService);
   private readonly calc = inject(NutritionCalcService);
 
-  private readonly _profile = signal<UserProfile | null>(
-    this.storage.get<UserProfile | null>(KEY_PROFILE, null),
-  );
+  private readonly _profile = signal<UserProfile | null>(this.load());
 
   /** Aktuelles Profil (oder null, wenn noch kein Onboarding erfolgt ist). */
   readonly profile = this._profile.asReadonly();
@@ -36,6 +35,12 @@ export class ProfileStore {
     const next: UserProfile = { ...profile, updatedAt: new Date().toISOString() };
     this._profile.set(next);
     this.storage.set(KEY_PROFILE, next);
+  }
+
+  /** Liest das Profil; Ernährungsangaben werden bereinigt (alte Profile ohne diese Felder bleiben unverändert). */
+  private load(): UserProfile | null {
+    const stored = this.storage.get<UserProfile | null>(KEY_PROFILE, null);
+    return stored ? sanitizeProfileDiet(stored) : null;
   }
 
   /** Setzt das Profil zurück (für "Daten zurücksetzen"). */

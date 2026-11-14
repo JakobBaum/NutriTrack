@@ -28,9 +28,12 @@ const TRANSLATION_CACHE_KEY = 'translations';
 export const AUTO_SNAPSHOT_KEY = 'autosnapshot';
 /** Zeitpunkt, bis zu dem die Backup-Erinnerung ruht. */
 export const REMINDER_SNOOZE_KEY = 'backupReminderSnooze';
+/** Früherer eigener Rezeptsuche-Key (entfernt): wird weder exportiert noch importiert. */
+const RECIPE_SEARCH_KEY = 'recipe-search-config';
 const NEVER_BACKED_UP_KEYS: ReadonlySet<string> = new Set([
   LAST_BACKUP_KEY,
   AI_KEY,
+  RECIPE_SEARCH_KEY,
   TRANSLATION_CACHE_KEY,
   SCHEMA_KEY,
   AUTO_SNAPSHOT_KEY,
@@ -38,7 +41,6 @@ const NEVER_BACKED_UP_KEYS: ReadonlySet<string> = new Set([
 ]);
 /** Geräte-interne Schlüssel (Meta, Auto-Sicherung, Quarantäne): weder Export noch Import. */
 export const isNeverBackedUp = (key: string): boolean => NEVER_BACKED_UP_KEYS.has(key) || isQuarantineKey(key);
-const RECIPE_SEARCH_KEY = 'recipe-search-config';
 
 /** Gespeicherte Daten: Schlüssel (ohne Präfix) → bereits geparster JSON-Wert. */
 export type BackupData = Readonly<Record<string, unknown>>;
@@ -98,23 +100,14 @@ export function backupFileName(date: Date): string {
   return `${BACKUP_FORMAT}-${y}-${m}-${d}.json`;
 }
 
-/** Entfernt den eigenen API-Key, damit er nicht in einer geteilten Datei landet. */
-function withoutSecrets(data: BackupData): BackupData {
-  const blank = (d: BackupData, key: string): BackupData => {
-    const entry = d[key];
-    return isPlainObject(entry) && 'apiKey' in entry ? { ...d, [key]: { ...entry, apiKey: '' } } : d;
-  };
-  return blank(data, RECIPE_SEARCH_KEY);
-}
-
-/** Erstellt das Backup-Objekt aus den gespeicherten Daten (ohne Meta-Schlüssel, KI-Verbindung und Secrets). */
+/** Erstellt das Backup-Objekt aus den gespeicherten Daten (ohne Meta-Schlüssel und KI-Verbindung). */
 export function buildBackup(data: BackupData, now: Date): BackupFile {
   const entries = Object.entries(data).filter(([key]) => !isNeverBackedUp(key));
   return {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
     exportedAt: now.toISOString(),
-    data: withoutSecrets(Object.fromEntries(entries)),
+    data: Object.fromEntries(entries),
   };
 }
 
@@ -215,41 +208,9 @@ export function describeCounts(c: BackupCounts): string {
   return parts.join(', ');
 }
 
-/** Übernimmt beim Wiederherstellen den lokalen API-Key, wenn das Backup keinen enthält. */
-function keepLocalKey(restored: BackupData, current: BackupData, key: string): BackupData {
-  const entry = restored[key];
-  const currentEntry = current[key];
-  if (!isPlainObject(entry) || !isPlainObject(currentEntry)) return restored;
-  const hasOwnKey = typeof entry['apiKey'] === 'string' && entry['apiKey'] !== '';
-  const localKey = currentEntry['apiKey'];
-  if (hasOwnKey || typeof localKey !== 'string' || localKey === '') return restored;
-  return { ...restored, [key]: { ...entry, apiKey: localKey } };
-}
-
-/** Felder mit Zieladressen: Sie dürfen nie aus einem Backup kommen (sonst ginge der lokale Key an einen fremden Host). */
-const ENDPOINT_FIELDS: Readonly<Record<string, readonly string[]>> = {
-  [RECIPE_SEARCH_KEY]: ['baseUrl'],
-};
-
-/** Ersetzt Zieladressen des Backups durch die lokalen (oder entfernt sie, wenn lokal keine gesetzt sind). */
-function dropEndpoints(restored: BackupData, current: BackupData): BackupData {
-  return Object.entries(ENDPOINT_FIELDS).reduce<BackupData>((acc, [key, fields]) => {
-    const entry = acc[key];
-    if (!isPlainObject(entry)) return acc;
-    const local = isPlainObject(current[key]) ? (current[key] as Record<string, unknown>) : {};
-    const cleaned = Object.fromEntries(Object.entries(entry).filter(([k]) => !fields.includes(k)));
-    const kept = Object.fromEntries(fields.filter((k) => k in local).map((k) => [k, local[k]]));
-    return { ...acc, [key]: { ...cleaned, ...kept } };
-  }, restored);
-}
-
-/**
- * Daten, die beim Import geschrieben werden: Backup-Inhalt ohne KI-Verbindung, der lokale Rezept-Suche-Key
- * bleibt erhalten, wenn das Backup (wie beim Export üblich) keinen enthält.
- */
-export function prepareRestore(backup: BackupData, current: BackupData): BackupData {
-  const restored = Object.fromEntries(Object.entries(backup).filter(([key]) => !isNeverBackedUp(key)));
-  return dropEndpoints(keepLocalKey(restored, current, RECIPE_SEARCH_KEY), current);
+/** Daten, die beim Import geschrieben werden: Backup-Inhalt ohne Geräte-interne Schlüssel (KI-Verbindung, Meta, Quarantäne). */
+export function prepareRestore(backup: BackupData): BackupData {
+  return Object.fromEntries(Object.entries(backup).filter(([key]) => !isNeverBackedUp(key)));
 }
 
 /** Formatiert ein ISO-Datum als "06.11.2026, 14:05" (lokal); `null` bei ungültiger Eingabe. */

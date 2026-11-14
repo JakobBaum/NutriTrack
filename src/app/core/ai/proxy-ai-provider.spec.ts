@@ -30,6 +30,31 @@ beforeEach(() => {
 
 afterEach(() => http.verify());
 
+const GOOD = {
+  restaurant: 'KFC', itemName: 'Wrap', rationale: 'ok', estPrice: 4,
+  facts: { kcal: 440, proteinG: 25, carbsG: 34, fatG: 23, basis: 'perPortion' },
+};
+
+describe('ProxyAiProvider — suggestFastfood prueft die Antwort', () => {
+  it('filtert ungueltige Eintraege heraus', async () => {
+    const p = provider.suggestFastfood(REQ);
+    http.expectOne(PROXY).flush([GOOD, { ...GOOD, itemName: '' }, { ...GOOD, facts: { ...GOOD.facts, kcal: 5 } }]);
+    expect((await p).map((s) => s.itemName)).toEqual(['Wrap']);
+  });
+
+  it('wirft eine verstaendliche Meldung, wenn kein Eintrag brauchbar ist', async () => {
+    const p = provider.suggestFastfood(REQ);
+    http.expectOne(PROXY).flush([{ ...GOOD, itemName: '' }]);
+    await expect(p).rejects.toThrow(/unbrauchbar/);
+  });
+
+  it('wirft bei einer Antwort, die kein Array ist', async () => {
+    const p = provider.suggestFastfood(REQ);
+    http.expectOne(PROXY).flush({ error: 'x' });
+    await expect(p).rejects.toThrow(/unbrauchbar/);
+  });
+});
+
 describe('ProxyAiProvider', () => {
   it('wirft ohne Proxy-URL', async () => {
     setProxy('  ');
@@ -54,7 +79,7 @@ describe('ProxyAiProvider', () => {
     const reqs = http.match(PROXY);
     expect(reqs.map((r) => r.request.body.fn)).toEqual(cases.map(([, fn]) => fn));
     expect(reqs[1].request.body.payload).toEqual({ imageBase64: 'b64', basis: 'per100g' });
-    reqs.forEach((r) => r.flush({}));
+    reqs.forEach((r) => r.flush(r.request.body.fn === 'suggestFastfood' ? [] : {}));
     await Promise.all(cases.map(([p]) => p));
   });
 

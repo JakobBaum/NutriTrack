@@ -1,6 +1,8 @@
 import { Component, DestroyRef, inject } from '@angular/core';
 import { showKeyboardDoneBar } from './core/keyboard/keyboard-accessory';
 import { reducedMotionQuery, setIonicAnimated, watchReducedMotion } from './core/motion/reduced-motion';
+import { removeLegacyRecipeSearchConfig } from './core/state/legacy-storage-cleanup';
+import { StorageService } from './core/storage/storage.service';
 import { StoragePersistenceService } from './core/storage/storage-persistence.service';
 
 @Component({
@@ -11,6 +13,7 @@ import { StoragePersistenceService } from './core/storage/storage-persistence.se
 })
 export class AppComponent {
   constructor() {
+    removeLegacyRecipeSearchConfig(inject(StorageService));
     void inject(StoragePersistenceService).request();
     void showKeyboardDoneBar();
     // Systemwunsch „Bewegung reduzieren“ auch zur Laufzeit übernehmen (Ionic-Animationen).

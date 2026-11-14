@@ -1,2 +1,18 @@
 @use '../diary-sheets';
 @use '../diary-sheet-flows';
+
+// Kennzeichnung "über Budget" am Vorschlag und Bereich "Weitere Vorschläge".
+.ff-over {
+  display: inline-block;
+  margin-left: var(--nt-space-2);
+  padding: 2px var(--nt-space-2);
+  font-size: var(--nt-fs-caption);
+  font-weight: 700;
+  color: var(--ion-color-danger);
+  border: 1px solid currentColor;
+  border-radius: var(--nt-radius-inner);
+}
+
+.ff-more {
+  margin-top: var(--nt-space-3);
+}

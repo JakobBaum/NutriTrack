@@ -15,6 +15,21 @@
       <ion-select-option [value]="other">Anderes…</ion-select-option>
     </ion-select>
   </ion-item>
+  <ion-item lines="none">
+    <ion-select
+      label="Land"
+      labelPlacement="stacked"
+      interface="action-sheet"
+      cancelText="Abbrechen"
+      [interfaceOptions]="{ header: 'Land wählen' }"
+      [value]="form.country"
+      (ionChange)="onCountry($event.detail.value)"
+    >
+      @for (c of countries; track c) {
+        <ion-select-option [value]="c">{{ c }}</ion-select-option>
+      }
+    </ion-select>
+  </ion-item>
   @if (choice === other) {
     <ion-item lines="none">
       <ion-input
@@ -72,21 +87,20 @@
     >Kein Limit</ion-toggle>
   </div>
 
-  <ion-item lines="none">
-    <ion-select
-      label="Priorität"
-      labelPlacement="stacked"
-      interface="action-sheet"
-      cancelText="Abbrechen"
-      [interfaceOptions]="{ header: 'Priorität wählen' }"
-      [value]="preference"
-      (ionChange)="onPreference($event.detail.value)"
-    >
-      @for (p of preferences; track p.value) {
-        <ion-select-option [value]="p.value">{{ p.label }}</ion-select-option>
+  <div class="ff-criteria" role="group" aria-labelledby="ff-criteria-label">
+    <span class="ff-range__label" id="ff-criteria-label">Kriterien (1 bis {{ maxPreferences }})</span>
+    <div class="ff-chips">
+      @for (p of options; track p.value) {
+        <button
+          type="button"
+          class="ff-chip"
+          [class.ff-chip--on]="isSelected(p.value)"
+          [attr.aria-pressed]="isSelected(p.value)"
+          (click)="onTogglePreference(p.value)"
+        >{{ p.label }}</button>
       }
-    </ion-select>
-  </ion-item>
+    </div>
+  </div>
 </div>
 
 @if (!live) {

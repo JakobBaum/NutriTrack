@@ -74,6 +74,11 @@ const RECIPE_ENUM_PARAMS = {
   sort: ['healthiness', 'popularity', 'random'],
   sortDirection: ['asc', 'desc'],
 };
+// Listenparameter (Spiegel: spoonacular.query.ts): nur Buchstaben, Leerzeichen, Komma und Bindestrich, begrenzte Länge.
+const RECIPE_LIST_PARAMS = ['intolerances', 'excludeIngredients'];
+const RECIPE_LIST_MAX_CHARS = 200; // gleicher Wert wie MAX_FILTER_PARAM_CHARS in der App (diet-options.ts)
+const RECIPE_INTOLERANCES = ['dairy', 'egg', 'gluten', 'peanut', 'seafood', 'shellfish', 'soy', 'tree nut', 'wheat', 'sesame'];
+const RECIPE_LIST_PATTERN = /^[\p{L} ,-]+$/u;
 const RECIPE_MAX_NUMBER = 20;
 const RECIPE_DEFAULT_NUMBER = 10;
 const RECIPE_TIMEOUT_MS = 12000;
@@ -279,11 +284,26 @@ function withHeaders(response, extra) {
 
 // ── spoonacular-Proxy ──────────────────────────────────────────────────
 
+/** Behält nur Werte der festen Unverträglichkeiten-Liste (unbekannte fallen weg); '' wenn nichts übrig bleibt. */
+function onlyKnownIntolerances(value) {
+  return value
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter((item) => RECIPE_INTOLERANCES.includes(item))
+    .join(',');
+}
+
 function buildRecipeUrl(url) {
   const target = new URL(SPOONACULAR_URL);
   for (const key of RECIPE_PARAMS) {
     const value = url.searchParams.get(key);
     if (value !== null) target.searchParams.set(key, value.slice(0, MAX_QUERY_CHARS));
+  }
+  for (const key of RECIPE_LIST_PARAMS) {
+    const value = (url.searchParams.get(key) ?? '').trim();
+    if (value.length === 0 || value.length > RECIPE_LIST_MAX_CHARS || !RECIPE_LIST_PATTERN.test(value)) continue;
+    const accepted = key === 'intolerances' ? onlyKnownIntolerances(value) : value;
+    if (accepted !== '') target.searchParams.set(key, accepted);
   }
   for (const [key, allowed] of Object.entries(RECIPE_ENUM_PARAMS)) {
     const value = (url.searchParams.get(key) ?? '').trim().toLowerCase();
@@ -493,12 +513,38 @@ function validateLabelRequest(p) {
   return { imageBase64: image(p.imageBase64), basis: oneOf(p.basis ?? 'per100g', ['per100g', 'perPortion'], 'Basis') };
 }
 
+// Fastfood-Helfer: Obergrenzen und feste Länderliste (Sortiment gilt je Land).
+const FASTFOOD_MAX_PREFERENCES = 4;
+const FASTFOOD_PREFERENCE_CHARS = 30;
+const FASTFOOD_MAX_EXCLUDE = 20;
+const FASTFOOD_EXCLUDE_CHARS = 60;
+const FASTFOOD_COUNTRIES = [
+  'Österreich', 'Deutschland', 'Schweiz', 'Italien', 'Spanien', 'Frankreich', 'Niederlande', 'Vereinigtes Königreich', 'USA',
+];
+const FASTFOOD_DEFAULT_COUNTRY = FASTFOOD_COUNTRIES[0];
+
+/** Einzeiliger Freitext für Prompts: alle Steuerzeichen (auch Zeilenumbrüche) werden zu Leerzeichen. */
+function lineText(value, maxChars) {
+  return text(String(value ?? '').replace(/[\u0000-\u001f\u007f\u2028\u2029]/g, ' ').replace(/\s+/g, ' '), maxChars);
+}
+
+/** Liste aus Kurztexten: fehlt sie, ist sie leer; kein Array ist ein Fehler; leere Einträge entfallen. */
+function lineList(value, maxItems, maxChars, name) {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) throw new ClientError(400, `${name} ungültig.`);
+  return value.slice(0, maxItems).map((v) => lineText(v, maxChars)).filter(Boolean);
+}
+
 function validateFastfoodRequest(p) {
   return {
-    restaurant: text(p.restaurant, 60),
+    restaurant: lineText(p.restaurant, 60),
     kcalBudget: num(p.kcalBudget, 50, 5000, 'Kalorienbudget'),
     moneyBudget: optNum(p.moneyBudget, 0, 200, 'Geldbudget'),
-    preference: text(p.preference, 60),
+    preference: lineText(p.preference, 60),
+    preferences: lineList(p.preferences, FASTFOOD_MAX_PREFERENCES, FASTFOOD_PREFERENCE_CHARS, 'Kriterien'),
+    country: FASTFOOD_COUNTRIES.includes(p.country) ? p.country : FASTFOOD_DEFAULT_COUNTRY,
+    // Die jüngsten Namen zählen: die App hängt neue Runden hinten an.
+    exclude: lineList(Array.isArray(p.exclude) ? p.exclude.slice(-FASTFOOD_MAX_EXCLUDE) : p.exclude, FASTFOOD_MAX_EXCLUDE, FASTFOOD_EXCLUDE_CHARS, 'Ausschlussliste'),
   };
 }
 
@@ -824,12 +870,21 @@ Antworte NUR mit gültigem JSON:
   return gemini(prompt, env, req.imageBase64, { maxOutputTokens: TOKENS_LABEL });
 }
 
+/** Kriterien als Text: neue Liste, sonst das alte Einzelfeld, sonst proteinreich. */
+function fastfoodCriteria(req) {
+  if (req.preferences.length > 0) return req.preferences.join('; ');
+  return req.preference || 'proteinreich';
+}
+
 async function suggestFastfood(req, env) {
+  const exclude = req.exclude.length > 0 ? `Diese Produkte wurden schon vorgeschlagen und dürfen NICHT erneut vorkommen: ${req.exclude.join('; ')}.` : '';
   const prompt = `Du bist ein Ernährungs-Coach. Schlage 3 Fastfood-Optionen vor.
 Restaurant: ${req.restaurant || 'beliebig'}.
+Land: ${req.country}. Nenne nur Produkte, die es in ${req.country} bei diesem Restaurant gibt; Preise in der Landeswährung als EUR-Schätzung.
 Kalorienbudget: ${req.kcalBudget} kcal.
 ${req.moneyBudget ? `Geldbudget: ${req.moneyBudget} €.` : ''}
-Priorität: ${req.preference || 'proteinreich'}.
+Kriterien (alle gleichzeitig berücksichtigen): ${fastfoodCriteria(req)}.
+${exclude}
 
 Antworte NUR mit gültigem JSON-Array:
 [{

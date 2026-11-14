@@ -37,7 +37,6 @@ const SHEETS = [
     await p.getByRole('button', { name: 'Neue Mahlzeit' }).click();
   }],
   ['Profil', 'settings', (p) => p.locator('[data-testid="open-profile"]').click()],
-  ['Rezeptsuche-Zugang', 'settings', (p) => p.locator('[data-testid="recipe-search-row"]').click()],
   ['Anleitung', 'settings', (p) => p.locator('ion-item[button]', { hasText: 'Anleitung' }).first().click()],
   ['Gewicht eintragen', 'settings', (p) => p.locator('[data-testid="weight-add"]').click()],
   ['Artikel hinzufuegen', 'shopping', (p) => p.locator('ion-fab-button').click()],

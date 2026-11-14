@@ -88,3 +88,33 @@ Soll vom Nutzer freigegeben; Navigation Variante B. Die Regeln stehen in `DESIGN
 - Ein Toast mit "Rückgängig" kann den FAB kurz überdecken.
 - `:has()` in `layout.scss`/`sheets.scss` braucht iOS 15.4 oder neuer; das Deployment-Target ist nicht geprüft (kein `ios/`-Ordner im Repo).
 - Feste Wartezeiten in den neuen E2E-Tests.
+
+## Welle 3: Funktionen (Branch `welle-3-funktionen`, nicht gemergt, Worker nicht ausgerollt)
+
+### Geändert
+- **Rezeptsuche-Abschnitt entfernt:** Einstellungs-Komponente und `recipe-search-config.store.ts` gelöscht; die Suche läuft nur noch über den Worker. Alte Speicherwerte räumt `core/state/legacy-storage-cleanup.ts` beim Start weg; der alte Schlüssel wird nie gesichert oder wiederhergestellt. Hinweise in Einkauf und Wochenplan verweisen nicht mehr auf "Profil › Rezeptsuche".
+- **Ernährungsprofil:** `UserProfile.diet`, `intolerances`, `dislikes` (plus englische Entsprechung `dislikesEn`). Abschnitt "Ernährung" im Profil-Sheet. Online-Suche und Wochenplan filtern damit; Chip "Profil-Filter aktiv" in der Online-Suche schaltet den Filter ab und sucht dann neu. Logik in `core/diet/`.
+- **Kochmodus:** je Schritt "Dafür brauchst du" (Zutaten des Schritts), auf Seite 1 "Du brauchst" (Utensilien). Logik in `core/cook/`.
+- **Fastfood-Helfer:** 1 bis 4 Kriterien als Chips, Land (feste Auswahl, Vorgabe Österreich), "Weitere Vorschläge" ohne Wiederholungen (höchstens 4 Runden). KI-Antworten werden geprüft (`core/ai/fastfood-sanitize.ts`): Kalorien müssen zu den Makros passen, unplausible Einträge fallen weg, Vorschläge über dem Budget werden gekennzeichnet.
+- **Worker (nur im Code):** Rezeptroute nimmt `intolerances` (feste Liste) und `excludeIngredients` (höchstens 200 Zeichen) an; Fastfood-Anfrage prüft `preferences`, `country` (feste Liste) und `exclude`, Steuerzeichen werden entfernt.
+
+### Annahmen (ohne Rückfrage entschieden)
+- Land steht direkt im Fastfood-Helfer und wird in den App-Einstellungen gemerkt, kein Standortzugriff.
+- Vorschläge leicht über dem Budget (bis 5 %) bleiben ohne Kennzeichnung, darüber steht "über Budget"; sie werden nicht verworfen.
+- Zutaten je Schritt und Utensilien sind Wortvergleiche (Heuristik). Fehlt ein Treffer, fehlt die Zeile; falsche Zuordnungen sind möglich.
+- Unverträglichkeiten werden zusätzlich in der App gefiltert (Zutatennamen), weil der ausgerollte Worker den Parameter noch verwirft. Hinweis im Profil: Spuren und versteckte Zutaten werden nicht erkannt.
+- Abneigungen werden für die Suche ins Englische übersetzt. Nebenwirkung: Begriffe, die in beiden Sprachen gleich lauten (z. B. "Avocado"), lösen den Hinweis "konnten nicht übersetzt werden" aus. Zur Entscheidung.
+
+### Geprüft
+- `tsc` 0 Fehler, Lint sauber, 1488 Unit-Tests grün, Build ok, Worker-Tests 87/87.
+- E2E gegen den Produktions-Build: 274/276 im Gesamtlauf; die zwei roten Tests waren Testfehler (Filter-Chip sucht beim Umschalten selbst neu; Chip-Zustand wurde zu früh gelesen), korrigiert und danach `w3`-Specs zweimal 17/17. Kein zweiter Gesamtlauf nach dieser Korrektur.
+- Screenshots Kochmodus und Fastfood-Helfer bei 375 und 320 px angesehen.
+- Code-Review durch eigenen Agenten: 1 hoch (Unverträglichkeiten wirkten nur über den neuen Worker), 5 mittel, 2 niedrig, alle behoben.
+
+### Nicht geprüft
+- Echtes Gemini und echtes Spoonacular: alle Tests laufen gegen Mocks. Land, Ausschlussliste und `intolerances`-Parameter wirken serverseitig erst nach dem Worker-Deploy.
+- Echtes iPhone (Chips, Auswahlfelder, Kochmodus mit Tastatur und Safe Area), Safari/WebKit.
+- Qualität der Zutaten-Zuordnung im Kochmodus an echten Rezepten.
+
+### Offen
+- Im Fastfood-Helfer stehen "Weitere Vorschläge" und "Vorschläge holen" direkt übereinander; Design-Entscheidung offen.

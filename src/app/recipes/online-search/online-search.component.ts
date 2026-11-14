@@ -1,7 +1,10 @@
 import { TOAST_SWIPE_GESTURE } from '../../shared/toast-options';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
 import { ModalController } from '@ionic/angular/lazy';
+import { dietPrefsOf, hasDietPrefs } from '../../core/diet/diet-prefs';
+import { dietSearchPrefs } from '../../core/diet/diet-search';
+import { filterByDietPrefs } from '../../core/diet/diet-filter';
+import { ProfileStore } from '../../core/state/profile.store';
 import { RecipeSearchAccessService } from '../../core/recipes/online/recipe-search-access';
 import { RecipeStore } from '../../core/state/recipe.store';
 import { AppSettingsStore } from '../../core/state/app-settings.store';
@@ -35,7 +38,7 @@ export const SPOONACULAR_URL = 'https://spoonacular.com/food-api';
 })
 export class OnlineSearchComponent {
   private readonly modal = inject(ModalController);
-  private readonly router = inject(Router);
+  private readonly profileStore = inject(ProfileStore);
   private readonly provider = inject(SpoonacularProvider);
   private readonly access = inject(RecipeSearchAccessService);
   private readonly recipeStore = inject(RecipeStore);
@@ -50,10 +53,17 @@ export class OnlineSearchComponent {
   readonly query = signal('');
   readonly maxCalories = signal<number | null>(null);
   readonly maxReadyTime = signal(0);
-  readonly diet = signal('');
+  /** Ernährungsangaben des Profils; die Suche startet damit vorbelegt. */
+  private readonly profilePrefs = computed(() => dietSearchPrefs(dietPrefsOf(this.profileStore.profile())));
+  readonly hasProfileFilter = computed(() => hasDietPrefs(dietPrefsOf(this.profileStore.profile())));
+  /** An: Ernährungsform, Unverträglichkeiten und Abneigungen aus dem Profil gelten für die Suche. */
+  readonly profileFilterOn = signal(true);
+  readonly diet = signal<string>(this.profilePrefs().diet);
 
   readonly results = signal<OnlineRecipe[]>([]);
   readonly total = signal(0);
+  /** Anzahl beim Anbieter abgerufener Treffer (inkl. der durch Abneigungen ausgeblendeten); Grundlage für „Mehr laden“. */
+  private readonly fetched = signal(0);
   readonly loading = signal(false);
   readonly loadingMore = signal(false);
   readonly error = signal<string | null>(null);
@@ -69,9 +79,13 @@ export class OnlineSearchComponent {
   readonly toast = signal<string | null>(null);
   readonly toastSwipe = TOAST_SWIPE_GESTURE;
 
-  /** Nur ohne eigenen Schlüssel und ohne globalen Server ist die Einrichtung nötig. */
+  /** Ohne globalen Server (Worker) ist die Suche nicht verfügbar. */
   readonly needsSetup = computed(() => !this.access.isAvailable());
-  readonly hasMore = computed(() => this.results().length < this.total());
+  readonly hasMore = computed(() => this.fetched() < this.total());
+  /** True, wenn das Profil alle bisher geladenen Treffer ausblendet, es aber weitere beim Anbieter gibt. */
+  readonly allHiddenByProfile = computed(
+    () => this.profileFilterOn() && this.searched() && this.results().length === 0 && this.fetched() > 0 && this.hasMore(),
+  );
   /** Angezeigtes Rezept: die Übersetzung, sobald sie vorliegt. */
   readonly shown = computed(() => {
     const sel = this.selected();
@@ -89,12 +103,28 @@ export class OnlineSearchComponent {
   });
 
   private filters(): OnlineSearchFilters {
+    const prefs = this.profileFilterOn() ? this.profilePrefs() : null;
     return {
       query: this.query(),
       maxCalories: this.maxCalories(),
       maxReadyTime: this.maxReadyTime() || null,
       diet: this.diet(),
+      ...(prefs ? { intolerances: prefs.intolerances, excludeIngredients: prefs.excludeIngredients } : {}),
     };
+  }
+
+  /** Profil-Filter ein- oder ausschalten (aus: Suche ohne Profilangaben, auch ohne deren Ernährungsform). */
+  async toggleProfileFilter(): Promise<void> {
+    const on = !this.profileFilterOn();
+    this.profileFilterOn.set(on);
+    this.diet.set(on ? this.profilePrefs().diet : '');
+    // Bereits gesucht: neu suchen, damit Treffer und Nachladen nie zwei Filtersätze mischen.
+    if (this.searched()) await this.search();
+  }
+
+  /** Blendet Treffer mit Abneigungen aus (zusätzlich zum Filter beim Anbieter), solange der Profil-Filter an ist. */
+  private visible(recipes: readonly OnlineRecipe[]): OnlineRecipe[] {
+    return this.profileFilterOn() ? [...filterByDietPrefs(recipes, this.profilePrefs())] : [...recipes];
   }
 
   /** Filter mit dem Suchbegriff auf Englisch (KI, sonst Wörterbuch); die Datenbank kennt nur Englisch. */
@@ -110,10 +140,12 @@ export class OnlineSearchComponent {
     this.error.set(null);
     try {
       const page = await this.provider.search(await this.englishFilters());
-      this.results.set(page.recipes);
+      this.results.set(this.visible(page.recipes));
+      this.fetched.set(page.recipes.length);
       this.total.set(page.totalResults);
     } catch (e: unknown) {
       this.results.set([]);
+      this.fetched.set(0);
       this.total.set(0);
       this.error.set(toOnlineSearchError(e, false).message);
     } finally {
@@ -127,9 +159,11 @@ export class OnlineSearchComponent {
     this.loadingMore.set(true);
     this.error.set(null);
     try {
-      const page = await this.provider.search(await this.englishFilters(), this.results().length);
-      this.results.update((list) => [...list, ...page.recipes.filter((r) => !list.some((o) => o.id === r.id))]);
-      this.total.set(page.totalResults);
+      const page = await this.provider.search(await this.englishFilters(), this.fetched());
+      this.results.update((list) => [...list, ...this.visible(page.recipes).filter((r) => !list.some((o) => o.id === r.id))]);
+      this.fetched.update((n) => n + page.recipes.length);
+      // Leere Seite: es kommt nichts mehr, das Nachladen endet.
+      this.total.set(page.recipes.length === 0 ? this.fetched() : page.totalResults);
     } catch (e: unknown) {
       this.error.set(e instanceof OnlineSearchError ? e.message : toOnlineSearchError(e, false).message);
     } finally {
@@ -171,11 +205,6 @@ export class OnlineSearchComponent {
     this.recipeStore.add(toRecipeDraft(recipe));
     this.savedIds.update((s) => new Set(s).add(sel.id));
     this.toast.set('Rezept gespeichert. Du findest es in deiner Rezeptliste.');
-  }
-
-  openSettings(): void {
-    void this.modal.dismiss();
-    void this.router.navigate(['/settings'], { queryParams: { open: 'recipe-search' } });
   }
 
   close(): void {

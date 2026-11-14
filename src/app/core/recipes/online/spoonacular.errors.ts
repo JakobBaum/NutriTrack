@@ -13,8 +13,8 @@ export class OnlineSearchError extends Error {
 }
 
 export const ONLINE_SEARCH_MESSAGES: Readonly<Record<OnlineSearchFailure, string>> = {
-  'no-key': 'Die Rezeptsuche ist nicht eingerichtet. Du kannst sie unter Profil › Rezeptsuche mit einem eigenen Schlüssel einrichten.',
-  auth: 'Der Schlüssel der Rezeptsuche wurde abgelehnt. Prüfe ihn unter Profil › Rezeptsuche.',
+  'no-key': 'Die Rezeptsuche ist gerade nicht verfügbar. Versuche es später erneut.',
+  auth: 'Der Rezeptserver hat die Anfrage abgelehnt. Versuche es später erneut.',
   quota: 'Das Tageslimit von Spoonacular ist erreicht. Versuche es morgen erneut.',
   'rate-limit': STATE_MESSAGES.rateLimited,
   offline: STATE_MESSAGES.offline,

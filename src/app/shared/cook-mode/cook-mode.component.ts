@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output, si
 import { AppSettingsStore } from '../../core/state/app-settings.store';
 import { formatQuantity } from '../../core/shopping/units/unit-format';
 import { convertStepText } from '../../core/shopping/units/unit-text';
+import { stepIngredientsByStep } from '../../core/cook/step-ingredients';
+import { utensilsFor } from '../../core/cook/utensils';
 
 /** Zutat in der Kochansicht (Menge bereits skaliert). */
 export interface CookIngredient {
@@ -13,8 +15,8 @@ export interface CookIngredient {
 }
 
 /**
- * Kochmodus (Vollbild): Schritt für Schritt mit Fortschritt. Mit `ingredients` steht vorn eine
- * Seite „Zutaten“. Genutzt von der Rezeptseite und vom Wochenplan.
+ * Kochmodus (Vollbild): Schritt für Schritt mit Fortschritt. Vorn steht eine Seite mit Utensilien und
+ * (mit `ingredients`) Zutaten; jeder Schritt nennt die Zutaten mit Menge, die in ihm vorkommen. Genutzt von der Rezeptseite und vom Wochenplan.
  */
 @Component({
   selector: 'nt-cook-mode',
@@ -35,14 +37,20 @@ export class NtCookModeComponent {
   readonly dismissed = output<void>();
 
   protected readonly page = signal(0);
-  protected readonly hasIngredients = computed(() => this.ingredients().length > 0);
-  protected readonly total = computed(() => this.steps().length + (this.hasIngredients() ? 1 : 0));
+  /** Utensilien aus allen Schritten (deutsch, ohne Dopplungen). */
+  readonly utensils = computed(() => utensilsFor(this.steps()));
+  /** Je Schritt die Zutaten mit Menge, die im Schritttext vorkommen. */
+  readonly stepIngredients = computed(() => stepIngredientsByStep(this.steps(), this.ingredients()));
+  /** Erste Seite (Utensilien und Zutaten) nur, wenn es etwas zu zeigen gibt. */
+  readonly hasIntro = computed(() => this.ingredients().length > 0 || this.utensils().length > 0);
+  readonly total = computed(() => this.steps().length + (this.hasIntro() ? 1 : 0));
   protected readonly isLast = computed(() => this.page() >= this.total() - 1);
-  /** Schrittindex der aktuellen Seite; -1 = Zutatenseite. */
-  protected readonly stepIndex = computed(() => this.page() - (this.hasIngredients() ? 1 : 0));
+  /** Schrittindex der aktuellen Seite; -1 = Startseite. */
+  readonly stepIndex = computed(() => this.page() - (this.hasIntro() ? 1 : 0));
+  readonly currentStepIngredients = computed(() => this.stepIngredients()[this.stepIndex()] ?? []);
   protected readonly progress = computed(() => (this.total() > 0 ? ((this.page() + 1) / this.total()) * 100 : 0));
 
-  protected next(): void {
+  next(): void {
     this.page.update((p) => Math.min(p + 1, this.total() - 1));
   }
 

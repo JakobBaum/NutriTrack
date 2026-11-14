@@ -93,7 +93,7 @@ export function register({ test }) {
     await topModal(page).locator('.nt-sheet-header__title', { hasText: 'Rezept bearbeiten' }).waitFor();
   });
 
-  test('recipes: Online-Suche ohne eigenen Schlüssel nutzt den Worker (503 → Hinweis, keine Einrichtung)', seed(), async (page) => {
+  test('recipes: Online-Suche: Worker nicht erreichbar (503) zeigt eine verständliche Meldung, keine Einrichtung', seed(), async (page) => {
     const hits = [];
     await page.route('https://*.workers.dev/recipes/complexSearch**', async (route) => {
       const req = route.request();
@@ -115,17 +115,17 @@ export function register({ test }) {
     await modal.locator('ion-input input[aria-label="Rezept suchen"]').fill('lentil');
     await modal.locator('.os-search-btn').click();
     await modal.locator('.os-error').waitFor();
-    assert.match(await modal.locator('.os-error').innerText(), /nicht eingerichtet/);
+    assert.match(await modal.locator('.os-error').innerText(), /gerade nicht verfügbar/);
     assert.deepEqual(hits, [null], 'genau eine Worker-Anfrage ohne x-api-key');
   });
 
-  test('recipes: Online-Suche (gemockt) finden, öffnen, speichern', seed({ 'recipe-search-config': { apiKey: 'test-key', baseUrl: 'https://api.spoonacular.com' } }), async (page) => {
+  test('recipes: Online-Suche (gemockt) finden, öffnen, speichern', seed(), async (page) => {
     const requests = [];
     const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-expose-headers': 'X-Api-Quota-Left' };
-    await page.route('https://api.spoonacular.com/**', async (route) => {
+    await page.route('https://*.workers.dev/recipes/complexSearch**', async (route) => {
       const req = route.request();
       if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
-      requests.push({ url: req.url(), key: req.headers()['x-api-key'] });
+      requests.push({ url: req.url(), key: req.headers()['x-api-key'] ?? null });
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -145,7 +145,7 @@ export function register({ test }) {
     assert.match(await card.innerText(), /320 kcal/);
     assert.match(await card.innerText(), /2 Portionen/);
     assert.equal(requests.length, 1);
-    assert.equal(requests[0].key, 'test-key');
+    assert.equal(requests[0].key, null, 'kein eigener Schlüssel im Header');
     assert.match(requests[0].url, /query=lentil/);
     assert.match(await modal.innerText(), /noch 41 Punkte heute/);
 

@@ -73,7 +73,7 @@ export class BackupService {
   restore(backup: BackupFile, cleanup?: BackupCleanup, reason: SafetyReason = 'import'): RestoreResult {
     const current = this.storage.snapshot();
     const safety = buildSafetySnapshot(current, reason, new Date());
-    const base = this.keepMeta(prepareRestore(backup.data, current), current);
+    const base = this.keepMeta(prepareRestore(backup.data), current);
     const withSafety = safety ? { ...base, [AUTO_SNAPSHOT_KEY]: safety } : base;
     let safetySaved = safety !== null;
     let ok = this.storage.replaceAll(withSafety);

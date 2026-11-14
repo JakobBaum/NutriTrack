@@ -1,4 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
+import { dietPrefsOf } from '../diet/diet-prefs';
+import { dietSearchPrefs } from '../diet/diet-search';
 import { MealType } from '../models';
 import { RecipeTranslateService } from '../recipes/translate/recipe-translate';
 import { RecipeSearchAccessService } from '../recipes/online/recipe-search-access';
@@ -33,8 +35,7 @@ export interface WeekPlanResult {
 }
 
 /**
- * Erstellt den Wochenplan aus Online-Rezepten (spoonacular, über eigenen Key oder den globalen
- * Worker), speichert ihn und schreibt alle Zutaten in die Einkaufsliste.
+ * Erstellt den Wochenplan aus Online-Rezepten (spoonacular, über den globalen Worker), speichert ihn und schreibt alle Zutaten in die Einkaufsliste.
  */
 @Injectable({ providedIn: 'root' })
 export class WeekPlanService {
@@ -52,7 +53,12 @@ export class WeekPlanService {
   /** Fortschritt der Übersetzung ("Übersetze Rezepte (n/m)"), sonst null. */
   readonly translateProgress = this._progress.asReadonly();
 
-  /** Ob die Online-Suche erreichbar konfiguriert ist (eigener Key oder globaler Worker). */
+  /** Ernährungsfilter aus dem Profil (Plan und Tausch nutzen dieselben). */
+  private dietPrefs(): ReturnType<typeof dietSearchPrefs> {
+    return dietSearchPrefs(dietPrefsOf(this.profile.profile()));
+  }
+
+  /** Ob die Online-Suche über den globalen Worker erreichbar ist. */
   isAvailable(): boolean {
     return this.access.isAvailable();
   }
@@ -73,6 +79,7 @@ export class WeekPlanService {
         dailyKcal: target?.kcal ?? null,
         dailyProteinG: target?.proteinG ?? null,
         excludeIds: this.planStore.blocked(),
+        dietPrefs: this.dietPrefs(),
       });
     } catch (e: unknown) {
       throw toOnlineSearchError(e, typeof navigator !== 'undefined' && navigator.onLine === false);
@@ -126,6 +133,7 @@ export class WeekPlanService {
         dailyProteinG: target?.proteinG ?? null,
         excludeIds: [...this.planStore.blocked(), ...plan.recipes.map((r) => r.id)],
         requestFloor: REPLACE_REQUEST_FLOOR,
+        dietPrefs: this.dietPrefs(),
       });
     } catch (e: unknown) {
       throw toOnlineSearchError(e, typeof navigator !== 'undefined' && navigator.onLine === false);

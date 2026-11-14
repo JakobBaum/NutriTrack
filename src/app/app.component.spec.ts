@@ -24,6 +24,12 @@ describe('AppComponent', () => {
     expect(fixture.nativeElement.querySelector('app-status-banner')).not.toBeNull();
   });
 
+  it('löscht beim Start einen alten Rezeptsuche-Eintrag mit eigenem Key', () => {
+    localStorage.setItem('nutritrack:recipe-search-config', JSON.stringify({ apiKey: 'geheim' }));
+    TestBed.createComponent(AppComponent);
+    expect(localStorage.getItem('nutritrack:recipe-search-config')).toBeNull();
+  });
+
   it('bittet beim Start um dauerhaften Speicher', () => {
     const request = vi.spyOn(TestBed.inject(StoragePersistenceService), 'request').mockResolvedValue(true);
     TestBed.createComponent(AppComponent);

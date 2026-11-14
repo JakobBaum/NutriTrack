@@ -31,6 +31,48 @@ describe('randomOffset', () => {
 });
 
 describe('buildWeekPlanRecipes', () => {
+  it('reicht die Ernährungsfilter des Profils an jede Suche durch', async () => {
+    const { search, calls } = fakeSearch(() => page(['1', '2', '3']));
+    const dietPrefs = { diet: 'vegan' as const, intolerances: ['soy' as const], excludeIngredients: ['mushrooms'], dislikeTerms: ['Pilze', 'mushrooms'] };
+
+    await buildWeekPlanRecipes(search, input({ meals: ['lunch', 'dinner'], dietPrefs }), () => 0);
+
+    expect(calls.length).toBeGreaterThan(0);
+    for (const c of calls) {
+      expect(c.filters).toMatchObject({ diet: 'vegan', intolerances: ['soy'], excludeIngredients: ['mushrooms'] });
+    }
+  });
+
+  it('sendet ohne Ernährungsfilter weiterhin keine Ernährungsform', async () => {
+    const { search, calls } = fakeSearch(() => page(['1', '2', '3']));
+
+    await buildWeekPlanRecipes(search, input({ meals: ['dinner'] }), () => 0);
+
+    expect(calls[0].filters.diet).toBe('');
+  });
+
+  it('entfernt Treffer mit Abneigungen im Titel oder in den Zutaten', async () => {
+    const withMushroom: OnlineRecipe = { ...recipe('2'), ingredients: [{ name: 'Pilze', amount: 1, unit: 'g' }] };
+    const withReis: OnlineRecipe = { ...recipe('3'), title: 'Reis-Bowl' };
+    const { search } = fakeSearch(() => ({ recipes: [recipe('1'), withMushroom, withReis], totalResults: 3, quotaLeft: null }));
+    const dietPrefs = { diet: '' as const, intolerances: [], excludeIngredients: [], dislikeTerms: ['Pilze', 'Ei'] };
+
+    const { recipes } = await buildWeekPlanRecipes(search, input({ meals: ['dinner'], days: 3, dietPrefs }), () => 0);
+
+    expect(recipes.map((r) => r.id)).toEqual(['1', '3']);
+  });
+
+  it('filtert Unverträglichkeiten auch selbst, falls der Server den Parameter verwirft', async () => {
+    const withEgg: OnlineRecipe = { ...recipe('2'), ingredients: [{ name: 'eggs', amount: 2, unit: '' }] };
+    const withMilk: OnlineRecipe = { ...recipe('3'), ingredients: [{ name: 'whole milk', amount: 1, unit: 'cup' }] };
+    const { search } = fakeSearch(() => ({ recipes: [recipe('1'), withEgg, withMilk], totalResults: 3, quotaLeft: null }));
+    const dietPrefs = { diet: '' as const, intolerances: ['egg' as const, 'dairy' as const], excludeIngredients: [], dislikeTerms: [] };
+
+    const { recipes } = await buildWeekPlanRecipes(search, input({ meals: ['dinner'], days: 3, dietPrefs }), () => 0);
+
+    expect(recipes.map((r) => r.id)).toEqual(['1']);
+  });
+
   it('sends one search per meal with type, calorie share, protein minimum and healthiness sort', async () => {
     const { search, calls } = fakeSearch((c) => page(c.filters.type === 'snack' ? ['s1', 's2', 's3'] : ['1', '2', '3']));
 

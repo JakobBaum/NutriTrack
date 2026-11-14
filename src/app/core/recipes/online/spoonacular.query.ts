@@ -1,3 +1,6 @@
+import { INTOLERANCE_VALUES, MAX_FILTER_PARAM_CHARS } from '../../diet/diet-options';
+import { sanitizeEnglishTerm } from '../../diet/diet-prefs';
+
 /** Suchfilter der Online-Rezeptsuche (UI-Zustand). */
 export interface OnlineSearchFilters {
   query: string;
@@ -13,6 +16,10 @@ export interface OnlineSearchFilters {
   minProtein?: number | null;
   /** Sortierung (Allowlist {@link SPOON_SORTS}); leer/fehlend = Standard des Anbieters. */
   sort?: string;
+  /** Unverträglichkeiten (feste Liste); unbekannte Werte werden nicht gesendet. */
+  intolerances?: readonly string[];
+  /** Englische Zutaten, die ausgeschlossen werden sollen; ungültige Begriffe werden nicht gesendet. */
+  excludeIngredients?: readonly string[];
 }
 
 /** Erlaubte Gerichtstypen (identisch mit der Worker-Allowlist). */
@@ -50,6 +57,19 @@ export const TIME_OPTIONS: readonly { value: number; label: string }[] = [
 
 export const KCAL_LIMIT = { min: 100, max: 1500, step: 50, start: 600 } as const;
 
+/** Kommagetrennte Liste aus erlaubten Werten, nur ganze Begriffe bis MAX_FILTER_PARAM_CHARS; '' wenn nichts übrig bleibt. */
+function joinTerms(terms: readonly string[] | undefined, clean: (raw: string) => string): string {
+  const kept: string[] = [];
+  let length = 0;
+  for (const term of (terms ?? []).map(clean).filter((t) => t !== '')) {
+    const next = length + term.length + (kept.length > 0 ? 1 : 0);
+    if (next > MAX_FILTER_PARAM_CHARS) break;
+    kept.push(term);
+    length = next;
+  }
+  return kept.join(',');
+}
+
 function positive(v: number | null): v is number {
   return typeof v === 'number' && Number.isFinite(v) && v > 0;
 }
@@ -74,6 +94,10 @@ export function buildSearchParams(
   if (positive(filters.maxCalories)) params['maxCalories'] = String(Math.round(filters.maxCalories));
   if (positive(filters.maxReadyTime)) params['maxReadyTime'] = String(Math.round(filters.maxReadyTime));
   if (filters.diet.trim()) params['diet'] = filters.diet.trim();
+  const intolerances = joinTerms(filters.intolerances, (v) => (INTOLERANCE_VALUES.includes(v as never) ? v : ''));
+  if (intolerances) params['intolerances'] = intolerances;
+  const excluded = joinTerms(filters.excludeIngredients, sanitizeEnglishTerm);
+  if (excluded) params['excludeIngredients'] = excluded;
   if (positive(filters.minProtein ?? null)) params['minProtein'] = String(Math.round(filters.minProtein as number));
   const type = (filters.type ?? '').trim().toLowerCase();
   if (SPOON_TYPES.includes(type)) params['type'] = type;

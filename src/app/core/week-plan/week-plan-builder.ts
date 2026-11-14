@@ -1,3 +1,5 @@
+import { filterByDietPrefs } from '../diet/diet-filter';
+import { DietSearchPrefs, NO_DIET_SEARCH } from '../diet/diet-search';
 import { MealType } from '../models';
 import { OnlineRecipe, OnlineSearchPage } from '../recipes/online/online-recipe.model';
 import { OnlineSearchFilters } from '../recipes/online/spoonacular.query';
@@ -26,6 +28,8 @@ export interface WeekPlanInput {
   excludeIds?: readonly string[];
   /** Mindestzahl angefragter Treffer (z. B. beim Tauschen eines einzelnen Rezepts, damit Auswahl bleibt). */
   requestFloor?: number;
+  /** Ernährungsfilter des Profils (Ernährungsform, Unverträglichkeiten, Abneigungen); fehlt = keine. */
+  dietPrefs?: DietSearchPrefs;
 }
 
 export interface WeekPlanDraft {
@@ -55,11 +59,13 @@ async function fetchPage(
   filters: OnlineSearchFilters,
   number: number,
   rng: () => number,
+  prefs: DietSearchPrefs,
 ): Promise<OnlineSearchPage> {
   const offset = randomOffset(number, rng);
   const page = await search(filters, offset, number);
   // Zufallsfenster hinter dem Ende der Treffer: einmal von vorn versuchen.
-  return page.recipes.length === 0 && offset > 0 ? search(filters, 0, number) : page;
+  const result = page.recipes.length === 0 && offset > 0 ? await search(filters, 0, number) : page;
+  return { ...result, recipes: [...filterByDietPrefs(result.recipes, prefs)] };
 }
 
 function uniqueById(list: readonly OnlineRecipe[]): OnlineRecipe[] {
@@ -74,6 +80,7 @@ async function searchMeal(
   number: number,
   rng: () => number,
 ): Promise<MealSearch> {
+  const prefs = input.dietPrefs ?? NO_DIET_SEARCH;
   const steps = proteinSteps(mealMinProtein(input.dailyProteinG, meal));
   let picked: OnlineRecipe[] = [];
   let stepIndex = 0;
@@ -83,12 +90,14 @@ async function searchMeal(
       query: '',
       maxCalories: mealMaxCalories(input.dailyKcal, meal),
       maxReadyTime: null,
-      diet: '',
+      diet: prefs.diet,
+      intolerances: prefs.intolerances,
+      excludeIngredients: prefs.excludeIngredients,
       type: SPOON_MEAL_TYPE[meal],
       minProtein,
       sort: 'healthiness',
     };
-    const page = await fetchPage(search, filters, number, rng);
+    const page = await fetchPage(search, filters, number, rng, prefs);
     const known = new Set([...exclude, ...picked.map((r) => r.id)]);
     picked = uniqueById([...picked, ...page.recipes.filter((r) => !known.has(r.id))]);
     if (picked.length >= input.days) break;

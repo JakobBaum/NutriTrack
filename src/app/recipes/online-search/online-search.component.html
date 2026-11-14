@@ -18,18 +18,9 @@
   @if (needsSetup()) {
     <div class="os-empty" data-testid="os-no-key">
       <ion-icon name="globe-outline" class="os-empty__icon" aria-hidden="true"></ion-icon>
-      <h3 class="os-empty__title">Rezept-Suche einrichten</h3>
-      <p>Die Online-Suche nutzt die Rezeptdatenbank von spoonacular. Dafür brauchst du einen kostenlosen Schlüssel:</p>
-      <ol class="os-steps">
-        <li>Kostenlos auf <a [href]="spoonacularUrl" target="_blank" rel="noopener noreferrer">spoonacular.com</a> registrieren.</li>
-        <li>Im Bereich „Profile“ den API-Key kopieren.</li>
-        <li>In der App unter Profil › Rezept-Suche eintragen.</li>
-      </ol>
-      <button type="button" class="nt-btn" (click)="openSettings()">
-        <ion-icon name="key-outline" aria-hidden="true"></ion-icon>
-        Schlüssel eintragen
-      </button>
-      <p class="os-note">Der kostenlose Plan reicht für etwa 50 Punkte pro Tag. Rezepte kommen auf Englisch und werden mit KI-Verbindung ins Deutsche übersetzt.</p>
+      <h3 class="os-empty__title">Rezeptsuche nicht verfügbar</h3>
+      <p>Die Online-Suche braucht den Rezeptserver, der gerade nicht eingerichtet ist. Versuche es später erneut.</p>
+      <p class="os-note">Deine eigenen Rezepte und gespeicherten Mahlzeiten findest du weiterhin in der Rezeptliste.</p>
     </div>
   } @else if (shown(); as r) {
     <article class="os-detail" data-testid="os-detail">
@@ -88,6 +79,12 @@
           Suchen
         </button>
       </form>
+      @if (hasProfileFilter()) {
+        <button type="button" class="nt-btn nt-btn--tonal nt-btn--inner" data-testid="os-profile-filter" [attr.aria-pressed]="profileFilterOn()" (click)="toggleProfileFilter()">
+          <ion-icon [name]="profileFilterOn() ? 'checkmark-circle' : 'ellipse-outline'" aria-hidden="true"></ion-icon>
+          {{ profileFilterOn() ? 'Profil-Filter aktiv' : 'Profil-Filter aus' }}
+        </button>
+      }
       @if (!canTranslate) { <p class="os-note" data-testid="os-search-hint">Ohne KI-Verbindung bitte auf Englisch suchen (bekannte deutsche Wörter werden übersetzt).</p> }
 
       <div class="os-filters">
@@ -128,6 +125,8 @@
 
       @if (loading()) {
         <p class="os-note os-center" role="status"><ion-spinner name="dots"></ion-spinner> Suche läuft…</p>
+      } @else if (allHiddenByProfile() && !error()) {
+        <p class="os-note os-center" data-testid="os-all-hidden">Alle bisherigen Treffer sind durch dein Profil ausgeblendet. Lade mehr oder schalte den Profil-Filter aus.</p>
       } @else if (searched() && results().length === 0 && !error()) {
         <p class="os-note os-center">Keine Rezepte gefunden. Lockere die Filter oder suche mit anderen Begriffen.</p>
       }

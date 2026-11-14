@@ -32,8 +32,7 @@
           }
           @if (!onlineAvailable()) {
             <p class="generator__mode" role="note">
-              Die Rezeptsuche ist nicht eingerichtet. Unten kannst du aus deinen eigenen Rezepten planen.
-              <a routerLink="/settings" [queryParams]="{ open: 'recipe-search' }">Profil › Rezeptsuche</a>
+              Die Rezeptsuche ist gerade nicht verfügbar. Versuche es später erneut. Unten kannst du aus deinen eigenen Rezepten planen.
             </p>
           }
 
@@ -82,7 +81,7 @@
             </ion-toggle>
             <p class="generator__mode" role="status" data-testid="own-recipes-state">
               @if (ownMode()) {
-                An: Die Einkaufsliste entsteht aus deinen eigenen Rezepten@if (!onlineAvailable()) { (Online-Rezeptsuche nicht eingerichtet)}.
+                An: Die Einkaufsliste entsteht aus deinen eigenen Rezepten@if (!onlineAvailable()) { (Online-Rezeptsuche gerade nicht verfügbar)}.
               } @else {
                 Aus: Die App sucht passende Rezepte online.
               }

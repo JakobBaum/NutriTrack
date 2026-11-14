@@ -36,6 +36,7 @@ import {
 } from './recipe-form';
 import { askPortionsSheet, cardMenuSheet, mealLabel, pickMealSheet } from './recipe-sheets';
 import { TOAST_SWIPE_GESTURE } from '../shared/toast-options';
+import { recipeCookIngredients } from '../core/cook/recipe-cook-ingredients';
 import { confirmDiscard } from '../meals/confirm-discard';
 import { MealType, NutritionFacts, Recipe, RecipeIngredient } from '../core/models';
 import { AiService } from '../core/ai/ai.service';
@@ -628,6 +629,7 @@ export class RecipesPage implements OnDestroy {
 
   // --- Kochmodus ---
   readonly cookRecipe = signal<Recipe | null>(null);
+  readonly cookIngredients = computed(() => recipeCookIngredients(this.cookRecipe()?.ingredients ?? []));
 
   startCook(recipe: Recipe): void {
     // Offene Hinweise würden „Weiter“ verdecken.

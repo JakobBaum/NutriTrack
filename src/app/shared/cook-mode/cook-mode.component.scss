@@ -17,3 +17,48 @@
 }
 
 .cook__ing-amount { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+// Kein Abschneiden oben bei langem Inhalt: statt mittig zu zentrieren oben beginnen, kurze Seiten bleiben mittig.
+.cook__body { justify-content: flex-start; min-width: 0; }
+.cook__body > :first-child { margin-top: auto; }
+.cook__body > :last-child { margin-bottom: auto; }
+
+// Zusatzbloecke (Utensilien, Zutaten je Schritt): klein, unter dem Haupttext, kein Ueberlauf bei 320 px.
+.cook__block { margin: var(--nt-space-4) 0 0; min-width: 0; }
+.cook__block--step {
+  padding: var(--nt-space-3) var(--nt-space-4);
+  background: var(--ion-color-light);
+  border-radius: var(--nt-radius-inner);
+}
+.cook__block-title {
+  margin: 0 0 var(--nt-space-2);
+  font-size: var(--nt-fs-caption);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ion-color-medium);
+}
+.cook__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nt-space-2);
+  margin: 0 0 var(--nt-space-4);
+  padding: 0;
+  list-style: none;
+}
+.cook__chip {
+  padding: var(--nt-space-1) var(--nt-space-3);
+  font-size: var(--nt-fs-body);
+  border-radius: 999px;
+  background: var(--ion-color-light);
+  overflow-wrap: anywhere;
+}
+.cook__step-ingredients {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--nt-fs-body);
+  line-height: 1.4;
+  li { padding: var(--nt-space-1) 0; overflow-wrap: anywhere; }
+}
+.cook__step-text, .cook__ingredients li { overflow-wrap: anywhere; }

@@ -18,10 +18,4 @@ describe('SettingsStore Migration der KI-Verbindung', () => {
     // Assert
     expect(localStorage.getItem(LEGACY)).toBeNull();
   });
-
-  it('lässt den eigenen Spoonacular-Key unberührt', () => {
-    localStorage.setItem('nutritrack:recipe-search-config', JSON.stringify({ apiKey: 'sp', baseUrl: '' }));
-    TestBed.inject(SettingsStore);
-    expect(localStorage.getItem('nutritrack:recipe-search-config')).toContain('sp');
-  });
 });

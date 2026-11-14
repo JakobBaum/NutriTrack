@@ -19,6 +19,7 @@ import { DebugLogService } from '../debug/debug-log.service';
 import { AI_ERROR_MESSAGES, AI_TIMEOUT_MS, friendlyAiErrorMessage, isTimeoutError, mapTimeoutError } from './ai-errors';
 import { defaultAiProxyUrl } from './ai-endpoint';
 import { normalizeRecipeImport } from './recipe-import-normalize';
+import { FASTFOOD_INVALID_MESSAGE, sanitizeFastfoodSuggestions } from './fastfood-sanitize';
 
 const PING_FN = 'ping';
 const UNKNOWN_FUNCTION_PATTERN = /^Unbekannte Funktion/;
@@ -65,8 +66,13 @@ export class ProxyAiProvider implements AiProvider {
     return this.call<LabelResult>('recognizeLabel', { imageBase64, basis });
   }
 
-  suggestFastfood(req: FastFoodRequest): Promise<FastFoodSuggestion[]> {
-    return this.call<FastFoodSuggestion[]>('suggestFastfood', req);
+  /** Die Antwort wird nie ungeprüft übernommen: nur plausible Einträge, sonst verständlicher Fehler. */
+  async suggestFastfood(req: FastFoodRequest): Promise<FastFoodSuggestion[]> {
+    const raw = await this.call<unknown>('suggestFastfood', req);
+    if (Array.isArray(raw) && raw.length === 0) return [];
+    const suggestions = sanitizeFastfoodSuggestions(raw);
+    if (suggestions.length === 0) throw new Error(FASTFOOD_INVALID_MESSAGE);
+    return suggestions;
   }
 
   async importRecipe(input: RecipeImportInput): Promise<RecipeImportResult> {

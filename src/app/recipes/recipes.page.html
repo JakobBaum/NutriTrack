@@ -489,5 +489,6 @@
   [open]="cookRecipe() !== null"
   [title]="cookRecipe()?.title ?? ''"
   [steps]="cookRecipe()?.steps ?? []"
+  [ingredients]="cookIngredients()"
   (dismissed)="closeCook()"
 ></nt-cook-mode>
