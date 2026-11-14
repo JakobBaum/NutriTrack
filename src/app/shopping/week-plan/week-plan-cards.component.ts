@@ -1,3 +1,4 @@
+import { HEALTH_NOTES } from '../../core/messages/health-notes';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ActionSheetController } from '@ionic/angular';
 import { ModalController } from '@ionic/angular/lazy';
@@ -25,6 +26,7 @@ export class WeekPlanCardsComponent {
   private readonly service = inject(WeekPlanService);
   private readonly actionSheet = inject(ActionSheetController);
   /** Rezept, dessen Ersatz gerade geladen wird (sonst null). */
+  protected readonly nameFilterNote = HEALTH_NOTES.nameFilter;
   protected readonly busyId = signal<string | null>(null);
   protected readonly error = signal<string | null>(null);
 

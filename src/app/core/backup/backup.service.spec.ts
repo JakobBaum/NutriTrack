@@ -95,6 +95,24 @@ describe('BackupService Auto-Sicherung (Welle A, Punkt 4)', () => {
   });
 });
 
+describe('BackupService und Zustimmung', () => {
+  const consent = { version: 1, acceptedAt: '2026-11-10T10:00:00.000Z', isAdultConfirmed: true };
+
+  it('behält die Zustimmung dieses Geräts über einen Import hinweg', () => {
+    setup({ diary: [entry('alt')], consent });
+    service.restore(backupWith([entry('neu')]));
+    expect(stored('consent')).toEqual(consent);
+  });
+
+  it('übernimmt keine Zustimmung aus der Backup-Datei', () => {
+    setup({ diary: [entry('alt')] });
+    const parsed = validateBackup({ format: 'nutritrack-backup', version: 1, exportedAt: '2026-11-01T10:00:00.000Z', data: { diary: [], consent } });
+    if (!parsed.ok) throw new Error('Testdaten ungültig');
+    service.restore(parsed.backup);
+    expect(stored('consent')).toBeNull();
+  });
+});
+
 describe('BackupService Reset (Welle A, Punkt 4)', () => {
   beforeEach(() => setup({ diary: [entry('alt')], lastBackup: '2026-10-01T10:00:00.000Z' }));
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CONSENT_KEY } from '../consent/consent.model';
 import {
   BACKUP_ERRORS,
   BACKUP_FORMAT,
@@ -7,6 +8,7 @@ import {
   backupFileName,
   buildBackup,
   countBackup,
+  isNeverBackedUp,
   describeCounts,
   formatBackupDate,
   parseBackup,
@@ -42,6 +44,12 @@ const sampleData = {
   profile: { weightKg: 80 },
   shopping: { id: 's', items: [{ name: 'Milch', amount: 1, unit: 'l', checked: false }] },
 };
+
+describe('Zustimmung im Backup', () => {
+  it('gehört nicht zu den gesicherten Schlüsseln', () => {
+    expect(isNeverBackedUp(CONSENT_KEY)).toBe(true);
+  });
+});
 
 describe('backupFileName', () => {
   it('uses the local date with zero padding', () => {

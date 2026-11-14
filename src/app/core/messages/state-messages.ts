@@ -7,6 +7,7 @@ export const STATE_MESSAGES = {
   offline: 'Keine Internetverbindung. Prüfe WLAN oder Mobilnetz und versuche es erneut.',
   aiUnavailable: 'Die KI ist gerade nicht verfügbar. Versuche es später erneut.',
   aiOverloaded: 'Die KI ist gerade überlastet. Versuche es in einer Minute erneut.',
+  aiLinkBlocked: 'Von dieser Seite können wir keine Rezepte abrufen. Kopiere den Rezepttext und füge ihn ein.',
   aiUnreadable: 'Die Antwort der KI war nicht lesbar. Versuche es noch einmal.',
   aiTimeout: 'Die KI antwortet gerade nicht. Versuche es erneut.',
   aiGeneric: 'Die KI-Anfrage ist fehlgeschlagen. Versuche es erneut.',
@@ -16,6 +17,7 @@ export const STATE_MESSAGES = {
   foodTimeout: 'Die Lebensmittel-Datenbank antwortet gerade nicht. Versuche es erneut.',
   foodServer: 'Die Lebensmittel-Datenbank ist gerade nicht erreichbar. Versuche es später erneut.',
   foodGeneric: 'Die Abfrage ist fehlgeschlagen. Versuche es erneut.',
+  consentRequired: 'Dafür brauchst du die Zustimmung zu den Online-Funktionen. Du findest sie unter Profil.',
   importFailed: 'Der Import ist fehlgeschlagen, der Grund ist unbekannt. Prüfe Text oder Link und versuche es erneut.',
 } as const;
 

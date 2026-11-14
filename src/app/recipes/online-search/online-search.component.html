@@ -84,6 +84,7 @@
           <ion-icon [name]="profileFilterOn() ? 'checkmark-circle' : 'ellipse-outline'" aria-hidden="true"></ion-icon>
           {{ profileFilterOn() ? 'Profil-Filter aktiv' : 'Profil-Filter aus' }}
         </button>
+        @if (profileFilterOn()) { <p class="os-note" data-testid="os-filter-note">{{ nameFilterNote }}</p> }
       }
       @if (!canTranslate) { <p class="os-note" data-testid="os-search-hint">Ohne KI-Verbindung bitte auf Englisch suchen (bekannte deutsche Wörter werden übersetzt).</p> }
 

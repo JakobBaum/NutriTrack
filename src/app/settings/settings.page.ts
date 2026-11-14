@@ -27,6 +27,11 @@ import { resolveDebugMode, safeLocalStorage } from './debug-flag';
 import { backupStatusLabel, goalLabel, hasManualTarget } from './settings-view';
 import { BackupService } from '../core/backup/backup.service';
 import { isSetupLink } from './setup-link';
+import { InfoSectionId, infoLinkSection } from './info-link';
+import { consentStatusLabel } from './settings-view';
+import { ConsentService } from '../core/consent/consent.service';
+import { ConsentStore } from '../core/consent/consent.store';
+import { consentDateLabel } from '../core/consent/consent.model';
 import { BackupCleanup, BackupFile, countBackup, describeCounts, formatBackupDate } from '../core/backup/backup';
 import { describeSafetySnapshot } from '../core/backup/backup-safety';
 
@@ -81,7 +86,12 @@ export class SettingsPage implements OnInit {
   /** Gewicht, das das Profil-Sheet beim Öffnen vorbelegt (Hinweis „Ziel neu berechnen“). */
   readonly prefillWeight = signal<number | null>(null);
   readonly logOpen = signal(false);
-  readonly infoSection = signal<'anleitung' | 'datenschutz' | 'agb' | 'hilfe' | null>(null);
+  readonly infoSection = signal<InfoSectionId | null>(null);
+
+  private readonly consentStore = inject(ConsentStore);
+  private readonly consentService = inject(ConsentService);
+  readonly consentGranted = this.consentStore.granted;
+  readonly consentStatus = computed(() => consentStatusLabel(this.consentGranted(), consentDateLabel(this.consentStore.acceptedAt())));
 
   private readonly backup = inject(BackupService);
   readonly backupBusy = signal(false);
@@ -103,9 +113,26 @@ export class SettingsPage implements OnInit {
 
   /** Einrichtungslink: Profil öffnen und den Parameter entfernen, damit er nicht erneut greift. */
   private handleNavigation(url: string): void {
-    if (!isSetupLink(this.router.parseUrl(url))) return;
+    const tree = this.router.parseUrl(url);
+    const info = infoLinkSection(tree);
+    if (info) {
+      this.infoSection.set(info);
+      void this.router.navigate(['/settings'], { replaceUrl: true });
+      return;
+    }
+    if (!isSetupLink(tree)) return;
     this.openProfile(null);
     void this.router.navigate(['/settings'], { replaceUrl: true });
+  }
+
+  /** Öffnet die gemeinsame Zustimmung (Dialog) aus der Einstellungszeile. */
+  async grantConsent(): Promise<void> {
+    await this.consentService.ensure();
+  }
+
+  revokeConsent(): void {
+    this.consentStore.revoke();
+    this.savedToast.set('Zustimmung widerrufen. Es wird nichts mehr an Dritte gesendet.');
   }
 
   openProfile(prefillKg: number | null): void {
@@ -171,6 +198,7 @@ export class SettingsPage implements OnInit {
     this.favoriteStore.clear();
     this.settingsStore.clear();
     this.appSettings.clear();
+    this.consentStore.revoke();
     const safetySaved = this.backup.completeReset(safety);
     this.refreshSafetyInfo();
     this.savedToast.set(

@@ -43,3 +43,9 @@ export function manualProteinError(text: string): string | null {
   if (value === null) return 'Zahl eingeben, z. B. 2,0.';
   return inRange(value, MANUAL_PROTEIN_RANGE) ? null : 'Das Eiweißziel muss zwischen 1,2 und 2,4 g pro kg liegen.';
 }
+
+/** Hinweis (keine Sperre), wenn das manuelle Ziel unter der üblichen Mindestzufuhr liegt; null bei fehlendem oder unzulässigem Wert. */
+export function manualKcalWarning(kcal: number | null, minimumKcal: number): string | null {
+  if (!inRange(kcal, MANUAL_KCAL_RANGE) || kcal >= minimumKcal) return null;
+  return `Unter der üblichen Mindestzufuhr von ${minimumKcal.toLocaleString('de-DE')} kcal. Das ist nur ein Hinweis.`;
+}

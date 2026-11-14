@@ -12,6 +12,7 @@ import {
   ViewChild,
 } from '@angular/core';
 import { ToastController } from '@ionic/angular';
+import { HEALTH_NOTES } from '../../core/messages/health-notes';
 import { FastFoodRequest, FastFoodSuggestion } from '../../core/models';
 import { AppSettingsStore } from '../../core/state/app-settings.store';
 import { AiService } from '../../core/ai/ai.service';
@@ -61,6 +62,7 @@ export class FastfoodSheetComponent implements OnChanges {
 
   readonly error = signal<string | null>(null);
   readonly ffLoading = signal(false);
+  readonly ffNote = HEALTH_NOTES.fastfood;
   readonly ffResults = signal<FastFoodSuggestion[]>([]);
   /** true nach der ersten Suche (Leerzustand). */
   readonly ffSearched = signal(false);

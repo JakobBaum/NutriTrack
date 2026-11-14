@@ -1,3 +1,4 @@
+import { HEALTH_NOTES } from '../../core/messages/health-notes';
 import { TOAST_SWIPE_GESTURE } from '../../shared/toast-options';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ModalController } from '@ionic/angular/lazy';
@@ -73,6 +74,7 @@ export class OnlineSearchComponent {
 
   /** Ohne KI-Verbindung gibt es nur das Wörterbuch: Suche und Rezepttexte bleiben dann überwiegend Englisch. */
   readonly canTranslate = this.translator.canTranslate();
+  readonly nameFilterNote = HEALTH_NOTES.nameFilter;
   readonly translating = signal(false);
   private readonly translations = signal<ReadonlyMap<string, OnlineRecipe>>(new Map());
   private readonly savedIds = signal<ReadonlySet<string>>(new Set());

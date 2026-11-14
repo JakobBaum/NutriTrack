@@ -5,6 +5,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { SpoonacularProvider } from './spoonacular.provider';
 import { AI_TIMEOUT_MS } from '../../ai/ai-errors';
 import { environment } from '../../../../environments/environment';
+import { ConsentStore } from '../../consent/consent.store';
 import { EMPTY_FILTERS } from './spoonacular.query';
 
 const WORKER = 'https://nutritrack.example.workers.dev';
@@ -19,6 +20,7 @@ beforeEach(() => {
   TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
   http = TestBed.inject(HttpTestingController);
   provider = TestBed.inject(SpoonacularProvider);
+  TestBed.inject(ConsentStore).grant(new Date(), true);
 });
 afterEach(() => http.verify());
 

@@ -14,6 +14,7 @@
       </button>
     </div>
   }
+  <p class="wp-note" data-testid="wp-filter-note">{{ nameFilterNote }}</p>
   @if (error(); as err) { <p class="nt-card wp-error" role="alert" data-testid="wp-error">{{ err }}</p> }
   @for (group of groups(); track group.meal) {
     <h2 class="nt-section-header">{{ group.label }}</h2>

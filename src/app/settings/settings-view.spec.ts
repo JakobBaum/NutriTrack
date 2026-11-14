@@ -1,4 +1,4 @@
-import { backupStatusLabel, goalLabel, hasManualTarget } from './settings-view';
+import { backupStatusLabel, consentStatusLabel, goalLabel, hasManualTarget } from './settings-view';
 
 describe('settings-view', () => {
   describe('goalLabel', () => {
@@ -33,5 +33,19 @@ describe('settings-view', () => {
       expect(backupStatusLabel('09.11.2026')).toBe('Letztes Backup: 09.11.2026');
       expect(backupStatusLabel(null)).toBe('Noch kein Backup erstellt');
     });
+  });
+});
+
+describe('consentStatusLabel', () => {
+  it('nennt das Datum bei erteilter Zustimmung', () => {
+    expect(consentStatusLabel(true, '10.11.2026')).toBe('Zugestimmt am 10.11.2026');
+  });
+
+  it('nennt nur die Zustimmung, wenn das Datum fehlt', () => {
+    expect(consentStatusLabel(true, null)).toBe('Zugestimmt');
+  });
+
+  it('sagt ohne Zustimmung, dass nichts an Dritte gesendet wird', () => {
+    expect(consentStatusLabel(false, null)).toBe('Nicht zugestimmt. Es wird nichts an Dritte gesendet.');
   });
 });

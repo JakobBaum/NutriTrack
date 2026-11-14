@@ -1,4 +1,5 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { isPlausiblePer100g } from './facts-plausibility';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom, timeout } from 'rxjs';
 import { FoodItem, NutritionFacts } from '../models';
@@ -179,6 +180,10 @@ export class OpenFoodFactsProvider implements FoodProvider {
       saltG: this.optionalNum(n['salt_100g']),
       basis: 'per100g',
     };
+    if (!isPlausiblePer100g(facts)) {
+      this.log.error(`Unplausible Nährwerte verworfen (Barcode ${p.code ?? 'ohne'})`);
+      return null;
+    }
     return {
       id: makeId('off'),
       source: 'openfoodfacts',

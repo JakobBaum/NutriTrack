@@ -355,6 +355,16 @@
             @for (st of r.steps; track $index) { <li>{{ st }}</li> }
           </ol>
         }
+        @if (sourceOf(r); as src) {
+          <p class="recipe__meta recipe__source" data-testid="recipe-source">
+            @if (src.name) {
+              Quelle:
+              @if (src.url) { <a [href]="src.url" target="_blank" rel="noopener">{{ src.name }}</a> }
+              @else { {{ src.name }} }
+            }
+            @if (src.showSpoonacular) { <span class="recipe__source-credit">Rezeptdaten von <a href="https://spoonacular.com" target="_blank" rel="noopener">spoonacular.com</a></span> }
+          </p>
+        }
         <div class="nt-sheet-footer">
           <ion-button expand="block" class="nt-btn nt-btn--block" (click)="detailThen(diaryAction)">Eintragen</ion-button>
           <div class="recipe__actions">

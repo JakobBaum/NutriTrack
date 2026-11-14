@@ -5,6 +5,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ProxyAiProvider } from './proxy-ai-provider';
 import { environment } from '../../../environments/environment';
+import { ConsentStore } from '../consent/consent.store';
 import { DebugLogService } from '../debug/debug-log.service';
 
 const PROXY = 'https://proxy.test/ai';
@@ -24,6 +25,7 @@ beforeEach(() => {
   TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
   http = TestBed.inject(HttpTestingController);
   provider = TestBed.inject(ProxyAiProvider);
+  TestBed.inject(ConsentStore).grant(new Date(), true);
   log = TestBed.inject(DebugLogService);
   setProxy(` ${PROXY} `);
 });
@@ -112,6 +114,20 @@ describe('ProxyAiProvider', () => {
       http.expectOne(PROXY).flush({ error: 'Gemini 503' }, { status, statusText: 'x' });
       await expect(p).rejects.toThrow(message);
     }
+  });
+});
+
+describe('ProxyAiProvider Link-Import 422', () => {
+  it('zeigt beim Link-Import den Hinweis zum Einfügen des Rezepttexts', async () => {
+    const p = provider.importRecipe({ url: 'https://www.tiktok.com/x' });
+    http.expectOne(PROXY).flush({ error: 'gesperrt' }, { status: 422, statusText: 'x' });
+    await expect(p).rejects.toThrow(AI_ERROR_MESSAGES.linkBlocked);
+  });
+
+  it('behält bei einem unlesbaren Rezeptfoto den bisherigen Text', async () => {
+    const p = provider.importRecipe({ imageBase64: 'abc' });
+    http.expectOne(PROXY).flush({ error: 'x' }, { status: 422, statusText: 'x' });
+    await expect(p).rejects.toThrow(AI_ERROR_MESSAGES.unreadable);
   });
 });
 

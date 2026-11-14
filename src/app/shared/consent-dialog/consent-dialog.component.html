@@ -1,0 +1,47 @@
+<div class="sheet-grabber" aria-hidden="true"></div>
+<ion-header class="ion-no-border sheet-header">
+  <div class="nt-sheet-header">
+    <div class="nt-sheet-header__start"></div>
+    <h2 class="nt-sheet-header__title" role="heading" aria-level="2">KI- und Online-Funktionen</h2>
+    <div class="nt-sheet-header__end">
+      <ion-button fill="clear" class="nt-sheet-close" (click)="decline()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
+    </div>
+  </div>
+</ion-header>
+<ion-content class="sheet-content">
+  <div class="nt-page consent" data-testid="consent-dialog">
+    @if (isMinor) {
+      <p class="consent__minor" role="alert" data-testid="consent-minor">
+        Dein Profil gibt ein Alter unter 18 Jahren an. Die KI- und Online-Funktionen sind erst ab 18 Jahren nutzbar. Das Ernährungstagebuch funktioniert weiter ohne sie.
+      </p>
+    } @else {
+      <p class="consent__lead">Diese Funktionen senden Daten an Dritte. Ohne deine Zustimmung geht nichts davon hinaus.</p>
+      <ul class="consent__list">
+        <li><strong>KI (Google Gemini, USA):</strong> Fotos von Etiketten und Rezepten, Rezepttexte und Links, Fastfood-Wünsche mit deinem Kalorien-Budget. Sie gehen über unseren Zwischenserver bei Cloudflare (USA).</li>
+        <li><strong>Rezeptsuche (Spoonacular, USA):</strong> Suchbegriffe sowie Ernährungsform, Unverträglichkeiten und ausgeschlossene Zutaten aus deinem Profil.</li>
+      </ul>
+      <p class="consent__note">Angaben zu Unverträglichkeiten können Gesundheitsdaten sein. Ergebnisse der KI sind Schätzungen.</p>
+      <p class="consent__note">Du kannst die Zustimmung jederzeit unter Profil widerrufen.</p>
+      <ion-checkbox
+        class="consent__adult"
+        labelPlacement="end"
+        justify="start"
+        alignment="center"
+        data-testid="consent-adult"
+        [checked]="isAdult()"
+        (ionChange)="setAdult($event.detail.checked)"
+      >Ich bin mindestens 18 Jahre alt.</ion-checkbox>
+    }
+    <ion-button fill="clear" class="nt-btn nt-btn--text consent__privacy" data-testid="consent-privacy" (click)="openPrivacy()">Datenschutzerklärung lesen</ion-button>
+  </div>
+</ion-content>
+<ion-footer class="ion-no-border add-footer">
+  <div class="nt-page">
+    <div class="nt-sheet-footer consent__actions">
+      @if (!isMinor) {
+        <ion-button expand="block" class="nt-btn nt-btn--block" data-testid="consent-accept" [disabled]="!isAdult()" (click)="accept()">Zustimmen</ion-button>
+      }
+      <ion-button expand="block" fill="clear" class="nt-btn nt-btn--tonal nt-btn--block" data-testid="consent-decline" (click)="decline()">Nicht jetzt</ion-button>
+    </div>
+  </div>
+</ion-footer>

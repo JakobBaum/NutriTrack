@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { AiService } from '../ai/ai.service';
+import { ConsentStore } from '../consent/consent.store';
 import { DISLIKE_TRANSLATE_TIMEOUT_MS, DietTranslateService } from './diet-translate.service';
 
-function setup(translate: ReturnType<typeof vi.fn>, isLive = true): DietTranslateService {
+function setup(translate: ReturnType<typeof vi.fn>, isLive = true, consented = true): DietTranslateService {
   localStorage.clear();
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ providers: [{ provide: AiService, useValue: { translateSearchQuery: translate, isLive: () => isLive } }] });
+  if (consented) TestBed.inject(ConsentStore).grant(new Date(), true);
   return TestBed.inject(DietTranslateService);
 }
 
@@ -93,5 +95,17 @@ describe('DietTranslateService.translateDislikes', () => {
 
     expect(await service.translateDislikes([], NONE)).toEqual({ dislikesEn: [], failedCount: 0 });
     expect(translate).not.toHaveBeenCalled();
+  });
+});
+
+describe('DietTranslateService ohne Zustimmung', () => {
+  it('ruft die KI nicht auf und lässt die englische Entsprechung leer', async () => {
+    const translate = vi.fn(async () => 'leek');
+    const service = setup(translate, true, false);
+
+    const result = await service.translateDislikes(['Lauch'], NONE);
+
+    expect(translate).not.toHaveBeenCalled();
+    expect(result).toEqual({ dislikesEn: [''], failedCount: 1 });
   });
 });

@@ -1,8 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { isTimeoutError } from '../../ai/ai-errors';
+import { isConsentRequiredError } from '../../consent/consent.errors';
 import { STATE_MESSAGES } from '../../messages/state-messages';
 
-export type OnlineSearchFailure = 'no-key' | 'auth' | 'quota' | 'rate-limit' | 'offline' | 'timeout' | 'server';
+export type OnlineSearchFailure = 'no-key' | 'auth' | 'quota' | 'rate-limit' | 'offline' | 'timeout' | 'server' | 'consent';
 
 /** Fehler der Online-Rezeptsuche mit fertiger deutscher Meldung. */
 export class OnlineSearchError extends Error {
@@ -20,6 +21,7 @@ export const ONLINE_SEARCH_MESSAGES: Readonly<Record<OnlineSearchFailure, string
   offline: STATE_MESSAGES.offline,
   timeout: 'Die Rezeptsuche antwortet gerade nicht. Versuche es erneut.',
   server: 'Spoonacular ist gerade nicht erreichbar. Versuche es später erneut.',
+  consent: STATE_MESSAGES.consentRequired,
 };
 
 /** Bildet einen HTTP-Status (0 = keine Antwort) auf einen Fehlergrund ab. */
@@ -41,6 +43,7 @@ function isNotConfigured(e: HttpErrorResponse): boolean {
 }
 
 function failureFor(e: unknown, isOffline: boolean): OnlineSearchFailure {
+  if (isConsentRequiredError(e)) return 'consent';
   if (isTimeoutError(e)) return 'timeout';
   if (!(e instanceof HttpErrorResponse)) return 'server';
   return isNotConfigured(e) ? 'no-key' : failureForStatus(e.status, isOffline);

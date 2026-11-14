@@ -3,6 +3,7 @@ import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { AiService } from '../../core/ai/ai.service';
+import { ConsentStore } from '../../core/consent/consent.store';
 import { ProfileStore } from '../../core/state/profile.store';
 import { ProfileSheetComponent } from './profile-sheet.component';
 
@@ -17,6 +18,7 @@ function setup(translate: ReturnType<typeof vi.fn>): { sheet: ProfileSheetCompon
     providers: [provideHttpClient(), { provide: AiService, useValue: { translateSearchQuery: translate, isLive: () => true } }],
   });
   TestBed.overrideComponent(ProfileSheetComponent, { set: { template: '' } });
+  TestBed.inject(ConsentStore).grant(new Date(), true);
   const store = TestBed.inject(ProfileStore);
   store.setProfile({ ...BASE });
   const fixture = TestBed.createComponent(ProfileSheetComponent);

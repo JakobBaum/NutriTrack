@@ -1,5 +1,6 @@
 import { sanitizeBackupData } from './backup-sanitize';
 import { SCHEMA_KEY } from '../storage/storage-schema';
+import { CONSENT_KEY } from '../consent/consent.model';
 import { isQuarantineKey } from '../storage/storage-quarantine';
 
 /**
@@ -38,6 +39,7 @@ const NEVER_BACKED_UP_KEYS: ReadonlySet<string> = new Set([
   SCHEMA_KEY,
   AUTO_SNAPSHOT_KEY,
   REMINDER_SNOOZE_KEY,
+  CONSENT_KEY,
 ]);
 /** Geräte-interne Schlüssel (Meta, Auto-Sicherung, Quarantäne): weder Export noch Import. */
 export const isNeverBackedUp = (key: string): boolean => NEVER_BACKED_UP_KEYS.has(key) || isQuarantineKey(key);

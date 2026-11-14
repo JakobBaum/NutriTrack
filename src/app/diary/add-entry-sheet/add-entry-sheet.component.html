@@ -189,6 +189,7 @@
             <p class="form-note"><span class="ai-badge">mind.</span> Einige Zutaten haben keine Nährwerte — die Summe ist eine Untergrenze.</p>
           }
           @if (formHint()) { <p class="scan-hint">{{ formHint() }}</p> }
+          @if (sourceNote()) { <p class="scan-hint" data-testid="source-note">{{ sourceNote() }}</p> }
 
           <ion-list class="diary-list" lines="none">
             <ion-item lines="none">

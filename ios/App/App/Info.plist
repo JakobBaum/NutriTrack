@@ -69,10 +69,10 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>NutriTrack nutzt die Kamera, um Lebensmittel-Etiketten zu scannen und Barcodes zu lesen.</string>
+	<string>NutriTrack nutzt die Kamera für den Barcode-Scan sowie für Fotos von Etiketten und Rezepten. Fotos können zur Auswertung an einen KI-Dienst (Google Gemini) gesendet werden, wenn du dem zugestimmt hast.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>NutriTrack greift auf deine Fotos zu, um Etiketten-Bilder für die Nährwert-Erkennung auszuwählen.</string>
+	<string>NutriTrack greift auf deine Fotos zu, damit du ein Foto eines Etiketts oder Rezepts auswählen kannst. Das gewählte Foto kann zur Auswertung an einen KI-Dienst (Google Gemini) gesendet werden, wenn du dem zugestimmt hast.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>NutriTrack speichert aufgenommene Etiketten-Fotos in deiner Fotobibliothek.</string>
+	<string>NutriTrack speichert keine Fotos in deiner Mediathek. Diese Angabe verlangt nur der eingebundene Kamera-Baustein; die App nutzt die Funktion nicht.</string>
 </dict>
 </plist>

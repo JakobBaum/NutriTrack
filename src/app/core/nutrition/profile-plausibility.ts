@@ -9,7 +9,7 @@ const BMI_UNDERWEIGHT = 18.5;
 /** Ab diesem BMI rechnet das Eiweißziel mit einem Referenzgewicht. */
 const BMI_REFERENCE_WEIGHT = 30;
 /** Die Formeln sind für Erwachsene gerechnet. */
-const ADULT_AGE = 18;
+export const ADULT_AGE = 18;
 
 export interface PlausibilityInput {
   weightKg: number;
@@ -18,7 +18,7 @@ export interface PlausibilityInput {
   goal: Goal;
 }
 
-export type ProfileNoteCode = 'minor' | 'implausible' | 'underweightLose' | 'referenceWeight';
+export type ProfileNoteCode = 'minor' | 'minorLose' | 'implausible' | 'underweightLose' | 'referenceWeight';
 
 export interface ProfileNote {
   code: ProfileNoteCode;
@@ -32,8 +32,14 @@ export function bmiOf(weightKg: number, heightCm: number): number | null {
   return weightKg / (heightM * heightM);
 }
 
-function ageNote(age: number): ProfileNote[] {
+function ageNote(age: number, goal: Goal): ProfileNote[] {
   if (!Number.isFinite(age) || age <= 0 || age >= ADULT_AGE) return [];
+  if (goal === 'lose') {
+    return [{
+      code: 'minorLose',
+      text: 'Abnehmen ist unter 18 Jahren nicht vorgesehen. Die Formeln sind für Erwachsene gerechnet - sprich dein Ziel mit einer Ärztin oder einem Arzt ab.',
+    }];
+  }
   return [{
     code: 'minor',
     text: 'Die Formeln sind für Erwachsene gerechnet. Unter 18 Jahren sind die Werte nur eine grobe Orientierung - sprich bei Bedarf mit einer Ärztin oder einem Arzt.',
@@ -56,5 +62,5 @@ function bmiNote(bmi: number | null, goal: Goal): ProfileNote[] {
 
 /** Hinweise zu Alter und BMI für das Profilformular; leer bei unauffälligen Werten. */
 export function profileNotes(input: PlausibilityInput): ProfileNote[] {
-  return [...ageNote(input.age), ...bmiNote(bmiOf(input.weightKg, input.heightCm), input.goal)];
+  return [...ageNote(input.age, input.goal), ...bmiNote(bmiOf(input.weightKg, input.heightCm), input.goal)];
 }

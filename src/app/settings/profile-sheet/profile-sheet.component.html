@@ -108,6 +108,7 @@
         }
 
         <h2 class="nt-section-header">Ziele</h2>
+        <p class="hint" data-testid="health-note">{{ healthNote }}</p>
         <ion-list class="nt-grouped settings-form" data-testid="target-mode">
           <ion-item lines="none" class="form-row form-row--segment">
             <ion-segment [value]="form().manual ? 'manual' : 'auto'" aria-label="Tagesziel festlegen" (ionChange)="setManualMode($any($event).detail.value === 'manual')">
@@ -129,7 +130,7 @@
             </ion-item>
           </ion-list>
             @if (visibleManualError('kcal'); as err) { <p class="row-error row-error--block" role="alert" data-testid="manual-kcal-error">{{ err }}</p> }
-            @else if (manualKcalWarning(); as warn) { <p class="hint hint--warn row-error--block" role="status">{{ warn }}</p> }
+            @else if (manualKcalNote(); as warn) { <p class="hint hint--warn row-error--block" role="status">{{ warn }}</p> }
             @if (formula(); as f) { <p class="row-sub row-sub--block">Formel: {{ f.kcal | ntNum:0 }} kcal pro Tag</p> }
           <ion-list class="nt-grouped settings-form manual-form">
             <ion-item class="form-row manual-row" lines="none">

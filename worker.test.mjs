@@ -303,16 +303,19 @@ describe('importRecipe — SSRF-Schutz und Seitentext', () => {
     const page = `<html><head><script>var tracking = "MUELL";</script>
       <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage"},
       {"@type":"Recipe","name":"Linsensuppe","recipeIngredient":["200 g Linsen"]}]}</script></head><body>Text</body></html>`;
-    mockFetch((url) => url.startsWith('https://rezepte.example')
-      ? new Response(page, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } })
-      : geminiReply({ title: 'Linsensuppe', servings: 2, ingredients: [], steps: [] }));
+    mockFetch((url) => {
+      if (url.endsWith('/robots.txt')) return new Response('', { status: 404 });
+      return url.startsWith('https://rezepte.example')
+        ? new Response(page, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+        : geminiReply({ title: 'Linsensuppe', servings: 2, ingredients: [], steps: [] });
+    });
 
     // Act
     const res = await worker.fetch(post({ fn: 'importRecipe', payload: { url: 'https://rezepte.example/linsen' } }), ENV);
 
     // Assert
     assert.equal(res.status, 200);
-    const prompt = JSON.parse(upstream[1].init.body).contents[0].parts.at(-1).text;
+    const prompt = JSON.parse(upstream.at(-1).init.body).contents[0].parts.at(-1).text;
     assert.match(prompt, /Linsensuppe/);
     assert.match(prompt, /200 g Linsen/);
     assert.doesNotMatch(prompt, /MUELL/);
@@ -323,26 +326,22 @@ describe('GET /health und Modellwechsel', () => {
   const OK = { kcal: 2000, proteinG: 150, carbsG: 200, fatG: 60, fiberG: 30, sugarG: 40 };
   const run = () => worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), ENV);
 
-  it('meldet Status ohne Key-Wert', async () => {
-    const res = await worker.fetch(get('/health'), ENV);
+  it('meldet nur ok:true und keine Konfigurationsdetails (R19)', async () => {
+    const env = {
+      ...ENV, SPOONACULAR_API_KEY: 'spoon-secret', GEMINI_MODEL: 'm1', GEMINI_FALLBACK_MODEL: 'm2',
+      AI_LIMITER: { limit: async () => ({ success: true }) },
+    };
+    const res = await worker.fetch(get('/health'), env);
     assert.equal(res.status, 200);
     assert.equal(res.headers.get('Access-Control-Allow-Origin'), APP_ORIGIN);
     const body = await res.json();
-    assert.deepEqual(body, {
-      ok: true, hasKey: true, hasRecipeKey: false, hasRateLimiter: false, hasDailyCap: false,
-      warning: 'Kein Tageslimit aktiv (KV-Binding DAILY_KV fehlt).',
-      model: 'gemini-3.6-flash', fallbackModel: 'gemini-3.5-flash-lite',
-    });
+    assert.deepEqual(body, { ok: true });
     assert.ok(!JSON.stringify(body).includes('test-key'));
   });
 
-  it('meldet hasKey=false ohne Secret und respektiert Modell-Overrides', async () => {
-    const res = await worker.fetch(get('/health'), { GEMINI_MODEL: 'm1', GEMINI_FALLBACK_MODEL: 'm2' });
-    assert.deepEqual(await res.json(), {
-      ok: true, hasKey: false, hasRecipeKey: false, hasRateLimiter: false, hasDailyCap: false,
-      warning: 'Kein Tageslimit aktiv (KV-Binding DAILY_KV fehlt).',
-      model: 'm1', fallbackModel: 'm2',
-    });
+  it('antwortet auch ohne jede Konfiguration nur mit ok:true', async () => {
+    const res = await worker.fetch(get('/health'), {});
+    assert.deepEqual(await res.json(), { ok: true });
   });
 
   it('wechselt bei 404 (Modell unbekannt) sofort auf das Fallback-Modell', async () => {
@@ -537,14 +536,12 @@ describe('GET /recipes/complexSearch (spoonacular)', () => {
     assert.equal(upstream.length, 0);
   });
 
-  it('meldet hasRecipeKey in /health ohne den Wert zu verraten', async () => {
+  it('verrät den Rezept-Schlüssel nicht über /health', async () => {
     // Act
     const res = await worker.fetch(get('/health'), RECIPE_ENV);
 
     // Assert
-    const body = await res.json();
-    assert.equal(body.hasRecipeKey, true);
-    assert.ok(!JSON.stringify(body).includes('spoon-secret'));
+    assert.ok(!(await res.text()).includes('spoon-secret'));
   });
 });
 
@@ -585,21 +582,10 @@ describe('Tageszähler (WRK-01/SEC-02)', () => {
     assert.equal((await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), env)).status, 429);
   });
 
-  it('läuft ohne Binding fail-open und meldet das in /health', async () => {
+  it('läuft ohne Binding fail-open (kein Deckel)', async () => {
     mockFetch(() => geminiReply({}));
     const res = await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), ENV);
     assert.equal(res.status, 200);
-    const health = await (await worker.fetch(get('/health'), ENV)).json();
-    assert.equal(health.hasDailyCap, false);
-    assert.match(health.warning, /Tageslimit/);
-  });
-
-  it('meldet hasDailyCap und hasRateLimiter mit Bindings', async () => {
-    const env = { ...ENV, DAILY_KV: fakeKv(), AI_LIMITER: { limit: async () => ({ success: true }) } };
-    const health = await (await worker.fetch(get('/health'), env)).json();
-    assert.equal(health.hasDailyCap, true);
-    assert.equal(health.hasRateLimiter, true);
-    assert.equal(health.warning, undefined);
   });
 
   it('antwortet bei konfiguriertem, aber nicht erreichbarem KV mit 503 (fail-closed) ohne Upstream-Call', async () => {
@@ -755,6 +741,14 @@ describe('spoonacular-Cache (WRK-03)', () => {
     assert.equal(upstream.length, 1);
   });
 
+  it('hält Antworten höchstens eine Stunde im Cache (Spoonacular-Bedingungen, R4)', async () => {
+    mockFetch(() => new Response('{"results":[]}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    await worker.fetch(get('/recipes/complexSearch?query=soup'), RECIPE_ENV);
+    const stored = await globalThis.caches.default.match(new Request(upstream[0].url));
+    const maxAge = Number(/max-age=(\d+)/.exec(stored.headers.get('Cache-Control'))?.[1]);
+    assert.ok(maxAge > 0 && maxAge <= 3600, `max-age war ${maxAge}`);
+  });
+
   it('cached keine Fehlerantworten', async () => {
     mockFetch(() => new Response('{"message":"limit"}', { status: 402 }));
     await worker.fetch(get('/recipes/complexSearch?query=soup'), RECIPE_ENV);
@@ -888,5 +882,289 @@ describe('suggestFastfood: Kriterien, Land und Ausschlussliste', () => {
     assert.equal((await run({ preferences: 'günstig' })).status, 400);
     assert.equal((await run({ exclude: { a: 1 } })).status, 400);
     assert.equal(upstream.length, 0);
+  });
+});
+
+// ── Link-Import: ehrlicher User-Agent, Sperrliste, robots.txt (R16) ──────
+
+const IMPORT_UA = 'NutriTrackRecipeImport/1.0 (+https://jakobbaum.github.io/NutriTrack/)';
+const PAGE_NOT_ALLOWED = 'Von dieser Seite können wir keine Rezepte abrufen. Kopiere den Rezepttext und füge ihn ein.';
+const RECIPE_PAGE = '<html><script type="application/ld+json">{"@type":"Recipe","name":"Linsensuppe","recipeIngredient":["200 g Linsen"]}</script></html>';
+const RECIPE_JSON = { title: 'Linsensuppe', servings: 2, ingredients: [], steps: [] };
+
+const isRobotsUrl = (url) => new URL(url).pathname === '/robots.txt';
+const htmlReply = (body) => new Response(body, { status: 200, headers: { 'Content-Type': 'text/html' } });
+const importUrl = (url, extra = {}) => worker.fetch(post({ fn: 'importRecipe', payload: { url, ...extra } }), ENV);
+const pageCalls = () => upstream.filter((u) => !isRobotsUrl(u.url) && !u.url.includes('generativelanguage'));
+
+/** Mockt Rezeptseite, robots.txt und Gemini; `robots` liefert die robots.txt-Antwort je URL. */
+function mockSite(robots) {
+  mockFetch((url) => {
+    if (url.includes('generativelanguage')) return geminiReply(RECIPE_JSON);
+    if (isRobotsUrl(url)) return robots(url);
+    return htmlReply(RECIPE_PAGE);
+  });
+}
+const robotsText = (text) => () => new Response(text, { status: 200, headers: { 'Content-Type': 'text/plain' } });
+const robotsStatus = (status) => () => new Response('', { status });
+
+describe('importRecipe — ehrlicher User-Agent', () => {
+  it('nutzt für Seite und robots.txt denselben ehrlichen User-Agent ohne Browser-Tarnung', async () => {
+    mockSite(robotsStatus(404));
+
+    const res = await importUrl('https://rezepte.example/linsen');
+
+    assert.equal(res.status, 200);
+    const agents = upstream.filter((u) => !u.url.includes('generativelanguage')).map((u) => u.init.headers['User-Agent']);
+    assert.equal(agents.length, 2);
+    for (const agent of agents) {
+      assert.equal(agent, IMPORT_UA);
+      assert.doesNotMatch(agent, /Mozilla/);
+    }
+  });
+});
+
+describe('importRecipe — Sperrliste für Plattformen', () => {
+  for (const host of ['tiktok.com', 'www.tiktok.com', 'vm.tiktok.com', 'instagram.com', 'www.instagram.com', 'facebook.com', 'm.facebook.com',
+    'x.com', 'twitter.com', 'mobile.twitter.com', 'TikTok.com', 'www.tiktok.com.']) {
+    it(`lehnt ${host} mit 422 und klarer Meldung ab, ohne Abruf`, async () => {
+      mockSite(robotsStatus(404));
+
+      const res = await importUrl(`https://${host}/video/123`);
+
+      assert.equal(res.status, 422);
+      assert.equal((await res.json()).error, PAGE_NOT_ALLOWED);
+      assert.equal(upstream.length, 0);
+    });
+  }
+
+  for (const host of ['nottiktok.com', 'tiktok.com.evil.example', 'fakex.com', 'notx.com', 'xx.com', 'mytwitter.com', 'instagram.com.example']) {
+    it(`behandelt ${host} nicht als gesperrt`, async () => {
+      mockSite(robotsStatus(404));
+
+      const res = await importUrl(`https://${host}/rezept`);
+
+      assert.equal(res.status, 200);
+    });
+  }
+
+  it('fällt bei gesperrtem Host auf den mitgesendeten Text zurück, ohne die Seite abzurufen', async () => {
+    mockSite(robotsStatus(404));
+
+    const res = await importUrl('https://www.tiktok.com/@a/video/1', { text: 'Linsensuppe: 200 g Linsen' });
+
+    assert.equal(res.status, 200);
+    assert.equal(upstream.length, 1);
+    assert.match(upstream[0].url, /generativelanguage/);
+  });
+
+  it('lehnt eine Weiterleitung auf einen gesperrten Host ab', async () => {
+    mockFetch((url) => {
+      if (isRobotsUrl(url)) return new Response('', { status: 404 });
+      return new Response(null, { status: 302, headers: { Location: 'https://www.instagram.com/p/abc' } });
+    });
+
+    const res = await importUrl('https://kurz.example/r');
+
+    assert.equal(res.status, 422);
+    assert.equal((await res.json()).error, PAGE_NOT_ALLOWED);
+    assert.ok(!upstream.some((u) => u.url.includes('instagram.com')));
+  });
+});
+
+describe('importRecipe — robots.txt-Regeln', () => {
+  const CASES = [
+    ['Disallow: / für alle', 'User-agent: *\nDisallow: /', '/rezept', false],
+    ['Disallow-Präfix trifft nicht andere Pfade', 'User-agent: *\nDisallow: /privat', '/rezept', true],
+    ['Disallow-Präfix trifft Unterpfad', 'User-agent: *\nDisallow: /privat', '/privat/x', false],
+    ['längerer Allow schlägt kürzeren Disallow', 'User-agent: *\nDisallow: /rezepte\nAllow: /rezepte/offen', '/rezepte/offen/linsen', true],
+    ['kürzerer Allow verliert gegen längeren Disallow', 'User-agent: *\nAllow: /rezepte\nDisallow: /rezepte/zu', '/rezepte/zu/linsen', false],
+    ['gleich langer Allow gewinnt', 'User-agent: *\nDisallow: /a\nAllow: /a', '/a/b', true],
+    ['leeres Disallow erlaubt alles', 'User-agent: *\nDisallow:', '/alles', true],
+    ['eigene Gruppe erlaubt trotz Disallow für *', 'User-agent: *\nDisallow: /\n\nUser-agent: NutriTrackRecipeImport\nAllow: /', '/x', true],
+    ['eigene Gruppe verbietet trotz Allow für *', 'User-agent: *\nAllow: /\n\nUser-agent: NutriTrackRecipeImport\nDisallow: /', '/x', false],
+    ['Agentenname ohne Beachtung der Groß-/Kleinschreibung', 'User-agent: nutritrackrecipeimport\nDisallow: /', '/x', false],
+    ['andere Bots beeinflussen uns nicht', 'User-agent: Googlebot\nDisallow: /', '/x', true],
+    ['mehrere User-agent-Zeilen bilden eine Gruppe', 'User-agent: foo\nUser-agent: NutriTrackRecipeImport\nDisallow: /', '/x', false],
+    ['Kommentare und Feldnamen in Großschreibung', 'USER-AGENT: *  # alle\nDISALLOW: /x # nein', '/x/y', false],
+    ['Wildcard * im Pfad', 'User-agent: *\nDisallow: /*/drucken', '/linsen/drucken', false],
+    ['Wildcard trifft fremden Pfad nicht', 'User-agent: *\nDisallow: /*/drucken', '/linsen/lesen', true],
+    ['$ verankert das Ende (Treffer)', 'User-agent: *\nDisallow: /*.pdf$', '/a.pdf', false],
+    ['$ verankert das Ende (kein Treffer)', 'User-agent: *\nDisallow: /*.pdf$', '/a.pdf.html', true],
+    ['Query-String zählt zum Pfad', 'User-agent: *\nDisallow: /*?print=', '/r?print=1', false],
+    ['Pfad ohne Query bleibt erlaubt', 'User-agent: *\nDisallow: /*?print=', '/r', true],
+    ['Pfade sind case-sensitiv', 'User-agent: *\nDisallow: /Privat', '/privat', true],
+    ['Regeln ohne Gruppe werden ignoriert', 'Disallow: /', '/x', true],
+    ['leere robots.txt erlaubt alles', '', '/x', true],
+  ];
+  for (const [name, robots, path, allowed] of CASES) {
+    it(`${name}: ${path} ${allowed ? 'erlaubt' : 'gesperrt'}`, async () => {
+      mockSite(robotsText(robots));
+
+      const res = await importUrl(`https://rezepte.example${path}`);
+
+      if (allowed) {
+        assert.equal(res.status, 200);
+        assert.equal(pageCalls().length, 1);
+      } else {
+        assert.equal(res.status, 422);
+        assert.equal((await res.json()).error, PAGE_NOT_ALLOWED);
+        assert.equal(pageCalls().length, 0);
+      }
+    });
+  }
+
+  it('holt robots.txt vom selben Host über https', async () => {
+    mockSite(robotsStatus(404));
+
+    await importUrl('https://rezepte.example/a/b?x=1');
+
+    assert.equal(upstream[0].url, 'https://rezepte.example/robots.txt');
+  });
+
+  it('fällt bei Disallow auf den mitgesendeten Text zurück', async () => {
+    mockSite(robotsText('User-agent: *\nDisallow: /'));
+
+    const res = await importUrl('https://rezepte.example/linsen', { text: 'Linsensuppe' });
+
+    assert.equal(res.status, 200);
+    assert.equal(pageCalls().length, 0);
+  });
+});
+
+describe('importRecipe — robots.txt nicht erreichbar (RFC 9309)', () => {
+  for (const status of [404, 403, 410]) {
+    it(`erlaubt den Abruf bei robots.txt mit HTTP ${status}`, async () => {
+      mockSite(robotsStatus(status));
+
+      const res = await importUrl('https://rezepte.example/linsen');
+
+      assert.equal(res.status, 200);
+    });
+  }
+
+  for (const status of [500, 502, 503]) {
+    it(`sperrt den Abruf bei robots.txt mit HTTP ${status}`, async () => {
+      mockSite(robotsStatus(status));
+
+      const res = await importUrl('https://rezepte.example/linsen');
+
+      assert.equal(res.status, 422);
+      assert.equal((await res.json()).error, PAGE_NOT_ALLOWED);
+      assert.equal(pageCalls().length, 0);
+    });
+  }
+
+  it('sperrt den Abruf bei Netzfehler der robots.txt', async () => {
+    mockSite(() => { throw new TypeError('network down'); });
+
+    const res = await importUrl('https://rezepte.example/linsen');
+
+    assert.equal(res.status, 422);
+    assert.equal(pageCalls().length, 0);
+  });
+
+  it('folgt Weiterleitungen der robots.txt und wertet das Ziel aus', async () => {
+    mockSite((url) => (url.startsWith('https://rezepte.example')
+      ? new Response(null, { status: 301, headers: { Location: 'https://cdn.example/robots.txt' } })
+      : new Response('User-agent: *\nDisallow: /', { status: 200 })));
+
+    const res = await importUrl('https://rezepte.example/linsen');
+
+    assert.equal(res.status, 422);
+    assert.equal(pageCalls().length, 0);
+  });
+
+  for (const target of ['http://127.0.0.1/robots.txt', 'http://169.254.169.254/latest', 'file:///etc/passwd']) {
+    it(`folgt einer robots.txt-Weiterleitung auf ${target} nicht und sperrt den Abruf`, async () => {
+      mockSite(() => new Response(null, { status: 302, headers: { Location: target } }));
+
+      const res = await importUrl('https://rezepte.example/linsen');
+
+      assert.equal(res.status, 422);
+      assert.ok(!upstream.some((u) => u.url === target));
+      assert.equal(pageCalls().length, 0);
+    });
+  }
+
+  it('wertet nur die ersten 512 KiB der robots.txt aus', async () => {
+    const padding = '# x\n'.repeat(160 * 1024);
+    mockSite(robotsText(`User-agent: *\n${padding}Disallow: /`));
+
+    const res = await importUrl('https://rezepte.example/linsen');
+
+    assert.equal(res.status, 200);
+  });
+
+  it('prüft robots.txt auch für den Host einer Weiterleitung der Seite', async () => {
+    mockFetch((url) => {
+      if (url.includes('generativelanguage')) return geminiReply(RECIPE_JSON);
+      if (url === 'https://kurz.example/robots.txt') return new Response('', { status: 404 });
+      if (url === 'https://ziel.example/robots.txt') return new Response('User-agent: *\nDisallow: /', { status: 200 });
+      if (url.startsWith('https://kurz.example')) return new Response(null, { status: 302, headers: { Location: 'https://ziel.example/r' } });
+      return htmlReply(RECIPE_PAGE);
+    });
+
+    const res = await importUrl('https://kurz.example/r');
+
+    assert.equal(res.status, 422);
+    assert.ok(!upstream.some((u) => u.url === 'https://ziel.example/r'));
+  });
+});
+
+// ── Logging ohne Inhalte (R20) ───────────────────────────────────────────
+
+function captureConsole() {
+  const methods = ['log', 'info', 'warn', 'error', 'debug'];
+  const originals = Object.fromEntries(methods.map((m) => [m, console[m]]));
+  const lines = [];
+  const render = (arg) => (arg instanceof Error ? `${arg.name}: ${arg.message}\n${arg.stack}` : typeof arg === 'string' ? arg : JSON.stringify(arg));
+  for (const m of methods) console[m] = (...args) => { lines.push(args.map(render).join(' ')); };
+  return { lines, restore: () => methods.forEach((m) => { console[m] = originals[m]; }) };
+}
+
+describe('Logging ohne Inhalte (R20)', () => {
+  let logs;
+  beforeEach(() => { logs = captureConsole(); });
+  afterEach(() => { logs.restore(); });
+
+  const rawGeminiReply = (text) => new Response(
+    JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } },
+  );
+
+  it('loggt bei nicht lesbarer KI-Antwort nur Art und Länge, nie den Inhalt', async () => {
+    const answer = 'GEHEIMER-NUTZERINHALT ohne JSON';
+    mockFetch(() => rawGeminiReply(answer));
+
+    const res = await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), ENV);
+
+    assert.equal(res.status, 422);
+    const output = logs.lines.join('\n');
+    assert.ok(output.length > 0, 'es sollte etwas geloggt werden');
+    assert.doesNotMatch(output, /GEHEIMER/);
+    assert.ok(output.includes(String(answer.length)), 'Länge fehlt im Log');
+  });
+
+  it('loggt bei Upstream-Fehlern keine Meldungstexte, Nutzereingaben oder Schlüssel', async () => {
+    mockFetch(() => new Response(JSON.stringify({ error: { message: 'Eingabe NUTZERTEXT-XYZ und Schluessel test-key' } }), { status: 400 }));
+    const request = post({ fn: 'suggestFastfood', payload: { restaurant: 'NUTZERTEXT-XYZ', kcalBudget: 600 } }, { headers: { 'CF-Connecting-IP': '203.0.113.7' } });
+
+    const res = await worker.fetch(request, ENV);
+
+    assert.equal(res.status, 500);
+    const output = logs.lines.join('\n');
+    assert.ok(output.length > 0);
+    assert.doesNotMatch(output, /NUTZERTEXT|test-key|203\.0\.113\.7/);
+  });
+
+  it('loggt bei KV-Fehlern keine Fehlermeldung des Speichers', async () => {
+    const kv = { get: async () => { throw new Error('kv-geheim-detail'); }, put: async () => {} };
+
+    const res = await worker.fetch(post({ fn: 'suggestFastfood', payload: FASTFOOD }), { ...ENV, DAILY_KV: kv });
+
+    assert.equal(res.status, 503);
+    assert.ok(logs.lines.length > 0);
+    assert.doesNotMatch(logs.lines.join('\n'), /kv-geheim-detail/);
   });
 });

@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { AiService } from '../ai/ai.service';
+import { ConsentService } from '../consent/consent.service';
 import { AppSettingsStore } from '../state/app-settings.store';
 import { sanitizeEnglishTerm } from './diet-prefs';
 
@@ -35,12 +36,14 @@ function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
 export class DietTranslateService {
   private readonly ai = inject(AiService);
   private readonly settings = inject(AppSettingsStore);
+  private readonly consent = inject(ConsentService);
 
   async translateDislikes(dislikes: readonly string[], base: DislikeTranslationBase): Promise<DislikeTranslation> {
     const known = new Map(
       base.dislikes.map((term, i) => [term.toLowerCase(), base.dislikesEn[i] ?? ''] as const).filter(([, en]) => en !== ''),
     );
-    const live = this.ai.isLive();
+    // Hintergrund: ohne Zustimmung bleibt die englische Entsprechung leer (kein Dialog, nichts geht hinaus).
+    const live = this.ai.isLive() && this.consent.isGranted();
     const results = await Promise.all(
       dislikes.map(async (term) => known.get(term.toLowerCase()) ?? (live ? await this.translateOne(term) : '')),
     );

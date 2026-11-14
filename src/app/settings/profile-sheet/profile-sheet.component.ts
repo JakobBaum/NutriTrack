@@ -1,10 +1,11 @@
+import { HEALTH_NOTES } from '../../core/messages/health-notes';
 import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { DIET_FORM_OPTIONS, DIET_HINT, INTOLERANCE_HINT, INTOLERANCE_OPTIONS, MAX_DISLIKES, MAX_DISLIKE_LENGTH } from '../../core/diet/diet-options';
 import { addDislike, removeDislike, toggleIntolerance } from '../../core/diet/diet-prefs';
 import { DietTranslateService } from '../../core/diet/diet-translate.service';
 import { ActivityLevel, DailyTarget, DietForm, Goal, Intolerance, Sex, UserProfile } from '../../core/models';
-import { PROTEIN_NOTE_ABOVE_G_PER_KG } from '../../core/nutrition/manual-target';
+import { PROTEIN_NOTE_ABOVE_G_PER_KG, manualKcalWarning } from '../../core/nutrition/manual-target';
 import { NutritionCalcService } from '../../core/nutrition/nutrition-calc.service';
 import { ProfileNote, profileNotes } from '../../core/nutrition/profile-plausibility';
 import { ProfileStore } from '../../core/state/profile.store';
@@ -187,12 +188,12 @@ export class ProfileSheetComponent {
   });
 
   /** Hinweis, wenn das manuelle Kalorienziel unter der Mindestzufuhr liegt (Warnung, keine Sperre). */
-  readonly manualKcalWarning = computed(() => {
+  readonly healthNote = HEALTH_NOTES.profile;
+
+  readonly manualKcalNote = computed(() => {
     const f = this.form();
     const kcal = f.manual ? parseDecimal(f.manualKcalText) : null;
-    if (kcal === null || kcal < 1000) return null;
-    const min = this.calc.minimumKcal({ sex: f.sex });
-    return kcal < min ? `Unter der üblichen Mindestzufuhr von ${min.toLocaleString('de-DE')} kcal. Das ist nur ein Hinweis.` : null;
+    return manualKcalWarning(kcal, this.calc.minimumKcal({ sex: f.sex }));
   });
   /** Gramm Eiweiß pro Tag, die das g/kg-Ziel ergibt (null bei ungültiger Eingabe oder ohne Gewicht). */
   readonly manualProteinGrams = computed(() => {

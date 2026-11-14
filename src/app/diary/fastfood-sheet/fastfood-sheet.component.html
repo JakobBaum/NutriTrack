@@ -25,6 +25,7 @@
         <p class="scan-hint" role="status">Keine Vorschläge im Budget. Budget erhöhen oder später erneut versuchen.</p>
       }
 
+      @if (ffResults().length > 0) { <p class="scan-hint" role="note" data-testid="ff-note">{{ ffNote }}</p> }
       <div #ffAnchor></div>
       @for (s of ffResults(); track s.itemName) {
         <ion-card class="ff-card">

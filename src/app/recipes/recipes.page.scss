@@ -167,3 +167,4 @@ ion-modal ion-content > .nt-section-header:first-child { margin-top: 0; }
 .detail-list, .detail-steps { margin: 0; color: var(--nt-ink); }
 .detail-list { padding: 0; list-style: none; li { @extend %row; justify-content: space-between; gap: var(--nt-space-3); padding: 8px 0; border-bottom: 0.5px solid var(--nt-separator); } }
 .detail-steps { padding: 0 0 0 var(--nt-space-4); li { padding: 4px 0; } }
+.recipe__source-credit { display: block; }

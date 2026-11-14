@@ -12,6 +12,7 @@ import {
 } from '@angular/core';
 import { ActionSheetController, ToastController } from '@ionic/angular';
 import { AmountUnit, DiaryEntry, FoodItem, MealType, NutritionFacts, Recipe, SavedMeal } from '../../core/models';
+import { sourceAttribution } from '../../core/messages/source-attribution';
 import { OpenPricesProvider } from '../../core/price/open-prices.provider';
 import { StorageService } from '../../core/storage/storage.service';
 import { describeStorageError } from '../../core/storage/storage-messages';
@@ -172,6 +173,8 @@ export class AddEntrySheetComponent implements OnChanges {
   /** True, wenn die Werte im Formular aus einer KI-Schätzung stammen. */
   readonly isAiEstimate = signal(false);
   readonly formHint = signal<string | null>(null);
+  /** Quellenangabe zu Open Food Facts / Open Prices (Lizenzpflicht), solange ein Treffer im Formular steht. */
+  readonly sourceNote = signal<string | null>(null);
   /** Freitext-Filter für die Rezept-Auswahl. */
   readonly recipeQuery = signal('');
   /** Freitext-Filter für gespeicherte (eigene) Lebensmittel. */
@@ -266,6 +269,7 @@ export class AddEntrySheetComponent implements OnChanges {
     this.customQuery.set('');
     this.foodSearch?.reset();
     this.formHint.set(null);
+    this.sourceNote.set(null);
     this.isAiEstimate.set(false);
     this.isPartialSource = false;
     this.adjustOpen.set(undefined);
@@ -389,6 +393,7 @@ export class AddEntrySheetComponent implements OnChanges {
     this.amountUnit = unitForName(label);
     this.unitTouched = false;
     this.formHint.set(null);
+    this.sourceNote.set(null);
     this.isAiEstimate.set(false);
     this.isPartialSource = false;
     this.error.set(null);
@@ -507,6 +512,7 @@ export class AddEntrySheetComponent implements OnChanges {
       servings,
     };
     this.formHint.set(opts.hint ?? null);
+    this.sourceNote.set(null);
     this.isAiEstimate.set(opts.isAi ?? false);
     this.isPartialSource = opts.isPartial ?? false;
     this.error.set(null);
@@ -610,6 +616,7 @@ export class AddEntrySheetComponent implements OnChanges {
   onSource(res: FoodSourceResult): void {
     this.applyFacts(res.name, res.facts, { brand: res.brand, isAi: res.isAi, hint: res.hint, servingG: plausibleServingG(res.servingG) });
     if (res.blankFields) this.form = { ...this.form, ...res.blankFields };
+    this.sourceNote.set(sourceAttribution(res.source, false));
     if (res.code) void this.addPriceHint(res.code);
   }
 
@@ -622,7 +629,9 @@ export class AddEntrySheetComponent implements OnChanges {
   /** Realen Preis (Open Prices) best-effort ergänzen — blockiert nichts. */
   private async addPriceHint(code: string): Promise<void> {
     const price = await this.prices.priceByBarcode(code);
-    if (price) this.formHint.set(`Realer Preis ca. ${formatNum(price.avg, 2, 2)} ${price.currency}.`);
+    if (!price) return;
+    this.formHint.set(`Realer Preis ca. ${formatNum(price.avg, 2, 2)} ${price.currency}.`);
+    this.sourceNote.set(sourceAttribution('barcode', true));
   }
 
   // --- Speichern ---

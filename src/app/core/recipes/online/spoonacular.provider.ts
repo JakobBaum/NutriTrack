@@ -2,6 +2,7 @@ import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom, timeout } from 'rxjs';
 import { AI_TIMEOUT_MS } from '../../ai/ai-errors';
+import { ConsentService } from '../../consent/consent.service';
 import { RecipeSearchAccessService } from './recipe-search-access';
 import { OnlineRecipe, OnlineSearchPage } from './online-recipe.model';
 import { OnlineSearchError, ONLINE_SEARCH_MESSAGES, toOnlineSearchError } from './spoonacular.errors';
@@ -25,6 +26,7 @@ const QUOTA_HEADER = 'X-Api-Quota-Left';
 export class SpoonacularProvider {
   private readonly http = inject(HttpClient);
   private readonly accessService = inject(RecipeSearchAccessService);
+  private readonly consent = inject(ConsentService);
 
   private readonly _quotaLeft = signal<number | null>(null);
   /** Zuletzt gemeldete Restpunkte des Tages (null = unbekannt). */
@@ -42,6 +44,7 @@ export class SpoonacularProvider {
   private async get(params: Record<string, string>): Promise<HttpResponse<SpoonSearchResponse>> {
     const access = this.accessService.resolve();
     if (!access.available) throw new OnlineSearchError('no-key', ONLINE_SEARCH_MESSAGES['no-key']);
+    if (!this.consent.isGranted() && !(await this.consent.ensure())) throw new OnlineSearchError('consent', ONLINE_SEARCH_MESSAGES.consent);
     try {
       const res = await firstValueFrom(
         this.http.get<SpoonSearchResponse>(`${access.baseUrl}${SEARCH_PATH}`, {

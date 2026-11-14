@@ -1,8 +1,9 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { AiService } from '../../ai/ai.service';
+import { ConsentService } from '../../consent/consent.service';
 import { AppSettingsStore } from '../../state/app-settings.store';
 import { OnlineRecipe } from '../online/online-recipe.model';
-import { translateIngredientName } from './ingredient-dictionary';
+import { translateIngredientName, translateQueryWithDictionary } from './ingredient-dictionary';
 import { RecipeTexts, TranslationResult } from './translate.model';
 import { TranslationCache, cacheKey } from './translation-cache';
 
@@ -45,6 +46,7 @@ export function isTranslated(recipe: Pick<OnlineRecipe, 'lang'>): boolean {
 @Injectable({ providedIn: 'root' })
 export class RecipeTranslateService {
   private readonly ai = inject(AiService);
+  private readonly consent = inject(ConsentService);
   private readonly cache = inject(TranslationCache);
   private readonly settings = inject(AppSettingsStore);
   private readonly inFlight = new Map<string, Promise<TranslationResult>>();
@@ -56,7 +58,17 @@ export class RecipeTranslateService {
 
   /** Ob eine KI-Übersetzung möglich ist (sonst nur Wörterbuch). */
   canTranslate(): boolean {
-    return this.ai.isLive();
+    return this.isAiUsable();
+  }
+
+  /** Die KI ist eingerichtet, aber es fehlt die Zustimmung: dann gar nicht erst aufrufen, nur das Wörterbuch nutzen. */
+  private isAiBlockedByConsent(): boolean {
+    return this.ai.isLive() && !this.consent.isGranted();
+  }
+
+  /** KI nur mit Zustimmung: Übersetzungen laufen im Hintergrund und öffnen nie den Dialog. */
+  private isAiUsable(): boolean {
+    return this.ai.isLive() && this.consent.isGranted();
   }
 
   /** Liefert das Rezept in der App-Sprache; schlägt nie fehl (Rückfall = Original mit `lang: 'en'`). */
@@ -97,7 +109,8 @@ export class RecipeTranslateService {
   async translateQuery(query: string): Promise<{ query: string; viaAi: boolean }> {
     const trimmed = query.trim();
     if (!trimmed) return { query: trimmed, viaAi: false };
-    const viaAi = this.ai.isLive();
+    const viaAi = this.isAiUsable();
+    if (this.isAiBlockedByConsent()) return { query: translateQueryWithDictionary(trimmed), viaAi: false };
     try {
       return { query: await this.ai.translateSearchQuery(trimmed, this.settings.appLanguage), viaAi };
     } catch {
@@ -117,15 +130,20 @@ export class RecipeTranslateService {
     return job;
   }
 
+  private dictionaryTexts(source: RecipeTexts): RecipeTexts {
+    return { ...source, ingredients: source.ingredients.map(translateIngredientName) };
+  }
+
   private async run(key: string, source: RecipeTexts): Promise<TranslationResult> {
     this.pending.update((n) => n + 1);
     try {
-      const complete = this.ai.isLive();
+      if (this.isAiBlockedByConsent()) return { texts: this.dictionaryTexts(source), complete: false };
+      const complete = this.isAiUsable();
       const texts = await this.ai.translateRecipe(source, this.settings.appLanguage);
       if (complete) this.cache.set(key, texts);
       return { texts, complete };
     } catch {
-      return { texts: { ...source, ingredients: source.ingredients.map(translateIngredientName) }, complete: false };
+      return { texts: this.dictionaryTexts(source), complete: false };
     } finally {
       this.pending.update((n) => n - 1);
     }
