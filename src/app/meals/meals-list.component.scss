@@ -53,7 +53,6 @@
 ion-modal ion-content {
   --padding-start: var(--nt-page-gutter);
   --padding-end: var(--nt-page-gutter);
-  --padding-bottom: 0; // der Sticky-Fuss (.nt-sheet-footer) bringt den unteren Abstand mit
 }
 
 
@@ -161,8 +160,3 @@ ion-modal ion-buttons ion-button {
   font-weight: 600;
   color: var(--nt-over);
 }
-
-// Speichern bleibt auch bei kurzem Inhalt unten (ohne Sticky-Wirkung waere es direkt unter dem letzten Feld)
-ion-modal ion-content::part(scroll) { display: flex; flex-direction: column; }
-ion-modal ion-content > * { flex: none; }
-.nt-sheet-footer { z-index: 3; margin-top: auto; padding-top: var(--nt-space-4); }

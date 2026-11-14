@@ -46,3 +46,45 @@ Annahmen: Rückgängig-Hinweis 3,5 s statt 5 s. Nutri-Score steht in der Nährwe
 - `allowClose` bleibt true, falls das Schließen nach bestätigtem Verwerfen scheitert (konstruierter Fall).
 - Feste Wartezeiten in den neuen E2E-Tests.
 - Die zentrale Feldschrift-Regel hat Spezifität (0,1,1); Komponenten, die bewusst größere Felder wollen, müssen `max(var(--nt-fs-input), …)` nutzen.
+
+## Welle 2: Layout und Einheitlichkeit (Branch `welle-2-layout`, nicht gemergt)
+
+Soll vom Nutzer freigegeben; Navigation Variante B. Die Regeln stehen in `DESIGN.md`, Abschnitt "Layout-Bausteine (Welle 2)".
+
+### Geändert
+- Tokens und Bausteine: `src/styles/layout.scss`, `src/styles/buttons.scss`, `src/theme/variables.scss`. Ein Seitenrand (`--nt-page-gutter`), Kartenabstand 12, Abschnittsabstand 24, Kopfzeile 44, Buttons und Symbol-Buttons 44, FAB 56 mit 16 Abstand, Innenradius = Kartenradius minus Kartenpadding (mind. 8).
+- Alle Seiten auf `.nt-page` / `.nt-stack` und `<nt-page-header>`; je Seite höchstens ein FAB als direktes Kind von `ion-content`.
+- Navigation: nur Symbole, Reihenfolge Heute, Rezepte, Tagebuch, Einkauf, Profil (`tabs.page.*`). Namen für Screenreader bleiben.
+- Kennzahlen als `.nt-stat` (Zahl und Einheit zusammen, nie getrennt umbrechend).
+- Sheets: Schließen-X rechts, 44x44; `.nt-sheet-footer` als ein globaler Baustein (`src/styles/sheets.scss`), lokale Kopien entfernt. Variante B (`ion-footer`) bleibt für Eintragen und Fastfood; Ausnahme Artikel-Sheet im Einkauf (Button unter den Feldern wegen Tastatur).
+- Kochmodus: X rechts neben dem Zähler.
+- Stepper, Mengen-Chips, Mahlzeit-Chips im Generator, Plus-Kachel der Suche: Innenradius statt Pille.
+- Einkauf: "Einkaufsliste öffnen" entfernt (Segment "Liste" reicht), Checkbox als abgerundetes Quadrat, Wochenplan-FAB mit Plus.
+- Rezepte/Mahlzeiten: Kopf mit zwei Symbol-Buttons (Online-Suche, Import), je Reiter eigener FAB. Mahlzeiten-Liste: "Eintragen" nur noch als Symbol (der Name brach bei 375 px mitten im Wort um).
+- Online-Suche: Host hatte keine Höhe, der Fuß der Detailansicht lag 57 px unter dem Sheet-Rand; behoben (`online-search.component.scss`).
+- Logikfehler (aus dem Code-Review, hoch): Nachübersetzen des Wochenplans schrieb den alten Plan zurück. Jetzt wird in den aktuellen Stand gemischt und ein neuer Plan nicht überschrieben (`core/week-plan/week-plan.service.ts`, zwei Unit-Tests). Menü während der Übersetzung gesperrt.
+
+### Annahmen (ohne Rückfrage entschieden)
+- Mahlzeit-Icon vor den Tagebuch-Überschriften entfällt.
+- Checkbox der Einkaufsliste eckig mit Radius statt rund.
+- Wochenplan bekommt einen FAB "Neuen Wochenplan erstellen" (öffnet nur den Generator, ersetzt noch nichts).
+
+### Geprüft
+- Stand 4ba8585: `tsc`, Lint, 1266 Unit-Tests, `ng build` ohne Budget-Warnung, E2E 247/247 (Chromium, mobile Emulation).
+- Nacharbeiten danach: `tsc`, Lint, Unit-Tests grün; `w2-layout` um 18 Sheet-Tests erweitert (375 und 320), 18/18 grün, gegen den älteren Build rot. Der vollständige E2E-Lauf nach den Nacharbeiten erfolgt zusammen mit Welle 3 (siehe dort), weil beide Stände im selben Arbeitsverzeichnis lagen.
+- Screenshots aller Tabs und der Sheets Gewicht, Eintragen, Rezept, Kochmodus bei 375 und 320 angesehen.
+- Code- und Design-Review durch eigenen Agenten: 0 kritisch, 0 hoch, 5 mittel, 5 niedrig. Behoben: toter Code im Dashboard, Umbruch in der Mahlzeiten-Liste, Symbol des Plan-FAB, FAB-Name im Test über den Shadow-Button, Sheet-Tests erweitert.
+
+### Nicht geprüft
+- Echtes iPhone: Safe Area, Tastatur, Wischgesten (Tagebuch-Zeilen, Sheets), Safari/WebKit.
+- Dark Mode: Die App hat keinen (`color-scheme: light` in `variables.scss` und `index.html`). Nichts zu prüfen; falls gewünscht, ist das eine eigene Aufgabe.
+- Tablet-Breiten.
+- Sticky-Verhalten des Sheet-Fußes mit offener Tastatur.
+
+### Offen (aus dem Review, zur Entscheidung)
+- Alte Klassen `.nt-pill` und `.nt-add-btn` leben als Alias in `buttons.scss` weiter (noch 10 Verwendungen). Migration auf `.nt-btn` wäre konsequent, ändert aber viele Dateien.
+- Vermutlich tote Stilregeln (`.page-head__add`, `.kcal-note`, `.share-btn`, `.own-btn`, `.generate-btn`, `.cancel-btn`, `.content-spacer` u. a.) sind nicht systematisch entfernt.
+- Der FAB überdeckt je nach Scrollposition einzelne Werte; am Seitenende ist Platz frei. Normales FAB-Verhalten.
+- Ein Toast mit "Rückgängig" kann den FAB kurz überdecken.
+- `:has()` in `layout.scss`/`sheets.scss` braucht iOS 15.4 oder neuer; das Deployment-Target ist nicht geprüft (kein `ios/`-Ordner im Repo).
+- Feste Wartezeiten in den neuen E2E-Tests.

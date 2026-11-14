@@ -1,7 +1,7 @@
 // Welle 2, Phase 1: Layout und Einheitlichkeit. Eine Messung je Route und Viewport (gecacht), ein Test je Route und Regel,
 // damit Phase 2 (Tagebuch, Rezepte, Mahlzeiten, Einkauf) gezielt einzelne Regeln gruen machen kann.
 import { assert, go, settle } from '../lib/harness.mjs';
-import { topModal } from '../lib/ionic.mjs';
+import { ionInput, topModal } from '../lib/ionic.mjs';
 import { DIARY_NORMAL, WEIGHT_HISTORY, seed } from '../lib/fixtures.mjs';
 
 const VIEWPORTS = [{ width: 375, height: 667 }, { width: 320, height: 568 }];
@@ -25,6 +25,9 @@ const FAB_END_PX = 16;
 const FAB_TO_TABBAR_PX = 16;
 const SECTION_FONT_PX = 13;
 const SETTLE_MS = 500;
+/** Speichern steht hoechstens so weit ueber der Sheet-Unterkante (Abstand 12 + Safe Area). */
+const SHEET_FOOTER_BOTTOM_MAX_PX = 24;
+const CLOSE_END_MAX_PX = 24;
 /** Innerste aktive Seite (nicht der Tabs-Rahmen, der die Tab-Bar und versteckte Seiten enthaelt). */
 const ACTIVE_PAGE = 'ion-tabs ion-router-outlet > .ion-page:not(.ion-page-hidden)';
 const STAMP = new Date().toISOString();
@@ -183,7 +186,7 @@ function measureInPage({ tol, minR, rtol, activeSel }) {
   const fab = page.querySelector('ion-fab.nt-fab');
   const fabBtn = fab?.querySelector('ion-fab-button');
   const tabBar = document.querySelector('ion-tab-bar');
-  const fabData = fabBtn ? { ...rect(fabBtn), label: (fabBtn.getAttribute('aria-label') ?? fabBtn.shadowRoot?.querySelector('button')?.getAttribute('aria-label') ?? ''), rightGap: vw - fabBtn.getBoundingClientRect().right, count: page.querySelectorAll('ion-fab.nt-fab').length, tabTop: tabBar ? tabBar.getBoundingClientRect().top : null } : null;
+  const fabData = fabBtn ? { ...rect(fabBtn), label: (fabBtn.shadowRoot?.querySelector('[aria-label]')?.getAttribute('aria-label') ?? ''), rightGap: vw - fabBtn.getBoundingClientRect().right, count: page.querySelectorAll('ion-fab.nt-fab').length, tabTop: tabBar ? tabBar.getBoundingClientRect().top : null } : null;
 
   const gutter = num(getComputedStyle(document.documentElement).getPropertyValue('--nt-page-gutter'));
   return { vw, gutter, cards, headerData, headerButtons, firstGap, overflow, scrollOverflow, radiusIssues, sectionHeaders, strayHeadings, solidButtons, buttonTexts, stats, fabData };
@@ -352,15 +355,29 @@ export function register({ test }) {
       assert.equal(sizes.size, 1, `Schrift je Rolle uneinheitlich: ${[...sizes].join(', ')}`);
     });
 
+    const SHEET_FOOTER_BTN = '.nt-sheet-footer .nt-btn';
     const sheetCases = [
-      ['Gewicht', '[data-testid="weight-add"]', '[data-testid="weight-save"]'],
-      ['Profil', '[data-testid="open-profile"]', '[data-testid="profile-save"]'],
+      ['Gewicht', 'settings', (p) => p.locator('[data-testid="weight-add"]').click(), '[data-testid="weight-save"]'],
+      ['Profil', 'settings', (p) => p.locator('[data-testid="open-profile"]').click(), '[data-testid="profile-save"]'],
+      ['Eintragen', 'diary', async (p) => {
+        await p.locator('[data-testid="diary-add"]').click();
+        const m = topModal(p);
+        await m.locator('.nt-source-btn', { hasText: 'Manuell' }).click();
+        await ionInput(m, 'Name').waitFor();
+      }, '.add-footer__save'],
+      ['Bearbeiten', 'diary', (p) => p.locator('ion-item[button]').first().click(), '[data-testid="edit-save"]'],
+      ['Rezept', 'recipes', (p) => p.getByRole('button', { name: 'Neues Rezept' }).click(), SHEET_FOOTER_BTN],
+      ['Mahlzeit', 'recipes', async (p) => {
+        await p.locator('ion-segment-button', { hasText: 'Mahlzeiten' }).click();
+        await settle(p, 400);
+        await p.getByRole('button', { name: 'Neue Mahlzeit' }).click();
+      }, SHEET_FOOTER_BTN],
     ];
-    for (const [name, opener, saveSel] of sheetCases) {
-      test(`w2 sheet ${name}: X rechts, Speichern unten in voller Breite (${at})`, SEED(), async (page) => {
+    for (const [name, route, open, saveSel] of sheetCases) {
+      test(`w2 sheet ${name}: X rechts, Speichern unten in voller Breite, Radien (${at})`, SEED(), async (page) => {
         await page.setViewportSize(vp);
-        await go(page, 'settings');
-        await page.locator(opener).click();
+        await go(page, route);
+        await open(page);
         const modal = topModal(page);
         await modal.locator(saveSel).waitFor();
         await settle(page, 900);
@@ -371,10 +388,70 @@ export function register({ test }) {
         }, saveSel);
         assert.ok(m.close && m.title && m.save, 'X, Titel oder Speichern fehlt');
         assert.ok(m.close.left > m.title.left + m.title.width / 2 || m.close.left >= m.vw / 2, `X nicht rechts (x ${m.close.left})`);
+        assert.ok(Math.abs(m.close.width - ICON_BUTTON_PX) <= 0.6 && Math.abs(m.close.height - ICON_BUTTON_PX) <= 0.6, `X ${m.close.width}x${m.close.height}`);
         assert.ok(Math.abs(m.save.width - (m.vw - 2 * m.gutter)) <= 2, `Speichern ${m.save.width}px statt volle Breite ${m.vw - 2 * m.gutter}`);
         assert.ok(Math.abs(m.save.height - BUTTON_HEIGHT_PX) <= 0.6, `Speichern ${m.save.height}px hoch`);
         assert.ok(m.save.top > m.header.bottom && m.save.bottom <= m.vh + 0.5, `Speichern nicht unten sichtbar (${m.save.top}..${m.save.bottom} von ${m.vh})`);
+        const radii = await page.evaluate(measureInPage, { tol: TOL_PX, minR: MIN_INNER_RADIUS_PX, rtol: RADIUS_TOL_PX, activeSel: 'ion-modal.show-modal' });
+        assert.equal(radii.radiusIssues.length, 0, describe(radii.radiusIssues));
       });
     }
+
+    test(`w2 sheet Gewicht: kurzer Inhalt, Speichern sitzt am unteren Rand ohne Spalt (${at})`, SEED(), async (page) => {
+      await page.setViewportSize(vp);
+      await go(page, 'settings');
+      await page.locator('[data-testid="weight-add"]').click();
+      const modal = topModal(page);
+      await modal.locator('[data-testid="weight-save"]').waitFor();
+      await settle(page, 900);
+      const m = await modal.evaluate((el) => {
+        const save = el.querySelector('[data-testid="weight-save"]').getBoundingClientRect();
+        const wrapper = el.shadowRoot.querySelector('.modal-wrapper').getBoundingClientRect();
+        return { bottom: save.bottom, wrapperBottom: wrapper.bottom };
+      });
+      assert.ok(m.wrapperBottom - m.bottom <= SHEET_FOOTER_BOTTOM_MAX_PX, `Abstand Speichern -> Sheet-Unterkante ${(m.wrapperBottom - m.bottom).toFixed(1)}px (max ${SHEET_FOOTER_BOTTOM_MAX_PX})`);
+    });
+
+    test(`w2 sheet Rezept: langer Inhalt, Speichern bleibt unten sichtbar, nichts liegt ueber dem Button (${at})`, SEED(), async (page) => {
+      await page.setViewportSize(vp);
+      await go(page, 'recipes');
+      await page.getByRole('button', { name: 'Neues Rezept' }).click();
+      const modal = topModal(page);
+      await modal.locator(SHEET_FOOTER_BTN).waitFor();
+      await settle(page, 900);
+      const add = modal.locator('button', { hasText: 'Schritt hinzufügen' });
+      for (let i = 0; i < 6; i++) await add.click();
+      const m = await modal.evaluate(async (el) => {
+        const content = el.querySelector('ion-content');
+        await content.scrollToTop(0);
+        await new Promise((r) => setTimeout(r, 300));
+        const save = el.querySelector('.nt-sheet-footer .nt-btn').getBoundingClientRect();
+        const wrapper = el.shadowRoot.querySelector('.modal-wrapper').getBoundingClientRect();
+        const scrollEl = await content.getScrollElement();
+        const hit = document.elementFromPoint(save.left + save.width / 2, save.top + save.height / 2);
+        return { scrolls: scrollEl.scrollHeight > scrollEl.clientHeight + 1, saveBottom: save.bottom, wrapperBottom: wrapper.bottom, hitInFooter: !!hit?.closest('.nt-sheet-footer') };
+      });
+      assert.ok(m.scrolls, 'Inhalt scrollt nicht (Test braucht langen Inhalt)');
+      assert.ok(m.wrapperBottom - m.saveBottom <= SHEET_FOOTER_BOTTOM_MAX_PX, `Speichern ${(m.wrapperBottom - m.saveBottom).toFixed(1)}px ueber der Sheet-Unterkante`);
+      assert.ok(m.hitInFooter, 'Ueber dem Speichern-Button liegt ein anderes Element');
+    });
+
+    test(`w2 sheet Kochmodus: X rechts, 44x44, aria-label (${at})`, SEED(), async (page) => {
+      await page.setViewportSize(vp);
+      await go(page, 'recipes');
+      await page.locator('.recipe__title-btn').first().click();
+      await topModal(page).locator('ion-button', { hasText: 'Kochen' }).click();
+      await page.locator('.cook__close').waitFor();
+      await settle(page, 900);
+      const m = await page.evaluate(() => {
+        const q = (s) => document.querySelector(s)?.getBoundingClientRect() ?? null;
+        return { vw: window.innerWidth, close: q('.cook__close'), title: q('.cook__title'), label: document.querySelector('.cook__close')?.getAttribute('aria-label') ?? '' };
+      });
+      assert.ok(m.close && m.title, 'X oder Titel fehlt');
+      assert.ok(m.close.left >= m.title.right - 0.5, `X nicht rechts vom Titel (X ${m.close.left}, Titel bis ${m.title.right})`);
+      assert.ok(m.vw - m.close.right <= CLOSE_END_MAX_PX, `X ${(m.vw - m.close.right).toFixed(1)}px vom rechten Rand`);
+      assert.ok(Math.abs(m.close.width - ICON_BUTTON_PX) <= 0.6 && Math.abs(m.close.height - ICON_BUTTON_PX) <= 0.6, `X ${m.close.width}x${m.close.height}`);
+      assert.ok(m.label.trim() !== '', 'X ohne aria-label');
+    });
   }
 }

@@ -175,12 +175,6 @@ ion-searchbar.nt-searchbar {
   overflow: hidden;
 }
 
-// Sheet-Fuss (Eintragen, Vorschlaege holen): .nt-sheet-footer aus src/styles/sheets.scss, hier im ion-footer (fix am Sheet-Rand).
-.add-footer .nt-sheet-footer {
-  margin-top: 0;
-  background: var(--nt-ground);
-}
-
 .scan-hint {
   margin: var(--nt-space-2) var(--nt-space-5) 0;
   font-size: var(--nt-fs-caption);

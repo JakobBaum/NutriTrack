@@ -1,12 +1,12 @@
 // Online-Rezeptsuche. Felder, Sheet-Kopf und Pillen kommen aus global.scss.
-:host { display: block; }
+// Kopf + Inhalt fuellen das Sheet: sonst ragt ion-content um die Kopfhoehe ueber den Rand (Sheet-Fuss waere unerreichbar).
+:host { display: flex; flex-direction: column; height: 100%; }
 
 ion-content {
   --background: var(--nt-ground);
   --padding-start: var(--nt-page-gutter);
   --padding-end: var(--nt-page-gutter);
   --padding-top: var(--nt-space-2);
-  --padding-bottom: 0; // der Sticky-Fuss (.nt-sheet-footer) bringt den unteren Abstand mit
 }
 
 .os-search { padding-bottom: var(--nt-space-6); }

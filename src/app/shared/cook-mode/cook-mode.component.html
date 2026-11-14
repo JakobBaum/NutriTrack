@@ -2,13 +2,13 @@
   <ng-template>
     <div class="cook">
       <div class="cook__header">
-        <button class="cook__close" (click)="close()" aria-label="Kochmodus beenden">
-          <ion-icon name="close-outline"></ion-icon>
-        </button>
         <span class="cook__title">{{ title() }}</span>
         @if (total() > 0) {
           <span class="cook__counter">{{ page() + 1 }} / {{ total() }}</span>
         }
+        <button class="cook__close" (click)="close()" aria-label="Kochmodus beenden">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
       </div>
 
       <div class="cook__progress">

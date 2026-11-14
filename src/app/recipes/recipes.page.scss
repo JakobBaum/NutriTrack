@@ -15,7 +15,6 @@ ion-modal ion-content {
   --padding-start: var(--nt-page-gutter);
   --padding-end: var(--nt-page-gutter);
   --padding-top: var(--nt-space-2);
-  --padding-bottom: 0; // der Sticky-Fuss (.nt-sheet-footer) bringt den unteren Abstand mit
 }
 
 // Erstes Feldlabel im Sheet sitzt direkt unter dem Sheet-Kopf
@@ -168,10 +167,3 @@ ion-modal ion-content > .nt-section-header:first-child { margin-top: 0; }
 .detail-list, .detail-steps { margin: 0; color: var(--nt-ink); }
 .detail-list { padding: 0; list-style: none; li { @extend %row; justify-content: space-between; gap: var(--nt-space-3); padding: 8px 0; border-bottom: 0.5px solid var(--nt-separator); } }
 .detail-steps { padding: 0 0 0 var(--nt-space-4); li { padding: 4px 0; } }
-
-
-
-// Sticky-Fuss liegt ueber durchscrollenden Feldern. Speichern bleibt auch bei kurzem Inhalt unten (ohne Sticky-Wirkung waere es direkt unter dem letzten Feld)
-ion-modal ion-content::part(scroll) { display: flex; flex-direction: column; }
-ion-modal ion-content > * { flex: none; }
-.nt-sheet-footer { z-index: 3; margin-top: auto; padding-top: var(--nt-space-4); }

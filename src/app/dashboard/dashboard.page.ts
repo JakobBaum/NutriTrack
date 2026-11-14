@@ -6,7 +6,7 @@ import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { formatNum } from '../shared/num.pipe';
 import { dayLabel, rollDate, toDateISO } from '../core/util/date';
-import { MEAL_DEFS, mealForHour, mealLabel } from '../diary/diary-helpers';
+import { MEAL_DEFS, mealForHour } from '../diary/diary-helpers';
 import { isWarnMacro, macroEnergyShares, macroNote, proteinHint, proteinOfEntries, softHyphenLabel } from './dashboard-math';
 
 interface MacroView {
@@ -243,10 +243,6 @@ export class DashboardPage {
   /** Mahlzeit, die zur aktuellen Uhrzeit passt (Ziel des FAB). */
   currentMeal(): MealType {
     return mealForHour(new Date().getHours());
-  }
-
-  currentMealLabel(): string {
-    return mealLabel(this.currentMeal());
   }
 
   /** FAB / „Eintragen“: Sheet für die Mahlzeit zur aktuellen Uhrzeit. */

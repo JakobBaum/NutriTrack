@@ -74,7 +74,7 @@ ion-list.results {
   flex: none;
   width: var(--nt-touch);
   height: var(--nt-touch);
-  border-radius: var(--nt-radius-pill);
+  border-radius: var(--nt-radius-inner); // sitzt in Karten/Zeilen
   background: var(--nt-accent-tint);
   color: var(--nt-accent);
 

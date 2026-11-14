@@ -51,7 +51,7 @@ ion-content {
   min-height: var(--nt-touch);
   padding: 0 var(--nt-space-4);
   border: 0;
-  border-radius: var(--nt-radius-pill);
+  border-radius: var(--nt-radius-inner); // Chips sitzen in der Generator-Karte
   background: var(--nt-track);
   color: var(--nt-ink);
   font: inherit;

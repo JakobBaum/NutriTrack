@@ -16,9 +16,8 @@
             <h3>{{ meal.name }}</h3>
             <p>{{ meal.entries.length }} Einträge · {{ totalKcal(meal) | ntNum: 0 }} kcal</p>
           </ion-label>
-          <ion-button slot="end" class="nt-btn nt-btn--text meal-use" [attr.aria-label]="'„' + meal.name + '“ ins Tagebuch eintragen'" (click)="$event.stopPropagation(); useMeal(meal)">
-            <ion-icon slot="start" name="add-circle-outline" aria-hidden="true"></ion-icon>
-            Eintragen
+          <ion-button slot="end" fill="clear" class="nt-icon-btn meal-use" [attr.aria-label]="'„' + meal.name + '“ ins Tagebuch eintragen'" (click)="$event.stopPropagation(); useMeal(meal)">
+            <ion-icon slot="icon-only" name="add-circle-outline" aria-hidden="true"></ion-icon>
           </ion-button>
           <ion-button slot="end" fill="clear" color="danger" class="icon-btn nt-hover-delete" [attr.aria-label]="'„' + meal.name + '“ löschen'" (click)="$event.stopPropagation(); removeMeal(meal.id)">
             <ion-icon slot="icon-only" name="trash-outline" aria-hidden="true"></ion-icon>

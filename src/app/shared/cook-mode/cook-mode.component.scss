@@ -2,7 +2,8 @@
 .cook { width: 100%; max-width: 680px; margin-inline: auto; }
 // Normale Lesegroesse (wie Fliesstext der App) statt Riesenschrift: lange Schritte passen auf einen Bildschirm.
 .cook__step-text { font-size: var(--nt-fs-headline); font-weight: 400; line-height: 1.5; }
-.cook__close { min-width: var(--nt-touch); min-height: var(--nt-touch); }
+// X rechts wie in allen Sheets: 44x44 Tippflaeche, Symbol 28 px mittig.
+.cook__close { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--nt-icon-btn); height: var(--nt-icon-btn); }
 
 .cook__ingredients {
   margin: 0;

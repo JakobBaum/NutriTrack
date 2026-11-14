@@ -38,7 +38,7 @@
     height: var(--nt-touch);
     padding: 0;
     border: 0;
-    border-radius: var(--nt-radius-pill);
+    border-radius: var(--nt-radius-inner); // sitzt in Karten
     background: var(--nt-accent-tint);
     color: var(--nt-accent);
     cursor: pointer;

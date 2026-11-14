@@ -40,20 +40,55 @@ ion-button.nt-sheet-close {
   margin: 0;
 }
 
-// Sheet-Fuss (S9): Speichern immer unten, volle Breite, 44 px. Markup:
-// <div class="nt-sheet-footer"><ion-button class="nt-btn nt-btn--block" expand="block">Speichern</ion-button></div>
-// Bleibt beim Scrollen unten stehen (sticky), damit Speichern auch in langen Formularen sichtbar ist.
+// Sheet-Fuss (S9): Speichern immer unten, volle Breite, 44 px. EIN Baustein, keine lokalen Zusatzregeln noetig.
+// Markup: <div class="nt-sheet-footer"><ion-button class="nt-btn nt-btn--block" expand="block">Speichern</ion-button></div>
+// Variante A (Standard): der Fuss ist das letzte Element IM ion-content (direktes Kind oder letztes Kind des Seitencontainers).
+//   Kurzer Inhalt: der Fuss sitzt am unteren Rand (Flex-Spalte, margin-top: auto). Langer Inhalt: er bleibt sichtbar
+//   (sticky) und verdeckt durchscrollende Felder mit eigenem Hintergrund. Kein Spalt darunter (--padding-bottom: 0,
+//   der Fuss bringt den unteren Abstand samt Safe Area selbst mit).
+// Variante B: <ion-footer class="ion-no-border"><div class="nt-page"><div class="nt-sheet-footer">...</div></div></ion-footer>
+//   fuer Sheets mit mehreren Ansichten (Eintragen, Vorschlaege holen); der Fuss steht dann fix am Sheet-Rand.
+// Ausnahme: Artikel-Sheet im Einkauf (Button direkt unter den Feldern, damit die Tastatur ihn nicht verdeckt).
 .nt-sheet-footer {
   position: sticky;
   bottom: 0;
-  z-index: 1;
-  margin-top: var(--nt-section-gap);
+  z-index: 3;
+  margin-top: auto;
   // Nur vertikal: der Seitenrand kommt von .nt-page bzw. dem Sheet-Inhalt.
-  padding-block: var(--nt-space-3) max(var(--nt-space-3), env(safe-area-inset-bottom, 0px));
-  background: var(--ion-background-color, var(--nt-ground));
+  padding-block: var(--nt-space-4) max(var(--nt-space-3), env(safe-area-inset-bottom, 0px));
+  background: var(--nt-ground);
 
   ion-button,
   .nt-btn {
     width: 100%;
   }
+}
+
+ion-content:has(.nt-sheet-footer) {
+  --padding-bottom: 0;
+
+  &::part(scroll) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  > * {
+    flex: none;
+  }
+
+  // Seitencontainer/Artikel, der den Fuss enthaelt, waechst bis zum unteren Rand.
+  > :has(.nt-sheet-footer) {
+    flex: 1 0 auto;
+    display: flex;
+    flex-direction: column;
+
+    > * {
+      flex: none;
+    }
+  }
+}
+
+ion-footer .nt-sheet-footer {
+  position: static;
+  margin-top: 0;
 }
