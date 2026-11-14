@@ -8,7 +8,7 @@ const MENGE_MANUAL = 'Menge (optional)';
 /** Öffnet das Eintragen-Sheet im manuellen Formular. */
 async function openManual(page) {
   await go(page, 'diary');
-  await page.locator('.page-head__add').click();
+  await page.locator('[data-testid="diary-add"]').click();
   const modal = topModal(page);
   await modal.locator('.nt-source-btn', { hasText: 'Manuell' }).click();
   await ionInput(modal, 'Name').waitFor();
@@ -86,7 +86,7 @@ export function register({ test }) {
     await modal.locator('.nt-sheet-header__title', { hasText: 'Eintrag bearbeiten' }).waitFor();
     await ionInput(modal, 'Name').fill('Haferflocken kernig');
     await amountInput(modal, 'Menge').fill('150');
-    await modal.locator('.sheet-header__save').click();
+    await modal.locator('[data-testid="edit-save"]').click();
     await settle(page);
 
     const stored = (await readStore(page, 'diary')).find((e) => e.id === SCALABLE_ENTRY.id);
@@ -121,4 +121,55 @@ export function register({ test }) {
     await page.locator('ion-action-sheet button', { hasText: 'Löschen' }).click();
     await eventually(async () => assert.equal(await diaryEntry(page, 'Linsencurry').count(), 1));
   });
+
+  // Welle 2: Tagebuch-Aktionen nur als Symbole, Sheet-Fuss, Trennlinie.
+  test('diary: Zeilen- und Mahlzeit-Aktionen sind nur Symbole mit aria-label, Tippflaeche 44', seed({ diary: DIARY_NORMAL }), async (page) => {
+    await go(page, 'diary');
+    const m = await page.evaluate(() => {
+      const root = document.querySelector('ion-tabs ion-router-outlet > .ion-page:not(.ion-page-hidden)');
+      const info = (el) => { const r = el.getBoundingClientRect(); return { text: el.textContent.trim(), label: el.getAttribute('aria-label') ?? el.shadowRoot?.querySelector('button')?.getAttribute('aria-label') ?? '', w: r.width, h: r.height }; };
+      return {
+        options: [...root.querySelectorAll('ion-item-option')].map(info),
+        more: [...root.querySelectorAll('[data-testid="entry-more"]')].map(info),
+        add: [...root.querySelectorAll('.meal__add')].map(info),
+        moreBg: getComputedStyle(root.querySelector('[data-testid="entry-more"]')).backgroundColor,
+      };
+    });
+    assert.ok(m.options.length >= 3 && m.more.length >= 1 && m.add.length >= 1, 'Aktionen nicht gefunden');
+    for (const o of m.options) { assert.equal(o.text, '', `Wisch-Aktion mit Text: "${o.text}"`); assert.ok(o.label !== '', 'Wisch-Aktion ohne aria-label'); }
+    for (const b of [...m.more, ...m.add]) { assert.equal(b.text, ''); assert.ok(b.label !== ''); assert.ok(b.w >= 43.5 && b.h >= 43.5, `Tippflaeche ${b.w}x${b.h}`); }
+    assert.ok(m.moreBg.replace(/\s/g, '') === 'rgba(0,0,0,0)' || m.moreBg === 'transparent', `"..." hat Flaeche: ${m.moreBg}`);
+  });
+
+  test('diary: letzte Zeile einer Karte ohne Trennlinie', seed({ diary: DIARY_NORMAL }), async (page) => {
+    await go(page, 'diary');
+    const rows = await page.evaluate(() => [...document.querySelectorAll('ion-tabs ion-router-outlet > .ion-page:not(.ion-page-hidden) .entry-row')].map((row) => ({
+      last: !row.nextElementSibling, border: getComputedStyle(row.querySelector('ion-item')).getPropertyValue('--inner-border-width').trim(),
+    })));
+    assert.ok(rows.some((r) => r.last), 'keine Karte mit Eintraegen');
+    for (const r of rows.filter((x) => x.last)) assert.equal(r.border, '0', `Trennlinie an letzter Zeile: "${r.border}"`);
+  });
+
+  for (const [name, open, saveSel] of [
+    ['Bearbeiten', async (page) => { await diaryEntry(page, SCALABLE_ENTRY.label).click(); }, '[data-testid="edit-save"]'],
+    ['Eintragen', async (page) => { await page.locator('[data-testid="diary-add"]').click(); const m = topModal(page); await m.locator('.nt-source-btn', { hasText: 'Manuell' }).click(); await ionInput(m, 'Name').waitFor(); }, '.add-footer__save'],
+    ['Fastfood', async (page) => { await page.locator('.ff-btn').click(); }, '[data-testid="ff-run"]'],
+  ]) {
+    test(`diary: Sheet ${name}: X rechts, Bestaetigen unten in voller Breite, 44 hoch`, seed({ diary: DIARY_NORMAL }), async (page) => {
+      await go(page, 'diary');
+      await open(page);
+      const modal = topModal(page);
+      await modal.locator(saveSel).waitFor();
+      await settle(page, 900);
+      const m = await modal.evaluate((el, sel) => {
+        const q = (s) => el.querySelector(s)?.getBoundingClientRect() ?? null;
+        return { vw: window.innerWidth, vh: window.innerHeight, close: q('ion-button.nt-sheet-close'), save: q(sel), header: q('.nt-sheet-header'), gutter: Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nt-page-gutter')) };
+      }, saveSel);
+      assert.ok(m.close && m.save, 'X oder Bestaetigen fehlt');
+      assert.ok(m.close.left >= m.vw / 2, `X nicht rechts (x ${m.close.left})`);
+      assert.ok(Math.abs(m.save.width - (m.vw - 2 * m.gutter)) <= 2, `Button ${m.save.width}px statt ${m.vw - 2 * m.gutter}`);
+      assert.ok(Math.abs(m.save.height - 44) <= 0.6, `Button ${m.save.height}px hoch`);
+      assert.ok(m.save.top > m.header.bottom && m.save.bottom <= m.vh + 0.5, 'Button nicht unten sichtbar');
+    });
+  }
 }

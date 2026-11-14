@@ -20,10 +20,10 @@ ion-button.nt-sheet-close {
   --padding-end: 0;
   --border-radius: 50%;
   --color: var(--nt-secondary);
-  width: 40px;
-  min-width: 40px;
-  height: 40px;
-  min-height: 40px;
+  width: var(--nt-icon-btn);
+  min-width: var(--nt-icon-btn);
+  height: var(--nt-icon-btn);
+  min-height: var(--nt-icon-btn);
   margin: 0;
 
   ion-icon {
@@ -35,8 +35,8 @@ ion-button.nt-sheet-close {
 .nt-sheet-header ion-button {
   --padding-start: 8px;
   --padding-end: 8px;
-  min-width: 40px;
-  min-height: 40px;
+  min-width: var(--nt-icon-btn);
+  min-height: var(--nt-icon-btn);
   margin: 0;
 }
 
@@ -48,7 +48,8 @@ ion-button.nt-sheet-close {
   bottom: 0;
   z-index: 1;
   margin-top: var(--nt-section-gap);
-  padding: var(--nt-space-3) 0 max(var(--nt-space-3), env(safe-area-inset-bottom, 0px));
+  // Nur vertikal: der Seitenrand kommt von .nt-page bzw. dem Sheet-Inhalt.
+  padding-block: var(--nt-space-3) max(var(--nt-space-3), env(safe-area-inset-bottom, 0px));
   background: var(--ion-background-color, var(--nt-ground));
 
   ion-button,

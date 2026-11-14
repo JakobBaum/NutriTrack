@@ -9,7 +9,7 @@ const byAria = (scope, label) => scope.locator(`ion-input input[aria-label="${la
 /** Legt das Rezept an: 1 Zutat (300 g, 100 kcal/100 g → 300 kcal), ergibt 1,5 Portionen. */
 async function createRecipe(page) {
   await go(page, 'recipes');
-  await page.locator('.page-head__add').click();
+  await page.getByRole('button', { name: 'Neues Rezept' }).click();
   const modal = topModal(page);
   await modal.locator('.nt-sheet-header__title', { hasText: 'Neues Rezept' }).waitFor();
   await fillAndBlur(byAria(modal, 'Name'), TITLE);
@@ -52,7 +52,7 @@ export function register({ test }) {
   test('recipes: halbe Portion über Tagebuch loggen', seed(), async (page) => {
     await createRecipe(page);
     await go(page, 'diary');
-    await page.locator('.page-head__add').click();
+    await page.locator('[data-testid="diary-add"]').click();
     const modal = topModal(page);
     await modal.locator('.nt-source-btn', { hasText: 'Rezept' }).click();
     await modal.locator('ion-item', { hasText: TITLE }).click();
@@ -175,6 +175,34 @@ export function register({ test }) {
     await listCard.locator('.recipe__title-btn').click();
     const sheet = topModal(page);
     await eventually(async () => assert.match(await sheet.innerText(), /Simmer the lentils|Linsen/));
+  });
+
+  // Welle 2: Kochen ist getoent (nicht wie Eintragen gefuellt), der FAB legt je Reiter das Richtige an.
+  const STAMP = new Date().toISOString();
+  const COOKABLE = {
+    id: 'r-c', title: 'Kochbares Dal', servings: 2, origin: 'manual', createdAt: STAMP, updatedAt: STAMP,
+    ingredients: [{ id: 'i1', name: 'Linsen', amount: 200, unit: 'g' }], steps: ['Kochen'],
+  };
+  const nativeBg = (button) => button.evaluate((el) => getComputedStyle(el.shadowRoot.querySelector('.button-native')).backgroundColor);
+
+  test('recipes: Kochen ist getoent, Eintragen gefuellt (verschiedene Flaechen)', seed({ recipes: [COOKABLE] }), async (page) => {
+    await go(page, 'recipes');
+    const card = page.locator('article.recipe', { hasText: COOKABLE.title });
+    const log = await nativeBg(card.locator('ion-button', { hasText: 'Eintragen' }));
+    const cook = await nativeBg(card.locator('ion-button', { hasText: 'Kochen' }));
+    assert.notEqual(cook, log, `Kochen ${cook} gleich Eintragen ${log}`);
+  });
+
+  test('recipes: FAB oeffnet je Reiter das richtige Sheet', seed(), async (page) => {
+    await go(page, 'recipes');
+    await page.getByRole('button', { name: 'Neues Rezept' }).click();
+    await topModal(page).locator('.nt-sheet-header__title', { hasText: 'Neues Rezept' }).waitFor();
+    await topModal(page).locator('ion-button.nt-sheet-close').click();
+    await settle(page, 800);
+    await page.locator('ion-segment-button', { hasText: 'Mahlzeiten' }).click();
+    await settle(page, 400);
+    await page.getByRole('button', { name: 'Neue Mahlzeit' }).click();
+    await topModal(page).locator('.nt-sheet-header__title', { hasText: 'Mahlzeit anlegen' }).waitFor();
   });
 }
 

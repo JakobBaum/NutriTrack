@@ -177,12 +177,6 @@ ion-modal:not(.barcode-fullscreen-modal):not(.cook-fullscreen-modal).nt-date-mod
   padding-bottom: var(--nt-tabbar-clearance);
 }
 
-// FAB ueber der Tab-Bar (16 px Abstand). Auf der Seite zusaetzlich ausblenden, wenn ein Generator/Sheet offen ist.
-:root ion-fab.nt-fab-offset { // Alt-Name, siehe .nt-fab in layout.scss
- 
-  bottom: var(--nt-fab-bottom);
-}
-
 // Preis-Dialog (ion-alert mit Eingabe): Feld im Stil von .nt-field statt Ionic-Standardrahmen.
 ion-alert input.alert-input {
   height: 44px;

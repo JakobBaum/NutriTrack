@@ -1,22 +1,31 @@
+// Wochenplan-Karten. Der Host traegt .nt-stack (Abstaende 12/24/8), Karten sind .nt-card ohne eigenen Seitenrand.
 :host { display: block; }
 
 .wp-notices {
-  margin: var(--nt-space-2) 0 0; padding: var(--nt-space-3) var(--nt-space-4); list-style: none;
-  background: var(--nt-card); border-radius: var(--nt-radius-card); font-size: var(--nt-fs-caption); color: var(--nt-secondary);
+  margin: 0;
+  list-style: none;
+  font-size: var(--nt-fs-caption);
+  color: var(--nt-secondary);
   li + li { margin-top: var(--nt-space-1); }
 }
 
-.wp-group { margin: var(--nt-space-5) var(--nt-space-1) var(--nt-space-2); text-transform: none; letter-spacing: 0; font-weight: 600; }
+.wp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--nt-card-gap); }
 
-.wp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--nt-space-2); }
+// Eine Karte je Rezept: Zeile (oeffnet das Rezept) und "..."-Knopf liegen IN der Karte.
+.wp-item {
+  display: flex;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+}
 
 .wp-card {
-  display: flex; align-items: center; gap: var(--nt-space-3); width: 100%; min-height: 72px; padding: var(--nt-space-2);
-  background: var(--nt-card); border: 0; border-radius: var(--nt-radius-card); text-align: left; font: inherit; color: inherit; cursor: pointer;
-  &:focus-visible { outline: 2px solid var(--nt-focus); }
+  display: flex; align-items: center; gap: var(--nt-space-3); flex: 1; min-width: 0; min-height: 72px; padding: var(--nt-space-3);
+  background: transparent; border: 0; text-align: left; font: inherit; color: inherit; cursor: pointer;
+  &:focus-visible { outline: 2px solid var(--nt-focus); outline-offset: -2px; }
   &__thumb {
     flex: none; display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px;
-    border-radius: 12px; overflow: hidden; background: var(--nt-track); color: var(--nt-secondary);
+    border-radius: var(--nt-radius-inner); overflow: hidden; background: var(--nt-track); color: var(--nt-secondary);
     img { width: 100%; height: 100%; object-fit: cover; }
   }
   &__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -26,34 +35,26 @@
   }
   &__meta { font-size: var(--nt-fs-caption); color: var(--nt-secondary); font-variant-numeric: tabular-nums; }
   &__chev { flex: none; color: var(--nt-secondary); }
+  &__spin { flex: none; width: 20px; height: 20px; color: var(--nt-secondary); }
 }
 
-.wp-item { display: flex; align-items: stretch; gap: var(--nt-space-1); }
-.wp-item .wp-card { flex: 1; min-width: 0; }
-.wp-card__spin { flex: none; width: 20px; height: 20px; color: var(--nt-secondary); }
-
 .wp-more {
-  flex: none; width: var(--nt-touch); border: 0; border-radius: var(--nt-radius-card);
-  background: var(--nt-card); color: var(--nt-secondary); font: inherit; cursor: pointer;
+  flex: none; width: var(--nt-touch); border: 0; background: transparent; color: var(--nt-secondary); font: inherit; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
-  &:focus-visible { outline: 2px solid var(--nt-focus); }
+  ion-icon { font-size: 24px; }
+  &:focus-visible { outline: 2px solid var(--nt-focus); outline-offset: -2px; }
   &:disabled { opacity: 0.5; }
 }
 
 .wp-error {
-  margin: var(--nt-space-2) var(--nt-space-1) 0; padding: var(--nt-space-3) var(--nt-space-4);
-  background: var(--nt-card); border-radius: var(--nt-radius-card);
+  margin: 0;
   font-size: var(--nt-fs-caption); color: var(--nt-ink);
 }
 
 .wp-translate {
-  margin: var(--nt-space-2) var(--nt-space-1) 0;
+  margin: 0;
   font-size: var(--nt-fs-caption);
   color: var(--nt-secondary);
 }
 
-.wp-translate__retry {
-  display: inline-flex;
-  margin-top: var(--nt-space-2);
-  min-height: var(--nt-touch);
-}
+.wp-translate__retry { margin-top: var(--nt-space-2); }

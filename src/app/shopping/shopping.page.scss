@@ -1,5 +1,8 @@
 @use "add-sheet";
 
+// Zeilenhoehe der Einkaufszeilen und Breite der Wisch-Aktion: Tippflaeche + Luft.
+$row-min: calc(var(--nt-touch) + var(--nt-space-3));
+
 %caps {
   font-size: var(--nt-fs-caption);
   letter-spacing: 0.3px;
@@ -9,20 +12,14 @@
 
 ion-content {
   --background: var(--nt-ground);
-  --padding-top: var(--nt-space-2);
+  --padding-top: 0;
 }
 
-// In .nt-page: Listen ohne eigenen Rand.
-.nt-page > ion-list.nt-grouped { margin: 0; }
-.view-switch { padding-bottom: var(--nt-space-2); background: var(--nt-ground); }
+// Segment im Kopf: Standard-Gutter (.nt-page), Abstand zum ersten Inhalt = Kartenabstand.
+.view-switch { padding-bottom: var(--nt-card-gap); background: var(--nt-ground); }
 
-// Generator: freistehende weisse Karte.
+// Generator: Karte (.nt-card), Abstaende liefert .nt-stack.
 .generator {
-  margin: var(--nt-space-1) 0 var(--nt-space-2);
-  background: var(--nt-card);
-  border-radius: var(--nt-radius-card);
-  box-shadow: none;
-
   &__intro, &__mode { margin: 0 0 var(--nt-space-3); color: var(--nt-secondary); }
   &__intro { font-size: var(--nt-fs-body); }
   &__mode { font-size: var(--nt-fs-caption); a { color: var(--nt-accent); white-space: nowrap; } }
@@ -44,16 +41,13 @@ ion-content {
   }
 }
 
-.own-btn { --border-radius: var(--nt-radius-pill); min-height: var(--nt-touch); font-weight: 600; }
-.plan-summary { padding-bottom: var(--nt-space-2); }
-
 .chips { display: flex; flex-wrap: wrap; gap: var(--nt-space-2); margin-top: var(--nt-space-2); }
 
 // Mahlzeit-Chips: echte Buttons, 44 px hoch.
 .meal-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--nt-space-1);
   min-height: var(--nt-touch);
   padding: 0 var(--nt-space-4);
   border: 0;
@@ -76,16 +70,6 @@ ion-content {
   &:focus-visible { outline: 2px solid var(--nt-focus); outline-offset: 2px; }
 }
 
-.generate-btn {
-  --background: var(--nt-accent);
-  --background-activated: var(--nt-accent);
-  --color: var(--nt-on-accent);
-  --box-shadow: none;
-  --border-radius: var(--nt-radius-pill);
-  min-height: var(--nt-touch);
-  font-weight: 600;
-}
-
 .form-error { margin: var(--nt-space-2) 2px 0; font-weight: 600; }
 
 .summary {
@@ -94,30 +78,26 @@ ion-content {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: var(--nt-space-2) var(--nt-space-3);
-  padding: var(--nt-space-1) 0 0;
 
-  &__text { flex: 1 1 12rem; min-width: 0; font-size: var(--nt-fs-body); color: var(--nt-secondary); text-wrap: balance; }
-  &__btn { flex: none; width: auto; }
+  &__btn { flex: none; }
 }
-// Summen; "Davon offen" zaehlt nur nicht abgehakte Positionen.
-.totals {
-  padding: var(--nt-space-3) 0 var(--nt-space-1);
+.summary__text { flex: 1 1 12rem; min-width: 0; margin: 0; font-size: var(--nt-fs-body); color: var(--nt-secondary); text-wrap: balance; }
 
-  &__main { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--nt-space-1) var(--nt-space-5); }
-  &__group { display: inline-flex; align-items: baseline; gap: var(--nt-space-2); white-space: nowrap; }
-  &__label { font-size: var(--nt-fs-caption); color: var(--nt-secondary); }
+// Summen (.nt-stat): Zahl und Einheit einzeilig; "Davon offen" zaehlt nur nicht abgehakte Positionen.
+.totals {
+  &__main { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--nt-space-2) var(--nt-space-3); }
   &__sum {
-    font-size: 1.5rem;
+    font-size: var(--nt-fs-title);
     font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
     color: var(--nt-accent);
     &.over { color: var(--nt-over); }
   }
-  &__open { font-size: var(--nt-fs-headline); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--nt-ink); }
-  &__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--nt-space-1) var(--nt-space-3); margin-top: var(--nt-space-1); }
-  &__budget, &__detail, &__note { margin: 0; font-size: var(--nt-fs-caption); color: var(--nt-secondary); font-variant-numeric: tabular-nums; }
-  &__budget { white-space: nowrap; }
+  &__open { font-size: var(--nt-fs-title); font-weight: 600; color: var(--nt-ink); }
+  .nt-stat__unit { color: inherit; }
+  &__label { font-size: var(--nt-fs-caption); font-weight: 400; color: var(--nt-secondary); }
+  &__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--nt-space-1) var(--nt-space-3); margin-top: var(--nt-space-2); }
+  &__budget, &__detail, &__note { margin: var(--nt-space-1) 0 0; font-size: var(--nt-fs-caption); color: var(--nt-secondary); font-variant-numeric: tabular-nums; }
+  &__meta &__budget { margin: 0; white-space: nowrap; }
   &__note { color: var(--nt-over); }
 }
 
@@ -128,12 +108,13 @@ ion-list.nt-grouped {
 .check-row {
   --padding-start: 0;
   --inner-padding-end: 0;
-  --min-height: 56px;
+  --min-height: #{$row-min};
   &__box {
     flex: 1 1 auto;
-    min-height: 56px;
-    padding: 6px var(--nt-space-4);
+    min-height: $row-min;
+    padding: var(--nt-space-2) 0 var(--nt-space-2) var(--nt-space-4);
     --size: 24px;
+    --border-radius: var(--nt-radius-inner);
     --checkbox-background-checked: var(--nt-accent);
     --border-color-checked: var(--nt-accent);
     --checkmark-color: var(--nt-on-accent);
@@ -152,42 +133,49 @@ ion-list.nt-grouped {
 // Umbrechen erlaubt (ion-checkbox erbt nowrap); Betrag und Tag brechen nie mittendrin.
 .qty { display: block; white-space: normal; font-size: var(--nt-fs-caption); color: var(--nt-secondary); font-variant-numeric: tabular-nums; }
 .qty__sum, .est-badge { display: inline-block; white-space: nowrap; }
-.est-badge { margin-left: 4px; padding: 1px 6px; border-radius: 8px; font-size: 0.8125rem; background: var(--ion-color-step-100, rgba(128, 128, 128, 0.15)); color: var(--nt-secondary); }
-
-.cat-header {
-  margin: var(--nt-space-6) var(--nt-space-4) var(--nt-space-2);
-  text-transform: none;
-  letter-spacing: 0;
-  font-weight: 600;
+.est-badge {
+  margin-left: var(--nt-space-1);
+  padding: 0 var(--nt-space-2);
+  border-radius: var(--nt-radius-inner);
+  font-size: var(--nt-fs-caption);
+  line-height: 1.5;
+  background: var(--ion-color-step-100, rgba(128, 128, 128, 0.15));
+  color: var(--nt-secondary);
 }
 
-ion-item-option { --padding-start: 0; --padding-end: 0; width: 56px; }
+// Text-Button "Preis ändern": schmaleres Padding, damit der Artikelname Platz behaelt.
+.price-btn { --padding-start: var(--nt-space-2); --padding-end: var(--nt-space-2); }
 
+ion-item-option { --padding-start: 0; --padding-end: 0; width: $row-min; }
+
+// "Erledigt (n)" ist eine normale .nt-section-header; "Erledigte entfernen" der Text-Button rechts.
 .done-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--nt-space-2);
-  padding: var(--nt-space-3) 0 0;
+  padding-inline-end: 0;
 
   &__toggle {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--nt-space-1);
     min-height: var(--nt-touch);
-    padding: 0 var(--nt-space-1);
+    padding: 0;
     border: 0;
     background: none;
-    color: var(--nt-secondary);
+    color: inherit;
     font: inherit;
-    @extend %caps;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    white-space: nowrap;
     cursor: pointer;
     &:focus-visible { outline: 2px solid var(--nt-focus); outline-offset: 2px; }
   }
-  &__clear { --color: var(--nt-accent); min-height: var(--nt-touch); margin: 0; }
+  .nt-btn--text { letter-spacing: normal; text-transform: none; }
 }
 
-.price-note { margin: var(--nt-space-3) 0 0; font-size: var(--nt-fs-caption); color: var(--nt-secondary); }
+.price-note { margin: 0; font-size: var(--nt-fs-caption); color: var(--nt-secondary); }
 
 .empty {
   display: flex;
@@ -197,17 +185,8 @@ ion-item-option { --padding-start: 0; --padding-end: 0; width: 56px; }
   gap: var(--nt-space-2);
   padding: var(--nt-space-6) var(--nt-space-4);
   &__icon { font-size: 48px; color: var(--nt-secondary); }
-  &__btn { width: auto; margin-top: var(--nt-space-3); }
+  &__btn { margin-top: var(--nt-space-3); }
   p { margin: 0; color: var(--nt-secondary); }
-}
-
-// Platz fuer den FAB ueber der Tab-Bar.
-.content-spacer { height: 64px; }
-
-// FAB in der 720-px-Spalte (nt-fab-offset).
-ion-fab.add-fab {
-  right: max(var(--nt-page-gutter), calc((100% - var(--nt-page-max)) / 2 + var(--nt-page-gutter)));
-  ion-fab-button { --background: var(--nt-accent); --background-activated: var(--nt-accent); --color: var(--nt-on-accent); width: 56px; height: 56px; }
 }
 
 .add-error {

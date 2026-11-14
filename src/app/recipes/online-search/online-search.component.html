@@ -25,14 +25,14 @@
         <li>Im Bereich „Profile“ den API-Key kopieren.</li>
         <li>In der App unter Profil › Rezept-Suche eintragen.</li>
       </ol>
-      <button type="button" class="nt-pill" (click)="openSettings()">
+      <button type="button" class="nt-btn" (click)="openSettings()">
         <ion-icon name="key-outline" aria-hidden="true"></ion-icon>
         Schlüssel eintragen
       </button>
       <p class="os-note">Der kostenlose Plan reicht für etwa 50 Punkte pro Tag. Rezepte kommen auf Englisch und werden mit KI-Verbindung ins Deutsche übersetzt.</p>
     </div>
   } @else if (shown(); as r) {
-    <article class="os-detail nt-page" data-testid="os-detail">
+    <article class="os-detail" data-testid="os-detail">
       @if (r.imageUrl) { <img class="os-detail__img" [src]="r.imageUrl" alt="" width="556" height="370" loading="lazy" /> }
       <h3 class="os-detail__title">{{ r.title }}</h3>
       <p class="os-meta">{{ metaLine(r) }}</p>
@@ -46,10 +46,6 @@
       }
       @if (translating()) { <p class="os-note" role="status" data-testid="os-translating"><ion-spinner name="dots"></ion-spinner> übersetze…</p> }
       @if (showUntranslatedHint()) { <p class="os-note os-untranslated" role="status" data-testid="os-untranslated">nicht übersetzt: Die KI ist nicht erreichbar, Titel und Anleitung bleiben Englisch.</p> }
-      <button type="button" class="nt-pill os-save" [disabled]="isSaved() || translating()" (click)="save()">
-        <ion-icon [name]="isSaved() ? 'checkmark' : 'bookmark-outline'" aria-hidden="true"></ion-icon>
-        {{ isSaved() ? 'Gespeichert' : 'Als Rezept speichern' }}
-      </button>
 
       <h4 class="os-h">Zutaten</h4>
       <ul class="os-ingredients">
@@ -67,9 +63,15 @@
         <p class="os-source">Quelle: <a [href]="r.sourceUrl" target="_blank" rel="noopener noreferrer">{{ r.sourceName || r.sourceUrl }}</a></p>
       }
       <p class="os-source">Rezepte von <a [href]="spoonacularUrl" target="_blank" rel="noopener noreferrer">spoonacular.com</a></p>
+      <div class="nt-sheet-footer">
+        <button type="button" class="nt-btn nt-btn--block os-save" [disabled]="isSaved() || translating()" (click)="save()">
+          <ion-icon [name]="isSaved() ? 'checkmark' : 'bookmark-outline'" aria-hidden="true"></ion-icon>
+          {{ isSaved() ? 'Gespeichert' : 'Als Rezept speichern' }}
+        </button>
+      </div>
     </article>
   } @else {
-    <div class="nt-page os-search">
+    <div class="os-search">
       <form class="os-form" (submit)="$event.preventDefault(); search()">
         <ion-input
           class="nt-field"
@@ -81,7 +83,7 @@
           (ngModelChange)="query.set($event)"
           [ngModelOptions]="{ standalone: true }"
         ></ion-input>
-        <button type="submit" class="nt-pill os-search-btn" [disabled]="loading()">
+        <button type="submit" class="nt-btn os-search-btn" [disabled]="loading()">
           <ion-icon name="search" aria-hidden="true"></ion-icon>
           Suchen
         </button>
@@ -148,7 +150,7 @@
       </ul>
 
       @if (hasMore() && !loading()) {
-        <button type="button" class="nt-pill nt-pill--secondary os-more" [disabled]="loadingMore()" (click)="loadMore()">
+        <button type="button" class="nt-btn nt-btn--tonal os-more" [disabled]="loadingMore()" (click)="loadMore()">
           {{ loadingMore() ? 'Lädt…' : 'Mehr laden' }}
         </button>
       }

@@ -1,6 +1,6 @@
 @if (plan(); as p) {
   @if (p.notices.length > 0) {
-    <ul class="wp-notices" role="status" data-testid="wp-notices">
+    <ul class="nt-card wp-notices" role="status" data-testid="wp-notices">
       @for (n of p.notices; track n) { <li>{{ n }}</li> }
     </ul>
   }
@@ -9,17 +9,17 @@
   } @else if (untranslated() > 0) {
     <div class="wp-translate" role="status" data-testid="wp-untranslated">
       <span>{{ untranslated() }} {{ untranslated() === 1 ? 'Rezept ist' : 'Rezepte sind' }} noch auf Englisch.</span>
-      <button type="button" class="nt-pill nt-pill--secondary wp-translate__retry" data-testid="wp-retranslate" (click)="retryTranslation()">
+      <button type="button" class="nt-btn nt-btn--tonal wp-translate__retry" data-testid="wp-retranslate" (click)="retryTranslation()">
         <ion-icon name="language-outline" aria-hidden="true"></ion-icon> Erneut übersetzen
       </button>
     </div>
   }
-  @if (error(); as err) { <p class="wp-error" role="alert" data-testid="wp-error">{{ err }}</p> }
+  @if (error(); as err) { <p class="nt-card wp-error" role="alert" data-testid="wp-error">{{ err }}</p> }
   @for (group of groups(); track group.meal) {
-    <h2 class="nt-section-header wp-group">{{ group.label }}</h2>
+    <h2 class="nt-section-header">{{ group.label }}</h2>
     <ul class="wp-list" [attr.data-testid]="'wp-group-' + group.meal">
       @for (r of group.recipes; track r.id) {
-        <li class="wp-item">
+        <li class="nt-card wp-item">
           <button type="button" class="wp-card" (click)="open(r)" [attr.aria-label]="r.title + ' ansehen'">
             <span class="wp-card__thumb">
               @if (r.imageUrl) { <img [src]="r.imageUrl" alt="" width="64" height="64" loading="lazy" /> } @else { <ion-icon name="restaurant-outline" aria-hidden="true"></ion-icon> }
@@ -34,7 +34,7 @@
               <ion-icon name="chevron-forward" class="wp-card__chev" aria-hidden="true"></ion-icon>
             }
           </button>
-          <button type="button" class="wp-more" data-testid="wp-more" [disabled]="busyId() !== null" (click)="openMenu(r)" [attr.aria-label]="'Optionen für ' + r.title">
+          <button type="button" class="wp-more" data-testid="wp-more" [disabled]="busyId() !== null || progress() !== null" (click)="openMenu(r)" [attr.aria-label]="'Optionen für ' + r.title">
             <ion-icon name="ellipsis-horizontal" aria-hidden="true"></ion-icon>
           </button>
         </li>

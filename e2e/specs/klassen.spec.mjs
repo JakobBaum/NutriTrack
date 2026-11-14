@@ -14,7 +14,7 @@ export function register({ test }) {
 
   test('klassen: Text-Import oeffnet das Rezept-Sheet, genau ein Overlay, Feld bedienbar', seed(), async (page) => {
     await go(page, 'recipes');
-    await page.locator('button.page-head__import[aria-label^="Rezept importieren"]').click();
+    await page.locator('[data-testid="import-btn"]').click();
     const modal = page.locator('ion-modal.show-modal').last();
     await modal.locator('textarea').fill('Pfannkuchen\n250 g Mehl\n2 Eier\n300 ml Milch\nAlles verruehren und braten.');
     await modal.locator('ion-button.save-btn').click();

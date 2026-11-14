@@ -6,40 +6,20 @@
 %tap-44 { min-width: var(--nt-touch); min-height: var(--nt-touch); }
 %note { margin: var(--nt-space-2) 0 0; font-size: .8125rem; color: var(--nt-secondary); }
 
-$footer-clearance: calc(var(--nt-touch) + var(--nt-space-6) + var(--nt-space-4) + env(safe-area-inset-bottom, 0px));
-
-ion-header ion-toolbar.view-bar { --background: var(--nt-ground); --border-width: 0; max-width: var(--nt-page-max); margin: 0 auto; }
+// Segment unter dem Kopf: Seitenrand durch .nt-page, Abstand nach unten = Kartenabstand
+.view-bar { padding-bottom: var(--nt-card-gap); }
 ion-modal ion-buttons ion-button, .touch-btn { min-height: var(--nt-touch); }
-ion-content { --background: var(--nt-ground); --padding-top: var(--nt-space-2); }
+ion-content { --background: var(--nt-ground); }
 
 ion-modal ion-content {
   --padding-start: var(--nt-page-gutter);
   --padding-end: var(--nt-page-gutter);
   --padding-top: var(--nt-space-2);
-  --padding-bottom: var(--nt-space-4);
+  --padding-bottom: 0; // der Sticky-Fuss (.nt-sheet-footer) bringt den unteren Abstand mit
 }
 
-
-.page-head__actions { @extend %row; flex: none; }
-
-.page-head__import {
-  @extend %row;
-  height: var(--nt-touch);
-  padding: 0 var(--nt-space-3);
-  background: transparent;
-  border: 0;
-  color: var(--nt-accent);
-  font-size: var(--nt-fs-body);
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-// Schmale Phones: „Online suchen“ und „Import“ nur als Icon
-@media (max-width: 429px) {
-  .page-head__import-label { display: none; }
-  .page-head__import { justify-content: center; width: var(--nt-touch); padding: 0; }
-}
+// Erstes Feldlabel im Sheet sitzt direkt unter dem Sheet-Kopf
+ion-modal ion-content > .nt-section-header:first-child { margin-top: 0; }
 
 .empty {
   display: flex;
@@ -53,67 +33,43 @@ ion-modal ion-content {
   p { margin: 0; color: var(--nt-muted); }
 }
 
+// Rezeptkarte: Padding und Radius kommen von .nt-card, Abstand der Karten von .nt-stack
 .recipe {
-  margin: 0 0 var(--nt-space-3);
-  padding: var(--nt-space-4);
-
   &__title { margin: 0; font-size: var(--nt-fs-headline); font-weight: 600; color: var(--nt-ink); }
   &__title-btn { display: flex; align-items: center; min-height: var(--nt-touch); padding: 0; background: none; border: 0; font: inherit; color: inherit; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
   &__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--nt-space-2); }
   &__head-text { min-width: 0; flex: 1; }
-  &__meta { @extend %note; margin-top: var(--nt-space-2); }
-  &__missing { @extend %note; @extend %row; gap: 4px; margin-top: var(--nt-space-1); }
-
-  &__kcal {
-    margin: var(--nt-space-3) 0 0;
-    font-size: var(--nt-fs-body);
-    color: var(--nt-secondary);
-    strong { font-size: 2.125rem; line-height: 1.1; font-weight: 700; color: var(--nt-kcal); font-variant-numeric: tabular-nums; }
-  }
+  &__meta { @extend %note; margin-top: 0; }
+  &__missing { @extend %note; @extend %row; gap: var(--nt-space-1); margin-top: var(--nt-card-gap); }
+  &__kcal { margin: var(--nt-card-gap) 0 0; .nt-stat__num { font-size: 2.125rem; font-weight: 700; color: var(--nt-kcal); } }
 
   &__macros {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
     gap: var(--nt-space-2);
-    margin: var(--nt-space-3) 0 0;
-    > div { min-width: 0; padding: var(--nt-space-2) var(--nt-space-3); background: var(--nt-ground); border-radius: 12px; }
-    dt { font-size: .8125rem; color: var(--nt-secondary); }
+    margin: var(--nt-card-gap) 0 0;
+    > div { min-width: 0; padding: var(--nt-space-2) var(--nt-space-3); background: var(--nt-ground); border-radius: var(--nt-radius-inner); }
+    dt { font-size: var(--nt-fs-caption); color: var(--nt-secondary); }
     dd { margin: 2px 0 0; font-size: var(--nt-fs-body); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--nt-ink); }
   }
 
-  // Eine Button-Familie fuer Karte und Detail-Footer: gleiche Hoehe, gleiche Form
+  // Im Detail-Sheet liegen die Kacheln auf dem Seitengrund: weisse Flaeche statt Grund
+  ion-modal &__macros > div { background: var(--nt-card); }
+
+  // Karte und Detail-Fuss: gleiche Buttons nebeneinander, schmale Innenabstaende damit "Eintragen" bei 320 px passt
   &__actions {
     display: flex;
-    align-items: center;
     gap: var(--nt-space-2);
-    margin-top: var(--nt-space-3);
-    ion-button.recipe__btn {
-      flex: 1 1 0;
-      min-width: 0;
-      --padding-start: 8px;
-      --padding-end: 8px;
-      height: var(--nt-touch);
-      margin: 0;
-      --border-radius: var(--nt-radius-pill);
-      --background: var(--nt-accent);
-      --color: var(--nt-on-accent);
-      --box-shadow: none;
-      font-weight: 600;
-    }
-    ion-button.recipe__btn--tint { --background: var(--nt-accent-tint); --color: var(--nt-accent); }
+    margin-top: var(--nt-card-gap);
+    ion-button { flex: 1 1 0; min-width: 0; --padding-start: var(--nt-space-2); --padding-end: var(--nt-space-2); }
   }
 
-  &__icon-btn {
-    @extend %tap-44;
-    margin: calc(-1 * var(--nt-space-2)) calc(-1 * var(--nt-space-2)) 0 0;
-    flex: none;
-    --border-radius: var(--nt-radius-pill);
-    --color: var(--nt-secondary);
-  }
+  // Menue-Symbol: Glyph bleibt an der Textkante der Karte
+  &__head &__icon-btn { flex: none; margin: calc(-1 * var(--nt-space-2)) calc(-1 * var(--nt-space-2)) 0 0; --color: var(--nt-secondary); }
 }
 
 .form-error { margin: 0 0 var(--nt-space-2); font-weight: 600; }
-.field-label { display: block; margin: var(--nt-space-5) var(--nt-space-1) 6px; font-size: .8125rem; font-weight: 400; }
+.field-label { display: block; }
 
 // Zutat: Name oben, darunter "Menge | Einheit" und Naehrwert-Toggle
 .ing { display: flex; flex-direction: column; gap: var(--nt-space-2); min-width: 0; padding: var(--nt-space-3) 0; }
@@ -201,21 +157,11 @@ ion-modal ion-content {
 .ai-needed { @extend %hint; margin: 8px 0 12px; font-size: 0.8125rem; }
 .block-reason { text-align: center; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.save-btn { margin-top: var(--nt-space-4); }
-.auto-weight-hint { @extend %hint; margin: 4px var(--nt-space-1) 0; }
+.auto-weight-hint { @extend %hint; margin: var(--nt-space-1) var(--nt-space-4) 0; }
 .scan-hint { @extend %hint; margin: 8px 0 0; }
-.weight-detail { @extend %hint; margin: 0 var(--nt-space-1); summary { @extend %row; min-height: var(--nt-touch); cursor: pointer; } p { margin: 0 0 8px; } }
+.weight-detail { @extend %hint; margin: 0 var(--nt-space-4); summary { @extend %row; min-height: var(--nt-touch); cursor: pointer; } p { margin: 0 0 8px; } }
 .scan-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--nt-space-2); margin-bottom: var(--nt-space-2); }
-.tiktok-hint { @extend %hint; @extend %row; margin: 6px var(--nt-space-1) 4px; ion-icon { font-size: 16px; } }
-.content-spacer { height: 80px; }
-
-// Platz unter dem letzten Editor-Feld, damit der Sticky-Footer nichts verdeckt
-.editor-spacer { height: $footer-clearance; }
-
-.save-footer {
-  ion-toolbar { --background: var(--nt-ground); --padding-start: var(--nt-space-4); --padding-end: var(--nt-space-4); --padding-bottom: calc(var(--nt-space-3) + env(safe-area-inset-bottom, 0px)); --padding-top: var(--nt-space-2); }
-  .save-btn { margin: 0; }
-}
+.tiktok-hint { @extend %hint; @extend %row; margin: var(--nt-space-2) var(--nt-space-4) var(--nt-space-1); ion-icon { font-size: 16px; } }
 
 .save-error { margin: 0 0 var(--nt-space-2); padding: 10px 14px; background: rgba(var(--ion-color-danger-rgb), 0.1); border-radius: var(--nt-radius-sm); font-size: 0.875rem; }
 
@@ -224,3 +170,8 @@ ion-modal ion-content {
 .detail-steps { padding: 0 0 0 var(--nt-space-4); li { padding: 4px 0; } }
 
 
+
+// Sticky-Fuss liegt ueber durchscrollenden Feldern. Speichern bleibt auch bei kurzem Inhalt unten (ohne Sticky-Wirkung waere es direkt unter dem letzten Feld)
+ion-modal ion-content::part(scroll) { display: flex; flex-direction: column; }
+ion-modal ion-content > * { flex: none; }
+.nt-sheet-footer { z-index: 3; margin-top: auto; padding-top: var(--nt-space-4); }

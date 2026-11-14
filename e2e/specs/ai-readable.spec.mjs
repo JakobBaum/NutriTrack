@@ -65,7 +65,7 @@ async function openFastfood(page) {
 
 async function scanLabel(page) {
   await go(page, 'diary');
-  await page.locator('.page-head__add').click();
+  await page.locator('[data-testid="diary-add"]').click();
   await page.locator('.nt-source-btn', { hasText: 'Etikett' }).waitFor();
   const jpeg = await page.evaluate(() => {
     const canvas = document.createElement('canvas');

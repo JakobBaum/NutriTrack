@@ -17,7 +17,6 @@
 
   h2 { margin: 8px 0 0; font-size: var(--nt-fs-title); font-weight: 700; color: var(--nt-ink); }
   p { margin: 0 0 12px; color: var(--nt-muted); }
-  ion-button { width: 100%; max-width: 320px; --border-radius: var(--nt-radius-pill); min-height: var(--nt-touch); }
 }
 
 .icon-btn {
@@ -26,11 +25,6 @@
   margin: 0;
   --padding-start: 0;
   --padding-end: 0;
-}
-
-// Abschnittskopf: globale .nt-section-header, im Sheet ohne extra Einzug (Content hat Padding)
-.section-sub {
-  margin: var(--nt-space-5) var(--nt-space-1) var(--nt-space-2);
 }
 
 .nt-grouped {
@@ -56,28 +50,14 @@
   }
 }
 
-ion-modal .nt-grouped {
-  margin-left: 0;
-  margin-right: 0;
-}
-
 ion-modal ion-content {
   --padding-start: var(--nt-page-gutter);
   --padding-end: var(--nt-page-gutter);
+  --padding-bottom: 0; // der Sticky-Fuss (.nt-sheet-footer) bringt den unteren Abstand mit
 }
 
 
-// "Eintragen" als beschriftete Pille (44 px), ersetzt das bloße +-Symbol
-.meal-use {
-  height: var(--nt-touch);
-  min-height: var(--nt-touch);
-  margin: 0 var(--nt-space-1);
-  --color: var(--nt-accent);
-  --padding-start: var(--nt-space-2);
-  --padding-end: var(--nt-space-2);
-  font-weight: 600;
-  text-transform: none;
-}
+label.nt-section-header { display: block; }
 
 .draft-total {
   text-align: right;
@@ -85,7 +65,7 @@ ion-modal ion-content {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--nt-secondary);
-  margin: var(--nt-space-2) var(--nt-space-1) var(--nt-space-3);
+  margin: var(--nt-space-2) var(--nt-space-4) var(--nt-space-3);
 }
 
 .add-btns {
@@ -169,7 +149,7 @@ ion-modal ion-buttons ion-button {
 }
 
 .manual-hint {
-  margin: var(--nt-space-2) var(--nt-space-1) var(--nt-space-4);
+  margin: var(--nt-space-2) var(--nt-space-4) var(--nt-space-4);
   font-size: var(--nt-fs-caption);
   color: var(--nt-secondary);
 }
@@ -181,3 +161,8 @@ ion-modal ion-buttons ion-button {
   font-weight: 600;
   color: var(--nt-over);
 }
+
+// Speichern bleibt auch bei kurzem Inhalt unten (ohne Sticky-Wirkung waere es direkt unter dem letzten Feld)
+ion-modal ion-content::part(scroll) { display: flex; flex-direction: column; }
+ion-modal ion-content > * { flex: none; }
+.nt-sheet-footer { z-index: 3; margin-top: auto; padding-top: var(--nt-space-4); }

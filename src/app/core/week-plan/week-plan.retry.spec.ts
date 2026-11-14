@@ -56,6 +56,40 @@ describe('WeekPlanService.retryTranslation', () => {
     expect(translateAll).toHaveBeenCalledTimes(2);
   });
 
+  it('holt ein während der Übersetzung entferntes Rezept nicht zurück', async () => {
+    let finish: (r: unknown[]) => void = () => undefined;
+    const translateAll = vi.fn().mockImplementation((r: unknown[]) => new Promise((resolve) => {
+      finish = () => resolve(r.map((x) => ({ ...(x as object), title: 'Huhn', lang: 'de' })));
+    }));
+    const service = setup(translateAll);
+    const store = TestBed.inject(WeekPlanStore);
+    store.set({ ...plan(), recipes: [...plan().recipes, { ...plan().recipes[0], id: '2', title: 'Beef' }] });
+
+    const job = service.ensureTranslated();
+    service.removeRecipe('2', false);
+    finish([]);
+    await job;
+
+    expect(store.plan()?.recipes.map((r) => `${r.id}:${r.title}`)).toEqual(['1:Huhn']);
+  });
+
+  it('überschreibt einen inzwischen neu erstellten Plan nicht', async () => {
+    let finish: () => void = () => undefined;
+    const translateAll = vi.fn().mockImplementation((r: unknown[]) => new Promise((resolve) => {
+      finish = () => resolve(r);
+    }));
+    const service = setup(translateAll);
+    const store = TestBed.inject(WeekPlanStore);
+
+    const job = service.ensureTranslated();
+    const fresh: WeekPlan = { ...plan(), id: 'w2', recipes: [{ ...plan().recipes[0], id: '9', title: 'Neu' }] };
+    store.set(fresh);
+    finish();
+    await job;
+
+    expect(store.plan()).toEqual(fresh);
+  });
+
   it('tut ohne Plan nichts', async () => {
     const translateAll = vi.fn();
     const service = setup(translateAll);

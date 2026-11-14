@@ -258,9 +258,11 @@
 
     @if (view() === 'form') {
       <ion-footer class="ion-no-border add-footer">
-        <ion-toolbar>
-          <ion-button expand="block" class="add-footer__save" (click)="save()">Eintragen</ion-button>
-        </ion-toolbar>
+        <div class="nt-page">
+          <div class="nt-sheet-footer">
+            <ion-button expand="block" class="nt-btn nt-btn--block add-footer__save" (click)="save()">Eintragen</ion-button>
+          </div>
+        </div>
       </ion-footer>
     }
   </ng-template>

@@ -1,11 +1,9 @@
 <ion-header class="ion-no-border">
   <nt-page-header title="Einkaufsliste">
     @if (isListView() && list() !== null) {
-      <div class="nt-page-header__action">
-        <ion-button class="share-btn" fill="clear" (click)="shareList()" aria-label="Liste teilen">
-          <ion-icon slot="icon-only" name="share-outline"></ion-icon>
-        </ion-button>
-      </div>
+      <ion-button fill="clear" class="nt-icon-btn" (click)="shareList()" aria-label="Liste teilen">
+        <ion-icon slot="icon-only" name="share-outline"></ion-icon>
+      </ion-button>
     }
   </nt-page-header>
   <div class="nt-page view-switch">
@@ -17,31 +15,18 @@
 </ion-header>
 
 <ion-content>
-  <div class="nt-page">
+  <div class="nt-page nt-stack">
   @if (showGenerator()) {
     @if (weekPlan(); as wp) {
       @if (!showForm()) {
-        <div class="summary plan-summary">
-          <span class="summary__text">
-            Wochenplan für {{ wp.persons }} {{ wp.persons === 1 ? 'Person' : 'Personen' }} · {{ wp.days }} {{ wp.days === 1 ? 'Tag' : 'Tage' }} · {{ wp.recipes.length }} Rezepte
-          </span>
-          <ion-button class="nt-add-btn summary__btn" data-testid="new-plan-btn" (click)="expandGenerator()">
-            <ion-icon slot="start" name="refresh-outline"></ion-icon>
-            Neuen Wochenplan erstellen
-          </ion-button>
-          @if (list(); as l) {
-            <ion-button class="nt-add-btn summary__btn" data-testid="open-list-btn" (click)="setView('list')">
-              <ion-icon slot="start" name="list-outline"></ion-icon>
-              Einkaufsliste öffnen ({{ l.items.length }} {{ l.items.length === 1 ? 'Position' : 'Positionen' }}, {{ openCount() }} offen)
-            </ion-button>
-          }
-        </div>
+          <p class="summary__text" data-testid="plan-summary">
+          Wochenplan für {{ wp.persons }} {{ wp.persons === 1 ? 'Person' : 'Personen' }} · {{ wp.days }} {{ wp.days === 1 ? 'Tag' : 'Tage' }} · {{ wp.recipes.length }} Rezepte
+        </p>
       }
     }
 
     @if (showForm()) {
-      <ion-card class="generator">
-        <ion-card-content>
+      <section class="nt-card generator" aria-label="Wochenplan erstellen">
           @if (weekPlan() === null) {
             <p class="generator__intro" role="status">Noch kein Wochenplan. Die App sucht gesunde eiweißreiche Rezepte, zeigt sie hier mit Anleitung und legt alle Zutaten in die Einkaufsliste.</p>
           }
@@ -130,15 +115,15 @@
             @if (noRecipesBlock()) {
               <div class="generator__empty" role="status">
                 <p>Lege zuerst eigene Rezepte an, daraus entsteht dann die Einkaufsliste.</p>
-                <ion-button fill="outline" size="small" routerLink="/recipes">Zu meinen Rezepten</ion-button>
+                <ion-button class="nt-btn nt-btn--tonal nt-btn--inner" routerLink="/recipes">Zu meinen Rezepten</ion-button>
               </div>
             }
             </div>
-            <ion-button expand="block" class="own-btn" data-testid="own-plan-btn" (click)="generate()" [disabled]="loading() || noRecipesBlock()">
+            <ion-button expand="block" class="nt-btn nt-btn--block nt-btn--inner" data-testid="own-plan-btn" (click)="generate()" [disabled]="loading() || noRecipesBlock()">
               @if (loading()) { <ion-spinner name="dots" slot="start"></ion-spinner> Erstelle… } @else { <ion-icon slot="start" name="book-outline"></ion-icon> Plan aus meinen Rezepten erstellen }
             </ion-button>
           } @else {
-            <ion-button expand="block" class="generate-btn" data-testid="week-plan-btn" (click)="generateWeekPlan()" [disabled]="loading() || !onlineAvailable()">
+            <ion-button expand="block" class="nt-btn nt-btn--block nt-btn--inner" data-testid="week-plan-btn" (click)="generateWeekPlan()" [disabled]="loading() || !onlineAvailable()">
               @if (loading()) {
                 <ion-spinner name="dots" slot="start"></ion-spinner>
                 @if (translateProgress(); as pr) { Übersetze Rezepte ({{ pr.done }}/{{ pr.total }})… } @else { Erstelle… }
@@ -148,26 +133,25 @@
             </ion-button>
           }
           @if (weekPlan() !== null || list() !== null) {
-            <ion-button expand="block" fill="clear" class="cancel-btn" (click)="cancelGenerator()">Abbrechen</ion-button>
+            <ion-button expand="block" fill="clear" class="nt-btn nt-btn--text nt-btn--block nt-btn--inner" (click)="cancelGenerator()">Abbrechen</ion-button>
           }
           @if (error()) {
             <ion-text color="danger"><p class="form-error" role="alert">{{ error() }}</p></ion-text>
           }
-        </ion-card-content>
-      </ion-card>
+      </section>
     }
 
-    <app-week-plan-cards></app-week-plan-cards>
+    <app-week-plan-cards class="nt-stack"></app-week-plan-cards>
   }
 
   @if (isListView()) {
     @if (list(); as l) {
       <div class="summary">
-        <span class="summary__text">
+        <p class="summary__text">
           Einkauf für {{ l.persons }} {{ l.persons === 1 ? 'Person' : 'Personen' }}
           @if ((l.days ?? null) !== null) { · {{ l.days }} {{ l.days === 1 ? 'Tag' : 'Tage' }} }
-        </span>
-        <ion-button class="nt-add-btn summary__btn" (click)="openGenerator()">
+        </p>
+        <ion-button class="nt-btn nt-btn--tonal summary__btn" (click)="openGenerator()">
           <ion-icon slot="start" name="refresh-outline"></ion-icon>
           Neu generieren
         </ion-button>
@@ -176,13 +160,19 @@
       @if (showTotals()) {
         <div class="totals">
           <div class="totals__main">
-            <span class="totals__group">
-              <span class="totals__label">Gesamt (geschätzt)</span>
-              <span class="totals__sum" [class.over]="live() && overBudget()">ca. {{ totals().total | ntNum:2:2 }} €</span>
+            <span class="nt-stat">
+              <span class="nt-stat__value">
+                <span class="nt-stat__num totals__sum" [class.over]="live() && overBudget()">ca. {{ totals().total | ntNum:2:2 }}</span>
+                <span class="nt-stat__unit">€</span>
+              </span>
+              <span class="nt-stat__extra totals__label">Gesamt (geschätzt)</span>
             </span>
-            <span class="totals__group">
-              <span class="totals__label">Davon offen</span>
-              <span class="totals__open">ca. {{ totals().open | ntNum:2:2 }} €</span>
+            <span class="nt-stat">
+              <span class="nt-stat__value">
+                <span class="nt-stat__num totals__open">ca. {{ totals().open | ntNum:2:2 }}</span>
+                <span class="nt-stat__unit">€</span>
+              </span>
+              <span class="nt-stat__extra totals__label">Davon offen</span>
             </span>
           </div>
           <div class="totals__meta">
@@ -228,7 +218,7 @@
                 </span>
               </span>
             </ion-checkbox>
-            <ion-button slot="end" fill="clear" size="small" class="price-btn" (click)="editPrice(row.index)" [attr.aria-label]="item.name + ': Preis ändern'">
+            <ion-button slot="end" fill="clear" class="nt-btn nt-btn--text price-btn" (click)="editPrice(row.index)" [attr.aria-label]="item.name + ': Preis ändern'">
               Preis ändern
             </ion-button>
             <ion-button slot="end" fill="clear" color="medium" class="nt-hover-delete" (click)="removeItem(row.index)" [attr.aria-label]="item.name + ' löschen'">
@@ -245,7 +235,7 @@
 
       @for (group of openGroups(); track group.category ?? '') {
         @if (group.category) {
-          <h2 class="nt-section-header cat-header">{{ categoryLabel(group.category) }}</h2>
+          <h2 class="nt-section-header">{{ categoryLabel(group.category) }}</h2>
         }
         <ion-list class="nt-grouped" lines="full">
           @for (row of group.rows; track row.index) {
@@ -262,7 +252,7 @@
       }
 
       @if (doneRows().length > 0) {
-        <div class="done-head">
+        <div class="nt-section-header done-head">
           <button
             type="button"
             class="done-head__toggle"
@@ -273,7 +263,7 @@
             <ion-icon [name]="doneOpen() ? 'chevron-up-outline' : 'chevron-down-outline'" aria-hidden="true"></ion-icon>
             Erledigt ({{ doneRows().length }})
           </button>
-          <ion-button fill="clear" class="done-head__clear" (click)="removeChecked()">Erledigte entfernen</ion-button>
+          <ion-button fill="clear" class="nt-btn nt-btn--text" (click)="removeChecked()">Erledigte entfernen</ion-button>
         </div>
         @if (doneOpen()) {
           <ion-list id="done-list" class="nt-grouped done-list" lines="full">
@@ -284,12 +274,12 @@
         }
       }
 
-      <p class="price-note">Preise sind Richtwerte (Österreich, Supermarkt) und können im Markt abweichen. Eigene Preise überschreiben die Schätzung.</p>
+      <p class="price-note" data-testid="price-note">Preise sind Richtwerte (Österreich, Supermarkt) und können im Markt abweichen. Eigene Preise überschreiben die Schätzung.</p>
     } @else {
       <div class="empty">
         <ion-icon name="cart-outline" class="empty__icon" aria-hidden="true"></ion-icon>
         <p>Noch keine Liste. Tippe auf „+“, um Artikel einzutragen, oder erstelle einen Wochenplan.</p>
-        <ion-button class="nt-add-btn empty__btn" (click)="setView('recipes')">Wochenplan erstellen</ion-button>
+        <ion-button class="nt-btn nt-btn--tonal empty__btn" (click)="setView('recipes')">Wochenplan erstellen</ion-button>
       </div>
     }
   }
@@ -320,13 +310,17 @@
     [swipeGesture]="toastSwipe"
     (didDismiss)="onShareToastDismiss()"
   ></ion-toast>
-
-  <div class="content-spacer"></div>
   </div>
   @if (isListView()) {
-    <ion-fab slot="fixed" vertical="bottom" horizontal="end" class="add-fab nt-fab-offset">
+    <ion-fab slot="fixed" vertical="bottom" horizontal="end" class="nt-fab">
       <ion-fab-button (click)="openAdd()" aria-label="Artikel hinzufügen" aria-haspopup="dialog">
         <ion-icon name="add-outline"></ion-icon>
+      </ion-fab-button>
+    </ion-fab>
+  } @else if (weekPlan() !== null && !showForm()) {
+    <ion-fab slot="fixed" vertical="bottom" horizontal="end" class="nt-fab">
+      <ion-fab-button data-testid="new-plan-btn" (click)="expandGenerator()" aria-label="Neuen Wochenplan erstellen">
+        <ion-icon name="refresh-outline"></ion-icon>
       </ion-fab-button>
     </ion-fab>
   }
@@ -348,7 +342,7 @@
       <span class="nt-sheet-header__start" aria-hidden="true"></span>
       <h2 class="nt-sheet-header__title" role="heading" aria-level="2">Artikel hinzufügen</h2>
       <span class="nt-sheet-header__end">
-        <ion-button fill="clear" (click)="closeAdd()">Fertig</ion-button>
+        <ion-button fill="clear" class="nt-sheet-close" (click)="closeAdd()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
       </span>
     </div>
     <ion-content class="add-sheet__content">
@@ -398,7 +392,7 @@
         </div>
         @if (addAmountError(); as err) { <p class="add-error" role="alert" data-testid="add-amount-error">Menge: {{ err }}</p> }
         @if (addPriceError(); as err) { <p class="add-error" role="alert" data-testid="add-price-error">Preis: {{ err }}</p> }
-        <button type="button" class="nt-add-btn add-submit" (click)="addManual()">Hinzufügen</button>
+        <button type="button" class="nt-btn nt-btn--block add-submit" (click)="addManual()">Hinzufügen</button>
       </div>
     </ion-content>
   </ng-template>

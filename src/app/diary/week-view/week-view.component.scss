@@ -10,46 +10,29 @@ $bar-height: 120px;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: var(--nt-space-4) var(--nt-space-3);
-    margin-top: var(--nt-space-2);
-  }
-
-  &__chart {
-    margin-top: 0;
   }
 
   &__note {
-    margin: var(--nt-space-2) var(--nt-space-5) var(--nt-space-3);
+    margin: 0;
+    padding-inline: var(--nt-space-4);
     font-size: var(--nt-fs-caption);
     color: var(--nt-secondary);
   }
 }
 
-.stat {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+// Kennzahl: Zahl + Einheit in einer Zeile (.nt-stat), Farbe nach Groesse.
+.week-num {
+  font-size: var(--nt-fs-title);
+  font-weight: 700;
+  line-height: 1.15;
+}
 
-  &__value {
-    font-size: var(--nt-fs-title);
-    font-weight: 700;
-    line-height: 1.15;
-    color: var(--nt-ink);
-    font-variant-numeric: tabular-nums;
+.stat__value--kcal .week-num {
+  color: var(--nt-kcal);
+}
 
-    &--kcal {
-      color: var(--nt-kcal);
-    }
-
-    &--protein {
-      color: var(--nt-protein);
-    }
-  }
-
-  &__label {
-    font-size: var(--nt-fs-caption);
-    color: var(--nt-secondary);
-  }
+.stat__value--protein .week-num {
+  color: var(--nt-protein);
 }
 
 .bars {

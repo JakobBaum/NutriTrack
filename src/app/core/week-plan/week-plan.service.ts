@@ -166,8 +166,11 @@ export class WeekPlanService {
   }
 
   private async retranslate(plan: WeekPlan): Promise<void> {
-    const recipes = await this.translateRecipes(plan.recipes);
-    const next: WeekPlan = { ...plan, recipes };
+    const translated = new Map((await this.translateRecipes(plan.recipes)).map((r) => [r.id, r]));
+    // Die Übersetzung dauert; der Plan kann inzwischen geändert oder ersetzt worden sein. Nur in den aktuellen Stand mischen.
+    const current = this.planStore.plan();
+    if (current?.id !== plan.id) return;
+    const next: WeekPlan = { ...current, recipes: current.recipes.map((r) => translated.get(r.id) ?? r) };
     this.planStore.set(next);
     this.shopping.applyWeekPlan(next);
   }

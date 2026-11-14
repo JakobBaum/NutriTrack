@@ -9,7 +9,7 @@ const MEAL = { id: 'm-1', name: 'Frühstück Standard', entries: [{ label: 'Hafe
 
 const openCreate = async (page) => {
   await go(page, 'recipes?view=meals');
-  await page.locator('.page-head__add').click();
+  await page.getByRole('button', { name: 'Neue Mahlzeit' }).click();
   const modal = topModal(page);
   await modal.locator('#meal-name input').waitFor();
   return modal;
@@ -64,7 +64,7 @@ export function register({ test }) {
 
   test('w1: Rezept-Sheet X fragt nach "Weiter bearbeiten" erneut', seed(), async (page) => {
     await go(page, 'recipes');
-    await page.locator('.page-head__add').click();
+    await page.getByRole('button', { name: 'Neues Rezept' }).click();
     const modal = topModal(page);
     await modal.locator('ion-input').first().locator('input').fill('Testrezept');
     await closeX(page).click();

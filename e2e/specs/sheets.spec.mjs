@@ -15,7 +15,7 @@ const LONG_RECIPE = {
 
 async function openAddSheet(page) {
   await go(page, 'diary');
-  await page.locator('.page-head__add').click();
+  await page.locator('[data-testid="diary-add"]').click();
   const modal = topModal(page);
   await modal.locator('.nt-source-btn', { hasText: 'Manuell' }).waitFor();
   return modal;

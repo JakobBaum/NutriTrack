@@ -45,7 +45,7 @@ export function register({ test }) {
   test('shopping: Artikel mit Enter hinzufügen', seed({ shopping: SHOPPING }), async (page) => {
     await go(page, 'shopping');
     // "+" öffnet das Bottom Sheet
-    await page.locator('ion-fab.add-fab ion-fab-button').click();
+    await page.locator('ion-fab.nt-fab ion-fab-button').click();
     await page.locator('ion-modal.add-sheet').waitFor({ state: 'visible' });
     const name = page.locator('ion-modal.add-sheet ion-input.add-name input');
     await name.fill('Hafermilch');

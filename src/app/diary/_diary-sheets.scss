@@ -17,7 +17,7 @@
 // --- Inset-gruppierte Listen (Karte, Radius 20, Zeilen >= 56, inset Trenner) -
 .diary-list {
   display: block;
-  margin: 0 var(--nt-space-4);
+  margin-inline: var(--nt-space-4);
   padding: 0;
   background: var(--nt-card);
   border-radius: var(--nt-radius-card);
@@ -25,6 +25,12 @@
 
   &--spaced {
     margin-top: var(--nt-space-4);
+  }
+
+  // Auf der Seite: Seitenrand und Abstand liefert .nt-page / .nt-stack, die Karte hat keinen eigenen Rand
+  // (kein margin-top/-bottom setzen: sonst schlaegt es den Stack-Abstand).
+  &--page {
+    margin-inline: 0;
   }
 
   ion-item {
@@ -76,7 +82,7 @@
   }
 }
 
-// Akzent-Tint-Kreis (44 px) für Plus / Icon-Marker
+// Akzent-Tint-Kachel (44 px) für Plus / Icon-Marker. Liegt in einer Karte: Innenradius statt Kreis.
 .tint-circle {
   display: inline-flex;
   align-items: center;
@@ -84,7 +90,7 @@
   flex: none;
   width: var(--nt-touch);
   height: var(--nt-touch);
-  border-radius: var(--nt-radius-pill);
+  border-radius: var(--nt-radius-inner);
   background: var(--nt-accent-tint);
   color: var(--nt-accent);
 
