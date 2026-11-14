@@ -165,8 +165,8 @@
         } @else if (form().weightKg === null || form().heightCm === null || form().age === null) {
           <p class="hint" role="status">Bitte Gewicht, Größe und Alter angeben.</p>
         }
-        <div class="form-actions">
-          <ion-button expand="block" data-testid="profile-save" (click)="save()">
+        <div class="nt-sheet-footer">
+          <ion-button class="nt-btn nt-btn--block" expand="block" data-testid="profile-save" (click)="save()">
             Speichern
           </ion-button>
         </div>

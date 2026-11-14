@@ -67,3 +67,18 @@ Typo: Systemschrift, tabular-nums; 13 / 15 / 17 / 22 / 34, Hero-Zahlen 48 (kcal 
 
 ## Kompakte Phones
 Unter 390 px Breite (oder Hoehe <= 700 px) verkleinert `src/styles/compact-phone.scss` die Tokens um ca. 6-10 %: Titel 31 px, Body 14 px, Touch 40 px, Tab-Leiste 56 px. Untergrenzen: Tippflaeche 40 px, Tab-Leiste >= 44, Schrift >= 13 px (Tab-Beschriftung >= 11 px). Datei wird zuletzt geladen; Komponenten-SCSS mit Emulated Encapsulation schlaegt :root, daher Tab-Leiste in `tabs.page.scss`.
+
+## Layout-Bausteine (Welle 2)
+
+Quellen: `src/styles/layout.scss`, `src/styles/buttons.scss`, Tokens in `src/theme/variables.scss`. Ersetzt die gleichnamigen Altregeln in den Abschnitten oben (`.nt-card`, `.nt-pill`, `.nt-add-btn`, `.nt-page-header`).
+
+Tokens: `--nt-page-gutter` (Seitenrand, einzige Quelle), `--nt-card-pad` 16, `--nt-card-gap` 12, `--nt-section-gap` 24, `--nt-header-row` 44, `--nt-header-gap` 12, `--nt-btn-height` 44, `--nt-icon-btn` 44, `--nt-fab-size` 56, `--nt-fab-end` 16, `--nt-radius-inner` = max(8, Kartenradius - Kartenpadding).
+
+- Seitenrand nur durch `.nt-page` (Inhalt) und `.nt-page-header` (Kopf). Karten, Gruppen, Ueberschriften haben keinen eigenen Seitenrand.
+- `.nt-stack` am `.nt-page`: Abstand Karte-Karte 12, vor Abschnittsueberschrift 24, Ueberschrift-Gruppe 8. Komponenten-Hosts ohne eigenen margin-top; Hosts, die mit einer Ueberschrift beginnen, tragen `.nt-stack__section`.
+- Kopf: `<ion-header class="ion-no-border"><nt-page-header title="..."> [Symbol-Buttons] </nt-page-header></ion-header>`. Rechts nur `<ion-button fill="clear" class="nt-icon-btn" aria-label="..."><ion-icon slot="icon-only" name="..."></ion-icon></ion-button>` (44x44). Aktionen wie "Eintragen" sind der FAB, kein Text-Button im Kopf. Der Abstand zum Inhalt steckt im Kopf, der erste Block hat margin-top 0. Heute: Titel im Kopf, Datumsleiste (`nt-date-nav`) als erster Block darunter.
+- FAB: `<ion-fab slot="fixed" vertical="bottom" horizontal="end" class="nt-fab"><ion-fab-button aria-label="Eintragen"><ion-icon name="add"></ion-icon></ion-fab-button></ion-fab>` als direktes Kind von `ion-content`; der Inhalt bekommt unten automatisch Platz (`:has(> ion-fab.nt-fab)`).
+- Buttons: `.nt-btn` (primaer), `.nt-btn--tonal`, `.nt-btn--text`, Zusaetze `.nt-btn--block`, `.nt-btn--inner` (in Karten: abgerundetes Rechteck). Immer 44 px. Alt-Namen `.nt-pill`, `.nt-pill--secondary`, `.nt-add-btn` bleiben gueltig. Pillen nur frei auf dem Seitengrund, in Karten `.nt-btn--inner`.
+- `.nt-section-header`: 13 px, Grossbuchstaben, secondary, Einzug 16. `.nt-card`: Padding 16, Kompakt-Phones 14.
+- `.nt-stat`: `__value` (Zeile mit `__num` und `__unit`, nie umbrechend), `__extra` darunter ("noch", "gegessen").
+- `.nt-inner`/`--nt-radius-inner` fuer Kacheln in Karten. Sheets: X immer rechts, Speichern in `.nt-sheet-footer` unten, volle Breite.

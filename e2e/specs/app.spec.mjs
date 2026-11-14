@@ -70,7 +70,7 @@ export function register({ test }) {
     const eaten = toInt(await page.locator('.hero__item:not(.hero__item--protein) .hero__eaten').innerText());
     const target = toInt(await page.locator('.hero__item:not(.hero__item--protein) .hero__target').innerText());
     assert.equal(eaten, sumKcal(DIARY_NORMAL));
-    assert.match(await page.locator('.hero__item:not(.hero__item--protein) .hero__unit').innerText(), /kcal noch/);
+    assert.match(await page.locator('.hero__item:not(.hero__item--protein) .hero__main').innerText(), /kcal\s+noch/);
     assert.equal(toInt(await page.locator('.hero__item:not(.hero__item--protein) .hero__big').innerText()), target - eaten);
     assert.equal(await page.locator('.hero__item--over').count(), 0);
     const lunch = page.locator('.row__btn', { hasText: 'Mittagessen' });

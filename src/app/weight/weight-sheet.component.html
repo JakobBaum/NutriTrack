@@ -1,12 +1,10 @@
 <ion-modal [isOpen]="isOpen()" [handle]="true" (ionModalDidDismiss)="closed.emit()">
   <ng-template>
     <div class="nt-sheet-header">
-      <span class="nt-sheet-header__start">
-        <ion-button fill="clear" class="nt-sheet-close" (click)="closed.emit()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
-      </span>
+      <span class="nt-sheet-header__start"></span>
       <h2 class="nt-sheet-header__title" role="heading" aria-level="2">Gewicht eintragen</h2>
       <span class="nt-sheet-header__end">
-        <ion-button fill="clear" data-testid="weight-save" (click)="save()">Speichern</ion-button>
+        <ion-button fill="clear" class="nt-sheet-close" (click)="closed.emit()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
       </span>
     </div>
     <ion-content>
@@ -21,6 +19,9 @@
           </ion-item>
         </ion-list>
         <p class="weight-sheet__hint">Ein Eintrag je Tag. Morgens nüchtern gewogen sind die Werte am besten vergleichbar.</p>
+        <div class="nt-sheet-footer">
+          <ion-button class="nt-btn nt-btn--block" expand="block" data-testid="weight-save" (click)="save()">Speichern</ion-button>
+        </div>
       </div>
     </ion-content>
   </ng-template>

@@ -46,8 +46,8 @@
         @if (test().message; as msg) {
           <p class="hint" role="status" [class.hint--warn]="test().ok === false">{{ msg }}</p>
         }
-        <div class="actions">
-          <ion-button expand="block" (click)="save()">Speichern</ion-button>
+        <div class="nt-sheet-footer">
+          <ion-button class="nt-btn nt-btn--block" expand="block" (click)="save()">Speichern</ion-button>
         </div>
       </div>
     </ion-content>

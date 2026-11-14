@@ -1,13 +1,15 @@
+<ion-header class="ion-no-border">
+  <nt-page-header title="Profil"></nt-page-header>
+</ion-header>
+
 <ion-content>
-  <div class="nt-page settings-page">
-    <nt-page-header title="Profil"></nt-page-header>
+  <div class="nt-page nt-stack settings-page">
 
     <!-- Aktuelles Tagesziel -->
     @if (target(); as t) {
-      <ion-card class="target-card">
-        <ion-card-content>
-          <div class="target-card__kcal">
-            <span class="num">{{ t.kcal | ntNum:0 }}</span><span class="unit">kcal / Tag</span>
+      <section class="nt-card target-card" aria-label="Tagesziel">
+          <div class="nt-stat target-card__kcal">
+            <span class="nt-stat__value"><span class="nt-stat__num num">{{ t.kcal | ntNum:0 }}</span><span class="nt-stat__unit unit">kcal / Tag</span></span>
           </div>
           @if (savedMinKcalApplied) {
             <p class="target-card__note">Mindestzufuhr aktiv (nur beim Abnehmen): Die Formel läge darunter, das Ziel wurde auf den Mindestwert angehoben.</p>
@@ -23,11 +25,10 @@
             <span><strong>{{ t.fiberG | ntNum:0 }}</strong> g Ballaststoffe</span>
             <span><strong>{{ t.sugarG | ntNum:0 }}</strong> g Zucker gesamt (Richtwert)</span>
           </div>
-        </ion-card-content>
-      </ion-card>
+      </section>
     }
 
-    <app-weight-card (recalculate)="recalculateWithWeight($event)"></app-weight-card>
+    <app-weight-card class="nt-stack__section" (recalculate)="recalculateWithWeight($event)"></app-weight-card>
 
     <h2 class="nt-section-header">Ziele &amp; KI</h2>
     <ion-list class="nt-grouped" lines="full">
@@ -42,7 +43,7 @@
       <app-ai-status-row></app-ai-status-row>
     </ion-list>
 
-    <app-recipe-search-settings></app-recipe-search-settings>
+    <app-recipe-search-settings class="nt-stack__section"></app-recipe-search-settings>
 
     <h2 class="nt-section-header">Einheiten</h2>
     <ion-list class="nt-grouped" lines="none">

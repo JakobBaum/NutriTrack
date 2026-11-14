@@ -2,35 +2,14 @@ ion-content {
   --background: var(--nt-ground);
 }
 
-// Seite und Sheets nutzen .nt-page (720 px, 16 px Rand) und .nt-sheet-header aus global.scss.
-// Gruppen und Ueberschriften liegen deshalb buendig auf dem Seitenrand, ohne eigene Einrückung.
-.settings-page .nt-grouped,
-.settings-sheet .nt-grouped {
-  margin-inline: 0;
-}
+// Seite: .nt-page (Seitenrand) + .nt-stack (Abstaende), Kopf aus <nt-page-header> in ion-header (layout.scss).
+// Gruppen und Ueberschriften haben keinen eigenen Seitenrand.
 
-.settings-page .nt-section-header,
-.settings-sheet .nt-section-header {
-  margin-inline: 0;
-}
-
-.settings-page .nt-section-header {
-  margin-top: var(--nt-space-6);
-}
-
-// Tagesziel: weisse Karte, kcal gross in Akzent.
+// Tagesziel: weisse Karte (.nt-card), kcal gross in Akzent.
 .target-card {
-  margin: var(--nt-space-2) 0 0;
-  background: var(--nt-card);
   color: var(--nt-ink);
-  border-radius: var(--nt-radius-card);
-  box-shadow: none;
 
   &__kcal {
-    display: flex;
-    align-items: baseline;
-    gap: var(--nt-space-2);
-
     .num {
       font-size: 2.5rem;
       font-weight: 700;
@@ -39,8 +18,6 @@ ion-content {
       color: var(--nt-kcal);
     }
     .unit {
-      font-size: var(--nt-fs-body);
-      font-weight: 600;
       color: var(--nt-secondary);
     }
   }
@@ -141,7 +118,8 @@ ion-item {
 }
 
 .hint {
-  margin: 0 0 var(--nt-space-1);
+  margin: var(--nt-space-2) 0 0;
+  padding-inline: var(--nt-space-4);
   font-size: var(--nt-fs-caption);
   color: var(--nt-secondary);
 }

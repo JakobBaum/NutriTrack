@@ -1,0 +1,120 @@
+/* =========================================================================
+ * Welle 2, S4: Buttons. Je Rolle EIN Stil, eine Hoehe (--nt-btn-height, 44 px, auch auf Kompaktphones).
+ *   primaer  .nt-btn              gefuellt, Akzent
+ *   getoent  .nt-btn--tonal       Akzent-Tint
+ *   Text     .nt-btn--text        ohne Flaeche, 16 px / 600, Akzent
+ *   Zusaetze .nt-btn--block (volle Breite), .nt-btn--inner (in einer Karte: abgerundetes Rechteck, --nt-radius-inner)
+ * Native <button> und <ion-button> tragen dieselben Klassen. Alt-Namen bleiben gueltig:
+ *   .nt-pill = .nt-btn, .nt-pill--secondary = .nt-btn--tonal, .nt-add-btn = .nt-btn--tonal.nt-btn--block
+ * ========================================================================= */
+
+.nt-btn,
+.nt-pill,
+.nt-add-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--nt-btn-height);
+  min-height: var(--nt-btn-height);
+  padding: 0 var(--nt-space-5);
+  border: 0;
+  border-radius: var(--nt-radius-pill);
+  background: var(--nt-accent);
+  color: var(--nt-on-accent);
+  font: inherit;
+  font-size: var(--nt-fs-headline);
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+
+  &:active { opacity: 0.7; }
+  &:disabled { opacity: 0.4; cursor: default; }
+  &:focus-visible { outline: 2px solid var(--nt-focus); outline-offset: 2px; }
+}
+
+.nt-btn--tonal,
+.nt-pill--secondary,
+.nt-add-btn {
+  background: var(--nt-accent-tint);
+  color: var(--ion-color-primary-shade); // 5.4:1 auf Tint
+}
+
+.nt-btn--text {
+  padding: 0 var(--nt-space-3);
+  background: transparent;
+  color: var(--nt-accent);
+}
+
+.nt-btn--block,
+.nt-add-btn {
+  display: flex;
+  width: 100%;
+}
+
+.nt-btn--inner {
+  border-radius: var(--nt-radius-inner);
+}
+
+// ion-button mit denselben Klassen: Variablen statt Farben, Hoehe ueber den Host.
+ion-button.nt-btn,
+ion-button.nt-pill,
+ion-button.nt-add-btn {
+  --background: var(--nt-accent);
+  --background-activated: var(--ion-color-primary-shade);
+  --background-hover: var(--ion-color-primary-shade);
+  --background-focused: var(--ion-color-primary-shade);
+  --color: var(--nt-on-accent);
+  --box-shadow: none;
+  --border-radius: var(--nt-radius-pill);
+  --padding-start: var(--nt-space-5);
+  --padding-end: var(--nt-space-5);
+  height: var(--nt-btn-height);
+  min-height: var(--nt-btn-height);
+  margin: 0;
+
+  &::part(native) {
+    height: 100%;
+    min-height: 0;
+    background: var(--background);
+    color: var(--color);
+  }
+}
+
+ion-button.nt-btn--tonal,
+ion-button.nt-pill--secondary,
+ion-button.nt-add-btn {
+  --background: var(--nt-accent-tint);
+  --background-activated: var(--nt-accent-tint);
+  --background-hover: var(--nt-accent-tint);
+  --background-focused: var(--nt-accent-tint);
+  --color: var(--ion-color-primary-shade);
+}
+
+ion-button.nt-btn--text {
+  --background: transparent;
+  --background-activated: transparent;
+  --background-hover: transparent;
+  --background-focused: transparent;
+  --color: var(--nt-accent);
+  --padding-start: var(--nt-space-3);
+  --padding-end: var(--nt-space-3);
+}
+
+ion-button.nt-btn--inner {
+  --border-radius: var(--nt-radius-inner);
+}
+
+// Jeder gefuellte ion-button (ohne Klasse) hat dieselbe Hoehe; Toolbar-, clear- und outline-Buttons bleiben unberuehrt.
+ion-button:not([fill='clear']):not([fill='outline']):not([size='small']):not(ion-buttons ion-button) {
+  height: var(--nt-btn-height);
+  min-height: var(--nt-btn-height);
+
+  &::part(native) {
+    min-height: 0;
+    height: 100%;
+  }
+}

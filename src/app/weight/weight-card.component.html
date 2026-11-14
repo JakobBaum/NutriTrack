@@ -34,7 +34,7 @@
     <p class="weight__empty" data-testid="weight-empty">Noch kein Gewicht eingetragen. Trage dein Gewicht ein, um den Verlauf zu sehen.</p>
   }
 
-  <button type="button" class="nt-pill nt-pill--secondary weight__add" data-testid="weight-add" (click)="openSheet()">
+  <button type="button" class="nt-btn nt-btn--tonal nt-btn--inner weight__add" data-testid="weight-add" (click)="openSheet()">
     <ion-icon name="add" aria-hidden="true"></ion-icon> Gewicht eintragen
   </button>
 
@@ -42,8 +42,8 @@
     <div class="weight__drift" role="status" data-testid="weight-drift">
       <p>{{ text }}</p>
       <div class="weight__drift-actions">
-        <button type="button" class="nt-pill weight__recalc" (click)="recalc()">Ziel neu berechnen</button>
-        <button type="button" class="nt-pill nt-pill--secondary" data-testid="weight-drift-dismiss" (click)="dismissHint()">Ausblenden</button>
+        <button type="button" class="nt-btn nt-btn--inner weight__recalc" (click)="recalc()">Ziel neu berechnen</button>
+        <button type="button" class="nt-btn nt-btn--text nt-btn--inner" data-testid="weight-drift-dismiss" (click)="dismissHint()">Ausblenden</button>
       </div>
     </div>
   }

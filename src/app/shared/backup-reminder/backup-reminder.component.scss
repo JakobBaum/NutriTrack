@@ -3,9 +3,9 @@
 }
 
 .reminder {
-  margin: 0 var(--nt-page-gutter, 16px) 12px;
-  padding: 12px 14px;
-  border-radius: 14px;
+  margin: 0;
+  padding: var(--nt-card-pad);
+  border-radius: var(--nt-radius-card);
   background: var(--nt-surface-2, rgba(127, 127, 127, 0.12));
   color: var(--nt-ink, inherit);
   font-size: 0.875rem;
@@ -23,28 +23,13 @@
 
   &__actions {
     display: flex;
-    gap: 8px;
-    margin-top: 10px;
+    gap: var(--nt-space-2);
+    margin-top: var(--nt-space-3);
   }
 
   &__btn {
-    min-height: 44px;
-    padding: 0 16px;
-    border: 0;
-    border-radius: 999px;
-    background: var(--nt-accent);
-    color: var(--nt-on-accent, #fff);
-    font: inherit;
-    font-weight: 600;
-
-    &:disabled {
-      opacity: 0.6;
-    }
-
-    &:focus-visible {
-      outline: 2px solid var(--nt-accent);
-      outline-offset: 2px;
-    }
+    // Form kommt von .nt-btn (Hoehe, Schrift); in der Karte: Innenradius.
+    border-radius: var(--nt-radius-inner);
 
     &--ghost {
       background: transparent;

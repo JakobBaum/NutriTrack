@@ -128,7 +128,7 @@
     gap: var(--nt-space-2);
     padding: var(--nt-space-3);
     background: var(--nt-accent-tint);
-    border-radius: var(--nt-radius-tile);
+    border-radius: var(--nt-radius-inner);
 
     p {
       margin: 0;
@@ -179,7 +179,8 @@
   padding-top: var(--nt-space-3);
 
   &__hint {
-    margin: var(--nt-space-3) var(--nt-space-4) 0;
+    margin: var(--nt-space-3) 0 0;
+    padding-inline: var(--nt-space-4);
     font-size: var(--nt-fs-caption);
     color: var(--nt-secondary);
   }

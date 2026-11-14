@@ -24,7 +24,7 @@ for (const size of sizes) {
   await shot('heute-gefuellt-oben', seed({ diary: [...DIARY_NORMAL, ...week], weight: WEIGHT_HISTORY }), size);
   await shot('heute-4stellig', seed({ diary: big }), size);
   await shot('add-sheet', seed({ diary: DIARY_NORMAL }), size, async (p) => {
-    await p.locator('.head__add').click();
+    await p.locator('ion-fab.nt-fab ion-fab-button').click();
     await p.locator('ion-modal.show-modal').last().waitFor();
     await settle(p, 800);
   });

@@ -18,6 +18,8 @@ import * as sheetAudit from './specs/sheet-audit.spec.mjs';
 import * as klassen from './specs/klassen.spec.mjs';
 import * as w1MealToast from './specs/w1-meal-toast.spec.mjs';
 import * as w1ShoppingZoom from './specs/w1-shopping-zoom.spec.mjs';
+import * as w2Nav from './specs/w2-nav.spec.mjs';
+import * as w2Layout from './specs/w2-layout.spec.mjs';
 
 /** Chromium liefert für getUserMedia ein Testbild; Berechtigungsdialog entfällt. */
 const FAKE_MEDIA_ARGS = ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'];
@@ -40,7 +42,7 @@ const test = (name, seed, fn) => (name.includes(filter) ? runner.test(name, seed
 
 // Tests registrieren und nacheinander ausführen
 const queue = [];
-for (const spec of [app, diary, recipes, weekplan, weight, week, favorites, search, csp, scan, aiReadable, sheets, sheetAudit, klassen, w1MealToast, w1ShoppingZoom]) spec.register({ test: (...args) => queue.push(args) });
+for (const spec of [app, diary, recipes, weekplan, weight, week, favorites, search, csp, scan, aiReadable, sheets, sheetAudit, klassen, w1MealToast, w1ShoppingZoom, w2Nav, w2Layout]) spec.register({ test: (...args) => queue.push(args) });
 for (const args of queue) await test(...args);
 await browser.close();
 

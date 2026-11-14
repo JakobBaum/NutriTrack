@@ -39,3 +39,20 @@ ion-button.nt-sheet-close {
   min-height: 40px;
   margin: 0;
 }
+
+// Sheet-Fuss (S9): Speichern immer unten, volle Breite, 44 px. Markup:
+// <div class="nt-sheet-footer"><ion-button class="nt-btn nt-btn--block" expand="block">Speichern</ion-button></div>
+// Bleibt beim Scrollen unten stehen (sticky), damit Speichern auch in langen Formularen sichtbar ist.
+.nt-sheet-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin-top: var(--nt-section-gap);
+  padding: var(--nt-space-3) 0 max(var(--nt-space-3), env(safe-area-inset-bottom, 0px));
+  background: var(--ion-background-color, var(--nt-ground));
+
+  ion-button,
+  .nt-btn {
+    width: 100%;
+  }
+}
