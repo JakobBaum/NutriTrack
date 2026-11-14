@@ -158,3 +158,27 @@ Grundlage: `RECHT-BESTANDSAUFNAHME.md` (28 Befunde). Keine Rechtsberatung; die T
 - `worker.js` hat 1123 Zeilen (Regel: höchstens 800); der robots-Teil ließe sich auslagern.
 - Abneigungen, deren Übersetzung ohne Zustimmung ausfiel, werden nach späterer Zustimmung nicht automatisch nachgeholt.
 - Im Profil ist die Spalte "KI-Status" bei 320 px sehr schmal (bestand schon vorher).
+
+## Welle 5: Gesamtprüfung (auf Branch `recht-absicherung`, nicht gemergt)
+
+### Geprüft und dokumentiert
+- Statisch: `GESAMTPRUEFUNG.md` (0 kritisch, 1 hoch, 15 mittel, 8 niedrig; je Befund Datei und Zeile). Fehlerklassen K8 bis K10 in `docs/review-2/FEHLERKLASSEN.md`.
+- Laufzeit: `ZUSTAENDE-PRUEFUNG.md`. Neue Spec `e2e/specs/w5-states.spec.mjs` (117 Tests): alle 5 Tabs und die wichtigen Sheets in den Zuständen Leer, Fehler (500, 429, Abbruch) und Offline bei 375 und 320 px, je mit Screenshot.
+- Ergebnis Fehlerbehandlung: in allen 8 Online-Funktionen deutsche Meldung, kein hängender Ladezustand, Schaltfläche wieder aktiv, erneuter Versuch möglich, keine falsche Erfolgsmeldung. Kein "NaN" oder "undefined" im sichtbaren Text, kein horizontaler Überlauf.
+
+### Behoben (hoch und was klein war)
+- Nährwerte von Open Food Facts ohne Plausibilitätsprüfung (hoch): siehe Abschnitt Absicherung.
+- Einkauf: "Plan aus meinen Rezepten" schickte mit KI, aber ohne eigene Rezepte eine leere Anfrage (hoch). Jetzt gesperrt mit Hinweis, zusätzlich Schutz in `generate()`.
+- Einkauf 320 px: Beschriftung der Schaltfläche war abgeschnitten, gekürzt.
+- Barcode-Scanner: "Code eintippen" war 27 px hoch, jetzt volle Tipphöhe.
+- Suchleiste: Löschen-Kreuz war 30 x 36 px, jetzt volle Tipphöhe.
+- Heute ohne Profil: Seitenrand bei 320 px.
+
+### Nicht behoben, zur Entscheidung
+- 15 mittlere und 8 niedrige Befunde der statischen Prüfung (`OFFENE-FRAGEN.md` Nr. 15).
+- Bei einem Verbindungsabbruch zum Server zeigen die KI-Wege "Keine Internetverbindung", auch wenn das Gerät online ist (`core/ai/ai-errors.ts:21`).
+
+### Nicht geprüft
+- Echtes Offline (Flugmodus) am Gerät: im Test nur nachgestellt, weil ohne Service Worker die nachgeladenen Programmteile fehlen. Folge am Gerät unbekannt: ein Tab, der offline zum ersten Mal geöffnet wird, lädt in der Web-Version möglicherweise nicht.
+- Zeitüberschreitungen (10 s Lebensmittelsuche, 30 s KI), Kamera-Scan, Etikett-Foto, echte Dienste, iPhone und Safari.
+- Von 124 Screenshots wurde nur eine Auswahl angesehen; abgeschnittener Text kann an anderer Stelle noch vorkommen.

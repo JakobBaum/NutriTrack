@@ -24,6 +24,7 @@ import * as w3Diet from './specs/w3-diet.spec.mjs';
 import * as w3Cook from './specs/w3-cook.spec.mjs';
 import * as w3Fastfood from './specs/w3-fastfood.spec.mjs';
 import * as consent from './specs/consent.spec.mjs';
+import * as w5States from './specs/w5-states.spec.mjs';
 
 /** Chromium liefert für getUserMedia ein Testbild; Berechtigungsdialog entfällt. */
 const FAKE_MEDIA_ARGS = ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'];
@@ -46,7 +47,7 @@ const test = (name, seed, fn) => (name.includes(filter) ? runner.test(name, seed
 
 // Tests registrieren und nacheinander ausführen
 const queue = [];
-for (const spec of [app, diary, recipes, weekplan, weight, week, favorites, search, csp, scan, aiReadable, sheets, sheetAudit, klassen, w1MealToast, w1ShoppingZoom, w2Nav, w2Layout, w3Diet, w3Cook, w3Fastfood, consent]) spec.register({ test: (...args) => queue.push(args) });
+for (const spec of [app, diary, recipes, weekplan, weight, week, favorites, search, csp, scan, aiReadable, sheets, sheetAudit, klassen, w1MealToast, w1ShoppingZoom, w2Nav, w2Layout, w3Diet, w3Cook, w3Fastfood, consent, w5States]) spec.register({ test: (...args) => queue.push(args) });
 for (const args of queue) await test(...args);
 await browser.close();
 

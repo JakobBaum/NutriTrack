@@ -119,7 +119,7 @@
             }
             </div>
             <ion-button expand="block" class="nt-btn nt-btn--block nt-btn--inner" data-testid="own-plan-btn" (click)="generate()" [disabled]="loading() || noRecipesBlock()">
-              @if (loading()) { <ion-spinner name="dots" slot="start"></ion-spinner> Erstelle… } @else { <ion-icon slot="start" name="book-outline"></ion-icon> Plan aus meinen Rezepten erstellen }
+              @if (loading()) { <ion-spinner name="dots" slot="start"></ion-spinner> Erstelle… } @else { <ion-icon slot="start" name="book-outline"></ion-icon> Plan aus meinen Rezepten }
             </ion-button>
           } @else {
             <ion-button expand="block" class="nt-btn nt-btn--block nt-btn--inner" data-testid="week-plan-btn" (click)="generateWeekPlan()" [disabled]="loading() || !onlineAvailable()">

@@ -87,6 +87,11 @@
   justify-content: center;
 }
 
+// Einziger Weg zur Eingabe von Hand: volle Tippfläche.
+.bc-manual-btn {
+  min-height: var(--nt-touch);
+}
+
 .bc-manual-panel {
   position: absolute;
   bottom: 0;

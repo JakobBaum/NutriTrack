@@ -360,3 +360,10 @@ ion-item {
 @media (prefers-reduced-motion: reduce) {
   .nt-source-btn { transition: none; }
 }
+
+// Löschen-Kreuz der Suchleiste: Ionic-Standard ist 30 x 36 px, zu klein zum Tippen.
+ion-searchbar.nt-searchbar .searchbar-clear-button {
+  width: var(--nt-touch);
+  min-height: var(--nt-touch);
+  height: 100%;
+}
