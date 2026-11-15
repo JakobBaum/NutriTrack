@@ -83,7 +83,7 @@ Antworte NUR mit gültigem JSON:
     "portionG": number oder null
   }
 }`;
-  return gemini(prompt, env, req.imageBase64, { maxOutputTokens: TOKENS_LABEL });
+  return gemini(prompt, env, req.imageBase64, { maxOutputTokens: TOKENS_LABEL, strong: true });
 }
 
 /** Kriterien als Text: neue Liste, sonst das alte Einzelfeld, sonst proteinreich. */
@@ -140,7 +140,7 @@ async function importRecipe(req, env) {
   } else {
     prompt = `Extrahiere das Rezept aus folgendem Text:\n\n${req.text}`;
   }
-  return gemini(`${prompt}\n\n${IMPORT_SCHEMA}`, env, req.imageBase64 ?? null, { maxOutputTokens: TOKENS_IMPORT });
+  return gemini(`${prompt}\n\n${IMPORT_SCHEMA}`, env, req.imageBase64 ?? null, { maxOutputTokens: TOKENS_IMPORT, strong: true });
 }
 
 const TRANSLATE_SCHEMA = {

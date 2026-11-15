@@ -222,3 +222,15 @@ Eigener Review-Agent: 0 kritisch, 1 hoch, 6 mittel, 4 niedrig. Behoben: Nr 1 bis
 
 ### Merge und Deploy (2026-11-15)
 In main gemergt (`2785b4b`), Worker ausgerollt (Version `82fb7c69`). Nach dem Deploy mit echten Diensten geprüft: `parseMeal` (Gemini, 5 plausible Zeilen für "2 Semmeln mit Butter und Schinken, ein Apfel, Cappuccino"), Rezeptsuche und Rezeptdetails (Spoonacular), `/health`, Eingabefehler 400.
+
+## Welle 7: Modellwahl im Worker (2026-11-15)
+
+Branch `welle-7-modellwahl`. Noch nicht in main, noch nicht ausgerollt.
+
+- Standardmodell ist jetzt das schnelle `gemini-3.5-flash-lite` (Einkaufsliste, Fastfood, Essen beschreiben, Übersetzungen). Etikett-Foto und Rezeptimport nutzen weiter `gemini-3.6-flash` (`strong: true`). Das jeweils andere Modell ist der Fallback.
+- Neu: Bei leerer oder nicht lesbarer Antwort fragt der Worker einmal das andere Modell, im selben Zeitbudget von 25 s. Blockierte Antworten werden nicht wiederholt. Anlass war ein Review-Befund (mittel): Flash-Lite könnte ohne festes Antwortschema öfter kaputtes JSON liefern.
+- Variablen umbenannt: `GEMINI_FAST_MODEL`, `GEMINI_STRONG_MODEL` (vorher `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`; in `wrangler.toml` nicht gesetzt).
+- Tests zuerst geschrieben und rot gesehen. Worker-Tests 217 grün, Lint sauber. App-Code unverändert, daher kein App-QA-Lauf.
+- Review durch eigenen Agenten: keine hohen Befunde; mittlerer Befund (siehe oben) behoben, Testlücke Einkaufsliste geschlossen.
+
+Nicht geprüft: echte Antwortqualität und Tempo von Flash-Lite. Das geht erst nach dem Deploy mit echtem Gemini. Offen aus dem Review: Einkaufsliste und Fastfood haben kein festes Antwortschema; `GEMINI_THINKING_LEVEL` gilt für beide Modelle (derzeit nicht gesetzt).
