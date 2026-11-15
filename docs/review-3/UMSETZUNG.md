@@ -259,3 +259,10 @@ Jakob: bei fast allem das bessere Modell, damit keine kaputten Antworten kommen.
 - Messung kürzere Denkzeit (`GEMINI_THINKING_LEVEL=low`, nur testweise ausgerollt, wieder entfernt): Antworten in rund 3 s. Die Messung ist nicht belastbar, weil das starke Modell währenddessen Anfragen sofort mit einem vorübergehenden Fehler ablehnte und vermutlich Flash-Lite geantwortet hat.
 - Befund: Nach rund 40 Testaufrufen lehnt `gemini-3.6-flash` jede Anfrage in unter einer Sekunde ab (429, 500 oder 503; der genaue Status wird nicht protokolliert). Vermutung: Kontingent des Gratis-Keys erschöpft. Folge: Die App läuft dann faktisch auf Flash-Lite (rund 3 s). Mit einem Testlauf nur auf dem starken Modell kam durchgehend 503.
 - Offen: Upstream-Status beim Modellwechsel protokollieren; Kontingent in Google AI Studio prüfen; bezahlter Key.
+
+### Welle 7c: Protokoll bei fehlgeschlagenem Gemini-Versuch (2026-11-15)
+
+- Der Worker schreibt je fehlgeschlagenem Versuch eine Zeile ins Protokoll: Modellname und HTTP-Status oder "keine Antwort (Fehlerart)". Kein Fehlertext von Gemini. Tests zuerst, Worker-Tests 223 grün, Lint sauber.
+- main gemergt, gepusht, ausgerollt: Version `ea9f574f-afee-4107-bd2c-6a5349138010`.
+- Echt gelesen (`npx wrangler tail`, zwei Aufrufe): dreimal `gemini-3.6-flash, HTTP 429`. Damit belegt: Das starke Modell lehnt wegen des Kontingents des Gratis-Keys ab, nicht wegen Überlastung bei Google. Beide Aufrufe endeten trotzdem mit 200 (2,6 s über Flash-Lite, 6,4 s nach Wiederholung).
+- Offen: bezahlter Key oder Kontingent prüfen; bei 429 könnte der Worker ohne Wiederholung direkt das andere Modell fragen (spart rund 1 s).
