@@ -234,3 +234,12 @@ Branch `welle-7-modellwahl`. Noch nicht in main, noch nicht ausgerollt.
 - Review durch eigenen Agenten: keine hohen Befunde; mittlerer Befund (siehe oben) behoben, Testlücke Einkaufsliste geschlossen.
 
 Nicht geprüft: echte Antwortqualität und Tempo von Flash-Lite. Das geht erst nach dem Deploy mit echtem Gemini. Offen aus dem Review: Einkaufsliste und Fastfood haben kein festes Antwortschema; `GEMINI_THINKING_LEVEL` gilt für beide Modelle (derzeit nicht gesetzt).
+
+### Welle 7, Änderung nach Jakobs Entscheidung (2026-11-15)
+
+Jakob: bei fast allem das bessere Modell, damit keine kaputten Antworten kommen.
+
+- Standard ist wieder `gemini-3.6-flash`. Flash-Lite (`fast: true`) nur noch für `translateRecipe` und `translateSearchQuery` sowie als Fallback.
+- Einkaufsliste und Fastfood haben jetzt ein festes Antwortschema (`SHOPPING_SCHEMA`, `FASTFOOD_SCHEMA`).
+- Der zweite Versuch mit dem anderen Modell bei leerer oder nicht lesbarer Antwort bleibt.
+- Worker-Tests 219 grün, Lint sauber.

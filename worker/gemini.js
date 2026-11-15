@@ -1,10 +1,10 @@
 import { ClientError, OverloadedError } from './http.js';
 
-// Standard für Textaufgaben: schnell und günstig.
-const GEMINI_FAST_MODEL = 'gemini-3.5-flash-lite';
-
-// Für Fotos und Rezeptimport (opts.strong): genauer, aber langsamer und teurer.
+// Standard: das genauere Modell (Nährwerte, Fotos, Rezeptimport, Listen).
 const GEMINI_STRONG_MODEL = 'gemini-3.6-flash';
+
+// Nur für einfache Aufgaben mit festem Antwortschema (opts.fast, z. B. Übersetzungen) und als Fallback.
+const GEMINI_FAST_MODEL = 'gemini-3.5-flash-lite';
 
 const GEMINI_RETRIES = 1; // zusätzliche Versuche pro Modell bei 500/503/429
 
@@ -73,10 +73,10 @@ async function geminiRequest(model, body, env, timeoutMs) {
  * bleibt alles transient kaputt → OverloadedError, sonst Error mit Status.
  */
 /** Reihenfolge der Modelle: das zur Aufgabe passende zuerst, das andere als Fallback. Per Worker-Variable überschreibbar. */
-function modelOrder(env, strong) {
-  const fast = env.GEMINI_FAST_MODEL || GEMINI_FAST_MODEL;
+function modelOrder(env, fast) {
+  const fastModel = env.GEMINI_FAST_MODEL || GEMINI_FAST_MODEL;
   const strongModel = env.GEMINI_STRONG_MODEL || GEMINI_STRONG_MODEL;
-  return strong ? [strongModel, fast] : [fast, strongModel];
+  return fast ? [fastModel, strongModel] : [strongModel, fastModel];
 }
 
 async function geminiWithFallback(body, models, env, deadline) {
@@ -141,7 +141,7 @@ function extractAnswer(data) {
   return answer;
 }
 
-export async function gemini(prompt, env, imageBase64 = null, { maxOutputTokens = TOKENS_LIST, temperature = 0, responseSchema = null, strong = false } = {}) {
+export async function gemini(prompt, env, imageBase64 = null, { maxOutputTokens = TOKENS_LIST, temperature = 0, responseSchema = null, fast = false } = {}) {
   const parts = imageBase64
     ? [{ inlineData: { mimeType: 'image/jpeg', data: imageBase64 } }, { text: prompt }]
     : [{ text: prompt }];
@@ -157,7 +157,7 @@ export async function gemini(prompt, env, imageBase64 = null, { maxOutputTokens 
     },
   });
   const deadline = Date.now() + GEMINI_TOTAL_BUDGET_MS;
-  const [first, second] = modelOrder(env, strong);
+  const [first, second] = modelOrder(env, fast);
   try {
     return await askForJson(body, [first, second], env, deadline);
   } catch (e) {
