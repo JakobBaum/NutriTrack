@@ -132,7 +132,9 @@ ion-list.nt-grouped {
 
 // Umbrechen erlaubt (ion-checkbox erbt nowrap); Betrag und Tag brechen nie mittendrin.
 .qty { display: block; white-space: normal; font-size: var(--nt-fs-caption); color: var(--nt-secondary); font-variant-numeric: tabular-nums; }
-.qty__sum, .est-badge { display: inline-block; white-space: nowrap; }
+// Bleiben als Einheit zusammen, brechen aber innen um, wenn die Spalte schmaler ist als der Text
+// (breitere Schrift, 320 px), statt aus der Zeile zu ragen.
+.qty__sum, .est-badge { display: inline-block; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .est-badge {
   margin-left: var(--nt-space-1);
   padding: 0 var(--nt-space-2);
@@ -154,6 +156,8 @@ ion-item-option { --padding-start: 0; --padding-end: 0; width: $row-min; }
   align-items: center;
   justify-content: space-between;
   gap: var(--nt-space-2);
+  // Bei schmalem Bildschirm oder breiter Schrift rutscht "Erledigte entfernen" in die naechste Zeile.
+  flex-wrap: wrap;
   padding-inline-end: 0;
 
   &__toggle {

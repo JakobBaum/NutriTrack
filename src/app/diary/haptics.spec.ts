@@ -1,48 +1,50 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { HapticsPlatform, lightHaptic } from './haptics';
 
-const impact = vi.fn((_o?: unknown) => Promise.resolve());
-const isNativePlatform = vi.fn(() => false);
-
-vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => isNativePlatform() } }));
-vi.mock('@capacitor/haptics', () => ({
-  Haptics: { impact: (o: unknown) => impact(o) },
-  ImpactStyle: { Light: 'LIGHT' },
-}));
-
-import { lightHaptic } from './haptics';
+function platformOf(isNative: boolean, impactLight = vi.fn(() => Promise.resolve())): HapticsPlatform & {
+  impactLight: ReturnType<typeof vi.fn>;
+} {
+  return { isNative: () => isNative, impactLight };
+}
 
 describe('lightHaptic', () => {
   afterEach(() => {
-    impact.mockReset();
-    impact.mockImplementation(() => Promise.resolve());
-    isNativePlatform.mockReset();
-    isNativePlatform.mockReturnValue(false);
     vi.unstubAllGlobals();
   });
 
   it('nutzt auf nativen Plattformen das Haptics-Plugin mit leichtem Impuls', () => {
-    isNativePlatform.mockReturnValue(true);
-    lightHaptic();
-    expect(impact).toHaveBeenCalledWith({ style: 'LIGHT' });
+    const platform = platformOf(true);
+    lightHaptic(platform);
+    expect(platform.impactLight).toHaveBeenCalledTimes(1);
   });
 
   it('faellt im Web auf navigator.vibrate zurueck', () => {
     const vibrate = vi.fn();
     vi.stubGlobal('navigator', { vibrate });
-    lightHaptic();
+    const platform = platformOf(false);
+    lightHaptic(platform);
     expect(vibrate).toHaveBeenCalledTimes(1);
-    expect(impact).not.toHaveBeenCalled();
+    expect(platform.impactLight).not.toHaveBeenCalled();
   });
 
   it('wirft im Web ohne Vibration-API nicht', () => {
     vi.stubGlobal('navigator', {});
-    expect(() => lightHaptic()).not.toThrow();
+    expect(() => lightHaptic(platformOf(false))).not.toThrow();
   });
 
   it('schluckt Fehler des Plugins (auch asynchrone)', async () => {
-    isNativePlatform.mockReturnValue(true);
-    impact.mockImplementation(() => Promise.reject(new Error('nicht verfuegbar')));
-    expect(() => lightHaptic()).not.toThrow();
+    const platform = platformOf(true, vi.fn(() => Promise.reject(new Error('nicht verfuegbar'))));
+    expect(() => lightHaptic(platform)).not.toThrow();
     await Promise.resolve();
+  });
+
+  it('schluckt synchrone Fehler der Plattformabfrage', () => {
+    const platform: HapticsPlatform = {
+      isNative: () => {
+        throw new Error('kaputt');
+      },
+      impactLight: () => Promise.resolve(),
+    };
+    expect(() => lightHaptic(platform)).not.toThrow();
   });
 });
