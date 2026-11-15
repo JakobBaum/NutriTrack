@@ -1852,6 +1852,24 @@ describe('Modellwahl je Funktion', () => {
     });
   }
 
+  it('wechselt nach einer Zeitüberschreitung direkt auf das andere Modell', async () => {
+    mockFetch((url) => {
+      if (url.includes(STRONG)) throw new DOMException('The operation timed out.', 'TimeoutError');
+      return geminiReply([{ itemName: 'Wrap' }]);
+    });
+    const res = await call('suggestFastfood', FASTFOOD);
+    assert.equal(res.status, 200);
+    assert.equal(geminiCalls().length, 2);
+    assert.ok(geminiCalls()[1].url.includes(FAST));
+  });
+
+  it('meldet überlastet, wenn kein Modell antwortet (erstes Modell nur ein Versuch)', async () => {
+    mockFetch(() => { throw new DOMException('The operation timed out.', 'TimeoutError'); });
+    const res = await call('suggestFastfood', FASTFOOD);
+    assert.equal(res.status, 503);
+    assert.equal(geminiCalls().length, 3);
+  });
+
   it('Modellnamen sind per GEMINI_FAST_MODEL und GEMINI_STRONG_MODEL überschreibbar', async () => {
     const env = { ...ENV, GEMINI_FAST_MODEL: 'schnell-x', GEMINI_STRONG_MODEL: 'stark-x' };
     await call('translateSearchQuery', { query: 'Linsensuppe', lang: 'de' }, env);
