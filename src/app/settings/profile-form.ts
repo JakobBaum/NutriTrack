@@ -13,7 +13,7 @@ export interface ProfileFormValues {
 
 export type ProfileFieldErrors = Partial<Record<ProfileField, string>>;
 
-const RANGES: Record<ProfileField, { min: number; max: number }> = {
+export const RANGES: Record<ProfileField, { min: number; max: number }> = {
   weightKg: { min: 30, max: 300 },
   heightCm: { min: 100, max: 250 },
   age: { min: 14, max: 100 },
@@ -38,7 +38,7 @@ export function validateProfileForm(values: ProfileFormValues, needsRate: boolea
   }, {});
 }
 
-const TARGET_RANGE = { min: 30, max: 300 } as const;
+export const TARGET_RANGE = { min: 30, max: 300 } as const;
 /** Zielgewichte unter diesem BMI liegen im Untergewicht (WHO). */
 const TARGET_MIN_BMI = 18.5;
 

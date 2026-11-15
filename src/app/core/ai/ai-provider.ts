@@ -8,6 +8,7 @@ import {
   ShoppingItem,
 } from '../models';
 import { RecipeTexts, TranslateLanguage } from '../recipes/translate/translate.model';
+import { MealParseResult } from './meal-parse';
 
 /** Anfrage für die (Wochen-)Einkaufslisten-Generierung. */
 export interface ShoppingPlanRequest {
@@ -91,6 +92,9 @@ export interface AiProvider {
    * Einkaufs-Grundform (z. B. 'chopped fresh rosemary' -> 'Rosmarin, frisch'). Gleiche Anzahl Einträge wie die Eingabe.
    */
   translateRecipe(texts: RecipeTexts, lang: TranslateLanguage): Promise<RecipeTexts>;
+
+  /** Erkennt Lebensmittel und Mengen aus einer Freitext-Beschreibung (geprüft, höchstens 12 Zeilen, je 100 g). */
+  parseMeal(text: string): Promise<MealParseResult>;
 
   /** Übersetzt einen Suchbegriff (App-Sprache) ins Englische für die Rezeptdatenbank. */
   translateSearchQuery(query: string, lang: TranslateLanguage): Promise<string>;

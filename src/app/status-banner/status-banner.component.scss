@@ -66,3 +66,25 @@
     }
   }
 }
+
+// Ruhiger Offline-Hinweis oben: schiebt die App nach unten (siehe app.component.scss), liegt unter dem Fehler-Banner.
+.offline {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20999;
+  box-sizing: border-box;
+  padding: calc(env(safe-area-inset-top, 0px) + var(--nt-space-2, 8px)) var(--nt-page-gutter, 16px) var(--nt-space-2, 8px);
+  color: var(--ion-color-primary-shade);
+  background: var(--nt-accent-tint);
+  border-bottom: 0.5px solid var(--nt-separator);
+  pointer-events: none;
+
+  &__text {
+    margin: 0 auto;
+    max-width: var(--nt-page-max, 720px);
+    font-size: var(--nt-fs-caption, 0.8125rem);
+    line-height: 1.35;
+  }
+}

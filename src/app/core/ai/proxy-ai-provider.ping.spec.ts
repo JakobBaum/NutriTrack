@@ -46,10 +46,10 @@ describe('ProxyAiProvider.ping', () => {
     await expect(p).rejects.toThrow(AI_ERROR_MESSAGES.overloaded);
   });
 
-  it('meldet einen Netzwerkfehler als offline', async () => {
+  it('meldet einen Netzwerkfehler bei vorhandenem Netz als nicht erreichbar', async () => {
     const p = provider.ping();
     http.expectOne(PROXY).error(new ProgressEvent('error'));
-    await expect(p).rejects.toThrow(AI_ERROR_MESSAGES.offline);
+    await expect(p).rejects.toThrow(AI_ERROR_MESSAGES.unreachable);
   });
 
   it('meldet 404 (kein Worker unter dieser Adresse) als allgemeinen Fehler', async () => {

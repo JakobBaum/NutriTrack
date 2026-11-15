@@ -1,6 +1,6 @@
 import { HEALTH_NOTES } from '../../core/messages/health-notes';
 import { TOAST_SWIPE_GESTURE } from '../../shared/toast-options';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { ModalController } from '@ionic/angular/lazy';
 import { dietPrefsOf, hasDietPrefs } from '../../core/diet/diet-prefs';
 import { dietSearchPrefs } from '../../core/diet/diet-search';
@@ -23,8 +23,16 @@ import {
   TIME_OPTIONS,
 } from '../../core/recipes/online/spoonacular.query';
 import { toOnlineSearchError } from '../../core/recipes/online/spoonacular.errors';
+import { RequestGuard } from '../request-guard';
+
+interface ActiveSearch {
+  readonly filters: OnlineSearchFilters;
+  readonly prefs: ReturnType<typeof dietSearchPrefs> | null;
+}
 
 export const SPOONACULAR_URL = 'https://spoonacular.com/food-api';
+/** Wartezeit nach einem Filterwechsel, bevor gesucht wird (jede Anfrage zählt zum Tageslimit). */
+export const SEARCH_DEBOUNCE_MS = 400;
 
 /**
  * Online-Rezeptsuche (Sheet): Suche mit Filtern, Trefferliste, Detailansicht mit Zutaten und
@@ -45,6 +53,14 @@ export class OnlineSearchComponent {
   private readonly recipeStore = inject(RecipeStore);
   private readonly translator = inject(RecipeTranslateService);
   private readonly settings = inject(AppSettingsStore);
+  private debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  private debounceWaiters: ReadonlyArray<() => void> = [];
+  /** Schlüssel der gerade laufenden Suche; dieselben Filter starten keine zweite Anfrage. */
+  private inFlightKey: string | null = null;
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => this.cancelDebounce());
+  }
 
   readonly dietOptions = DIET_OPTIONS;
   readonly timeOptions = TIME_OPTIONS;
@@ -75,8 +91,18 @@ export class OnlineSearchComponent {
   /** Ohne KI-Verbindung gibt es nur das Wörterbuch: Suche und Rezepttexte bleiben dann überwiegend Englisch. */
   readonly canTranslate = computed(() => this.translator.canTranslate());
   readonly nameFilterNote = HEALTH_NOTES.nameFilter;
-  readonly translating = signal(false);
+  /** Ids der Rezepte, die gerade übersetzt werden (unveränderliche Menge, je Rezept ein Eintrag). */
+  private readonly translatingIds = signal<ReadonlySet<string>>(new Set());
+  private readonly pendingTranslations = new Map<string, Promise<void>>();
+  /** True, solange das geöffnete Rezept übersetzt wird; andere Übersetzungen ändern das nicht. */
+  readonly translating = computed(() => {
+    const sel = this.selected();
+    return !!sel && this.translatingIds().has(sel.id);
+  });
   private readonly translations = signal<ReadonlyMap<string, OnlineRecipe>>(new Map());
+  private readonly requests = new RequestGuard();
+  /** Filter und Profilangaben der letzten erfolgreichen Suche; „Mehr laden“ nutzt genau diese. */
+  private active: ActiveSearch | null = null;
   private readonly savedIds = signal<ReadonlySet<string>>(new Set());
   readonly toast = signal<string | null>(null);
   readonly toastSwipe = TOAST_SWIPE_GESTURE;
@@ -101,7 +127,7 @@ export class OnlineSearchComponent {
   });
   readonly isSaved = computed(() => {
     const sel = this.selected();
-    return sel ? this.savedIds().has(sel.id) : false;
+    return sel ? this.savedIds().has(sel.id) || this.recipeStore.findOnline(sel.id) !== undefined : false;
   });
 
   private filters(): OnlineSearchFilters {
@@ -120,13 +146,33 @@ export class OnlineSearchComponent {
     const on = !this.profileFilterOn();
     this.profileFilterOn.set(on);
     this.diet.set(on ? this.profilePrefs().diet : '');
-    // Bereits gesucht: neu suchen, damit Treffer und Nachladen nie zwei Filtersätze mischen.
-    if (this.searched()) await this.search();
+    // Bereits gesucht: neu suchen, damit Treffer und Nachladen nie zwei Filtersätze mischen (entprellt).
+    if (this.searched()) await this.debouncedSearch();
   }
 
-  /** Blendet Treffer mit Abneigungen aus (zusätzlich zum Filter beim Anbieter), solange der Profil-Filter an ist. */
-  private visible(recipes: readonly OnlineRecipe[]): OnlineRecipe[] {
-    return this.profileFilterOn() ? [...filterByDietPrefs(recipes, this.profilePrefs())] : [...recipes];
+  /** Sucht erst nach {@link SEARCH_DEBOUNCE_MS} Ruhe; schnelle Wechsel senden nur die letzte Suche. */
+  private debouncedSearch(): Promise<void> {
+    clearTimeout(this.debounceTimer);
+    return new Promise<void>((resolve) => {
+      this.debounceWaiters = [...this.debounceWaiters, resolve];
+      this.debounceTimer = setTimeout(() => {
+        const waiters = this.debounceWaiters;
+        this.debounceWaiters = [];
+        void this.search().finally(() => waiters.forEach((done) => done()));
+      }, SEARCH_DEBOUNCE_MS);
+    });
+  }
+
+  private cancelDebounce(): void {
+    clearTimeout(this.debounceTimer);
+    const waiters = this.debounceWaiters;
+    this.debounceWaiters = [];
+    waiters.forEach((done) => done());
+  }
+
+  /** Blendet Treffer mit Abneigungen aus (zusätzlich zum Filter beim Anbieter), solange der Profil-Filter beim Suchstart an war. */
+  private visible(recipes: readonly OnlineRecipe[], prefs: ActiveSearch['prefs']): OnlineRecipe[] {
+    return prefs ? [...filterByDietPrefs(recipes, prefs)] : [...recipes];
   }
 
   /** Filter mit dem Suchbegriff auf Englisch (KI, sonst Wörterbuch); die Datenbank kennt nur Englisch. */
@@ -136,40 +182,58 @@ export class OnlineSearchComponent {
     return { ...filters, query };
   }
 
+  /** Neue Suche; eine ältere, noch laufende Anfrage wird dadurch entwertet. */
   async search(): Promise<void> {
-    if (this.loading()) return;
+    const key = JSON.stringify([this.filters(), this.profileFilterOn()]);
+    if (this.loading() && this.inFlightKey === key) return;
+    this.inFlightKey = key;
+    const token = this.requests.begin();
     this.loading.set(true);
+    this.loadingMore.set(false);
     this.error.set(null);
     try {
-      const page = await this.provider.search(await this.englishFilters());
-      this.results.set(this.visible(page.recipes));
+      const prefs = this.profileFilterOn() ? this.profilePrefs() : null;
+      const filters = await this.englishFilters();
+      if (!this.requests.isCurrent(token)) return;
+      const page = await this.provider.search(filters);
+      if (!this.requests.isCurrent(token)) return;
+      this.active = { filters, prefs };
+      this.results.set(this.visible(page.recipes, prefs));
       this.fetched.set(page.recipes.length);
       this.total.set(page.totalResults);
     } catch (e: unknown) {
+      if (!this.requests.isCurrent(token)) return;
       this.results.set([]);
       this.fetched.set(0);
       this.total.set(0);
       this.error.set(toOnlineSearchError(e, false).message);
     } finally {
-      this.searched.set(true);
-      this.loading.set(false);
+      if (this.requests.isCurrent(token)) {
+        this.inFlightKey = null;
+        this.searched.set(true);
+        this.loading.set(false);
+      }
     }
   }
 
+  /** Weitere Treffer mit den beim Start der Suche eingefrorenen Filtern. */
   async loadMore(): Promise<void> {
-    if (this.loadingMore() || !this.hasMore()) return;
+    const active = this.active;
+    if (!active || this.loading() || this.loadingMore() || !this.hasMore()) return;
+    const token = this.requests.begin();
     this.loadingMore.set(true);
     this.error.set(null);
     try {
-      const page = await this.provider.search(await this.englishFilters(), this.fetched());
-      this.results.update((list) => [...list, ...this.visible(page.recipes).filter((r) => !list.some((o) => o.id === r.id))]);
+      const page = await this.provider.search(active.filters, this.fetched());
+      if (!this.requests.isCurrent(token)) return;
+      this.results.update((list) => [...list, ...this.visible(page.recipes, active.prefs).filter((r) => !list.some((o) => o.id === r.id))]);
       this.fetched.update((n) => n + page.recipes.length);
       // Leere Seite: es kommt nichts mehr, das Nachladen endet.
       this.total.set(page.recipes.length === 0 ? this.fetched() : page.totalResults);
     } catch (e: unknown) {
-      this.error.set(e instanceof OnlineSearchError ? e.message : toOnlineSearchError(e, false).message);
+      if (this.requests.isCurrent(token)) this.error.set(e instanceof OnlineSearchError ? e.message : toOnlineSearchError(e, false).message);
     } finally {
-      this.loadingMore.set(false);
+      if (this.requests.isCurrent(token)) this.loadingMore.set(false);
     }
   }
 
@@ -186,19 +250,28 @@ export class OnlineSearchComponent {
     this.selected.set(null);
   }
 
-  private async ensureTranslation(): Promise<void> {
+  /** Übersetzt das geöffnete Rezept; läuft für dieselbe Id schon eine Übersetzung, wird sie mitbenutzt. */
+  private ensureTranslation(): Promise<void> {
     const sel = this.selected();
-    if (!sel || this.translations().has(sel.id)) return;
-    this.translating.set(true);
+    if (!sel || this.translations().has(sel.id)) return Promise.resolve();
+    const running = this.pendingTranslations.get(sel.id);
+    if (running) return running;
+    const work = this.translateOne(sel).finally(() => this.pendingTranslations.delete(sel.id));
+    this.pendingTranslations.set(sel.id, work);
+    return work;
+  }
+
+  private async translateOne(sel: OnlineRecipe): Promise<void> {
+    this.translatingIds.update((ids) => new Set(ids).add(sel.id));
     try {
       const translated = await this.translator.translate(sel);
       this.translations.update((m) => new Map(m).set(sel.id, translated));
     } finally {
-      this.translating.set(false);
+      this.translatingIds.update((ids) => new Set([...ids].filter((id) => id !== sel.id)));
     }
   }
 
-  /** Speichert das Rezept in der App-Sprache (wartet auf eine laufende Übersetzung). */
+  /** Speichert das Rezept als Verweis (Id, Titel in der App-Sprache, Bild, Link); Details werden beim Öffnen neu geladen. */
   async save(): Promise<void> {
     await this.ensureTranslation();
     const recipe = this.shown();

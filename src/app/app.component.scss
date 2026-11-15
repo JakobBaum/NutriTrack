@@ -1,0 +1,5 @@
+// Offline-Hinweis (status-banner): App unter den Hinweis schieben, Safe-Area oben übernimmt dann der Hinweis.
+:host-context(.nt-offline) ion-app {
+  top: var(--nt-offline-offset, 0px);
+  --ion-safe-area-top: 0px;
+}

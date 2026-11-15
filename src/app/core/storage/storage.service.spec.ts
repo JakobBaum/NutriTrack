@@ -38,7 +38,7 @@ describe('StorageService snapshot/replaceAll', () => {
 
   it('replaceAll swaps all nutritrack keys and leaves foreign keys alone', () => {
     const ok = new StorageService().replaceAll({ recipes: [{ id: 'r1' }] });
-    expect(ok).toBe(true);
+    expect(ok).toBe('ok');
     expect(store.getItem('nutritrack:diary')).toBeNull();
     expect(store.getItem('nutritrack:broken')).toBeNull();
     expect(store.getItem('nutritrack:recipes')).toBe('[{"id":"r1"}]');
@@ -49,7 +49,7 @@ describe('StorageService snapshot/replaceAll', () => {
     store = memoryStorage({ 'nutritrack:diary': '[{"id":"d1"}]' }, 'nutritrack:recipes');
     vi.stubGlobal('localStorage', store);
     const ok = new StorageService().replaceAll({ profile: null, recipes: [] });
-    expect(ok).toBe(false);
+    expect(ok).toBe('failed');
     expect(store.getItem('nutritrack:diary')).toBe('[{"id":"d1"}]');
     expect(store.getItem('nutritrack:profile')).toBeNull();
   });

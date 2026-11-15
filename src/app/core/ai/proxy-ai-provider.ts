@@ -23,6 +23,10 @@ import { ConsentService } from '../consent/consent.service';
 import { ConsentRequiredError } from '../consent/consent.errors';
 import { normalizeRecipeImport } from './recipe-import-normalize';
 import { FASTFOOD_INVALID_MESSAGE, sanitizeFastfoodSuggestions } from './fastfood-sanitize';
+import { LABEL_INVALID_MESSAGE, sanitizeLabelResult } from './label-sanitize';
+import { MAX_MEAL_TEXT_CHARS, MealParseResult } from './meal-parse';
+import { sanitizeMealParse } from './meal-parse-sanitize';
+import { SHOPPING_INVALID_MESSAGE, hadShoppingItems, sanitizeShoppingPlan } from './shopping-sanitize';
 
 const PING_FN = 'ping';
 /** Läuft ohne Zutun des Nutzers im Hintergrund: öffnet nie den Zustimmungsdialog, sondern weicht auf lokale Wege aus. */
@@ -76,12 +80,20 @@ export class ProxyAiProvider implements AiProvider {
     }
   }
 
-  generateShoppingList(req: ShoppingPlanRequest): Promise<ShoppingPlanResult> {
-    return this.call<ShoppingPlanResult>('generateShoppingList', buildShoppingPayload(req));
+  /** Die Antwort wird nie ungeprüft übernommen: nur brauchbare Positionen, sonst verständlicher Fehler. */
+  async generateShoppingList(req: ShoppingPlanRequest): Promise<ShoppingPlanResult> {
+    const raw = await this.call<unknown>('generateShoppingList', buildShoppingPayload(req));
+    const plan = sanitizeShoppingPlan(raw);
+    if (plan.items.length === 0 && hadShoppingItems(raw)) throw new Error(SHOPPING_INVALID_MESSAGE);
+    return plan;
   }
 
-  recognizeLabel(imageBase64: string, basis: 'per100g' | 'perPortion'): Promise<LabelResult> {
-    return this.call<LabelResult>('recognizeLabel', { imageBase64, basis });
+  /** Die Werte werden geprüft (je 100 g mit Plausibilitätsgrenzen); Unplausibles führt zu einer Meldung. */
+  async recognizeLabel(imageBase64: string, basis: 'per100g' | 'perPortion'): Promise<LabelResult> {
+    const raw = await this.call<unknown>('recognizeLabel', { imageBase64, basis });
+    const label = sanitizeLabelResult(raw, basis);
+    if (!label) throw new Error(LABEL_INVALID_MESSAGE);
+    return label;
   }
 
   /** Die Antwort wird nie ungeprüft übernommen: nur plausible Einträge, sonst verständlicher Fehler. */
@@ -91,6 +103,18 @@ export class ProxyAiProvider implements AiProvider {
     const suggestions = sanitizeFastfoodSuggestions(raw);
     if (suggestions.length === 0) throw new Error(FASTFOOD_INVALID_MESSAGE);
     return suggestions;
+  }
+
+  /**
+   * Beschreibung -> Lebensmittelzeilen. Die Antwort wird nie ungeprüft übernommen (Typen, Grenzen, Atwater-Markierung);
+   * eine Antwort ohne Liste ist ein Fehler, eine Liste ohne brauchbare Zeile ergibt ein leeres Ergebnis ("Nichts erkannt").
+   */
+  async parseMeal(text: string): Promise<MealParseResult> {
+    const clean = text.trim();
+    if (!clean || clean.length > MAX_MEAL_TEXT_CHARS) throw new Error(AI_ERROR_MESSAGES.unreadable);
+    const raw = await this.call<unknown>('parseMeal', { text: clean });
+    if (!hasItemList(raw)) throw new Error(AI_ERROR_MESSAGES.unreadable);
+    return sanitizeMealParse(raw);
   }
 
   async importRecipe(input: RecipeImportInput): Promise<RecipeImportResult> {
@@ -128,6 +152,10 @@ export class ProxyAiProvider implements AiProvider {
       throw new Error(friendlyAiErrorMessage(status));
     }
   }
+}
+
+function hasItemList(raw: unknown): boolean {
+  return Array.isArray((raw as { items?: unknown } | null)?.items);
 }
 
 /** Rezept-Import über eine Adresse (nicht über Text oder Foto). */

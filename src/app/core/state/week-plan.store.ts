@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { StorageService } from '../storage/storage.service';
 import { WeekPlan } from '../week-plan/week-plan.model';
+import { sanitizeBlocked, sanitizeWeekPlan } from './week-plan-sanitize';
 
 const KEY_WEEK_PLAN = 'week-plan';
 const KEY_BLOCKED = 'week-plan-blocked';
@@ -10,9 +11,9 @@ const KEY_BLOCKED = 'week-plan-blocked';
 export class WeekPlanStore {
   private readonly storage = inject(StorageService);
 
-  private readonly _plan = signal<WeekPlan | null>(this.storage.get<WeekPlan | null>(KEY_WEEK_PLAN, null));
+  private readonly _plan = signal<WeekPlan | null>(this.loadPlan());
 
-  private readonly _blocked = signal<readonly string[]>(this.storage.get<string[]>(KEY_BLOCKED, []));
+  private readonly _blocked = signal<readonly string[]>(sanitizeBlocked(this.storage.get<unknown>(KEY_BLOCKED, [])));
 
   /** Aktueller Plan oder null. */
   readonly plan = this._plan.asReadonly();
@@ -30,6 +31,18 @@ export class WeekPlanStore {
   set(plan: WeekPlan): void {
     this._plan.set(plan);
     this.storage.set(KEY_WEEK_PLAN, plan);
+  }
+
+  /** Liest den Plan und prüft ihn; ein unbrauchbarer Plan kommt in Quarantäne und wird entfernt. */
+  private loadPlan(): WeekPlan | null {
+    const stored = this.storage.get<unknown>(KEY_WEEK_PLAN, null);
+    if (stored === null) return null;
+    const clean = sanitizeWeekPlan(stored);
+    if (clean === null) {
+      this.storage.quarantine(KEY_WEEK_PLAN, [stored], 'invalid');
+      this.storage.remove(KEY_WEEK_PLAN);
+    }
+    return clean;
   }
 
   /** Verwirft den Plan (auch für "Daten zurücksetzen"). */

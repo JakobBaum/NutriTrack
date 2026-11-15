@@ -4,13 +4,10 @@
  *   getoent  .nt-btn--tonal       Akzent-Tint
  *   Text     .nt-btn--text        ohne Flaeche, 16 px / 600, Akzent
  *   Zusaetze .nt-btn--block (volle Breite), .nt-btn--inner (in einer Karte: abgerundetes Rechteck, --nt-radius-inner)
- * Native <button> und <ion-button> tragen dieselben Klassen. Alt-Namen bleiben gueltig:
- *   .nt-pill = .nt-btn, .nt-pill--secondary = .nt-btn--tonal, .nt-add-btn = .nt-btn--tonal.nt-btn--block
+ * Native <button> und <ion-button> tragen dieselben Klassen. Die Alt-Namen .nt-pill/.nt-add-btn sind entfallen.
  * ========================================================================= */
 
-.nt-btn,
-.nt-pill,
-.nt-add-btn {
+.nt-btn {
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
@@ -36,9 +33,7 @@
   &:focus-visible { outline: 2px solid var(--nt-focus); outline-offset: 2px; }
 }
 
-.nt-btn--tonal,
-.nt-pill--secondary,
-.nt-add-btn {
+.nt-btn--tonal {
   background: var(--nt-accent-tint);
   color: var(--ion-color-primary-shade); // 5.4:1 auf Tint
 }
@@ -49,8 +44,7 @@
   color: var(--nt-accent);
 }
 
-.nt-btn--block,
-.nt-add-btn {
+.nt-btn--block {
   display: flex;
   width: 100%;
 }
@@ -60,9 +54,7 @@
 }
 
 // ion-button mit denselben Klassen: Variablen statt Farben, Hoehe ueber den Host.
-ion-button.nt-btn,
-ion-button.nt-pill,
-ion-button.nt-add-btn {
+ion-button.nt-btn {
   --background: var(--nt-accent);
   --background-activated: var(--ion-color-primary-shade);
   --background-hover: var(--ion-color-primary-shade);
@@ -84,9 +76,7 @@ ion-button.nt-add-btn {
   }
 }
 
-ion-button.nt-btn--tonal,
-ion-button.nt-pill--secondary,
-ion-button.nt-add-btn {
+ion-button.nt-btn--tonal {
   --background: var(--nt-accent-tint);
   --background-activated: var(--nt-accent-tint);
   --background-hover: var(--nt-accent-tint);

@@ -182,3 +182,40 @@ Grundlage: `RECHT-BESTANDSAUFNAHME.md` (28 Befunde). Keine Rechtsberatung; die T
 - Echtes Offline (Flugmodus) am Gerät: im Test nur nachgestellt, weil ohne Service Worker die nachgeladenen Programmteile fehlen. Folge am Gerät unbekannt: ein Tab, der offline zum ersten Mal geöffnet wird, lädt in der Web-Version möglicherweise nicht.
 - Zeitüberschreitungen (10 s Lebensmittelsuche, 30 s KI), Kamera-Scan, Etikett-Foto, echte Dienste, iPhone und Safari.
 - Von 124 Screenshots wurde nur eine Auswahl angesehen; abgeschnittener Text kann an anderer Stelle noch vorkommen.
+
+## Welle 6: Befunde, Rezept-Speicherung, Fastfood, "Essen beschreiben" (2026-11-15)
+
+Branch `welle-6-befunde`. Grundlage: Antworten in `OFFENE-FRAGEN.md`.
+
+### Geändert
+- **Befunde aus `GESAMTPRUEFUNG.md` (Nr 2 bis 15, 23, 24 teilweise):**
+  - Nr 2, 3: Zurücksetzen und Import melden Fehler ehrlich (`clearAll`, `restoreRaw`, `replaceAll` liefern ein Ergebnis).
+  - Nr 4: Bei Daten aus einer neueren App-Version schreibt die App nicht (`set`, `remove`, `quarantine`), Migrationen laufen dann nicht. Nach Zurücksetzen oder Import wird neu bewertet.
+  - Nr 5: KI-Antworten für Einkaufsliste und Etikett laufen über Sanitizer (`core/ai/shopping-sanitize.ts`, `label-sanitize.ts`).
+  - Nr 6: Profil, Wochenplan und Rezepte werden beim Laden und beim Import geprüft (`profile-sanitize.ts`, `week-plan-sanitize.ts`, `recipe-sanitize.ts`).
+  - Nr 7: Grenzen im Rezept-Import. Unplausible Nährwerte werden verworfen, nicht gekappt.
+  - Nr 8 bis 11: Sequenz-Token für Preishinweis, Online-Suche, Übersetzung je Rezept, Rezeptimport.
+  - Nr 12: Backup-Export meldet in der iOS-App ohne bestätigten Weg "Backup nicht bestätigt" statt "heruntergeladen".
+  - Nr 13 bis 15 (Worker): OFF-Parameter geprüft, Tageslimit für Rezeptabrufe (40, zählt nur ohne Cache-Treffer), URL-Fehler als 400.
+  - Nr 23: globaler Offline-Hinweis oben auf allen Tabs.
+  - Nr 24: `worker.js` in Module unter `worker/` aufgeteilt (alle unter 400 Zeilen). Die großen App-Dateien sind nicht aufgeteilt, aber nicht gewachsen.
+- **Online-Rezepte:** Gespeichert wird nur noch ein Verweis (ID, Titel, Bild-URL, Quell-Link). Details werden beim Öffnen, Kochen, Eintragen und für die Einkaufsliste neu geladen (Zwischenspeicher 1 Stunde im Arbeitsspeicher). Alte, unveränderte Online-Rezepte werden einmalig reduziert; vorher wird eine Auto-Sicherung geschrieben. Neue Worker-Route `GET /recipes/:id/information`.
+- **Fastfood:** Land steht im Profil (Vorgabe Österreich, altes Land wird übernommen). Im Helfer gibt es je Zustand nur eine Schaltfläche. Nach einer Änderung der Angaben bleibt die alte Liste mit Hinweis stehen.
+- **Essen beschreiben (Welle 4 A):** neuer Weg im Eintragen-Sheet, Text bis 500 Zeichen, Diktat über die Tastatur. Worker-Funktion `parseMeal`, Prüfung der Antwort in `meal-parse-sanitize.ts`, Bestätigungsliste vor dem Eintragen.
+- **Origin-Pflicht:** im Worker als Schalter `REQUIRE_ORIGIN` vorbereitet, bleibt aus. Die iOS-App sendet mit CapacitorHttp keinen Origin; sie sendet jetzt den Header `X-NutriTrack-Client: ios`.
+- **Kleinigkeiten:** kein Übersetzungshinweis bei gleichlautenden Wörtern, Meldung "Der Dienst ist gerade nicht erreichbar" bei Serverabbruch, `.nt-pill` und `.nt-add-btn` durch `.nt-btn` ersetzt, fünf tote Stilregeln entfernt.
+
+### Review
+Eigener Review-Agent: 0 kritisch, 1 hoch, 6 mittel, 4 niedrig. Behoben: Nr 1 bis 4, 6, 7, 9, 10. Nr 12 (Formulargrenzen) nicht bestätigt, per Test abgesichert. Offen: Nr 5 (Wochenplan), Nr 8 (Tageslimit nicht atomar, bekannt), Nr 11.
+
+### Nicht geprüft
+- Kein echtes Gerät, kein Safari. Alles nur Chromium bei 375 und 320 px.
+- Keine echten Antworten von Gemini und Spoonacular. `parseMeal` und die Rezeptdetail-Route sind nur mit nachgebauten Antworten getestet.
+- Migration alter Online-Rezepte nur im Unit-Test, nicht an echten Altdaten.
+- Header `X-NutriTrack-Client` auf dem iPhone (nur Quelltext gelesen).
+
+### Offen
+- Der Wochenplan speichert weiter vollständige Online-Rezepte.
+- Der Übersetzungs-Cache speichert übersetzte Rezepttexte dauerhaft.
+- Backup-Export in der iOS-App braucht `@capacitor/share` und `@capacitor/filesystem` für einen verlässlichen Weg.
+- `REQUIRE_ORIGIN` einschalten, sobald die App mit dem Header installiert ist; die Diagnose in `settings.page.ts` braucht dann den Header.

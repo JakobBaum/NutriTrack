@@ -71,8 +71,16 @@ describe('DietTranslateService.translateDislikes', () => {
     }
   });
 
-  it('wertet eine Antwort, die dem Begriff gleicht (ohne Groß-/Kleinschreibung), als nicht übersetzt', async () => {
-    const service = setup(vi.fn(async (q: string) => (q === 'Pilze' ? 'pilze' : 'Mushroom')));
+  it('wertet eine Antwort, die dem Begriff gleicht (z. B. Avocado), als übersetzt', async () => {
+    const service = setup(vi.fn(async (q: string) => (q === 'Avocado' ? 'avocado' : 'Mushroom')));
+
+    const result = await service.translateDislikes(['Avocado', 'Champignon'], NONE);
+
+    expect(result).toEqual({ dislikesEn: ['avocado', 'mushroom'], failedCount: 0 });
+  });
+
+  it('zählt eine leere Antwort weiter als nicht übersetzt', async () => {
+    const service = setup(vi.fn(async (q: string) => (q === 'Pilze' ? '' : 'Mushroom')));
 
     const result = await service.translateDislikes(['Pilze', 'Champignon'], NONE);
 

@@ -72,3 +72,48 @@ describe('sanitizeBackupData', () => {
     expect(input).toEqual(copy);
   });
 });
+
+describe('sanitizeBackupData Profil und Wochenplan (Review 3, Befund 6)', () => {
+  const profile = { weightKg: 80, heightCm: 180, age: 30, sex: 'male', activityLevel: 'moderate', goal: 'maintain', updatedAt: '2026-11-01T10:00:00.000Z' };
+
+  it('behält ein gültiges Profil', () => {
+    expect(sanitizeBackupData({ profile }).data['profile']).toEqual(profile);
+  });
+
+  it('verwirft ein kaputtes Profil und legt es in Quarantäne', () => {
+    const r = sanitizeBackupData({ profile: { weightKg: 'x' } });
+    expect('profile' in r.data).toBe(false);
+    expect(r.quarantined['profile']).toHaveLength(1);
+    expect(r.skipped).toBe(1);
+  });
+
+  it('verwirft einen kaputten Wochenplan und bereinigt gesperrte Ids', () => {
+    const r = sanitizeBackupData({ 'week-plan': { id: 1 }, 'week-plan-blocked': ['a', 2] });
+    expect('week-plan' in r.data).toBe(false);
+    expect(r.data['week-plan-blocked']).toEqual(['a']);
+    expect(r.skipped).toBe(2);
+  });
+});
+
+describe('sanitizeBackupData Online-Verweise', () => {
+  const ingredients = [{ name: 'Reis', amount: 1, unit: 'g' }];
+  const ref = { source: 'spoonacular', externalId: '4242', savedAt: '2026-11-01T10:00:00.000Z' };
+
+  it('entfernt ein ungültiges onlineRef (null) und behält das Rezept mit Zutaten', () => {
+    const r = sanitizeBackupData({ recipes: [{ id: 'r', title: 'A', servings: 2, ingredients, onlineRef: null }] });
+    expect(r.data['recipes']).toEqual([{ id: 'r', title: 'A', servings: 2, ingredients }]);
+    expect(r.repaired).toBe(1);
+  });
+
+  it('verwirft einen Verweis ohne Zutaten mit ungültiger Referenz', () => {
+    const bad = { id: 'r', title: 'A', servings: 1, ingredients: [], onlineRef: { ...ref, externalId: 'x' } };
+    const r = sanitizeBackupData({ recipes: [bad] });
+    expect(r.data['recipes']).toEqual([]);
+    expect(r.quarantined['recipes']).toEqual([bad]);
+  });
+
+  it('behält einen gültigen Verweis', () => {
+    const good = { id: 'r', title: 'A', servings: 1, ingredients: [], onlineRef: ref };
+    expect(sanitizeBackupData({ recipes: [good] }).data['recipes']).toEqual([good]);
+  });
+});

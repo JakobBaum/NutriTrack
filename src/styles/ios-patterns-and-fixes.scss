@@ -231,7 +231,7 @@ ion-item {
   ion-tab-button,
   ion-segment-button,
   ion-chip,
-  .nt-pill {
+  .nt-btn {
     cursor: pointer;
   }
 
@@ -244,11 +244,11 @@ ion-item {
     background: rgba(28, 28, 30, 0.06);
   }
 
-  .nt-pill:hover {
+  .nt-btn:hover {
     opacity: 0.9;
   }
 
-  .nt-pill--secondary:hover {
+  .nt-btn--tonal:hover {
     opacity: 1;
     filter: brightness(0.96);
   }

@@ -81,7 +81,9 @@ describe('ProxyAiProvider', () => {
     const reqs = http.match(PROXY);
     expect(reqs.map((r) => r.request.body.fn)).toEqual(cases.map(([, fn]) => fn));
     expect(reqs[1].request.body.payload).toEqual({ imageBase64: 'b64', basis: 'per100g' });
-    reqs.forEach((r) => r.flush(r.request.body.fn === 'suggestFastfood' ? [] : {}));
+    const LABEL_OK = { name: 'X', facts: { kcal: 100, proteinG: 1, carbsG: 1, fatG: 1, basis: 'per100g' } };
+    const answers: Record<string, unknown> = { suggestFastfood: [], recognizeLabel: LABEL_OK };
+    reqs.forEach((r) => r.flush(answers[r.request.body.fn] ?? {}));
     await Promise.all(cases.map(([p]) => p));
   });
 
@@ -93,10 +95,10 @@ describe('ProxyAiProvider', () => {
     expect(res.sourceUrl).toBe('https://x.test');
   });
 
-  it('meldet Status 0 als Offline-Hinweis', async () => {
+  it('meldet Status 0 bei vorhandenem Netz als Dienst nicht erreichbar', async () => {
     const p = provider.suggestFastfood(REQ);
     http.expectOne(PROXY).error(new ProgressEvent('error'), { status: 0 });
-    await expect(p).rejects.toThrow(AI_ERROR_MESSAGES.offline);
+    await expect(p).rejects.toThrow(AI_ERROR_MESSAGES.unreachable);
     expect(log.entries()[0].level).toBe('error');
   });
 
@@ -154,5 +156,37 @@ describe('ProxyAiProvider Einkaufsliste', () => {
     expect(req.request.body.payload.recipes).toEqual([{ title: 'Pasta' }]);
     req.flush({ items: [], suggestedDishes: [], estTotal: 0 });
     await p;
+  });
+});
+
+describe('ProxyAiProvider: Etikett und Einkaufsliste werden geprueft', () => {
+  const LABEL = { name: 'Muesli', facts: { kcal: 380, proteinG: 8, carbsG: 60, fatG: 10, basis: 'per100g' } };
+  const SHOP_REQ = { persons: 1, days: 1, meals: ['dinner' as const], recipes: [] };
+
+  it('uebernimmt ein plausibles Etikett', async () => {
+    const p = provider.recognizeLabel('abc', 'per100g');
+    http.expectOne(PROXY).flush(LABEL);
+    expect((await p).facts.kcal).toBe(380);
+  });
+
+  it('wirft eine verstaendliche Meldung bei unplausiblen Etikett-Werten', async () => {
+    const p = provider.recognizeLabel('abc', 'per100g');
+    http.expectOne(PROXY).flush({ ...LABEL, facts: { ...LABEL.facts, kcal: 9000 } });
+    await expect(p).rejects.toThrow(/Etikett/);
+  });
+
+  it('bereinigt die Einkaufsliste', async () => {
+    const ok = provider.generateShoppingList(SHOP_REQ);
+    http.expectOne(PROXY).flush({
+      items: [{ name: 'Reis', amount: 500, unit: 'g', estPrice: 1, evil: 1 }, { name: '', amount: 1, unit: 'g' }],
+      suggestedDishes: ['Reispfanne'], estTotal: 1,
+    });
+    expect((await ok).items).toEqual([{ name: 'Reis', amount: 500, unit: 'g', checked: false, estPrice: 1 }]);
+  });
+
+  it('wirft bei einer Einkaufsliste ohne brauchbare Position', async () => {
+    const bad = provider.generateShoppingList(SHOP_REQ);
+    http.expectOne(PROXY).flush({ items: [{ name: '', amount: -1, unit: 'g' }] });
+    await expect(bad).rejects.toThrow(/Einkaufsliste/);
   });
 });

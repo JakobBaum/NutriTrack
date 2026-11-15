@@ -3,7 +3,7 @@
     <ion-icon name="nutrition-outline" class="empty__icon" aria-hidden="true"></ion-icon>
     <h2>Noch keine Mahlzeiten</h2>
     <p>Speichere häufige Mahlzeiten (Rezept + Lebensmittel kombiniert) und füge sie mit einem Tippen ins Tagebuch ein.</p>
-    <button type="button" class="nt-add-btn" (click)="openCreate()">Erste Mahlzeit anlegen</button>
+    <button type="button" class="nt-btn nt-btn--tonal nt-btn--block" (click)="openCreate()">Erste Mahlzeit anlegen</button>
   </div>
 } @else {
   <h2 class="nt-section-header">Gespeicherte Mahlzeiten</h2>
@@ -100,7 +100,7 @@
       }
 
       <div class="add-btns">
-        <button type="button" class="nt-add-btn" (click)="openPicker()">
+        <button type="button" class="nt-btn nt-btn--tonal nt-btn--block" (click)="openPicker()">
           <ion-icon name="add-outline" aria-hidden="true"></ion-icon>
           Lebensmittel hinzufügen
         </button>
@@ -109,18 +109,29 @@
           <h2 class="nt-section-header">Rezept hinzufügen</h2>
           <ion-list lines="none" class="recipe-pick nt-grouped">
             @for (recipe of recipes(); track recipe.id) {
-              @if (recipe.factsPerServing) {
-                <ion-item button (click)="addRecipeToDraft(recipe)">
-                  <ion-icon slot="start" name="book-outline" color="primary" aria-hidden="true"></ion-icon>
-                  <ion-label>
-                    <div>{{ recipe.title }}</div>
-                    <p>{{ recipe.factsPerServing.kcal | ntNum: 0 }} kcal / Portion</p>
-                  </ion-label>
-                  <ion-icon slot="end" name="add-circle-outline" color="primary" aria-hidden="true"></ion-icon>
-                </ion-item>
-              }
+              <ion-item button (click)="addRecipeToDraft(recipe)">
+                <ion-icon slot="start" name="book-outline" color="primary" aria-hidden="true"></ion-icon>
+                <ion-label>
+                  <div>{{ recipe.title }}</div>
+                  @if (recipe.factsPerServing; as f) {
+                    <p>{{ f.kcal | ntNum: 0 }} kcal / Portion</p>
+                  } @else {
+                    <p>Online-Rezept, Nährwerte werden beim Hinzufügen geladen</p>
+                  }
+                </ion-label>
+                <ion-icon slot="end" name="add-circle-outline" color="primary" aria-hidden="true"></ion-icon>
+              </ion-item>
             }
           </ion-list>
+          @let load = recipeLoad.state();
+          @if (load.kind === 'loading') {
+            <p class="recipe-load" role="status" data-testid="meal-recipe-loading"><ion-spinner name="dots"></ion-spinner> Rezept wird geladen…</p>
+          } @else if (load.kind === 'error') {
+            <div class="recipe-load recipe-load--error" data-testid="meal-recipe-error">
+              <p class="block-reason" role="alert">{{ load.message }}</p>
+              <ion-button class="nt-btn nt-btn--tonal nt-btn--inner" (click)="retryRecipe()">Erneut versuchen</ion-button>
+            </div>
+          }
         }
       </div>
 

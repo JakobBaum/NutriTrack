@@ -2,11 +2,15 @@ import { ChangeDetectionStrategy, Component, OnDestroy, computed, inject, signal
 import { ActionSheetController, AlertController } from '@ionic/angular';
 import { SharedModule } from '../shared/shared.module';
 import { NumPipe } from '../shared/num.pipe';
-import { MealType, NutritionFacts, Recipe, SavedMeal, SavedMealEntry } from '../core/models';
+import { MealType, NutritionFacts, SavedMeal, SavedMealEntry } from '../core/models';
 import { DiaryStore } from '../core/state/diary.store';
 import { MealsStore } from '../core/state/meals.store';
 import { CustomFoodStore } from '../core/state/custom-food.store';
 import { RecipeStore } from '../core/state/recipe.store';
+import { OnlineRecipeDetailsService } from '../core/recipes/online/online-recipe-details.service';
+import { StoredRecipe } from '../core/recipes/online/online-recipe-ref';
+import { isLoggableRecipe } from '../diary/add-entry-sheet/add-entry-logic';
+import { RecipeFactsLoader } from './recipe-facts-loader';
 import { FoodSourceResult } from '../shared/food-sources/food-sources.component';
 import { formatDecimal, parseDecimal, parseNutrientInput } from '../core/util/number-input';
 import { selectAllOnFocus } from '../core/keyboard/select-all';
@@ -63,7 +67,10 @@ export class MealsListComponent implements OnDestroy {
 
   /** Gespeicherte Mahlzeiten ohne die gerade zum Löschen vorgemerkte. */
   readonly meals = computed(() => this.store.meals().filter((m) => m.id !== this.deletion.pendingId()));
-  readonly recipes = this.recipeStore.recipes;
+  /** Rezepte mit Werten oder Online-Verweise (deren Werte kommen beim Hinzufügen). */
+  readonly recipes = computed(() => this.recipeStore.recipes().filter(isLoggableRecipe));
+  /** Lädt Nährwerte gespeicherter Online-Verweise nach (Ladezustand, Fehler, Sequenz-Token). */
+  readonly recipeLoad = new RecipeFactsLoader(inject(OnlineRecipeDetailsService));
   readonly mealOptions = MEAL_OPTIONS;
 
   readonly toastMessage = signal<string | null>(null);
@@ -114,6 +121,7 @@ export class MealsListComponent implements OnDestroy {
   }
 
   private openDraft(id: string | null, name: string, entries: SavedMealEntry[]): void {
+    this.recipeLoad.cancel();
     this.allowClose = false;
     this.editingId.set(id);
     this.draftName = name;
@@ -127,10 +135,12 @@ export class MealsListComponent implements OnDestroy {
   async requestCloseCreate(): Promise<void> {
     if (!(await this.canDismissCreate())) return;
     this.allowClose = true;
+    this.recipeLoad.cancel();
     this.createOpen.set(false);
   }
 
   closeCreate(): void {
+    this.recipeLoad.cancel();
     this.allowClose = false;
     this.createOpen.set(false);
   }
@@ -171,13 +181,17 @@ export class MealsListComponent implements OnDestroy {
     this.draftEntries = this.draftEntries.map((e, i) => (i === index ? rescaleEntryAmount(e, value) : e));
   }
 
-  addRecipeToDraft(recipe: Recipe): void {
-    if (!recipe.factsPerServing) return;
-    this.draftEntries = [...this.draftEntries, {
-      label: recipe.title,
-      facts: recipe.factsPerServing,
-      ref: { kind: 'manual' },
-    }];
+  /** Fügt eine Portion des Rezepts hinzu; Online-Verweise laden ihre Nährwerte vorher nach. */
+  async addRecipeToDraft(recipe: StoredRecipe): Promise<void> {
+    const loaded = await this.recipeLoad.load(recipe);
+    if (!loaded) return;
+    this.draftEntries = [...this.draftEntries, { label: recipe.title, facts: loaded.facts, ref: { kind: 'manual' } }];
+  }
+
+  /** „Erneut versuchen“ nach einem Ladefehler. */
+  retryRecipe(): void {
+    const state = this.recipeLoad.state();
+    if (state.kind === 'error') void this.addRecipeToDraft(state.recipe);
   }
 
   // --- Food picker ---

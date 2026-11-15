@@ -11,7 +11,9 @@ import { fromNormalized, itemKey, normalizeUnit } from '../shopping/shopping-uni
 import { makeId } from '../util/id';
 import { WeekPlan } from '../week-plan/week-plan.model';
 import { weekPlanToRecipes } from '../week-plan/week-plan-recipes';
+import { OnlineRecipeDetailsService } from '../recipes/online/online-recipe-details.service';
 import { RecipeStore } from './recipe.store';
+import { joinNotes, skippedNote, splitOutcomes } from './shopping-resolve';
 
 /** Optionen für den Wocheneinkauf. */
 export interface ShoppingPlanOptions {
@@ -149,6 +151,7 @@ export class ShoppingStore {
   private readonly recipes = inject(RecipeStore);
   private readonly ai = inject(AiService);
   private readonly mock = inject(MockAiProvider);
+  private readonly onlineDetails = inject(OnlineRecipeDetailsService);
 
   private readonly _list = signal<ShoppingListView | null>(
     this.storage.get<ShoppingListView | null>(KEY_LIST, null),
@@ -167,6 +170,11 @@ export class ShoppingStore {
     if (!live && this.recipes.recipes().length === 0) {
       throw new Error('Lege zuerst Rezepte an, daraus entsteht die Einkaufsliste.');
     }
+    // Die KI bekommt nur Titel. Ohne KI braucht der lokale Plan Zutaten: Online-Verweise vorher nachladen.
+    const { recipes: planRecipes, skipped } = live
+      ? { recipes: this.recipes.recipes(), skipped: [] as string[] }
+      : splitOutcomes(await this.onlineDetails.resolveAll(this.recipes.recipes()));
+    if (!live && planRecipes.length === 0) throw new Error(skippedNote(skipped) ?? 'Keine Rezepte für die Einkaufsliste.');
     // Budget und Markt wirken nur mit Preisen, also nur mit KI-Verbindung.
     const budget = live ? opts.budget : undefined;
     const storeName = live ? opts.store : undefined;
@@ -176,7 +184,7 @@ export class ShoppingStore {
       meals: opts.meals,
       budget,
       store: storeName,
-      recipes: this.recipes.recipes(),
+      recipes: [...planRecipes],
     };
     const result = await this.ai.generateShoppingList(req).catch(async (err: unknown) => {
       if (live) {
@@ -200,7 +208,7 @@ export class ShoppingStore {
       items,
       suggestedDishes: result.suggestedDishes,
       estTotal: sumItems(items).total,
-      note: result.note,
+      note: joinNotes(result.note, skippedNote(skipped)),
       priceSource: live ? 'ai' : 'mock',
       generatedAt: new Date().toISOString(),
     };

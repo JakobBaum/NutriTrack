@@ -6,6 +6,8 @@ export const AI_ERROR_MESSAGES = {
   overloaded: STATE_MESSAGES.aiOverloaded,
   rateLimited: STATE_MESSAGES.rateLimited,
   offline: STATE_MESSAGES.offline,
+  /** Gerät hat Netz, die Anfrage kam trotzdem nicht durch (Server down, CORS, Abbruch). */
+  unreachable: 'Der Dienst ist gerade nicht erreichbar. Versuch es später noch einmal.',
   unauthorized: STATE_MESSAGES.aiUnavailable,
   linkBlocked: STATE_MESSAGES.aiLinkBlocked,
   unreadable: STATE_MESSAGES.aiUnreadable,
@@ -16,9 +18,14 @@ export const AI_ERROR_MESSAGES = {
 /** Client-seitiges Zeitlimit für einen KI-Aufruf (globaler Worker). */
 export const AI_TIMEOUT_MS = 30000;
 
-/** Bildet einen HTTP-Status (0 = Netzwerkfehler) auf eine deutsche Meldung ab; 422 beim Link-Import heißt: Seite gesperrt oder nicht abrufbar. */
+/** True, wenn der Browser sicher weiß, dass das Gerät offline ist. */
+function isDeviceOffline(): boolean {
+  return typeof navigator !== 'undefined' && navigator.onLine === false;
+}
+
+/** Bildet einen HTTP-Status (0 = keine Antwort: offline oder Dienst nicht erreichbar) auf eine deutsche Meldung ab; 422 beim Link-Import heißt: Seite gesperrt oder nicht abrufbar. */
 export function friendlyAiErrorMessage(status: number, isLinkImport = false): string {
-  if (status === 0) return AI_ERROR_MESSAGES.offline;
+  if (status === 0) return isDeviceOffline() ? AI_ERROR_MESSAGES.offline : AI_ERROR_MESSAGES.unreachable;
   if (status === 429) return AI_ERROR_MESSAGES.rateLimited;
   if (status === 422 && isLinkImport) return AI_ERROR_MESSAGES.linkBlocked;
   if (status === 422) return AI_ERROR_MESSAGES.unreadable;

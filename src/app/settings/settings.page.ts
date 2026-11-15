@@ -34,6 +34,7 @@ import { ConsentStore } from '../core/consent/consent.store';
 import { consentDateLabel } from '../core/consent/consent.model';
 import { BackupCleanup, BackupFile, countBackup, describeCounts, formatBackupDate } from '../core/backup/backup';
 import { describeSafetySnapshot } from '../core/backup/backup-safety';
+import { ExportFeedback, exportMessage, resetFailure, restoreFailure } from './backup-messages';
 
 
 /**
@@ -176,7 +177,7 @@ export class SettingsPage implements OnInit {
       buttons: [
         { text: 'Abbrechen', role: 'cancel' },
         { text: 'Backup zuerst', handler: () => void this.exportThen(() => this.confirmReset()) },
-        { text: 'Löschen', role: 'destructive', handler: () => this.resetData() },
+        { text: 'Löschen', role: 'destructive', handler: () => void this.resetData() },
       ],
     });
     await alert.present();
@@ -188,7 +189,7 @@ export class SettingsPage implements OnInit {
     await next();
   }
 
-  resetData(): void {
+  async resetData(): Promise<void> {
     const safety = this.backup.takeResetSnapshot();
     this.profileStore.clear();
     this.diary.clear();
@@ -202,8 +203,13 @@ export class SettingsPage implements OnInit {
     this.settingsStore.clear();
     this.appSettings.clear();
     this.consentStore.revoke();
-    const safetySaved = this.backup.completeReset(safety);
+    const { cleared, safetySaved } = this.backup.completeReset(safety);
     this.refreshSafetyInfo();
+    if (!cleared) {
+      const failure = resetFailure();
+      await this.showBackupError(failure.header, failure.message);
+      return;
+    }
     this.savedToast.set(
       safety && safetySaved ? 'Alle Daten wurden zurückgesetzt. Eine automatische Sicherung liegt unter Daten.' : 'Alle Daten wurden zurückgesetzt.',
     );
@@ -213,14 +219,18 @@ export class SettingsPage implements OnInit {
   async exportBackup(): Promise<void> {
     this.backupBusy.set(true);
     try {
-      const result = await this.backup.exportBackup();
-      if (result === 'shared') this.savedToast.set('Backup erstellt.');
-      if (result === 'downloaded') this.savedToast.set('Backup heruntergeladen.');
+      await this.showExportFeedback(exportMessage(await this.backup.exportBackup()));
     } catch {
       await this.showBackupError('Backup nicht erstellt', 'Das Backup konnte nicht erstellt werden. Bitte erneut versuchen.');
     } finally {
       this.backupBusy.set(false);
     }
+  }
+
+  private async showExportFeedback(feedback: ExportFeedback | null): Promise<void> {
+    if (!feedback) return;
+    if (feedback.kind === 'toast') this.savedToast.set(feedback.text);
+    else await this.showBackupError(feedback.header, feedback.message);
   }
 
   /** Datei aus der Auswahl lesen, prüfen und Import bestätigen lassen. */
@@ -261,7 +271,8 @@ export class SettingsPage implements OnInit {
   private async applyImport(backup: BackupFile, cleanup: BackupCleanup): Promise<void> {
     const result = this.backup.restore(backup, cleanup);
     if (!result.ok) {
-      await this.showBackupError('Import fehlgeschlagen', 'Der Import ist fehlgeschlagen (Speicher voll oder gesperrt). Deine bisherigen Daten sind unverändert.');
+      const failure = restoreFailure(result, 'import');
+      await this.showBackupError(failure.header, failure.message);
       return;
     }
     if (result.safetySaved) {
@@ -301,7 +312,8 @@ export class SettingsPage implements OnInit {
   private async restoreSafety(): Promise<void> {
     const result = this.backup.restoreSafetySnapshot();
     if (!result.ok) {
-      await this.showBackupError('Wiederherstellen fehlgeschlagen', 'Die Sicherung konnte nicht eingespielt werden (Speicher voll oder gesperrt). Deine aktuellen Daten sind unverändert.');
+      const failure = restoreFailure(result, 'restore');
+      await this.showBackupError(failure.header, failure.message);
       return;
     }
     this.win?.location.reload();

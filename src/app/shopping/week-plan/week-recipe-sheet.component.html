@@ -26,17 +26,17 @@
     }
 
     <div class="wp-actions">
-      <button type="button" class="nt-pill wp-cook" (click)="startCook()">
+      <button type="button" class="nt-btn wp-cook" (click)="startCook()">
         <ion-icon name="restaurant-outline" aria-hidden="true"></ion-icon>
         Kochen
       </button>
       @if (recipe.facts) {
-        <button type="button" class="nt-pill nt-pill--secondary wp-log" data-testid="wp-log-diary" (click)="logToDiary()">
+        <button type="button" class="nt-btn nt-btn--tonal wp-log" data-testid="wp-log-diary" (click)="logToDiary()">
           <ion-icon name="add-circle-outline" aria-hidden="true"></ion-icon>
           In Tagebuch eintragen
         </button>
       }
-      <button type="button" class="nt-pill nt-pill--secondary wp-fav" [disabled]="isSaved()" (click)="save()">
+      <button type="button" class="nt-btn nt-btn--tonal wp-fav" [disabled]="isSaved()" (click)="save()">
         <ion-icon [name]="isSaved() ? 'checkmark' : 'bookmark-outline'" aria-hidden="true"></ion-icon>
         {{ isSaved() ? 'Gespeichert' : 'Zu Favoriten' }}
       </button>

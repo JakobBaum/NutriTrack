@@ -73,11 +73,8 @@ export function register({ test }) {
     assert.equal((await pressed(page)).length, 1, 'mindestens 1 Kriterium bleibt');
     const heights = await topModal(page).locator('.ff-chip').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
     assert.ok(heights.every((h) => h >= 44), `Chips zu niedrig: ${heights}`);
-    const country = await topModal(page).locator('ion-select[label="Land"]').evaluate((el) => ({
-      value: el.value, shown: el.shadowRoot?.querySelector('.select-text')?.textContent?.trim() ?? '',
-    }));
-    assert.equal(country.value, 'Österreich');
-    assert.equal(country.shown, 'Österreich');
+    const hint = (await topModal(page).locator('[data-testid="ff-country"]').innerText()).replace(/\s+/g, ' ').trim();
+    assert.equal(hint, 'Land: Österreich, im Profil ändern');
   });
 
   for (const vp of VIEWPORTS) {
@@ -112,14 +109,14 @@ export function register({ test }) {
     });
   }
 
-  test('w3 fastfood: Änderung am Formular beginnt die Liste neu', seed(), async (page) => {
+  test('w3 fastfood: Änderung am Formular bietet neue Vorschläge an und nimmt "Weitere" weg', seed(), async (page) => {
     await mockAi(page);
     await openFastfood(page);
     await topModal(page).locator('[data-testid="ff-run"]').click({ force: true });
     await topModal(page).locator('.ff-card').first().waitFor({ timeout: 8000 });
     await chip(page, 'Günstig').click();
     await settle(page, 300);
-    assert.equal(await topModal(page).locator('.ff-card').count(), 0);
     assert.equal(await topModal(page).locator('[data-testid="ff-more"]').count(), 0);
+    assert.equal(await topModal(page).locator('[data-testid="ff-run"]').count(), 1);
   });
 }

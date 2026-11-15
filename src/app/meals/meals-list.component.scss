@@ -75,12 +75,6 @@ label.nt-section-header { display: block; }
   background: var(--nt-card);
 }
 
-.picker-error {
-  color: var(--ion-color-danger);
-  font-size: 0.8125rem;
-  text-align: center;
-  padding: 8px 0;
-}
 
 // Touch-Ziele >= 44px (Abbrechen/Fertig im Sheet)
 ion-modal ion-buttons ion-button {
@@ -159,4 +153,19 @@ ion-modal ion-buttons ion-button {
   font-size: var(--nt-fs-caption);
   font-weight: 600;
   color: var(--nt-over);
+}
+
+/* Nachladen der Nährwerte eines Online-Rezepts: Ladehinweis und Fehler mit „Erneut versuchen“. */
+.recipe-load {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+  margin: 8px 0 0;
+}
+
+.recipe-load--error {
+  flex-direction: column;
+  align-items: stretch;
 }

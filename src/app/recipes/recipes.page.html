@@ -41,7 +41,7 @@
         <article class="nt-card recipe">
           <div class="recipe__head">
             <div class="recipe__head-text">
-              <h2 class="recipe__title"><button type="button" class="recipe__title-btn" (click)="openDetail(recipe)" [attr.aria-label]="'„' + recipe.title + '“ ansehen'">{{ recipe.title }}</button></h2>
+              <h2 class="recipe__title"><button type="button" class="recipe__title-btn" (click)="detail.open(recipe)" [attr.aria-label]="'„' + recipe.title + '“ ansehen'">{{ recipe.title }}</button></h2>
               <p class="recipe__meta">
                 {{ metaLine(recipe) }}
                 @if (isAiOrigin(recipe.origin)) { <span class="ai-badge">KI-Schätzung</span> }
@@ -67,12 +67,12 @@
             </p>
           }
           <div class="recipe__actions">
-            <ion-button class="nt-btn nt-btn--inner" fill="solid" (click)="logToDiary(recipe)">
+            <ion-button class="nt-btn nt-btn--inner" fill="solid" (click)="detail.run('diary', recipe)">
               <ion-icon slot="start" name="add-circle-outline" aria-hidden="true"></ion-icon>
               Eintragen
             </ion-button>
-            @if (recipe.steps.length > 0) {
-              <ion-button class="nt-btn nt-btn--tonal nt-btn--inner" fill="solid" (click)="startCook(recipe)">
+            @if (recipe.steps.length > 0 || isRef(recipe)) {
+              <ion-button class="nt-btn nt-btn--tonal nt-btn--inner" fill="solid" (click)="detail.startCook(recipe)">
                 <ion-icon slot="start" name="flame-outline" aria-hidden="true"></ion-icon>
                 Kochen
               </ion-button>
@@ -218,10 +218,10 @@
           }
         </ion-list>
       }
-      <button type="button" class="nt-add-btn" (click)="openPicker()">
+      <button type="button" class="nt-btn nt-btn--tonal nt-btn--block" (click)="openPicker()">
         <ion-icon name="add-outline" aria-hidden="true"></ion-icon> Zutat hinzufügen
       </button>
-      <button type="button" class="nt-add-btn" (click)="addManualIngredient()">
+      <button type="button" class="nt-btn nt-btn--tonal nt-btn--block" (click)="addManualIngredient()">
         <ion-icon name="create-outline" aria-hidden="true"></ion-icon> manuelle Zutat
       </button>
 
@@ -302,7 +302,7 @@
           </button>
         </div>
       }
-      <button type="button" class="nt-add-btn" (click)="addStep()">
+      <button type="button" class="nt-btn nt-btn--tonal nt-btn--block" (click)="addStep()">
         <ion-icon name="add-outline" aria-hidden="true"></ion-icon> Schritt hinzufügen
       </button>
       <div class="nt-sheet-footer">
@@ -316,22 +316,39 @@
 </ion-modal>
 
 <!-- Nur-Lesen-Detail -->
-<ion-modal [isOpen]="detailRecipe() !== null" (didDismiss)="closeDetail()">
+<ion-modal [isOpen]="detail.recipe() !== null" (didDismiss)="detail.close()">
   <ng-template>
-    @if (detailRecipe(); as r) {
+    @if (detail.recipe(); as r) {
       @let dMissing = countMissingFacts(r.ingredients);
       <ion-header class="ion-no-border">
         <div class="nt-sheet-header">
           <div class="nt-sheet-header__start"></div>
           <h2 class="nt-sheet-header__title" role="heading" aria-level="2">{{ r.title }}</h2>
           <div class="nt-sheet-header__end">
-            <ion-button fill="clear" class="nt-sheet-close" (click)="closeDetail()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
+            <ion-button fill="clear" class="nt-sheet-close" (click)="detail.close()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
           </div>
         </div>
       </ion-header>
       <ion-content>
         <p class="recipe__meta">{{ metaLine(r) }}
           @if (isAiOrigin(r.origin)) { <span class="ai-badge">KI-Schätzung</span> }</p>
+        @if (isRef(r)) {
+          @let st = detail.loader.state();
+          @if (st.kind === 'error') {
+            <div class="online-state" role="alert" data-testid="online-error">
+              <p>{{ st.message }}</p>
+              <ion-button class="nt-btn nt-btn--tonal" fill="solid" (click)="detail.retry()">Erneut versuchen</ion-button>
+              @if (st.reason === 'not-found') {
+                <ion-button class="nt-btn nt-btn--tonal" fill="solid" (click)="detail.removeRef()">Verweis löschen</ion-button>
+              }
+            </div>
+          } @else {
+            <div class="online-state" role="status" data-testid="online-loading">
+              <ion-spinner name="crescent" aria-hidden="true"></ion-spinner>
+              <p>Rezept wird geladen …</p>
+            </div>
+          }
+        }
         @if (recipeFacts(r); as f) {
           <h2 class="field-label nt-section-header">Nährwerte je Portion</h2>
           <p class="nt-stat recipe__kcal"><span class="nt-stat__value"><strong class="nt-stat__num">{{ f.kcal | ntNum: 0 }}</strong><span class="nt-stat__unit">kcal je Portion</span></span></p>
@@ -365,15 +382,17 @@
             @if (src.showSpoonacular) { <span class="recipe__source-credit">Rezeptdaten von <a href="https://spoonacular.com" target="_blank" rel="noopener">spoonacular.com</a></span> }
           </p>
         }
+        @if (!isRef(r)) {
         <div class="nt-sheet-footer">
-          <ion-button expand="block" class="nt-btn nt-btn--block" (click)="detailThen(diaryAction)">Eintragen</ion-button>
+          <ion-button expand="block" class="nt-btn nt-btn--block" (click)="detail.then('diary')">Eintragen</ion-button>
           <div class="recipe__actions">
             @if (r.steps.length > 0) {
-              <ion-button class="nt-btn nt-btn--tonal" fill="solid" (click)="detailThen(cookAction)">Kochen</ion-button>
+              <ion-button class="nt-btn nt-btn--tonal" fill="solid" (click)="detail.then('cook')">Kochen</ion-button>
             }
-            <ion-button class="nt-btn nt-btn--tonal" fill="solid" (click)="detailThen(editAction)">Bearbeiten</ion-button>
+            <ion-button class="nt-btn nt-btn--tonal" fill="solid" (click)="detail.then('edit')">Bearbeiten</ion-button>
           </div>
         </div>
+        }
       </ion-content>
     }
   </ng-template>
@@ -496,9 +515,9 @@
 
 <!-- Kochmodus (Vollbild), geteilt mit dem Wochenplan -->
 <nt-cook-mode
-  [open]="cookRecipe() !== null"
-  [title]="cookRecipe()?.title ?? ''"
-  [steps]="cookRecipe()?.steps ?? []"
-  [ingredients]="cookIngredients()"
-  (dismissed)="closeCook()"
+  [open]="detail.cook() !== null"
+  [title]="detail.cook()?.title ?? ''"
+  [steps]="detail.cook()?.steps ?? []"
+  [ingredients]="detail.cookIngredients()"
+  (dismissed)="detail.closeCook()"
 ></nt-cook-mode>

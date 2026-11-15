@@ -9,7 +9,7 @@ describe('failureForStatus', () => {
     [402, false, 'quota'],
     [429, false, 'rate-limit'],
     [0, true, 'offline'],
-    [0, false, 'server'],
+    [0, false, 'unreachable'],
     [500, false, 'server'],
   ] as const)('maps status %i (offline=%s) to %s', (status, offline, expected) => {
     expect(failureForStatus(status, offline)).toBe(expected);
@@ -17,6 +17,13 @@ describe('failureForStatus', () => {
 });
 
 describe('toOnlineSearchError', () => {
+  it('meldet Status 0 bei vorhandener Verbindung als Dienst nicht erreichbar, offline als Offline', () => {
+    const online = toOnlineSearchError(new HttpErrorResponse({ status: 0 }), false);
+    expect(online.reason).toBe('unreachable');
+    expect(online.message).toBe('Der Dienst ist gerade nicht erreichbar. Versuch es später noch einmal.');
+    expect(toOnlineSearchError(new HttpErrorResponse({ status: 0 }), true).reason).toBe('offline');
+  });
+
   it('returns a German message for a 402', () => {
     const err = toOnlineSearchError(new HttpErrorResponse({ status: 402 }), false);
     expect(err.reason).toBe('quota');

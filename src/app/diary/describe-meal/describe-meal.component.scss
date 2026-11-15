@@ -1,0 +1,135 @@
+@use '../diary-sheets';
+@use '../diary-sheet-flows';
+
+// Beschreiben-Ansicht: eigener Inhalt und Fuss im Eintragen-Sheet. Wirt ohne Rahmen, damit ion-content/ion-footer Kinder des Sheets bleiben.
+:host {
+  display: contents;
+}
+
+.dm {
+  padding-bottom: var(--nt-space-4);
+
+  &__label {
+    display: block;
+    margin: var(--nt-space-3) var(--nt-space-1) var(--nt-space-2);
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+  }
+
+  // Mindestens 16 px, sonst zoomt iOS beim Fokus.
+  &__text {
+    font-size: 16px;
+    --padding-top: var(--nt-space-3);
+    --padding-bottom: var(--nt-space-3);
+  }
+
+  &__counter {
+    margin: var(--nt-space-1) var(--nt-space-1) 0;
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+    text-align: right;
+
+    &--over {
+      color: var(--nt-danger);
+      font-weight: 600;
+    }
+  }
+
+  &__tip {
+    margin-inline: var(--nt-space-1);
+  }
+
+  &__loading {
+    margin: var(--nt-space-3) var(--nt-space-1);
+  }
+
+  &__msg {
+    margin: var(--nt-space-3) var(--nt-space-1) var(--nt-space-2);
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--nt-space-2);
+    margin-top: var(--nt-space-3);
+  }
+
+  &__title {
+    margin: 0;
+  }
+
+  &__note {
+    margin-inline: var(--nt-space-1);
+  }
+
+  &__list {
+    display: grid;
+    gap: var(--nt-space-3);
+    margin: var(--nt-space-3) 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__row {
+    min-width: 0;
+    padding: var(--nt-space-3);
+    background: var(--nt-card);
+    border-radius: var(--nt-radius-tile);
+  }
+
+  &__row-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--nt-space-2);
+  }
+
+  &__row-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--nt-space-1) var(--nt-space-2);
+    min-width: 0;
+    padding-top: var(--nt-space-2);
+  }
+
+  &__name {
+    min-width: 0;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+
+  &__qty {
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+  }
+
+  &__remove {
+    flex: none;
+    margin: 0;
+    color: var(--nt-secondary);
+  }
+
+  &__doubt {
+    margin: var(--nt-space-1) 0 var(--nt-space-2);
+    font-size: var(--nt-fs-caption);
+    font-weight: 700;
+    color: var(--nt-warning);
+  }
+
+  &__amount {
+    display: block;
+    margin-top: var(--nt-space-2);
+  }
+
+  &__meta {
+    margin: var(--nt-space-2) 0 0;
+    font-size: var(--nt-fs-body);
+    color: var(--nt-secondary);
+  }
+
+  &__sum {
+    margin-inline: 0;
+  }
+}

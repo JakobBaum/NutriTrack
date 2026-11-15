@@ -1,6 +1,7 @@
 import { NutritionBasis, NutritionFacts } from '../models';
 import { parseDecimal } from '../util/number-input';
 import { RecipeImportIngredient, RecipeImportResult } from './ai-provider';
+import { boundedList, cleanText, isInRange } from './sanitize-common';
 
 // Einheiten, die 1:1 als Gramm/Milliliter gelten (→ Bezug per100g).
 const GRAM_UNITS = new Set(['g', 'gramm', 'gr', 'kg', 'kilogramm', 'ml', 'milliliter', 'l', 'liter']);
@@ -8,14 +9,50 @@ const DEFAULT_PORTION_G = 50;
 const DEFAULT_SERVINGS = 2;
 const FALLBACK_TITLE = 'Importiertes Rezept';
 
-function num(v: unknown): number {
+/** Obergrenzen für importierte (unvertrauenswürdige) Rezepte; darüber wird abgeschnitten bzw. verworfen. */
+export const MAX_IMPORT_INGREDIENTS = 80;
+export const MAX_IMPORT_STEPS = 60;
+export const MAX_IMPORT_TITLE_CHARS = 120;
+export const MAX_IMPORT_INGREDIENT_CHARS = 100;
+export const MAX_IMPORT_UNIT_CHARS = 20;
+export const MAX_IMPORT_STEP_CHARS = 1000;
+export const MAX_IMPORT_SERVINGS = 100;
+export const MAX_IMPORT_AMOUNT = 100000;
+export const MAX_IMPORT_PORTION_G = 5000;
+/** Nährwerte je 100 g (physikalisch höchstens rund 900 kcal) bzw. je Portion/Stück. */
+const MAX_KCAL_PER_100G = 900;
+const MAX_GRAMS_PER_100G = 100;
+const MAX_KCAL_PER_PORTION = 5000;
+const MAX_GRAMS_PER_PORTION = 1000;
+
+/** Zahl aus einem Modellwert: nie negativ, endlich, höchstens `max`. */
+function num(v: unknown, max = MAX_IMPORT_AMOUNT): number {
   const n = parseDecimal(v);
-  // Nährwerte und Mengen sind nie negativ — defekte Modellwerte abfangen.
+  return n === null ? 0 : Math.min(max, Math.max(0, n));
+}
+
+/** Rohwert als Zahl, aber ohne Begrenzung nach oben; Unsinn wird 0 (zur Prüfung der Plausibilität). */
+function rawNum(v: unknown): number {
+  const n = parseDecimal(v);
   return n === null ? 0 : Math.max(0, n);
 }
 
+function deriveBasis(rawBasis: unknown, unit: string): NutritionBasis {
+  if (rawBasis === 'per100g' || rawBasis === 'perPortion') return rawBasis;
+  return GRAM_UNITS.has(unit.toLowerCase()) ? 'per100g' : 'perPortion';
+}
+
+function isWithinLimits(f: Record<string, unknown>, basis: NutritionBasis): boolean {
+  const maxKcal = basis === 'per100g' ? MAX_KCAL_PER_100G : MAX_KCAL_PER_PORTION;
+  const maxG = basis === 'per100g' ? MAX_GRAMS_PER_100G : MAX_GRAMS_PER_PORTION;
+  const kcalOk = isInRange(rawNum(f['kcal']), 0, maxKcal);
+  const gramsOk = ['proteinG', 'carbsG', 'fatG', 'fiberG', 'sugarG'].every((k) => isInRange(rawNum(f[k]), 0, maxG));
+  return kcalOk && gramsOk;
+}
+
 /** Parst KI-Nährwerte einer Zutat defensiv; Basis wird aus der Einheit
- *  abgeleitet, falls die KI keine gültige Basis liefert. */
+ *  abgeleitet, falls die KI keine gültige Basis liefert. Unplausible Werte (über den Grenzen)
+ *  werden verworfen statt übernommen: die Zutat hat dann keine Nährwerte. */
 export function parseIngredientFacts(raw: unknown, unit: string): NutritionFacts | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const f = raw as Record<string, unknown>;
@@ -26,15 +63,9 @@ export function parseIngredientFacts(raw: unknown, unit: string): NutritionFacts
   // Reine Null-Werte (z.B. Wasser/Salz liefern 0) nur verwerfen, wenn ALLES 0 ist.
   if (kcal === 0 && proteinG === 0 && carbsG === 0 && fatG === 0) return undefined;
 
-  const gramUnit = GRAM_UNITS.has(unit.toLowerCase());
-  const rawBasis = String(f['basis'] ?? '');
-  const basis: NutritionBasis =
-    rawBasis === 'per100g' || rawBasis === 'perPortion'
-      ? (rawBasis as NutritionBasis)
-      : gramUnit
-        ? 'per100g'
-        : 'perPortion';
-  const portionG = basis === 'perPortion' ? num(f['portionG']) || DEFAULT_PORTION_G : undefined;
+  const basis = deriveBasis(f['basis'], unit);
+  if (!isWithinLimits(f, basis)) return undefined;
+  const portionG = basis === 'perPortion' ? num(f['portionG'], MAX_IMPORT_PORTION_G) || DEFAULT_PORTION_G : undefined;
   return {
     kcal,
     proteinG,
@@ -50,28 +81,33 @@ export function parseIngredientFacts(raw: unknown, unit: string): NutritionFacts
 function parseIngredient(raw: unknown): RecipeImportIngredient | null {
   if (!raw || typeof raw !== 'object') return null;
   const i = raw as Record<string, unknown>;
-  const name = String(i['name'] ?? '').trim();
+  const name = cleanText(i['name'], MAX_IMPORT_INGREDIENT_CHARS);
   if (!name) return null;
-  const unit = String(i['unit'] ?? 'g').trim() || 'g';
+  const unit = cleanText(i['unit'], MAX_IMPORT_UNIT_CHARS) || 'g';
   return { name, amount: num(i['amount']), unit, facts: parseIngredientFacts(i['facts'], unit) };
+}
+
+function parseSteps(raw: unknown): string[] {
+  return boundedList(raw, MAX_IMPORT_STEPS)
+    .map((s) => cleanText(typeof s === 'number' ? String(s) : s, MAX_IMPORT_STEP_CHARS))
+    .filter((s): s is string => !!s);
 }
 
 /**
  * Macht aus einer (unvertrauenswürdigen) KI-Antwort ein gültiges
  * {@link RecipeImportResult} — gemeinsam genutzt von Gemini-direkt und Proxy.
+ * Zahl der Zutaten und Schritte, Textlängen, Portionen und Mengen sind begrenzt.
  */
 export function normalizeRecipeImport(raw: unknown, sourceUrl?: string): RecipeImportResult {
   const obj = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
-  const ingredients = Array.isArray(obj['ingredients'])
-    ? obj['ingredients'].map(parseIngredient).filter((i): i is RecipeImportIngredient => i !== null)
-    : [];
+  const ingredients = boundedList(obj['ingredients'], MAX_IMPORT_INGREDIENTS)
+    .map(parseIngredient)
+    .filter((i): i is RecipeImportIngredient => i !== null);
   return {
-    title: String(obj['title'] ?? FALLBACK_TITLE).trim() || FALLBACK_TITLE,
-    servings: Math.max(1, Math.round(num(obj['servings']) || DEFAULT_SERVINGS)),
+    title: cleanText(obj['title'], MAX_IMPORT_TITLE_CHARS) || FALLBACK_TITLE,
+    servings: Math.max(1, Math.round(num(obj['servings'], MAX_IMPORT_SERVINGS) || DEFAULT_SERVINGS)),
     ingredients,
-    steps: Array.isArray(obj['steps'])
-      ? obj['steps'].map((s) => String(s).trim()).filter((s) => s.length > 0)
-      : [],
+    steps: parseSteps(obj['steps']),
     sourceUrl,
   };
 }

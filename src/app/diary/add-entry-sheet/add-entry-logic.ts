@@ -1,5 +1,6 @@
 import { DiaryEntry, MealType, NutritionFacts, Recipe, SavedMeal } from '../../core/models';
 import { NewDiaryEntry } from '../../core/state/diary.store';
+import { StoredRecipe, isOnlineRef } from '../../core/recipes/online/online-recipe-ref';
 import { countMissingFacts } from '../../recipes/recipe-view';
 import { factsDiffer, isValidAmount, rebaseTo100, scaleFacts } from '../diary-helpers';
 
@@ -19,6 +20,23 @@ export function entryFromRecent(entry: DiaryEntry, dateISO: string, meal: MealTy
     isPartial: entry.isPartial,
     unit: entry.unit,
   };
+}
+
+/** Rezept, das sich ins Tagebuch eintragen lässt: mit eigenen Werten je Portion oder als Online-Verweis (Werte kommen beim Auswählen). */
+export function isLoggableRecipe(recipe: StoredRecipe): boolean {
+  return !!recipe.factsPerServing || isOnlineRef(recipe);
+}
+
+/** Eintragbare Rezepte, gefiltert nach Titel (ohne Groß-/Kleinschreibung). */
+export function filterLoggableRecipes(recipes: readonly StoredRecipe[], query: string): StoredRecipe[] {
+  const q = query.trim().toLowerCase();
+  const loggable = recipes.filter(isLoggableRecipe);
+  return q ? loggable.filter((r) => r.title.toLowerCase().includes(q)) : loggable;
+}
+
+/** Zuletzt benutzte, noch eintragbare Rezepte in der Reihenfolge der Ids (aus Tagebuch-Einträgen). */
+export function recentLoggableRecipes(ids: readonly string[], all: readonly StoredRecipe[]): StoredRecipe[] {
+  return ids.flatMap((id) => all.filter((r) => r.id === id && isLoggableRecipe(r)));
 }
 
 /** Eine Portion eines Rezepts; null, wenn das Rezept keine Nährwerte je Portion hat. */

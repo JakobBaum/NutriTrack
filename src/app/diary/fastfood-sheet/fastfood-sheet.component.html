@@ -20,7 +20,7 @@
       @if (error()) {
         <p class="form-error" role="alert">{{ error() }}</p>
       }
-      <app-fastfood-form [form]="ff" [live]="ffLive()" [remainingKcal]="targetKcal() > 0 ? remainingKcal() : null" (formChange)="onFormChange($event)" (connectAi)="closeFastfood()"></app-fastfood-form>
+      <app-fastfood-form [form]="ff()" [live]="ffLive()" [remainingKcal]="targetKcal() > 0 ? remainingKcal() : null" (formChange)="onFormChange($event)" (connectAi)="closeFastfood()" (openProfile)="closeFastfood()"></app-fastfood-form>
       @if (ffSearched() && !ffLoading() && ffResults().length === 0) {
         <p class="scan-hint" role="status">Keine Vorschläge im Budget. Budget erhöhen oder später erneut versuchen.</p>
       }
@@ -56,14 +56,8 @@
           @if (moreNote()) {
             <p class="scan-hint" role="status">{{ moreNote() }}</p>
           }
-          @if (canLoadMore()) {
-            <ion-button expand="block" class="nt-btn nt-btn--tonal nt-btn--block" data-testid="ff-more" (click)="moreFastfood()" [disabled]="moreLoading() || ffLoading()">
-              @if (moreLoading()) {
-                <ion-spinner name="dots" slot="start"></ion-spinner> Suche…
-              } @else {
-                <ion-icon slot="start" name="add-outline"></ion-icon> Weitere Vorschläge
-              }
-            </ion-button>
+          @if (inputsChanged()) {
+            <p class="scan-hint" role="status" data-testid="ff-stale">Auswahl geändert. Hole neue Vorschläge für die neue Auswahl.</p>
           } @else if (roundsExhausted()) {
             <p class="scan-hint" role="status" data-testid="ff-rounds-done">Mehr Vorschläge gibt es nicht. Ändere die Auswahl für neue Ideen.</p>
           }
@@ -71,18 +65,30 @@
       }
       </div>
     </ion-content>
-    <ion-footer class="ion-no-border add-footer">
-      <div class="nt-page">
-        <div class="nt-sheet-footer">
-          <ion-button expand="block" class="nt-btn nt-btn--block" data-testid="ff-run" (click)="runFastfood()" [disabled]="ffLoading() || moreLoading() || !ffLive()">
-            @if (ffLoading()) {
-              <ion-spinner name="dots" slot="start"></ion-spinner> Suche (bis zu 30 s)…
+    @if (showRun() || showMore()) {
+      <ion-footer class="ion-no-border add-footer">
+        <div class="nt-page">
+          <div class="nt-sheet-footer">
+            @if (showMore()) {
+              <ion-button expand="block" class="nt-btn nt-btn--block" data-testid="ff-more" (click)="moreFastfood()" [disabled]="moreLoading() || ffLoading() || !ffLive()">
+                @if (moreLoading()) {
+                  <ion-spinner name="dots" slot="start"></ion-spinner> Suche…
+                } @else {
+                  <ion-icon slot="start" name="add-outline"></ion-icon> Weitere Vorschläge
+                }
+              </ion-button>
             } @else {
-              <ion-icon slot="start" name="sparkles-outline"></ion-icon> Vorschläge holen
+              <ion-button expand="block" class="nt-btn nt-btn--block" data-testid="ff-run" (click)="runFastfood()" [disabled]="ffLoading() || moreLoading() || !ffLive()">
+                @if (ffLoading()) {
+                  <ion-spinner name="dots" slot="start"></ion-spinner> Suche (bis zu 30 s)…
+                } @else {
+                  <ion-icon slot="start" name="sparkles-outline"></ion-icon> Vorschläge holen
+                }
+              </ion-button>
             }
-          </ion-button>
+          </div>
         </div>
-      </div>
-    </ion-footer>
+      </ion-footer>
+    }
   </ng-template>
 </ion-modal>

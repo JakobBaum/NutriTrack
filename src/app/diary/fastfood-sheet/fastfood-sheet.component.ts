@@ -14,13 +14,13 @@ import {
 import { ToastController } from '@ionic/angular';
 import { HEALTH_NOTES } from '../../core/messages/health-notes';
 import { FastFoodRequest, FastFoodSuggestion } from '../../core/models';
-import { AppSettingsStore } from '../../core/state/app-settings.store';
+import { ProfileStore } from '../../core/state/profile.store';
 import { AiService } from '../../core/ai/ai.service';
 import { DiaryStore } from '../../core/state/diary.store';
 import { formatNum } from '../../shared/num.pipe';
 import {
-  FASTFOOD_CHAINS, FastFoodForm, MAX_FASTFOOD_ROUNDS, PREFERENCE_OPTIONS, defaultKcalBudget, excludeNames, isOverBudget, mergeSuggestions,
-  preferenceSummary,
+  FASTFOOD_CHAINS, FastFoodForm, FastFoodInputs, MAX_FASTFOOD_ROUNDS, PREFERENCE_OPTIONS, defaultKcalBudget, excludeNames, fastfoodInputsOf,
+  isOverBudget, mergeSuggestions, preferenceSummary, sameFastfoodInputs,
 } from '../fastfood-options';
 import { mealForHour } from '../diary-helpers';
 import { lightHaptic } from '../haptics';
@@ -46,7 +46,7 @@ export class FastfoodSheetComponent implements OnChanges {
   private readonly ai = inject(AiService);
   private readonly diary = inject(DiaryStore);
   private readonly toastCtrl = inject(ToastController);
-  private readonly settings = inject(AppSettingsStore);
+  private readonly profile = inject(ProfileStore);
 
   /** Anker über den Vorschlägen: Das Formular füllt auf dem Phone den Bildschirm, die Antwort liegt darunter. */
   @ViewChild('ffAnchor') private ffAnchor?: ElementRef<HTMLElement>;
@@ -75,12 +75,28 @@ export class FastfoodSheetComponent implements OnChanges {
   readonly canLoadMore = computed(() => this.ffSearched() && this.ffResults().length > 0 && this.rounds() < MAX_FASTFOOD_ROUNDS);
   readonly roundsExhausted = computed(() => this.ffSearched() && this.ffResults().length > 0 && this.rounds() >= MAX_FASTFOOD_ROUNDS);
   readonly maxRounds = MAX_FASTFOOD_ROUNDS;
+  /** Angaben der letzten erfolgreichen ersten Anfrage (unveränderlicher Schnappschuss); null vor der ersten Runde. */
+  readonly lastInputs = signal<FastFoodInputs | null>(null);
+  /** Aktuelle Angaben, so wie sie in eine Anfrage gingen. */
+  private readonly currentInputs = computed(() => fastfoodInputsOf(this.ff(), this.remainingKcal()));
+  /** Haben sich die Angaben seit der letzten Anfrage geändert? Dann passt die Ausschlussliste nicht mehr. */
+  readonly inputsChanged = computed(() => {
+    const last = this.lastInputs();
+    return last !== null && !sameFastfoodInputs(last, this.currentInputs());
+  });
+  private readonly hasRound = computed(() => this.ffSearched() && this.ffResults().length > 0);
+  /** "Vorschläge holen": vor der ersten Runde, nach leerem Ergebnis und nach geänderten Angaben. */
+  readonly showRun = computed(() => !this.hasRound() || this.inputsChanged());
+  /** "Weitere Vorschläge": nur nach einer Runde mit unveränderten Angaben. */
+  readonly showMore = computed(() => this.canLoadMore() && !this.inputsChanged());
   /** Zähler der Anfragen: Nur die neueste darf Ergebnisse oder Ladezustand setzen. */
   private requestSeq = 0;
-  ff: FastFoodForm = {
+  readonly ff = signal<FastFoodForm>({
     restaurant: FASTFOOD_CHAINS[0], kcalBudget: null, moneyBudget: null, preferences: [PREFERENCE_OPTIONS[0].value],
-    country: this.settings.fastfoodCountry(),
-  };
+    country: this.profile.fastfoodCountry(),
+  });
+  /** Land aus dem Profil (nur Anzeige im Helfer; geändert wird es im Profil). */
+  readonly country = computed(() => this.ff().country);
 
   ffLive = (): boolean => this.ai.isLive();
 
@@ -92,8 +108,8 @@ export class FastfoodSheetComponent implements OnChanges {
   private startSearch(): void {
     this.resetResults();
     // Auch bei verbrauchtem Budget setzen (0 = nichts mehr übrig).
-    const kcalBudget = this.targetKcal() > 0 ? defaultKcalBudget(this.remainingKcal()) : this.ff.kcalBudget;
-    this.ff = { ...this.ff, kcalBudget, country: this.settings.fastfoodCountry() };
+    const kcalBudget = this.targetKcal() > 0 ? defaultKcalBudget(this.remainingKcal()) : this.ff().kcalBudget;
+    this.ff.update((f) => ({ ...f, kcalBudget, country: this.profile.fastfoodCountry() }));
   }
 
   /** Leert die Liste und verwirft alle noch laufenden Anfragen. */
@@ -101,6 +117,7 @@ export class FastfoodSheetComponent implements OnChanges {
     this.requestSeq++;
     this.ffResults.set([]);
     this.ffSearched.set(false);
+    this.lastInputs.set(null);
     this.rounds.set(0);
     this.error.set(null);
     this.moreError.set(null);
@@ -116,11 +133,15 @@ export class FastfoodSheetComponent implements OnChanges {
     this.closed.emit();
   }
 
-  /** Formular geändert: Land merken, Liste beginnt neu. */
+  /** Formular geändert: laufende Anfragen verfallen; die Liste bleibt, aber "Vorschläge holen" kehrt zurück. */
   onFormChange(next: FastFoodForm): void {
-    if (next.country !== this.ff.country) this.settings.setFastfoodCountry(next.country);
-    this.ff = next;
-    this.resetResults();
+    this.requestSeq++;
+    this.ffLoading.set(false);
+    this.moreLoading.set(false);
+    this.error.set(null);
+    this.moreError.set(null);
+    this.moreNote.set(null);
+    this.ff.set(next);
   }
 
   runFastfood(): Promise<void> {
@@ -132,18 +153,18 @@ export class FastfoodSheetComponent implements OnChanges {
   }
 
   overBudget(s: FastFoodSuggestion): boolean {
-    return isOverBudget(s, this.ff.kcalBudget ?? defaultKcalBudget(this.remainingKcal()));
+    return isOverBudget(s, this.ff().kcalBudget ?? defaultKcalBudget(this.remainingKcal()));
   }
 
-  private buildRequest(exclude: string[]): FastFoodRequest {
+  private buildRequest(inputs: FastFoodInputs, exclude: string[]): FastFoodRequest {
     return {
-      restaurant: this.ff.restaurant.trim() || 'Fastfood',
-      kcalBudget: this.ff.kcalBudget ?? defaultKcalBudget(this.remainingKcal()),
-      moneyBudget: this.ff.moneyBudget ?? undefined,
+      restaurant: inputs.restaurant,
+      kcalBudget: inputs.kcalBudget,
+      moneyBudget: inputs.moneyBudget ?? undefined,
       // Älterer Worker kennt nur "preference" (Text, max. 60 Zeichen): Kurzfassung der Kriterien.
-      preference: preferenceSummary(this.ff.preferences),
-      preferences: this.ff.preferences,
-      country: this.ff.country,
+      preference: preferenceSummary(inputs.preferences),
+      preferences: [...inputs.preferences],
+      country: inputs.country,
       exclude,
     };
   }
@@ -158,9 +179,11 @@ export class FastfoodSheetComponent implements OnChanges {
     this.ffLoading.set(!append);
     this.moreLoading.set(append);
     const shown = append ? this.ffResults() : [];
+    const inputs = append ? (this.lastInputs() ?? this.currentInputs()) : this.currentInputs();
     try {
-      const found = await this.ai.suggestFastfood(this.buildRequest(excludeNames(shown)));
+      const found = await this.ai.suggestFastfood(this.buildRequest(inputs, excludeNames(shown)));
       if (token !== this.requestSeq) return;
+      if (!append) this.lastInputs.set(inputs);
       this.applyResults(shown, found, append);
     } catch (e: unknown) {
       if (token !== this.requestSeq) return;

@@ -79,17 +79,6 @@ ion-item {
   color: var(--nt-secondary);
 }
 
-// Feldgruppe im KI-Sheet: Beschriftung oberhalb, Feld .nt-field.
-.field-stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nt-space-2);
-  margin-top: var(--nt-space-3);
-
-  &.is-inactive {
-    opacity: 0.5;
-  }
-}
 
 .field-label {
   font-size: var(--nt-fs-caption);

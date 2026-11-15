@@ -41,7 +41,7 @@ const sampleData = {
     { id: 'c1', name: 'A', facts: { kcal: 1, proteinG: 0, carbsG: 0, fatG: 0, basis: 'perPortion' } },
     { id: 'c2', name: 'B', facts: { kcal: 1, proteinG: 0, carbsG: 0, fatG: 0, basis: 'perPortion' } },
   ],
-  profile: { weightKg: 80 },
+  profile: { weightKg: 80, heightCm: 180, age: 30, sex: 'male', activityLevel: 'moderate', goal: 'maintain', updatedAt: '2026-11-01T10:00:00.000Z' },
   shopping: { id: 's', items: [{ name: 'Milch', amount: 1, unit: 'l', checked: false }] },
 };
 

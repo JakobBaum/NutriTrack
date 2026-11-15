@@ -15,6 +15,7 @@ import {
   ShoppingPlanRequest,
   ShoppingPlanResult,
 } from './ai-provider';
+import { MealParseResult } from './meal-parse';
 
 /** Erkennt "250 g Mehl", "2 EL Öl", "1 Zwiebel" am Zeilenanfang. */
 const INGREDIENT_RE = /^\s*(\d+(?:[.,]\d+)?)\s*([a-zA-ZäöüÄÖÜ.]+)?\s+(.+)$/;
@@ -77,6 +78,11 @@ export class MockAiProvider implements AiProvider {
         portionG: basis === 'perPortion' ? 40 : undefined,
       },
     };
+  }
+
+  /** Ehrlich ohne KI: Der Mock erkennt keine Mahlzeiten und erfindet keine Nährwerte. */
+  async parseMeal(_text: string): Promise<MealParseResult> {
+    throw new Error('Essen beschreiben braucht eine KI-Verbindung.');
   }
 
   async suggestFastfood(req: FastFoodRequest): Promise<FastFoodSuggestion[]> {

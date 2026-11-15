@@ -4,10 +4,12 @@ import { ToastController } from '@ionic/angular';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AiService } from '../../core/ai/ai.service';
 import { FastFoodRequest, FastFoodSuggestion } from '../../core/models';
-import { AppSettingsStore } from '../../core/state/app-settings.store';
+import { ProfileStore } from '../../core/state/profile.store';
 import { DiaryStore } from '../../core/state/diary.store';
 import { MAX_FASTFOOD_ROUNDS } from '../fastfood-options';
 import { FastfoodSheetComponent } from './fastfood-sheet.component';
+
+const PROFILE = { weightKg: 80, heightCm: 180, age: 30, sex: 'male', activityLevel: 'moderate', goal: 'maintain', updatedAt: '2026-11-01T10:00:00.000Z' } as const;
 
 const sug = (itemName: string, kcal = 400): FastFoodSuggestion => ({
   restaurant: 'KFC', itemName, rationale: 'ok', estPrice: 4,
@@ -51,7 +53,7 @@ describe('FastfoodSheetComponent', () => {
   it('sendet Kriterien, Land, Kurztext und leere Ausschlussliste', async () => {
     const c = setup();
     suggestFastfood.mockResolvedValue([sug('Wrap')]);
-    c.ff = { ...c.ff, preferences: ['viel Protein', 'günstig'] };
+    c.ff.update((f) => ({ ...f, preferences: ['viel Protein', 'günstig'] }));
     await c.runFastfood();
     const req = suggestFastfood.mock.calls[0][0];
     expect(req.preferences).toEqual(['viel Protein', 'günstig']);
@@ -156,31 +158,113 @@ describe('FastfoodSheetComponent', () => {
     expect(c.ffLoading()).toBe(false);
   });
 
-  it('beginnt die Liste neu und verwirft laufende Anfragen, wenn das Formular geändert wird', async () => {
+  it('behält die Liste bei geänderten Angaben, verwirft aber laufende Anfragen', async () => {
     const c = setup();
     suggestFastfood.mockResolvedValueOnce([sug('Wrap')]);
     await c.runFastfood();
     const late = deferred<FastFoodSuggestion[]>();
     suggestFastfood.mockReturnValueOnce(late.promise);
     const p = c.moreFastfood();
-    c.onFormChange({ ...c.ff, preferences: ['günstig'] });
+    c.onFormChange({ ...c.ff(), preferences: ['günstig'] });
     late.resolve([sug('Spät')]);
     await p;
     await flush();
-    expect(c.ffResults()).toEqual([]);
-    expect(c.canLoadMore()).toBe(false);
+    expect(c.ffResults().map((s) => s.itemName)).toEqual(['Wrap']);
     expect(c.moreLoading()).toBe(false);
   });
 
-  it('speichert ein geändertes Land in den Einstellungen', () => {
+  it('liest das Land aus dem Profil und übernimmt es beim Öffnen', () => {
     const c = setup();
-    c.onFormChange({ ...c.ff, country: 'Italien' });
-    expect(TestBed.inject(AppSettingsStore).fastfoodCountry()).toBe('Italien');
+    TestBed.inject(ProfileStore).setProfile({ ...PROFILE, fastfoodCountry: 'Italien' });
+    open(c);
+    expect(c.ff().country).toBe('Italien');
+    expect(c.country()).toBe('Italien');
+  });
+
+  it('schreibt das Land nicht mehr in die App-Einstellungen', () => {
+    const c = setup();
+    c.onFormChange({ ...c.ff(), country: 'Italien' });
+    expect(JSON.parse(localStorage.getItem('nutritrack:app-settings') ?? '{}').fastfoodCountry).toBeUndefined();
+  });
+
+  describe('Schaltflächen', () => {
+    it('zeigt vor der ersten Runde nur "Vorschläge holen"', () => {
+      const c = setup();
+      expect(c.showRun()).toBe(true);
+      expect(c.showMore()).toBe(false);
+    });
+
+    it('zeigt nach einer Runde nur "Weitere Vorschläge"', async () => {
+      const c = setup();
+      suggestFastfood.mockResolvedValue([sug('Wrap')]);
+      await c.runFastfood();
+      expect(c.showRun()).toBe(false);
+      expect(c.showMore()).toBe(true);
+    });
+
+    it('zeigt nach einer Änderung der Angaben wieder nur "Vorschläge holen"', async () => {
+      const c = setup();
+      suggestFastfood.mockResolvedValue([sug('Wrap')]);
+      await c.runFastfood();
+      c.onFormChange({ ...c.ff(), restaurant: 'Subway' });
+      expect(c.showRun()).toBe(true);
+      expect(c.showMore()).toBe(false);
+    });
+
+    it('geht zurück zu "Weitere Vorschläge", wenn die Änderung rückgängig gemacht wird', async () => {
+      const c = setup();
+      suggestFastfood.mockResolvedValue([sug('Wrap')]);
+      await c.runFastfood();
+      const before = c.ff();
+      c.onFormChange({ ...before, restaurant: 'Subway' });
+      c.onFormChange(before);
+      expect(c.showMore()).toBe(true);
+      expect(c.showRun()).toBe(false);
+    });
+
+    it('hält den Schnappschuss unveränderlich: spätere Änderungen am Formular berühren ihn nicht', async () => {
+      const c = setup();
+      suggestFastfood.mockResolvedValue([sug('Wrap')]);
+      await c.runFastfood();
+      const snapshot = c.lastInputs();
+      c.onFormChange({ ...c.ff(), preferences: ['günstig'] });
+      expect(c.lastInputs()).toBe(snapshot);
+      expect(snapshot?.preferences).toEqual(['viel Protein']);
+    });
+
+    it('holt nach einer Änderung neu und zeigt danach wieder "Weitere Vorschläge"', async () => {
+      const c = setup();
+      suggestFastfood.mockResolvedValueOnce([sug('Wrap')]).mockResolvedValueOnce([sug('Burger')]);
+      await c.runFastfood();
+      c.onFormChange({ ...c.ff(), restaurant: 'Subway' });
+      await c.runFastfood();
+      expect(suggestFastfood.mock.calls[1][0].exclude).toEqual([]);
+      expect(c.showMore()).toBe(true);
+      expect(c.showRun()).toBe(false);
+    });
+
+    it('bietet bei leerem Ergebnis nur "Vorschläge holen" an', async () => {
+      const c = setup();
+      suggestFastfood.mockResolvedValue([]);
+      await c.runFastfood();
+      expect(c.showRun()).toBe(true);
+      expect(c.showMore()).toBe(false);
+    });
+
+    it('zeigt nach der letzten Runde keine der beiden, solange nichts geändert ist', async () => {
+      const c = setup();
+      let n = 0;
+      suggestFastfood.mockImplementation(async () => [sug('Gericht ' + n++)]);
+      await c.runFastfood();
+      for (let i = 0; i < MAX_FASTFOOD_ROUNDS; i++) await c.moreFastfood();
+      expect(c.showMore()).toBe(false);
+      expect(c.showRun()).toBe(false);
+    });
   });
 
   it('kennzeichnet Vorschläge über dem Budget', () => {
     const c = setup();
-    c.ff = { ...c.ff, kcalBudget: 500 };
+    c.ff.update((f) => ({ ...f, kcalBudget: 500 }));
     expect(c.overBudget(sug('A', 700))).toBe(true);
     expect(c.overBudget(sug('A', 450))).toBe(false);
   });

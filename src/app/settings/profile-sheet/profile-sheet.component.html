@@ -157,7 +157,15 @@
               }
             </ion-select>
           </ion-item>
+          <ion-item class="form-row" lines="none">
+            <ion-select label="Land für Fastfood" labelPlacement="stacked" data-testid="country-select" [value]="form().fastfoodCountry" (ionChange)="setFastfoodCountry($any($event).detail.value ?? '')" interface="action-sheet" cancelText="Abbrechen" [interfaceOptions]="{ header: 'Land wählen' }">
+              @for (c of countries; track c) {
+                <ion-select-option [value]="c">{{ c }}</ion-select-option>
+              }
+            </ion-select>
+          </ion-item>
         </ion-list>
+        <p class="hint" data-testid="country-hint">Das Land bestimmt das Sortiment im Fastfood-Helfer. Es wird kein Standort abgefragt.</p>
         <p class="row-sub row-sub--block" id="intolerance-label">Unverträglichkeiten</p>
         <div class="rate-chips" role="group" aria-labelledby="intolerance-label" data-testid="intolerances">
           @for (o of intoleranceOptions; track o.value) {

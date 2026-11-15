@@ -82,9 +82,9 @@ export function register({ test }) {
     assert.ok(stored?.some((f) => f.name === 'Hausmüsli' && f.facts.kcal === 410), 'manuelles Lebensmittel nicht gespeichert');
 
     await go(page, 'meals');
-    await page.locator('.nt-add-btn', { hasText: 'Erste Mahlzeit anlegen' }).click();
+    await page.locator('.nt-btn--tonal.nt-btn--block', { hasText: 'Erste Mahlzeit anlegen' }).click();
     const create = topModal(page);
-    await create.locator('.nt-add-btn', { hasText: 'Lebensmittel hinzufügen' }).click();
+    await create.locator('.nt-btn--tonal.nt-btn--block', { hasText: 'Lebensmittel hinzufügen' }).click();
     const picker = topModal(page);
     await picker.locator('nt-food-row', { hasText: 'Hausmüsli' }).first().waitFor();
     assert.equal(await picker.locator('.own-tag').first().innerText(), 'Eigen', 'ohne Suchbegriff: zuletzt genutzte eigene');
@@ -96,7 +96,7 @@ export function register({ test }) {
     await go(page, 'recipes');
     await page.getByRole('button', { name: 'Neues Rezept' }).click();
     const modal = topModal(page);
-    await modal.locator('.nt-add-btn', { hasText: 'Zutat hinzufügen' }).click();
+    await modal.locator('.nt-btn--tonal.nt-btn--block', { hasText: 'Zutat hinzufügen' }).click();
     const picker = topModal(page);
     await picker.locator('nt-food-row', { hasText: 'Joghurt Natur Eigen' }).waitFor();
     await picker.locator('nt-food-row', { hasText: 'Joghurt Natur Eigen' }).click();

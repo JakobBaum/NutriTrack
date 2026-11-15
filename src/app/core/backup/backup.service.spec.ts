@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { BackupService } from './backup.service';
 import { StorageService } from '../storage/storage.service';
+import { Capacitor } from '@capacitor/core';
 import { BackupFile, validateBackup } from './backup';
 
 const facts = { kcal: 100, proteinG: 5, carbsG: 10, fatG: 2, basis: 'perPortion' };
@@ -120,7 +121,7 @@ describe('BackupService Reset (Welle A, Punkt 4)', () => {
     expect(service.lastBackup()).toBe('2026-10-01T10:00:00.000Z');
     const safety = service.takeResetSnapshot();
     expect(safety?.reason).toBe('reset');
-    expect(service.completeReset(safety)).toBe(true);
+    expect(service.completeReset(safety)).toEqual({ cleared: true, safetySaved: true });
     expect(service.lastBackup()).toBeNull();
     expect(stored('lastBackup')).toBeNull();
     expect(stored('diary')).toBeNull();
@@ -130,7 +131,7 @@ describe('BackupService Reset (Welle A, Punkt 4)', () => {
   it('legt ohne Daten keine leere Auto-Sicherung an', () => {
     setup({});
     expect(service.takeResetSnapshot()).toBeNull();
-    expect(service.completeReset(null)).toBe(true);
+    expect(service.completeReset(null)).toEqual({ cleared: true, safetySaved: true });
     expect(service.readSafetySnapshot()).toBeNull();
   });
 
@@ -138,5 +139,72 @@ describe('BackupService Reset (Welle A, Punkt 4)', () => {
     storage.quarantine('diary', [1], 'invalid');
     service.completeReset(service.takeResetSnapshot());
     expect(Object.keys(localStorage).some((k) => k.includes('quarantine.'))).toBe(false);
+  });
+});
+
+describe('BackupService Fehlerwege (Review 3, Befunde 2 und 3)', () => {
+  beforeEach(() => setup({ diary: [entry('alt')] }));
+
+  it('completeReset meldet cleared=false, wenn clearAll scheitert', () => {
+    vi.spyOn(storage, 'clearAll').mockReturnValue(false);
+    const result = service.completeReset(service.takeResetSnapshot());
+    expect(result.cleared).toBe(false);
+  });
+
+  it('restore meldet rollbackFailed, wenn auch die Wiederherstellung scheitert', () => {
+    vi.spyOn(storage, 'replaceAll').mockReturnValue('rollbackFailed');
+    const result = service.restore(backupWith([entry('neu')]));
+    expect(result.ok).toBe(false);
+    expect(result.rollbackFailed).toBe(true);
+  });
+
+  it('restore meldet bei sauberem Rückrollen kein rollbackFailed', () => {
+    vi.spyOn(storage, 'replaceAll').mockReturnValue('failed');
+    const result = service.restore(backupWith([entry('neu')]));
+    expect(result.ok).toBe(false);
+    expect(result.rollbackFailed).toBeUndefined();
+  });
+});
+
+describe('BackupService Export (Review 3, Befund 12)', () => {
+  beforeEach(() => {
+    setup({ diary: [entry('alt')] });
+    Object.assign(URL, { createObjectURL: () => 'blob:x', revokeObjectURL: () => undefined });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    Reflect.deleteProperty(URL, 'createObjectURL');
+    Reflect.deleteProperty(URL, 'revokeObjectURL');
+  });
+
+  it('meldet im Browser ohne Teilen-Menü einen Download und merkt das Backup', async () => {
+    vi.spyOn(Capacitor, 'isNativePlatform').mockReturnValue(false);
+    expect(await service.exportBackup()).toBe('downloaded');
+    expect(service.lastBackup()).not.toBeNull();
+  });
+
+  it('meldet in der nativen App ohne Teilen-Menü unverified und merkt das Backup nicht', async () => {
+    vi.spyOn(Capacitor, 'isNativePlatform').mockReturnValue(true);
+    expect(await service.exportBackup()).toBe('unverified');
+    expect(service.lastBackup()).toBeNull();
+  });
+});
+
+describe('BackupService Reset bei neuerem Schema (Review-Befund 2)', () => {
+  it('meldet safetySaved=false, wenn die Auto-Sicherung nicht vorgemerkt werden konnte', () => {
+    setup({ diary: [entry('alt')] });
+    const safety = service.takeResetSnapshot();
+    vi.spyOn(storage, 'set').mockReturnValue(false);
+    expect(service.completeReset(safety)).toEqual({ cleared: true, safetySaved: false });
+  });
+
+  it('erlaubt den Reset bei neuerem Schema und schreibt die Auto-Sicherung danach wirklich', () => {
+    setup({ diary: [entry('alt')], schemaVersion: 99 });
+    expect(storage.schemaNewer()).toBe(true);
+    const result = service.completeReset(service.takeResetSnapshot());
+    expect(result).toEqual({ cleared: true, safetySaved: true });
+    expect(service.readSafetySnapshot()).not.toBeNull();
+    expect(stored('diary')).toBeNull();
   });
 });

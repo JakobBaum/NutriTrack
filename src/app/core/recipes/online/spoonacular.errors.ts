@@ -3,7 +3,7 @@ import { isTimeoutError } from '../../ai/ai-errors';
 import { isConsentRequiredError } from '../../consent/consent.errors';
 import { STATE_MESSAGES } from '../../messages/state-messages';
 
-export type OnlineSearchFailure = 'no-key' | 'auth' | 'quota' | 'rate-limit' | 'offline' | 'timeout' | 'server' | 'consent';
+export type OnlineSearchFailure = 'no-key' | 'auth' | 'quota' | 'rate-limit' | 'offline' | 'timeout' | 'server' | 'unreachable' | 'consent' | 'not-found';
 
 /** Fehler der Online-Rezeptsuche mit fertiger deutscher Meldung. */
 export class OnlineSearchError extends Error {
@@ -20,16 +20,19 @@ export const ONLINE_SEARCH_MESSAGES: Readonly<Record<OnlineSearchFailure, string
   'rate-limit': STATE_MESSAGES.rateLimited,
   offline: STATE_MESSAGES.offline,
   timeout: 'Die Rezeptsuche antwortet gerade nicht. Versuche es erneut.',
+  unreachable: 'Der Dienst ist gerade nicht erreichbar. Versuch es später noch einmal.',
   server: 'Spoonacular ist gerade nicht erreichbar. Versuche es später erneut.',
   consent: STATE_MESSAGES.consentRequired,
+  'not-found': 'Dieses Rezept gibt es bei Spoonacular nicht mehr.',
 };
 
 /** Bildet einen HTTP-Status (0 = keine Antwort) auf einen Fehlergrund ab. */
 export function failureForStatus(status: number, isOffline: boolean): OnlineSearchFailure {
-  if (status === 0) return isOffline ? 'offline' : 'server';
+  if (status === 0) return isOffline ? 'offline' : 'unreachable';
   if (status === 401 || status === 403) return 'auth';
   if (status === 402) return 'quota';
   if (status === 429) return 'rate-limit';
+  if (status === 404) return 'not-found';
   return 'server';
 }
 

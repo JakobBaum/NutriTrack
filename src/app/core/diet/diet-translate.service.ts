@@ -56,9 +56,8 @@ export class DietTranslateService {
         this.ai.translateSearchQuery(term, this.settings.appLanguage),
         DISLIKE_TRANSLATE_TIMEOUT_MS,
       );
-      const english = sanitizeEnglishTerm(raw);
-      // Gleicher Begriff wie die Eingabe: nicht übersetzt (z. B. KI hat nur zurückgegeben, was sie bekam).
-      return english.toLowerCase() === term.trim().toLowerCase() ? '' : english;
+      // Ein identisches Ergebnis (z. B. "Avocado") gilt als übersetzt; nur leere/ungültige Antworten sind Fehlfälle.
+      return sanitizeEnglishTerm(raw);
     } catch (e: unknown) {
       console.error('NutriTrack: Übersetzung einer Abneigung fehlgeschlagen', e);
       return '';

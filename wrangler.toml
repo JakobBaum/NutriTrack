@@ -29,4 +29,6 @@ binding = "DAILY_KV"
 id = "6d4c552cd18a41adaf58605f6853f9be"
 
 [vars]
+DAILY_RECIPE_CAP = "40"   # max. Rezeptsuchen (Cache-Misses) pro UTC-Tag, unter dem Spoonacular-Gratiskontingent (ca. 50 Punkte)
+# REQUIRE_ORIGIN = "true"  # erst aktivieren, wenn alle App-Staende den Header X-NutriTrack-Client senden (siehe docs/KI-WORKER.md)
 DAILY_AI_CAP = "500"   # max. KI-Aufrufe pro UTC-Tag (Standard 2000; KV-Free-Tier erlaubt ca. 1000 Schreibzugriffe pro Tag)

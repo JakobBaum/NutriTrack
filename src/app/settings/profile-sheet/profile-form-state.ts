@@ -8,6 +8,7 @@ import {
 } from '../../core/nutrition/manual-target';
 import { DietPrefs, EMPTY_DIET_PREFS, dietFieldsForProfile, dietPrefsOf } from '../../core/diet/diet-prefs';
 import { formatDecimal, parseDecimal } from '../../core/util/number-input';
+import { DEFAULT_FASTFOOD_COUNTRY, parseFastfoodCountry } from '../../core/ai/fastfood-countries';
 
 /** Unveränderlicher Zustand des Profilformulars; Änderungen erzeugen immer ein neues Objekt. */
 export interface ProfileFormState {
@@ -27,6 +28,8 @@ export interface ProfileFormState {
   readonly manualProteinText: string;
   /** Ernährungsform, Unverträglichkeiten und Abneigungen. */
   readonly dietPrefs: DietPrefs;
+  /** Land für das Fastfood-Sortiment (immer ein Wert aus der Länderliste). */
+  readonly fastfoodCountry: string;
 }
 
 export interface RateChoice {
@@ -76,12 +79,14 @@ export function emptyFormState(): ProfileFormState {
     goal: 'maintain', targetWeightKg: null, rateKgPerWeek: DEFAULT_RATE_KG_PER_WEEK.lose,
     manual: false, manualKcalText: '', manualProteinText: '',
     dietPrefs: EMPTY_DIET_PREFS,
+    fastfoodCountry: DEFAULT_FASTFOOD_COUNTRY,
   };
 }
 
 /** Formularzustand aus dem gespeicherten Profil; ohne Profil ein leeres Formular. */
-export function formStateFromProfile(p: UserProfile | null): ProfileFormState {
-  if (!p) return emptyFormState();
+/** `fallbackCountry`: Land, wenn das Profil noch keins hat (z. B. ein altes Land aus den Einstellungen). */
+export function formStateFromProfile(p: UserProfile | null, fallbackCountry?: string): ProfileFormState {
+  if (!p) return { ...emptyFormState(), fastfoodCountry: parseFastfoodCountry(fallbackCountry) };
   const kcal = manualKcalOf(p);
   const protein = manualProteinPerKgOf(p);
   return {
@@ -97,6 +102,7 @@ export function formStateFromProfile(p: UserProfile | null): ProfileFormState {
     manualKcalText: kcal === null ? '' : formatDecimal(kcal),
     manualProteinText: protein === null ? '' : formatDecimal(protein),
     dietPrefs: dietPrefsOf(p),
+    fastfoodCountry: parseFastfoodCountry(p.fastfoodCountry ?? fallbackCountry),
   };
 }
 
@@ -137,6 +143,7 @@ export function profileFromFormState(state: ProfileFormState, updatedAt: string)
     rateKgPerWeek: state.goal === 'maintain' ? 0 : state.rateKgPerWeek,
     ...(state.targetWeightKg !== null ? { targetWeightKg: state.targetWeightKg } : {}),
     updatedAt,
+    fastfoodCountry: parseFastfoodCountry(state.fastfoodCountry),
     ...dietFieldsForProfile(state.dietPrefs),
   };
   const withKcal = kcal !== null && manualKcalError(state.manualKcalText) === null ? { ...base, manualKcal: kcal } : base;
