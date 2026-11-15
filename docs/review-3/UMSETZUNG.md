@@ -250,3 +250,12 @@ Jakob: bei fast allem das bessere Modell, damit keine kaputten Antworten kommen.
 - Echt geprüft: `/health` ok; Fastfood (3 plausible Vorschläge, 20,5 s), Einkaufsliste (11,6 s), Suchbegriff-Übersetzung (1,0 s), "Essen beschreiben" dreimal ok (je rund 10 s).
 - Auffällig: Der erste Aufruf von "Essen beschreiben" endete nach 25,2 s mit 503 (überlastet). Das starke Modell braucht rund 10 s und liegt damit nah an der Grenze von 12 s je Versuch; zwei Zeitüberschreitungen verbrauchen das ganze Budget, der Fallback kommt dann nicht mehr dran. Nicht behoben.
 - Nicht geprüft: Etikett-Foto und Rezeptimport gegen echtes Gemini, iPhone.
+
+### Welle 7b: Fallback nach Zeitüberschreitung (2026-11-15)
+
+- Antwortet ein Modell gar nicht (Zeitüberschreitung, Netz), fragt der Worker sofort das andere, statt dasselbe noch einmal abzuwarten. Tests zuerst (rot gesehen), Worker-Tests 221 grün, Lint sauber.
+- main: Merge "Welle 7b", gepusht. Ausgerollt, aktuelle Version `6d04bbad-3e6f-4135-b64a-c164a34d0ccc` (ohne Zusatzvariablen).
+- Echt geprüft: fünf Aufrufe "Essen beschreiben" in Folge ok (6,5 bis 14 s; die 14-s-Fälle liefen über das Ersatzmodell).
+- Messung kürzere Denkzeit (`GEMINI_THINKING_LEVEL=low`, nur testweise ausgerollt, wieder entfernt): Antworten in rund 3 s. Die Messung ist nicht belastbar, weil das starke Modell währenddessen Anfragen sofort mit einem vorübergehenden Fehler ablehnte und vermutlich Flash-Lite geantwortet hat.
+- Befund: Nach rund 40 Testaufrufen lehnt `gemini-3.6-flash` jede Anfrage in unter einer Sekunde ab (429, 500 oder 503; der genaue Status wird nicht protokolliert). Vermutung: Kontingent des Gratis-Keys erschöpft. Folge: Die App läuft dann faktisch auf Flash-Lite (rund 3 s). Mit einem Testlauf nur auf dem starken Modell kam durchgehend 503.
+- Offen: Upstream-Status beim Modellwechsel protokollieren; Kontingent in Google AI Studio prüfen; bezahlter Key.
