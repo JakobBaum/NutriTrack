@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { RouteReuseStrategy } from '@angular/router';
@@ -10,6 +10,7 @@ import { AppRoutingModule } from './app-routing.module';
 import { StatusBannerComponent } from './status-banner/status-banner.component';
 import { FOOD_PROVIDER } from './core/food/food-provider';
 import { OpenFoodFactsProvider } from './core/food/openfoodfacts.provider';
+import { nativeClientInterceptor } from './core/http/native-client.interceptor';
 
 /** Systemwunsch "Bewegung reduzieren": Ionic-Animationen (Modals, Seitenwechsel, Toasts) ausschalten. */
 function prefersReducedMotion(): boolean {
@@ -22,7 +23,7 @@ function prefersReducedMotion(): boolean {
   providers: [
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
     { provide: FOOD_PROVIDER, useExisting: OpenFoodFactsProvider },
-    provideHttpClient(),
+    provideHttpClient(withInterceptors([nativeClientInterceptor])),
   ],
   bootstrap: [AppComponent],
 })

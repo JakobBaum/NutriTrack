@@ -19,3 +19,9 @@
     </div>
   </div>
 }
+
+@if (isOffline()) {
+  <div #offlineNotice class="offline" role="status" aria-live="polite" data-testid="offline-banner">
+    <p class="offline__text">Offline. KI und Online-Suche sind gerade nicht verfügbar, dein Tagebuch funktioniert weiter.</p>
+  </div>
+}

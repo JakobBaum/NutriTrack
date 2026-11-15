@@ -4,6 +4,9 @@
  * Rein, ohne Browser-Abhängigkeit.
  */
 import { sanitizeDiaryEntries, sanitizeList } from '../state/record-sanitize';
+import { sanitizeRecipes } from '../state/recipe-sanitize';
+import { sanitizeProfile } from '../state/profile-sanitize';
+import { sanitizeBlocked, sanitizeWeekPlan } from '../state/week-plan-sanitize';
 import { ARRAY_CHECKS, isShoppingItem, isWeightEntry } from './backup-records';
 
 type Rec = Record<string, unknown>;
@@ -60,6 +63,22 @@ function sanitizeShopping(acc: Accumulator, value: unknown): Accumulator {
   return { ...next, data: { ...next.data, shopping: { ...value, items } } };
 }
 
+/** Objekt-Wert (Profil, Wochenplan): `null` bleibt, Gültiges wird bereinigt, Unbrauchbares kommt in Quarantäne. */
+function sanitizeObject(acc: Accumulator, key: string, value: unknown, clean: (v: unknown) => unknown): Accumulator {
+  if (value === null) return { ...acc, data: { ...acc.data, [key]: null } };
+  const cleaned = clean(value);
+  if (cleaned !== null) return { ...acc, data: { ...acc.data, [key]: cleaned } };
+  const { [key]: _drop, ...rest } = acc.data;
+  return { ...acc, data: rest, quarantined: { ...acc.quarantined, [key]: [value] }, skipped: acc.skipped + 1 };
+}
+
+/** Gesperrte Rezept-Ids: nur Texte; Verworfenes kommt in Quarantäne. */
+function sanitizeBlockedIds(acc: Accumulator, key: string, value: unknown): Accumulator {
+  const items = sanitizeBlocked(value);
+  const rejected = Array.isArray(value) ? value.filter((v) => typeof v !== 'string') : [value];
+  return addList(acc, key, items, rejected, 0);
+}
+
 /** Bereinigt alle bekannten Listen eines Backups; unbekannte Schlüssel bleiben unverändert. */
 export function sanitizeBackupData(data: Readonly<Rec>): BackupSanitizeResult {
   let acc: Accumulator = { data: { ...data }, quarantined: {}, skipped: 0, repaired: 0 };
@@ -69,13 +88,16 @@ export function sanitizeBackupData(data: Readonly<Rec>): BackupSanitizeResult {
   }
   for (const [key, check] of Object.entries(ARRAY_CHECKS)) {
     if (key === 'diary' || !(key in data)) continue;
-    const r = sanitizeList(data[key], check);
-    acc = addList(acc, key, r.items, r.rejected, 0);
+    const r = key === 'recipes' ? sanitizeRecipes(data[key]) : sanitizeList(data[key], check);
+    acc = addList(acc, key, r.items, r.rejected, r.repaired);
   }
   if ('weight' in data) {
     const r = sanitizeWeightList(data['weight']);
     acc = addList(acc, 'weight', r.items, r.rejected, 0);
   }
   if ('shopping' in data) acc = sanitizeShopping(acc, data['shopping']);
+  if ('profile' in data) acc = sanitizeObject(acc, 'profile', data['profile'], sanitizeProfile);
+  if ('week-plan' in data) acc = sanitizeObject(acc, 'week-plan', data['week-plan'], sanitizeWeekPlan);
+  if ('week-plan-blocked' in data) acc = sanitizeBlockedIds(acc, 'week-plan-blocked', data['week-plan-blocked']);
   return { data: acc.data, quarantined: acc.quarantined, skipped: acc.skipped, repaired: acc.repaired };
 }

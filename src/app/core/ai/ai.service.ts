@@ -16,6 +16,7 @@ import { ProxyAiProvider } from './proxy-ai-provider';
 import { MockAiProvider } from './mock-ai-provider';
 import { defaultAiProxyUrl } from './ai-endpoint';
 import { AI_ERROR_MESSAGES } from './ai-errors';
+import { MealParseResult } from './meal-parse';
 
 export const NO_AI_MESSAGE = 'Kein KI-Dienst konfiguriert.';
 
@@ -54,6 +55,10 @@ export class AiService implements AiProvider {
 
   importRecipe(input: RecipeImportInput): Promise<RecipeImportResult> {
     return this.provider().importRecipe(input);
+  }
+
+  parseMeal(text: string): Promise<MealParseResult> {
+    return this.provider().parseMeal(text);
   }
 
   translateRecipe(texts: RecipeTexts, lang: TranslateLanguage): Promise<RecipeTexts> {

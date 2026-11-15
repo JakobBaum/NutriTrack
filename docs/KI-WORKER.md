@@ -1,18 +1,19 @@
 # KI-Worker (Cloudflare)
 
 ## Was der Worker tut
-`worker.js` ist der globale KI-Server von NutriTrack. Alle Nutzer teilen sich EINEN Gemini-Schluessel, der nur als Secret im Worker liegt. Repository und Web-Version (GitHub Pages) sind als oeffentlich zu behandeln; der Worker ist ohne Anmeldung erreichbar, die Origin-Pruefung schuetzt nur Browser und laesst sich ausserhalb davon umgehen. Kostenschutz sind Rate-Limit und Tagesdeckel (siehe unten). Die App sendet `{ fn, payload }` per POST auf `/`; der Worker prueft die Eingabe, ruft Gemini auf und liefert das fertige Ergebnis.
+`worker.js` (Einstieg und Routing; Module unter `worker/`, von wrangler per esbuild gebuendelt) ist der globale KI-Server von NutriTrack. Alle Nutzer teilen sich EINEN Gemini-Schluessel, der nur als Secret im Worker liegt. Repository und Web-Version (GitHub Pages) sind als oeffentlich zu behandeln; der Worker ist ohne Anmeldung erreichbar, die Origin-Pruefung schuetzt nur Browser und laesst sich ausserhalb davon umgehen. Kostenschutz sind Rate-Limit und Tagesdeckel (siehe unten). Die App sendet `{ fn, payload }` per POST auf `/`; der Worker prueft die Eingabe, ruft Gemini auf und liefert das fertige Ergebnis.
 
-- `POST /` - KI-Funktionen (Etikett, Rezept-Import, Einkaufsliste, Fastfood). Der Tagesbedarf wird nur noch lokal in der App berechnet (`computeTargets` wurde entfernt).
+- `POST /` - KI-Funktionen (Etikett, Rezept-Import, Einkaufsliste, Fastfood, Essen per Text `parseMeal`). Der Tagesbedarf wird nur noch lokal in der App berechnet (`computeTargets` wurde entfernt).
 - `GET /off-search` - OpenFoodFacts-Suche (CORS-Proxy)
 - `GET /recipes/complexSearch` - spoonacular-Rezeptsuche (siehe unten)
+- `GET /recipes/:id/information` - spoonacular-Einzelrezept (siehe unten)
 - `GET /health` - Status: `{ "ok": true }`. Die Route ist ohne Anmeldung erreichbar und gibt bewusst keine Konfigurationsdetails preis (keine Schluessel-Hinweise, keine Bindings, keine Modellnamen). Ob Secrets und Bindings gesetzt sind, zeigt das Cloudflare-Dashboard.
 
 Modelle: Hauptmodell `gemini-3.6-flash`, Fallback `gemini-3.5-flash-lite`. Ist ein Modell unbekannt (404 oder 400 "model"), wechselt der Worker sofort aufs Fallback. Zeitbudget: 25 s gesamt, 12 s je Versuch, 1 Wiederholung. Die App bricht nach 30 s mit einer klaren Meldung ab.
 
 **Gemini-Bedingungen:** Laut den Gemini-API-Zusatzbedingungen (abgerufen 2026-11-14) duerfen Clients fuer Nutzer im EWR, der Schweiz und dem UK nur mit bezahlten Diensten betrieben werden; im unbezahlten Tarif darf Google Eingaben zur Produktverbesserung nutzen. Welcher Tarif fuer den Schluessel gilt, ist aus dem Code nicht erkennbar und muss der Betreiber in der Google-Cloud-Konsole pruefen (Billing, Quota, Budgetalarm).
 
-Aenderbar ohne Code (Variablen in `wrangler.toml` oder Dashboard): `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`, `ALLOWED_ORIGINS`, `DAILY_AI_CAP`.
+Aenderbar ohne Code (Variablen in `wrangler.toml` oder Dashboard): `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`, `ALLOWED_ORIGINS`, `DAILY_AI_CAP`, `DAILY_RECIPE_CAP`, `REQUIRE_ORIGIN`.
 
 ## Kostenschutz und Missbrauch
 - **Rate-Limit je IP** (`AI_LIMITER`, 20/min) fuer KI und Rezept-Suche; `/off-search` nutzt `OFF_LIMITER` (optional, sonst `AI_LIMITER`) und zaehlt nur Cache-Misses.
@@ -20,6 +21,9 @@ Aenderbar ohne Code (Variablen in `wrangler.toml` oder Dashboard): `GEMINI_MODEL
   1. `npx wrangler kv namespace create DAILY_KV` (gibt eine `id` aus)
   2. In `wrangler.toml` den Block `[[kv_namespaces]]` einkommentieren und die `id` eintragen; optional `[vars] DAILY_AI_CAP`
   3. `npx wrangler deploy`; ob das Binding aktiv ist, zeigt das Cloudflare-Dashboard (Bindings des Workers)
+- **Tageslimit Rezept-Suche** (`DAILY_KV` + `DAILY_RECIPE_CAP`, Standard 40 pro UTC-Tag, unter dem Spoonacular-Gratiskontingent): eigener Zaehler (Schluessel `recipecap:<Datum>`), nur Cache-Misses zaehlen; bei Erreichen 429 mit deutscher Meldung, bei KV-Ausfall 503 (fail-closed), ohne Binding kein Deckel.
+- **Origin-Pflicht** (`REQUIRE_ORIGIN=true`, Standard aus): Anfragen ohne Origin bekommen 403, ausgenommen `GET /health`, `OPTIONS` und Anfragen mit dem Header `X-NutriTrack-Client: ios`. Das ist kein Geheimnis-Schutz, weil sich Header ausserhalb von Browsern faelschen lassen. Die native iOS-App sendet mit aktiviertem CapacitorHttp keinen Origin, und ein von JS gesetzter `Origin` wird nicht verlaesslich durchgereicht (WebKit verbietet ihn bei fetch und bei GET ueber den Capacitor-Proxy). Stattdessen setzt ein Angular-Interceptor (`src/app/core/http/native-client.interceptor.ts`) nativ fuer Worker-Aufrufe `X-NutriTrack-Client: ios`; `Access-Control-Allow-Headers` erlaubt ihn. **Einschalten erst, wenn alle installierten App-Staende den Interceptor haben**, sonst sind aeltere Staende ausgesperrt. Die Diagnose in den Einstellungen nutzt rohes `fetch` ohne Header und schluege nativ mit Pflicht fehl (nur `/health` ist ausgenommen).
+- **Suchparameter** (`/off-search`): `page` 1 bis 1000, `page_size` Zahl (bis 50 begrenzt), `fields`/`langs`/`sort_by` nur Buchstaben, Ziffern, Unterstrich und Komma mit Laengenlimit, Suchbegriff ohne Steuerzeichen; sonst 400 "Suchparameter ungueltig."; unbekannte Parameter werden verworfen.
 - **Limits**: Body max. 5 MB (hart gelesen, auch ohne Content-Length), Foto max. 4 Mio. Base64-Zeichen (~3 MB), Freitexte gekuerzt, `maxOutputTokens` je Funktion (Etikett 1024, Liste 4096, Fastfood 2048, Import 8192), `temperature 0`.
 - **SSRF** (Rezept-Import): nur http/https auf Port 80/443, keine IP-Literale aus privaten Netzen, kein `localhost` (auch `localhost.`), keine IPv6-Literale; Weiterleitungen werden erneut geprueft (auch beim Abruf der robots.txt).
 - **Link-Import, Hoeflichkeit**: ehrlicher User-Agent `NutriTrackRecipeImport/1.0 (+https://jakobbaum.github.io/NutriTrack/)`; Sperrliste fuer tiktok.com, instagram.com, facebook.com, x.com und twitter.com (samt Subdomains); vor jedem Abruf (und nach jeder Weiterleitung) wird die robots.txt des Hosts beachtet (RFC 9309: 2xx auswerten, 4xx erlaubt, 5xx oder Netzfehler gesperrt). Abgelehnte Links antworten mit 422 und einer deutschen Meldung; liegt zusaetzlich ein Text vor, wird dieser verwendet.
@@ -47,6 +51,14 @@ Einrichten:
 - Route: `GET /recipes/complexSearch` - nur die Parameter der App-Suche werden weitergereicht (`query`, `number` max. 20, `offset`, `maxCalories`, `maxReadyTime`, `diet`, `addRecipeNutrition`, `addRecipeInstructions`, `fillIngredients`, `instructionsRequired`); ein mitgeschickter `apiKey` wird verworfen. Der Header `X-Api-Quota-Left` wird an die App durchgereicht. Erfolgreiche Antworten werden hoechstens 1 Stunde im Worker-Cache gehalten (Obergrenze der Spoonacular-Bedingungen) (gleiche Suche = kein weiterer Quota-Verbrauch; der Quota-Wert ist dann der des Cache-Zeitpunkts).
 - Fehler: ohne Secret antwortet die Route mit 503 "Rezept-Suche nicht eingerichtet."; ein vom Anbieter abgelehnter Server-Schluessel wird als 502 gemeldet; Zeitlimit 12 s (504). Ist `AI_LIMITER` gebunden, gilt dasselbe Rate-Limit wie bei der KI.
 - Quota: Der kostenlose Plan hat ca. 50 Punkte pro Tag, geteilt fuer alle Nutzer des globalen Servers. Ist das Limit erreicht (402), zeigt die App "Tageslimit erreicht". Ob dieser Tarif fuer eine oeffentliche App ausreicht und die Nutzung (inkl. lokal gespeicherter Rezepte) zu den Bedingungen passt, muss der Betreiber bei Spoonacular klaeren.
+
+### Einzelrezept (GET /recipes/:id/information)
+- Die App laedt damit ein gespeichertes Online-Rezept neu (Zutaten, Anleitung, Naehrwerte). `:id` nur 1 bis 12 Ziffern, sonst 400 "Rezept-ID ungueltig."; von der Anfrage geht nur `includeNutrition=true` an Spoonacular weiter, der Schluessel liegt nur im Header.
+- Gleiche Behandlung wie die Suche: Origin-Pruefung, Rate-Limit, Cache hoechstens 1 Stunde, `DAILY_RECIPE_CAP` zaehlt nur Cache-Misses (gleicher Zaehler wie die Suche). Ein Upstream-404 geht als 404 durch (nicht gecacht, die App zeigt "nicht mehr vorhanden"); 401/403 werden als 502 gemeldet, 402 und andere Status unveraendert, Zeitlimit 12 s (504).
+
+## Essen per Text (parseMeal)
+- `parseMeal` `{ text }`: Text getrimmt 1 bis 500 Zeichen (Steuerzeichen entfernt), sonst 400. Antwort `{ items: [{ name, amount, unit, portionG, per100g: { kcal, proteinG, carbsG, fatG } }] }`, hoechstens 12 Eintraege, nichts erkannt: leere Liste. Vertrag: `docs/review-3/PARSE-MEAL-VERTRAG.md`.
+- Festes Antwortschema, Temperatur 0, `maxOutputTokens` 3072, Gewicht 1 gegen den Tagesdeckel. Der Nutzertext steht abgegrenzt in `<nutzertext>`-Tags und gilt im Prompt als Daten; das Tag wird aus dem Text entfernt. Der Worker prueft grob (`items` ist ein Array, auf 12 gekuerzt); die App validiert jede Zeile vollstaendig. Das Log enthaelt keine Inhalte.
 
 ## Uebersetzung (translateRecipe, translateSearchQuery)
 Spoonacular liefert nur Englisch. Die App uebersetzt Rezepte in die App-Sprache (`appLanguage`, derzeit `de`).

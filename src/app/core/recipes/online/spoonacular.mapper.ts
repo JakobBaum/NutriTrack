@@ -2,6 +2,7 @@ import { NutritionFacts, RecipeIngredient } from '../../models';
 import { RecipeDraft } from '../../state/recipe.store';
 import { isUsUnit, toMetric } from '../../shopping/units/unit-convert';
 import { OnlineRecipe } from './online-recipe.model';
+import { ONLINE_SOURCE } from './online-recipe-ref';
 import {
   SpoonExtendedIngredient,
   SpoonNutrient,
@@ -174,7 +175,7 @@ export function mapSpoonRecipe(raw: SpoonRecipe): OnlineRecipe | null {
   };
 }
 
-/** Entwurf für den RecipeStore (landet danach in der normalen Rezeptliste). */
+/** Entwurf für den RecipeStore; mit `onlineRef`, damit nur der Verweis (Id, Titel, Bild, Link) dauerhaft gespeichert wird. */
 export function toRecipeDraft(recipe: OnlineRecipe): RecipeDraft {
   return {
     title: recipe.title,
@@ -185,5 +186,6 @@ export function toRecipeDraft(recipe: OnlineRecipe): RecipeDraft {
     sourceUrl: recipe.sourceUrl,
     imageUrl: recipe.imageUrl,
     factsPerServing: recipe.facts,
+    onlineRef: { source: ONLINE_SOURCE, externalId: recipe.id, savedAt: new Date().toISOString() },
   };
 }

@@ -91,3 +91,42 @@ describe('StatusBannerComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="quarantine-banner"]')).toBeNull();
   });
 });
+
+describe('StatusBannerComponent Offline-Hinweis', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      declarations: [StatusBannerComponent],
+      providers: [{ provide: BackupService, useValue: { exportBackup: vi.fn() } }],
+    }).compileComponents();
+  });
+
+  afterEach(() => vi.restoreAllMocks());
+
+  const notice = (root: HTMLElement): HTMLElement | null => root.querySelector('[data-testid="offline-banner"]');
+
+  it('zeigt online keinen Hinweis', () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+    const fixture = TestBed.createComponent(StatusBannerComponent);
+    fixture.detectChanges();
+    expect(notice(fixture.nativeElement)).toBeNull();
+  });
+
+  it('zeigt offline den ruhigen Hinweis mit role=status und aria-live=polite', () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    const fixture = TestBed.createComponent(StatusBannerComponent);
+    fixture.detectChanges();
+    const el = notice(fixture.nativeElement);
+    expect(el).not.toBeNull();
+    expect(el?.getAttribute('aria-live')).toBe('polite');
+    expect(el?.textContent).toContain('Offline. KI und Online-Suche sind gerade nicht verfügbar, dein Tagebuch funktioniert weiter.');
+  });
+
+  it('blendet den Hinweis bei online-Ereignis wieder aus', () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    const fixture = TestBed.createComponent(StatusBannerComponent);
+    fixture.detectChanges();
+    window.dispatchEvent(new Event('online'));
+    fixture.detectChanges();
+    expect(notice(fixture.nativeElement)).toBeNull();
+  });
+});

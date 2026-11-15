@@ -1,9 +1,7 @@
+import { afterEach, describe, expect, it } from 'vitest';
 import { AI_ERROR_MESSAGES, friendlyAiErrorMessage } from './ai-errors';
 
 describe('friendlyAiErrorMessage', () => {
-  it('maps status 0 to the offline message', () => {
-    expect(friendlyAiErrorMessage(0)).toBe(AI_ERROR_MESSAGES.offline);
-  });
   it('maps 503 and 500 to the overloaded message', () => {
     expect(friendlyAiErrorMessage(503)).toBe(AI_ERROR_MESSAGES.overloaded);
     expect(friendlyAiErrorMessage(500)).toBe(AI_ERROR_MESSAGES.overloaded);
@@ -27,5 +25,23 @@ describe('friendlyAiErrorMessage', () => {
   });
   it('falls back to the generic message', () => {
     expect(friendlyAiErrorMessage(418)).toBe(AI_ERROR_MESSAGES.generic);
+  });
+});
+
+describe('friendlyAiErrorMessage bei Status 0', () => {
+  const setOnline = (value: boolean): void => {
+    Object.defineProperty(navigator, 'onLine', { value, configurable: true });
+  };
+  afterEach(() => setOnline(true));
+
+  it('meldet den Dienst als nicht erreichbar, wenn das Gerät online ist', () => {
+    setOnline(true);
+    expect(friendlyAiErrorMessage(0)).toBe(AI_ERROR_MESSAGES.unreachable);
+    expect(AI_ERROR_MESSAGES.unreachable).toBe('Der Dienst ist gerade nicht erreichbar. Versuch es später noch einmal.');
+  });
+
+  it('behält den Offline-Text, wenn das Gerät wirklich offline ist', () => {
+    setOnline(false);
+    expect(friendlyAiErrorMessage(0)).toBe(AI_ERROR_MESSAGES.offline);
   });
 });

@@ -36,3 +36,25 @@ describe('WeekPlanStore', () => {
     expect(localStorage.getItem('nutritrack:week-plan')).toBeNull();
   });
 });
+
+describe('WeekPlanStore Laden (Review 3, Befund 6)', () => {
+  const load = (key: string, raw: unknown): WeekPlanStore => {
+    localStorage.setItem(`nutritrack:${key}`, JSON.stringify(raw));
+    TestBed.resetTestingModule();
+    return TestBed.inject(WeekPlanStore);
+  };
+
+  it('verwirft einen kaputten Plan ohne Absturz', () => {
+    expect(load('week-plan', { id: 'x', recipes: 'kaputt' }).plan()).toBeNull();
+  });
+
+  it('behält gültige Rezepte eines teilweise kaputten Plans', () => {
+    const broken = { ...plan(), recipes: [...plan().recipes, { id: 2 }] };
+    expect(load('week-plan', broken).plan()?.recipes).toHaveLength(1);
+  });
+
+  it('filtert gesperrte Ids auf Texte', () => {
+    expect(load('week-plan-blocked', [1, 'a']).blocked()).toEqual(['a']);
+    expect(load('week-plan-blocked', 'x').blocked()).toEqual([]);
+  });
+});

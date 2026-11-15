@@ -1,6 +1,5 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { FASTFOOD_COUNTRIES } from '../core/ai/fastfood-countries';
 import {
   FASTFOOD_CHAINS, FastFoodForm, KCAL_RANGE, MAX_PREFERENCES, MONEY_RANGE, OTHER_RESTAURANT, PREFERENCE_OPTIONS,
   defaultKcalBudget, formatMoney, resolveRestaurant, restaurantChoice, snapToRange, togglePreference,
@@ -27,11 +26,12 @@ export class FastfoodFormComponent implements OnChanges {
   @Output() readonly formChange = new EventEmitter<FastFoodForm>();
   /** Wird vor der Navigation zu den KI-Einstellungen ausgelöst (Sheet schließen). */
   @Output() readonly connectAi = new EventEmitter<void>();
+  /** Wird vor der Navigation zum Profil ausgelöst (Sheet schließen). */
+  @Output() readonly openProfile = new EventEmitter<void>();
 
   readonly chains = FASTFOOD_CHAINS;
   readonly other = OTHER_RESTAURANT;
   readonly options = PREFERENCE_OPTIONS;
-  readonly countries = FASTFOOD_COUNTRIES;
   readonly maxPreferences = MAX_PREFERENCES;
   readonly kcalRange = KCAL_RANGE;
   readonly moneyRange = MONEY_RANGE;
@@ -100,15 +100,17 @@ export class FastfoodFormComponent implements OnChanges {
     this.emit({ preferences: togglePreference(this.form.preferences, value) });
   }
 
-  onCountry(value: unknown): void {
-    this.emit({ country: String(value ?? this.form.country) });
-  }
-
   readonly formatPin = (value: number): string => `${value}`;
 
   openAiSettings(): void {
     this.connectAi.emit();
     void this.router.navigate(['/settings']);
+  }
+
+  /** Das Land wird im Profil gewählt: Profil-Sheet über den Einrichtungslink der Einstellungen öffnen. */
+  openProfileSettings(): void {
+    this.openProfile.emit();
+    void this.router.navigate(['/settings'], { queryParams: { setup: '1' } });
   }
 
   private emit(patch: Partial<FastFoodForm>): void {

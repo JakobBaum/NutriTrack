@@ -49,6 +49,8 @@ export interface UserProfile {
   dislikes?: string[];
   /** Englische Entsprechungen zu `dislikes` (parallel, '' = keine Übersetzung) für die Suche. */
   dislikesEn?: string[];
+  /** Land für das Fastfood-Sortiment (Liste in `fastfood-countries.ts`); fehlt = noch nicht gewählt (Vorgabe Österreich). */
+  fastfoodCountry?: string;
   updatedAt: string;
 }
 

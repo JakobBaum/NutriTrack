@@ -14,7 +14,7 @@ import {
   validateBackup,
 } from './backup';
 
-export type SafetyReason = 'import' | 'restore' | 'reset';
+export type SafetyReason = 'import' | 'restore' | 'reset' | 'migration';
 
 /** Gespeicherte Auto-Sicherung. */
 export interface SafetySnapshot {
@@ -23,11 +23,12 @@ export interface SafetySnapshot {
   readonly backup: BackupFile;
 }
 
-const REASONS: ReadonlySet<string> = new Set(['import', 'restore', 'reset']);
+const REASONS: ReadonlySet<string> = new Set(['import', 'restore', 'reset', 'migration']);
 const REASON_LABEL: Readonly<Record<SafetyReason, string>> = {
   import: 'vor dem Import',
   restore: 'vor der Wiederherstellung',
   reset: 'vor dem Zurücksetzen',
+  migration: 'vor der Umstellung gespeicherter Online-Rezepte',
 };
 
 const isFilled = (v: unknown): boolean => {

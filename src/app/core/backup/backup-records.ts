@@ -4,6 +4,7 @@
  */
 
 import { MAX_WEIGHT_KG, MIN_WEIGHT_KG } from '../weight/weight-math';
+import { isValidOnlineRef } from '../recipes/online/online-recipe-ref';
 
 type Rec = Record<string, unknown>;
 
@@ -39,13 +40,14 @@ function isIngredient(v: unknown): boolean {
   return isRec(v) && isStr(v['name']) && isNum(v['amount']) && isStr(v['unit']);
 }
 
-function isRecipe(v: unknown): boolean {
+export function isRecipe(v: unknown): boolean {
   if (!isRec(v)) return false;
   const ingredients = v['ingredients'];
   return (
     isStr(v['id']) && isStr(v['title']) && isNum(v['servings']) &&
     (ingredients === undefined || (Array.isArray(ingredients) && ingredients.every(isIngredient))) &&
-    (v['steps'] === undefined || Array.isArray(v['steps']))
+    (v['steps'] === undefined || Array.isArray(v['steps'])) &&
+    (v['onlineRef'] === undefined || isValidOnlineRef(v['onlineRef']))
   );
 }
 

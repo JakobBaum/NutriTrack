@@ -126,3 +126,31 @@ export function isOverBudget(suggestion: FastFoodSuggestion, kcalBudget: number)
 export function formatMoney(value: number): string {
   return value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+
+/** Alle Angaben, die in die Anfrage eingehen (unveränderlicher Schnappschuss zum Vergleich mit der letzten Anfrage). */
+export interface FastFoodInputs {
+  readonly restaurant: string;
+  readonly kcalBudget: number;
+  readonly moneyBudget: number | null;
+  readonly preferences: readonly string[];
+  readonly country: string;
+}
+
+/** Schnappschuss der Angaben, so wie sie in die Anfrage gehen (Budget und Restaurant aufgelöst, Kriterien kopiert). */
+export function fastfoodInputsOf(form: Readonly<FastFoodForm>, remainingKcal: number): FastFoodInputs {
+  return Object.freeze({
+    restaurant: form.restaurant.trim() || 'Fastfood',
+    kcalBudget: form.kcalBudget ?? defaultKcalBudget(remainingKcal),
+    moneyBudget: form.moneyBudget,
+    preferences: Object.freeze([...form.preferences]),
+    country: form.country,
+  });
+}
+
+/** Gleiche Angaben? Die Reihenfolge der Kriterien spielt keine Rolle. */
+export function sameFastfoodInputs(a: FastFoodInputs, b: FastFoodInputs): boolean {
+  const sortedA = [...a.preferences].sort();
+  const sortedB = [...b.preferences].sort();
+  return a.restaurant === b.restaurant && a.kcalBudget === b.kcalBudget && a.moneyBudget === b.moneyBudget
+    && a.country === b.country && sortedA.length === sortedB.length && sortedA.every((p, i) => p === sortedB[i]);
+}

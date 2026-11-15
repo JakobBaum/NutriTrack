@@ -15,21 +15,10 @@
       <ion-select-option [value]="other">Anderes…</ion-select-option>
     </ion-select>
   </ion-item>
-  <ion-item lines="none">
-    <ion-select
-      label="Land"
-      labelPlacement="stacked"
-      interface="action-sheet"
-      cancelText="Abbrechen"
-      [interfaceOptions]="{ header: 'Land wählen' }"
-      [value]="form.country"
-      (ionChange)="onCountry($event.detail.value)"
-    >
-      @for (c of countries; track c) {
-        <ion-select-option [value]="c">{{ c }}</ion-select-option>
-      }
-    </ion-select>
-  </ion-item>
+  <p class="ff-country" data-testid="ff-country">
+    <span>Land: {{ form.country }}, </span>
+    <button type="button" class="ff-country__link" data-testid="ff-country-link" (click)="openProfileSettings()">im Profil ändern</button>
+  </p>
   @if (choice === other) {
     <ion-item lines="none">
       <ion-input

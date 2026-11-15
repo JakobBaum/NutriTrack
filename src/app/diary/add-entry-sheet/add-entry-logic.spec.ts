@@ -5,6 +5,7 @@ import {
   entriesFromSavedMeal,
   entryFromRecent,
   entryFromRecipe,
+  filterLoggableRecipes,
   resolveAdjustOpen,
   savedMealProtein,
   sumEntryTotals,
@@ -12,6 +13,21 @@ import {
 
 const PER100: NutritionFacts = { kcal: 200, proteinG: 10, carbsG: 20, fatG: 5, basis: 'per100g' };
 const DATE = '2026-11-09';
+
+describe('eintragbare Rezepte', () => {
+  const base = { servings: 1, ingredients: [], steps: [], createdAt: 'a', updatedAt: 'a' };
+  const own = { ...base, id: 'o', title: 'Reis', origin: 'own' as const, factsPerServing: { kcal: 1, proteinG: 1, carbsG: 1, fatG: 1, basis: 'perPortion' as const } };
+  const ref = { ...base, id: 'r', title: 'Linsensuppe', origin: 'online' as const, onlineRef: { source: 'spoonacular' as const, externalId: '4', savedAt: '2026-11-01T10:00:00.000Z' } };
+  const noFacts = { ...base, id: 'n', title: 'Leer', origin: 'own' as const };
+
+  it('nimmt Verweise auf, auch ohne gespeicherte Werte, und lässt eigene Rezepte ohne Werte weg', () => {
+    expect(filterLoggableRecipes([own, ref, noFacts], '').map((r) => r.id)).toEqual(['o', 'r']);
+  });
+
+  it('filtert nach Titel ohne Groß-/Kleinschreibung', () => {
+    expect(filterLoggableRecipes([own, ref], ' LINSEN ').map((r) => r.id)).toEqual(['r']);
+  });
+});
 
 describe('add-entry-logic', () => {
   describe('entryFromRecent', () => {

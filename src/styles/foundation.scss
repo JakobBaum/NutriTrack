@@ -198,7 +198,7 @@ ion-alert input.alert-input:focus {
 }
 
 // Zwei Hinzufuegen-Pillen untereinander (Zutat / manuelle Zutat) brauchen Luft, sonst kleben sie zusammen.
-ion-modal .nt-add-btn + .nt-add-btn {
+ion-modal button.nt-btn--block + button.nt-btn--block {
   margin-top: var(--nt-space-2);
 }
 

@@ -22,12 +22,24 @@
       </div>
     </ion-header>
 
+    @if (view() === 'describe') {
+      <app-describe-meal [meal]="form.meal" [date]="date()" (mealChange)="setMeal($event)" (logged)="closeAdd()" (manual)="openManualEntry()"></app-describe-meal>
+    } @else {
     <ion-content class="sheet-content">
       @if (storageError(); as storageMessage) {
         <p class="form-error form-error--banner" role="alert" data-testid="sheet-storage-error">{{ storageMessage }}</p>
       }
       @if (error()) {
         <p class="form-error form-error--banner" role="alert">{{ error() }}</p>
+      }
+      @let load = recipeLoad.state();
+      @if (load.kind === 'loading') {
+        <p class="scan-hint recipe-load" role="status" data-testid="recipe-loading"><ion-spinner name="dots"></ion-spinner> Rezept wird geladen…</p>
+      } @else if (load.kind === 'error') {
+        <div class="recipe-load recipe-load--error" data-testid="recipe-load-error">
+          <p class="form-error form-error--banner" role="alert">{{ load.message }}</p>
+          <ion-button class="nt-btn nt-btn--tonal nt-btn--inner" data-testid="recipe-retry" (click)="retryRecipe()">Erneut versuchen</ion-button>
+        </div>
       }
 
       <div class="meal-picker" role="radiogroup" aria-label="Essenszeit">
@@ -55,6 +67,14 @@
               </button>
             }
           </nt-food-sources>
+
+          <button type="button" class="describe-entry" data-testid="describe-open" (click)="showView('describe')">
+            <ion-icon name="sparkles-outline" aria-hidden="true"></ion-icon>
+            <span class="describe-entry__text">
+              <span class="describe-entry__title">Essen beschreiben</span>
+              <span class="describe-entry__sub">Per Text oder Diktat, die KI schätzt die Werte</span>
+            </span>
+          </button>
 
           @if (!foodSearch.query.trim() && favoriteList().length) {
             <h3 class="nt-section-header">Favoriten</h3>
@@ -103,7 +123,7 @@
                   <button type="button" class="recent__main" (click)="quickAddRecipe(recipe)" [attr.aria-label]="recipe.title + ' direkt eintragen'">
                     <span class="recent__text">
                       <span class="recent__name">{{ recipe.title }}</span>
-                      <span class="recent__meta">1 Portion · {{ recipe.factsPerServing?.kcal | ntNum:0 }} kcal · <span class="protein-val">{{ recipe.factsPerServing?.proteinG | ntNum:0 }} g Eiweiß</span></span>
+                      <span class="recent__meta">@if (recipe.factsPerServing; as f) { 1 Portion · {{ f.kcal | ntNum:0 }} kcal · <span class="protein-val">{{ f.proteinG | ntNum:0 }} g Eiweiß</span> } @else { Online-Rezept, Nährwerte werden geladen }</span>
                     </span>
                     <span class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
                   </button>
@@ -132,7 +152,11 @@
                 <ion-item button detail="false" lines="none" (click)="selectRecipe(recipe)">
                   <ion-label>
                     <h3>{{ recipe.title }}</h3>
-                    <p>{{ recipe.factsPerServing?.kcal | ntNum:0 }} kcal · <span class="protein-val">{{ recipe.factsPerServing?.proteinG | ntNum:0 }} g Eiweiß</span> / Portion</p>
+                    @if (recipe.factsPerServing; as f) {
+                      <p>{{ f.kcal | ntNum:0 }} kcal · <span class="protein-val">{{ f.proteinG | ntNum:0 }} g Eiweiß</span> / Portion</p>
+                    } @else {
+                      <p>Online-Rezept, Nährwerte werden beim Auswählen geladen</p>
+                    }
                   </ion-label>
                 </ion-item>
               }
@@ -256,6 +280,7 @@
         }
       }
     </ion-content>
+    }
 
     @if (view() === 'form') {
       <ion-footer class="ion-no-border add-footer">

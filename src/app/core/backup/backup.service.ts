@@ -1,4 +1,5 @@
 import { DOCUMENT } from '@angular/common';
+import { Capacitor } from '@capacitor/core';
 import { Injectable, inject, signal } from '@angular/core';
 import { CONSENT_KEY } from '../consent/consent.model';
 import { StorageService } from '../storage/storage.service';
@@ -18,12 +19,23 @@ import {
 } from './backup';
 import { SafetyReason, SafetySnapshot, buildSafetySnapshot, readSafetySnapshot } from './backup-safety';
 
-/** Wie das Backup ausgeliefert wurde. */
-export type ExportResult = 'shared' | 'downloaded' | 'cancelled';
+/**
+ * Wie das Backup ausgeliefert wurde. `unverified`: In der nativen App ist der Download über `<a download>`
+ * in der WebView wirkungslos oder nicht prüfbar; es gilt nicht als gesichert.
+ */
+export type ExportResult = 'shared' | 'downloaded' | 'cancelled' | 'unverified';
 
 /** Ergebnis von `restore`: ob ersetzt wurde und ob dabei die Auto-Sicherung des alten Stands entstand. */
 export interface RestoreResult {
   readonly ok: boolean;
+  readonly safetySaved: boolean;
+  /** Nur gesetzt (true), wenn der Import scheiterte und der alte Stand nicht vollständig wiederhergestellt werden konnte. */
+  readonly rollbackFailed?: true;
+}
+
+/** Ergebnis von `completeReset`: ob alles gelöscht wurde und ob die Auto-Sicherung geschrieben wurde (oder nichts zu sichern war). */
+export interface ResetResult {
+  readonly cleared: boolean;
   readonly safetySaved: boolean;
 }
 
@@ -52,7 +64,7 @@ export class BackupService {
     const name = backupFileName(now);
     const blob = new Blob([serializeBackup(backup)], { type: JSON_MIME });
     const result = await this.deliver(blob, name);
-    if (result !== 'cancelled') this.markBackup(backup.exportedAt);
+    if (result === 'shared' || result === 'downloaded') this.markBackup(backup.exportedAt);
     return result;
   }
 
@@ -77,13 +89,14 @@ export class BackupService {
     const base = this.keepMeta(prepareRestore(backup.data), current);
     const withSafety = safety ? { ...base, [AUTO_SNAPSHOT_KEY]: safety } : base;
     let safetySaved = safety !== null;
-    let ok = this.storage.replaceAll(withSafety);
-    if (!ok && safety) {
+    let outcome = this.storage.replaceAll(withSafety);
+    if (outcome !== 'ok' && safety) {
       safetySaved = false;
-      ok = this.storage.replaceAll(base);
+      outcome = this.storage.replaceAll(base);
     }
+    const ok = outcome === 'ok';
     if (ok && cleanup) this.quarantineCleanup(cleanup);
-    return { ok, safetySaved };
+    return { ok, safetySaved, ...(outcome === 'rollbackFailed' ? { rollbackFailed: true as const } : {}) };
   }
 
   /** Auto-Sicherung (falls vorhanden und lesbar), ohne die Daten zu verändern. */
@@ -110,14 +123,15 @@ export class BackupService {
 
   /**
    * Löscht alle lokalen Daten, setzt das Backup-Datum zurück und legt danach die Auto-Sicherung ab.
-   * @returns `true`, wenn die Auto-Sicherung geschrieben wurde (oder nichts zu sichern war).
+   * `cleared` ist `false`, wenn das Löschen scheiterte (dann wird keine Auto-Sicherung angelegt).
    */
-  completeReset(safety: SafetySnapshot | null): boolean {
-    this.storage.clearAll();
+  completeReset(safety: SafetySnapshot | null): ResetResult {
+    const cleared = this.storage.clearAll();
     this._lastBackup.set(null);
-    if (!safety) return true;
-    this.storage.set(AUTO_SNAPSHOT_KEY, safety);
-    return this.storage.flush();
+    if (!cleared) return { cleared, safetySaved: false };
+    if (!safety) return { cleared, safetySaved: true };
+    const queued = this.storage.set(AUTO_SNAPSHOT_KEY, safety);
+    return { cleared, safetySaved: queued && this.storage.flush() };
   }
 
   /** Meta-Schlüssel, die ein Import nicht überschreiben soll: Datum des letzten Exports, bestehende Auto-Sicherung und die Zustimmung dieses Geräts. */
@@ -156,7 +170,7 @@ export class BackupService {
       }
     }
     this.download(blob, name);
-    return 'downloaded';
+    return Capacitor.isNativePlatform() ? 'unverified' : 'downloaded';
   }
 
   private download(blob: Blob, name: string): void {

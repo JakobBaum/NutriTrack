@@ -13,7 +13,7 @@ async function createRecipe(page) {
   const modal = topModal(page);
   await modal.locator('.nt-sheet-header__title', { hasText: 'Neues Rezept' }).waitFor();
   await fillAndBlur(byAria(modal, 'Name'), TITLE);
-  await modal.locator('.nt-add-btn', { hasText: 'manuelle Zutat' }).click();
+  await modal.locator('.nt-btn--tonal.nt-btn--block', { hasText: 'manuelle Zutat' }).click();
   await fillAndBlur(byAria(modal, 'Zutatname'), 'Rote Linsen');
   await amountInput(modal, 'Menge').first().fill('300');
   await modal.locator('.ing-facts-toggle').first().click();
@@ -134,6 +134,12 @@ export function register({ test }) {
       });
     });
 
+    // Gespeicherte Online-Rezepte sind nur Verweise: das Detail wird beim Öffnen nachgeladen.
+    await page.route('https://*.workers.dev/recipes/4242/information**', async (route) => {
+      const req = route.request();
+      if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+      return route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(MOCK_RESPONSE.results[0]) });
+    });
     await go(page, 'recipes');
     await page.locator('[data-testid="online-search-btn"]').click();
     const modal = topModal(page);
@@ -162,16 +168,16 @@ export function register({ test }) {
     const saved = (await readStore(page, 'recipes')).find((r) => r.title === 'Mock Lentil Soup');
     assert.ok(saved, 'Rezept nicht gespeichert');
     assert.equal(saved.origin, 'online');
-    assert.equal(saved.servings, 2);
-    assert.deepEqual(saved.steps, ['Chop the onion.', 'Simmer the lentils for 20 minutes.']);
-    assert.equal(saved.ingredients[0].name, 'Rote Linsen');
-    assert.equal(saved.factsPerServing?.kcal, 320);
+    assert.deepEqual(saved.steps, [], 'nur der Verweis wird gespeichert, keine Schritte');
+    assert.deepEqual(saved.ingredients, [], 'nur der Verweis wird gespeichert, keine Zutaten');
+    assert.equal(saved.factsPerServing, undefined, 'keine Nährwerte im Speicher');
+    assert.equal(saved.onlineRef?.externalId, '4242');
 
     await modal.locator('ion-button.nt-sheet-close').click();
     await settle(page, 800);
     const listCard = page.locator('article.recipe', { hasText: 'Mock Lentil Soup' });
     await listCard.waitFor();
-    assert.match(await listCard.innerText(), /320/);
+    assert.match(await listCard.innerText(), /Online-Rezept/);
     await listCard.locator('.recipe__title-btn').click();
     const sheet = topModal(page);
     await eventually(async () => assert.match(await sheet.innerText(), /Simmer the lentils|Linsen/));

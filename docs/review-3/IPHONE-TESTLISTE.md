@@ -30,3 +30,13 @@ Alles hier ist bisher nur in Chromium (375 und 320 px) geprüft, mit nachgebaute
 - Unverträglichkeiten und ausgeschlossene Zutaten werden schon bei Spoonacular gefiltert.
 - Fastfood: Land und Ausschlussliste kommen bei der KI an.
 - Link-Import: Sperrliste und robots.txt.
+
+## Welle 6 (nach Merge und Worker-Deploy)
+17. **Essen beschreiben:** Eintragen, "Essen beschreiben", per Mikrofon-Taste der Tastatur diktieren, "Erkennen". Sind Namen, Mengen, kcal und Eiweiß plausibel? Menge ändern, Zeile entfernen, eintragen, Rückgängig. Bleibt "Erkennen" über der Tastatur sichtbar, zoomt das Feld nicht?
+18. **Online-Rezept speichern und öffnen:** Rezept aus der Online-Suche speichern, App schließen, wieder öffnen, Rezept öffnen (lädt kurz nach). Im Flugmodus: Hinweis, dass das Rezept Internet braucht.
+19. **Alte Online-Rezepte:** Sind früher gespeicherte Online-Rezepte noch da und lassen sie sich öffnen? Unter Profil, Daten liegt eine automatische Sicherung von vor der Umstellung.
+20. **Tagebuch aus Online-Rezept:** Eintragen, Rezept wählen, kcal und Eiweiß stimmen mit dem Rezept überein.
+21. **Fastfood:** Land im Profil ändern, Helfer zeigt es an. Vor der ersten Runde "Vorschläge holen", danach nur "Weitere Vorschläge", nach geänderter Auswahl wieder "Vorschläge holen".
+22. **Offline-Hinweis:** Flugmodus an: Hinweis oben, verdeckt weder Kopfzeile noch Notch. Flugmodus aus: Hinweis verschwindet.
+23. **Backup exportieren:** Kommt das Teilen-Menü? Wenn nicht, steht dort "Backup nicht bestätigt".
+24. **Diagnose im Profil:** KI-Verbindung prüfen funktioniert weiter.

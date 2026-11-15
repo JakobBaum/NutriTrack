@@ -8,13 +8,15 @@ import { RecipeSearchAccessService } from '../../core/recipes/online/recipe-sear
 import { SpoonacularProvider } from '../../core/recipes/online/spoonacular.provider';
 import { RecipeTranslateService } from '../../core/recipes/translate/recipe-translate';
 import { ProfileStore } from '../../core/state/profile.store';
-import { OnlineSearchComponent } from './online-search.component';
+import { OnlineSearchComponent, SEARCH_DEBOUNCE_MS } from './online-search.component';
 
 const recipe = (id: string, title: string, ingredient = 'Salz'): OnlineRecipe => ({
   id, title, servings: 2, steps: ['x'], ingredients: [{ name: ingredient, amount: 1, unit: 'g' }],
 });
 
-function setup(search: ReturnType<typeof vi.fn>, withProfile = true, canTranslate: () => boolean = () => false): OnlineSearchComponent {
+type TranslateFn = (r: OnlineRecipe) => Promise<OnlineRecipe>;
+
+function setup(search: ReturnType<typeof vi.fn>, withProfile = true, canTranslate: () => boolean = () => false, translate: TranslateFn = async (r) => r): OnlineSearchComponent {
   localStorage.clear();
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
@@ -23,7 +25,7 @@ function setup(search: ReturnType<typeof vi.fn>, withProfile = true, canTranslat
     providers: [
       { provide: SpoonacularProvider, useValue: { search, quotaLeft: () => null } },
       { provide: RecipeSearchAccessService, useValue: { isAvailable: () => true } },
-      { provide: RecipeTranslateService, useValue: { canTranslate, translateQuery: async (q: string) => ({ query: q, viaAi: false }) } },
+      { provide: RecipeTranslateService, useValue: { canTranslate, translate, translateQuery: async (q: string) => ({ query: q, viaAi: false }) } },
       { provide: ModalController, useValue: { dismiss: vi.fn() } },
       { provide: Router, useValue: { navigate: vi.fn() } },
     ],
@@ -180,5 +182,172 @@ describe('OnlineSearchComponent canTranslate', () => {
     expect(component.canTranslate()).toBe(false);
     consent.set(true);
     expect(component.canTranslate()).toBe(true);
+  });
+});
+
+/** Antwort, die der Test selbst auslöst (steuert die Reihenfolge paralleler Anfragen). */
+function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
+  let resolve!: (v: T) => void;
+  const promise = new Promise<T>((r) => { resolve = r; });
+  return { promise, resolve };
+}
+
+const pageOf = (ids: string[], total = ids.length) => ({ recipes: ids.map((id) => recipe(id, `R${id}`)), totalResults: total, quotaLeft: null });
+
+describe('OnlineSearchComponent veraltete Antworten (Nr. 9)', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('verwirft die Antwort einer älteren Suche, wenn inzwischen eine neuere gestartet wurde', async () => {
+    const slow = deferred<ReturnType<typeof pageOf>>();
+    const search = vi.fn().mockResolvedValueOnce(pageOf(['1'])).mockReturnValueOnce(slow.promise).mockResolvedValue(pageOf(['20']));
+    const component = setup(search, true);
+    await component.search();
+
+    const first = component.search();
+    await vi.waitFor(() => expect(search).toHaveBeenCalledTimes(2));
+    await component.toggleProfileFilter();
+    slow.resolve(pageOf(['10']));
+    await first;
+
+    expect(component.results().map((r) => r.id)).toEqual(['20']);
+    expect(component.loading()).toBe(false);
+  });
+
+  it('nachladen verwendet die beim Start der Suche eingefrorenen Filter', async () => {
+    const search = vi.fn().mockResolvedValue(pageOf(['1', '2'], 6));
+    const component = setup(search, false);
+    component.query.set('suppe');
+    await component.search();
+
+    component.query.set('kuchen');
+    await component.loadMore();
+
+    expect(search.mock.calls[1][0].query).toBe('suppe');
+  });
+
+  it('verwirft eine Nachlade-Antwort, wenn währenddessen neu gesucht wurde', async () => {
+    const slowMore = deferred<ReturnType<typeof pageOf>>();
+    const search = vi.fn()
+      .mockResolvedValueOnce(pageOf(['1', '2'], 6))
+      .mockReturnValueOnce(slowMore.promise)
+      .mockResolvedValue(pageOf(['30'], 1));
+    const component = setup(search, true);
+    await component.search();
+
+    const more = component.loadMore();
+    await component.toggleProfileFilter();
+    slowMore.resolve(pageOf(['3', '4'], 6));
+    await more;
+
+    expect(component.results().map((r) => r.id)).toEqual(['30']);
+    expect(component.loadingMore()).toBe(false);
+  });
+});
+
+describe('OnlineSearchComponent Übersetzung je Rezept (Nr. 10)', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('bleibt im Übersetzungszustand, solange das geöffnete Rezept noch übersetzt wird, auch wenn ein anderes fertig ist', async () => {
+    const a = deferred<OnlineRecipe>();
+    const b = deferred<OnlineRecipe>();
+    const translate = vi.fn((r: OnlineRecipe) => (r.id === 'a' ? a.promise : b.promise));
+    const component = setup(vi.fn(), true, () => true, translate);
+
+    const openA = component.open(recipe('a', 'A'));
+    component.back();
+    const openB = component.open(recipe('b', 'B'));
+    a.resolve({ ...recipe('a', 'A'), lang: 'de' });
+    await openA;
+
+    expect(component.translating()).toBe(true);
+    expect(component.showUntranslatedHint()).toBe(false);
+    b.resolve({ ...recipe('b', 'B'), lang: 'de' });
+    await openB;
+    expect(component.translating()).toBe(false);
+  });
+
+  it('übersetzt dasselbe Rezept bei zwei Öffnungen nur einmal', async () => {
+    const a = deferred<OnlineRecipe>();
+    const translate = vi.fn(() => a.promise);
+    const component = setup(vi.fn(), true, () => true, translate);
+
+    const first = component.open(recipe('a', 'A'));
+    const second = component.open(recipe('a', 'A'));
+    a.resolve({ ...recipe('a', 'A'), lang: 'de' });
+    await Promise.all([first, second]);
+
+    expect(translate).toHaveBeenCalledTimes(1);
+    expect(component.translating()).toBe(false);
+  });
+});
+
+describe('OnlineSearchComponent Tageslimit schonen', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('startet für dieselbe laufende Anfrage keine zweite', async () => {
+    const slow = deferred<ReturnType<typeof pageOf>>();
+    const search = vi.fn().mockReturnValue(slow.promise);
+    const component = setup(search, true);
+    component.query.set('suppe');
+
+    const first = component.search();
+    const second = component.search();
+    await vi.waitFor(() => expect(search).toHaveBeenCalledTimes(1));
+    slow.resolve(pageOf(['1']));
+    await Promise.all([first, second]);
+
+    expect(search).toHaveBeenCalledTimes(1);
+    expect(component.loading()).toBe(false);
+  });
+
+  it('startet bei geänderten Filtern trotz laufender Anfrage eine neue', async () => {
+    const slow = deferred<ReturnType<typeof pageOf>>();
+    const search = vi.fn().mockReturnValueOnce(slow.promise).mockResolvedValue(pageOf(['2']));
+    const component = setup(search, true);
+
+    const first = component.search();
+    await vi.waitFor(() => expect(search).toHaveBeenCalledTimes(1));
+    component.query.set('kuchen');
+    await component.search();
+    slow.resolve(pageOf(['1']));
+    await first;
+
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(component.results().map((r) => r.id)).toEqual(['2']);
+  });
+
+  it('sendet nach schnellem mehrfachem Umschalten des Profil-Filters nur die letzte Suche', async () => {
+    vi.useFakeTimers();
+    try {
+      const search = vi.fn().mockResolvedValue(pageOf(['1']));
+      const component = setup(search, true);
+      await component.search();
+
+      const a = component.toggleProfileFilter();
+      const b = component.toggleProfileFilter();
+      const c = component.toggleProfileFilter();
+      expect(search).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
+      await Promise.all([a, b, c]);
+
+      expect(search).toHaveBeenCalledTimes(2);
+      expect(search.mock.calls[1][0].diet).toBe('');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('lädt nicht doppelt nach', async () => {
+    const more = deferred<ReturnType<typeof pageOf>>();
+    const search = vi.fn().mockResolvedValueOnce(pageOf(['1', '2'], 6)).mockReturnValue(more.promise);
+    const component = setup(search, true);
+    await component.search();
+
+    const first = component.loadMore();
+    const second = component.loadMore();
+    more.resolve(pageOf(['3', '4'], 6));
+    await Promise.all([first, second]);
+
+    expect(search).toHaveBeenCalledTimes(2);
   });
 });

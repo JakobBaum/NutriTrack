@@ -35,7 +35,7 @@ Typo: Systemschrift, tabular-nums; 13 / 15 / 17 / 22 / 34, Hero-Zahlen 48 (kcal 
 - `.nt-grouped`: inset gruppierte Karte (Radius 20, Zeilen >= 44 px, 0.5px Trenner eingerueckt); `.nt-grouped__chevron` fuer Drill-in.
 - `.nt-section-header`: 13 px, Grossbuchstaben, secondary, ueber einer Gruppe.
 - `.nt-card`: freistehende weisse Karte. `.nt-large-title`, `.nt-subtitle`: Seitenkopf.
-- `.nt-pill` (primaer = Akzent, `.nt-pill--secondary` = Tint), Hoehe 44. Ionic-Buttons sind Pillen; destruktiv behaelt Danger.
+- Buttons: siehe `.nt-btn` unter "Layout-Bausteine (Welle 2)" (`.nt-pill` und `.nt-pill--secondary` sind entfallen), Hoehe 44. Ionic-Buttons sind Pillen; destruktiv behaelt Danger.
 - `.nt-input` / `ion-searchbar.nt-searchbar`: Radius 12, Fokus mit 2px Akzent-Ring.
 - `ion-modal` (nicht Vollbild): Sheet, oben Radius 28, Grabber. Vollbild-Modals (Barcode, Kochmodus) bleiben.
 - `ion-segment` (iOS): Spur rgba(118,118,128,.12), Radius 9, Reiter 44 px in 48-px-Spur, aktiver Reiter weiss (Radius 7, kleiner Schatten), keine Grossbuchstaben.
@@ -50,7 +50,7 @@ Typo: Systemschrift, tabular-nums; 13 / 15 / 17 / 22 / 34, Hero-Zahlen 48 (kcal 
 - `.nt-page`: Inhaltsbreite max. 720, zentriert, 16 px Rand. `.nt-page-header`: Titel (`.nt-large-title`) und Aktion in einer Zeile, oben mit Safe-Area.
 - `.nt-sheet-header`: Modal-Kopf, Grid aus Start / Titel (mittig) / Ende, Seitenspalten >= 88 px. Alle Sheets (auch Tagebuch, Eintragen, Fastfood, Drill) nutzen ihn statt `ion-toolbar`. Griff kommt vom `ion-modal`.
 - `ion-modal.nt-date-modal`: Datepicker-Sheet, Phone volle Breite, Tablet/Desktop 360 px, Hoehe nach Inhalt.
-- `.nt-add-btn`: einziger Sekundaer-Stil fuer "Hinzufuegen" (Pille, Akzent-Tint, 44 px), als `button` oder `ion-button`.
+- Hinzufuegen-Schaltflaeche: `.nt-btn.nt-btn--tonal.nt-btn--block` (Pille, Akzent-Tint, 44 px), als `button` oder `ion-button`. `.nt-add-btn` ist entfallen.
 - Tab-Bar-Freiraum: `ion-tabs ion-content` nutzt `--nt-tabbar-clearance`; fuer andere Scroll-Container `.nt-tab-clearance`.
 - `.nt-fab-offset` (auf `ion-fab`): FAB 16 px ueber der Tab-Bar.
 - Komponenten: `nt-stepper` (Zeile 56, Buttons 36 mit 44 px Tippflaeche), `nt-food-row` (nur Text, keine Produktbilder: Name fett, darunter Marke · Packungsgroesse, kcal und Eiweiss je 100 g bzw. je Portion, Nutri-Score als kleine Textmarke A-E nur wenn vorhanden; eigene Lebensmittel tragen das Kennzeichen "Eigen" in `--nt-accent-on-tint` auf `--nt-accent-tint`, 5,4:1), `nt-food-sources` (vier gleiche Spalten, "Manuell" immer sichtbar), `nt-amount-row` (Feld wie `.nt-field`).
@@ -78,7 +78,7 @@ Tokens: `--nt-page-gutter` (Seitenrand, einzige Quelle), `--nt-card-pad` 16, `--
 - `.nt-stack` am `.nt-page`: Abstand Karte-Karte 12, vor Abschnittsueberschrift 24, Ueberschrift-Gruppe 8. Komponenten-Hosts ohne eigenen margin-top; Hosts, die mit einer Ueberschrift beginnen, tragen `.nt-stack__section`.
 - Kopf: `<ion-header class="ion-no-border"><nt-page-header title="..."> [Symbol-Buttons] </nt-page-header></ion-header>`. Rechts nur `<ion-button fill="clear" class="nt-icon-btn" aria-label="..."><ion-icon slot="icon-only" name="..."></ion-icon></ion-button>` (44x44). Aktionen wie "Eintragen" sind der FAB, kein Text-Button im Kopf. Der Abstand zum Inhalt steckt im Kopf, der erste Block hat margin-top 0. Heute: Titel im Kopf, Datumsleiste (`nt-date-nav`) als erster Block darunter.
 - FAB: `<ion-fab slot="fixed" vertical="bottom" horizontal="end" class="nt-fab"><ion-fab-button aria-label="Eintragen"><ion-icon name="add"></ion-icon></ion-fab-button></ion-fab>` als direktes Kind von `ion-content`; der Inhalt bekommt unten automatisch Platz (`:has(> ion-fab.nt-fab)`).
-- Buttons: `.nt-btn` (primaer), `.nt-btn--tonal`, `.nt-btn--text`, Zusaetze `.nt-btn--block`, `.nt-btn--inner` (in Karten: abgerundetes Rechteck). Immer 44 px. Alt-Namen `.nt-pill`, `.nt-pill--secondary`, `.nt-add-btn` bleiben gueltig. Pillen nur frei auf dem Seitengrund, in Karten `.nt-btn--inner`.
+- Buttons: `.nt-btn` (primaer), `.nt-btn--tonal`, `.nt-btn--text`, Zusaetze `.nt-btn--block`, `.nt-btn--inner` (in Karten: abgerundetes Rechteck). Immer 44 px. Die Alt-Namen `.nt-pill`, `.nt-pill--secondary` und `.nt-add-btn` sind entfallen (Umstellung: `.nt-btn`, `.nt-btn--tonal`, `.nt-btn--tonal.nt-btn--block`). Pillen nur frei auf dem Seitengrund, in Karten `.nt-btn--inner`.
 - `.nt-section-header`: 13 px, Grossbuchstaben, secondary, Einzug 16. `.nt-card`: Padding 16, Kompakt-Phones 14.
 - `.nt-stat`: `__value` (Zeile mit `__num` und `__unit`, nie umbrechend), `__extra` darunter ("noch", "gegessen").
 - `.nt-inner`/`--nt-radius-inner` fuer Kacheln in Karten. Sheets: X immer rechts, Speichern in `.nt-sheet-footer` unten, volle Breite.

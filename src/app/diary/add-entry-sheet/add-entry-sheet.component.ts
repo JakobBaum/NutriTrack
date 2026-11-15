@@ -11,7 +11,7 @@ import {
   signal,
 } from '@angular/core';
 import { ActionSheetController, ToastController } from '@ionic/angular';
-import { AmountUnit, DiaryEntry, FoodItem, MealType, NutritionFacts, Recipe, SavedMeal } from '../../core/models';
+import { AmountUnit, DiaryEntry, FoodItem, MealType, NutritionFacts, SavedMeal } from '../../core/models';
 import { sourceAttribution } from '../../core/messages/source-attribution';
 import { OpenPricesProvider } from '../../core/price/open-prices.provider';
 import { StorageService } from '../../core/storage/storage.service';
@@ -21,9 +21,11 @@ import { FavoriteFood, FavoriteStore, newEntryFromFavorite } from '../../core/st
 import { CustomFood, CustomFoodStore } from '../../core/state/custom-food.store';
 import { MealsStore } from '../../core/state/meals.store';
 import { RecipeStore } from '../../core/state/recipe.store';
+import { OnlineRecipeDetailsService } from '../../core/recipes/online/online-recipe-details.service';
+import { StoredRecipe } from '../../core/recipes/online/online-recipe-ref';
+import { RecipeFactsLoader } from '../../meals/recipe-facts-loader';
 import { countMissingFacts } from '../../recipes/recipe-view';
 import { plausibleServingG } from '../../core/food/serving';
-import { formatNum } from '../../shared/num.pipe';
 import { AmountRowComponent } from '../../shared/amount-row/amount-row.component';
 import { FoodSourceResult, NtFoodSourcesComponent } from '../../shared/food-sources/food-sources.component';
 import { AmountChip, StepDirection, amountChips, mealShortLabel, stepAmount, stepServings } from '../diary-edit';
@@ -57,6 +59,7 @@ import { lightHaptic } from '../haptics';
 import { hasMacros, withDerivedKcal } from '../nutrient-fields';
 import { clearRawTexts } from '../raw-texts';
 import { showEntryToast } from '../entry-toast';
+import { PriceHint, priceHintText } from './price-hint';
 import { dismissKeyboard } from '../../core/keyboard/dismiss-keyboard';
 import { entryAddedMessage } from '../entry-message';
 import {
@@ -65,13 +68,16 @@ import {
   entriesFromSavedMeal,
   entryFromRecent,
   entryFromRecipe,
+  filterLoggableRecipes,
+  isLoggableRecipe,
+  recentLoggableRecipes,
   resolveAdjustOpen,
   AccordionChangeEvent,
   savedMealProtein,
   sumEntryTotals,
 } from './add-entry-logic';
 
-type AddView = 'search' | 'form' | 'recipes' | 'saved' | 'meals';
+type AddView = 'search' | 'form' | 'recipes' | 'saved' | 'meals' | 'describe';
 type QuantityUnit = 'g' | 'portion';
 
 /** Bezugswerte, aus denen die Formularfelder bei Mengenänderung neu berechnet werden. */
@@ -141,6 +147,9 @@ export class AddEntrySheetComponent implements OnChanges {
   private readonly toastCtrl = inject(ToastController);
   private readonly sheetCtrl = inject(ActionSheetController);
   private readonly storage = inject(StorageService);
+  /** Lädt Nährwerte gespeicherter Online-Verweise nach (Ladezustand, Fehler, Sequenz-Token). */
+  readonly recipeLoad = new RecipeFactsLoader(inject(OnlineRecipeDetailsService));
+  private retryQuick = false;
 
   /** Sheet offen. Wechsel auf true startet einen neuen Eintrag. */
   readonly isOpen = input(false);
@@ -172,7 +181,8 @@ export class AddEntrySheetComponent implements OnChanges {
   readonly adjustOpen = signal<string | undefined>(undefined);
   /** True, wenn die Werte im Formular aus einer KI-Schätzung stammen. */
   readonly isAiEstimate = signal(false);
-  readonly formHint = signal<string | null>(null);
+  private readonly hint = new PriceHint();
+  readonly formHint = this.hint.text;
   /** Quellenangabe zu Open Food Facts / Open Prices (Lizenzpflicht), solange ein Treffer im Formular steht. */
   readonly sourceNote = signal<string | null>(null);
   /** Freitext-Filter für die Rezept-Auswahl. */
@@ -207,15 +217,9 @@ export class AddEntrySheetComponent implements OnChanges {
     short: mealShortLabel(m.type),
   }));
 
-  readonly recipeOptions = computed<Recipe[]>(() => {
-    const q = this.recipeQuery().trim().toLowerCase();
-    const withFacts = this.recipeStore.recipes().filter((r) => !!r.factsPerServing);
-    return q ? withFacts.filter((r) => r.title.toLowerCase().includes(q)) : withFacts;
-  });
+  readonly recipeOptions = computed(() => filterLoggableRecipes(this.recipeStore.recipes(), this.recipeQuery()));
 
-  readonly hasLoggableRecipes = computed(() =>
-    this.recipeStore.recipes().some((r) => !!r.factsPerServing),
-  );
+  readonly hasLoggableRecipes = computed(() => this.recipeStore.recipes().some(isLoggableRecipe));
 
   readonly customFoodOptions = computed<CustomFood[]>(() => {
     const q = this.customQuery().trim().toLowerCase();
@@ -232,14 +236,7 @@ export class AddEntrySheetComponent implements OnChanges {
   /** Zuletzt benutzte Lebensmittel. */
   readonly recentFoods = computed(() => this.diary.recentFoods(MAX_RECENT_FOODS, this.selectedMeal()));
 
-  /** Zuletzt benutzte Rezepte (max. 3) aus Tagebuch-Einträgen. */
-  readonly recentRecipes = computed<Recipe[]>(() => {
-    const ids = this.diary.recentRecipeIds(3);
-    const all = this.recipeStore.recipes();
-    return ids
-      .map((id) => all.find((r) => r.id === id))
-      .filter((r): r is Recipe => !!r && !!r.factsPerServing);
-  });
+  readonly recentRecipes = computed(() => recentLoggableRecipes(this.diary.recentRecipeIds(3), this.recipeStore.recipes()));
 
   readonly canDismissAdd = (): Promise<boolean> => this.confirmAddClose();
 
@@ -252,33 +249,39 @@ export class AddEntrySheetComponent implements OnChanges {
 
   /** Setzt Formular und Zustand für einen neuen Eintrag zurück. */
   private startEntry(meal: MealType): void {
+    this.recipeLoad.cancel();
     this.isSaving = false;
-    this.addDirty = false;
-    this.kcalManual = false;
+    this.resetSource();
     this.form = { ...EMPTY_FORM, meal };
     this.selectedMeal.set(meal);
     this.addedCount.set(0);
-    this.pickedServingG = null;
-    clearRawTexts(this.rawTexts, ADD_FORM_TEXT_KEYS);
     this.amountUnit = 'g';
-    this.unitTouched = false;
-    this.pickedRecipeId = null;
-    this.pickedBrand = undefined;
-    this.scaleBase = null;
     this.recipeQuery.set('');
     this.customQuery.set('');
     this.foodSearch?.reset();
-    this.formHint.set(null);
-    this.sourceNote.set(null);
-    this.isAiEstimate.set(false);
-    this.isPartialSource = false;
     this.adjustOpen.set(undefined);
-    this.error.set(null);
     this.view.set('search');
   }
 
+  /** Setzt alles zurück, was von einer gewählten Quelle (Treffer, Rezept, manuell) stammt. */
+  private resetSource(): void {
+    this.addDirty = false;
+    this.kcalManual = false;
+    this.scaleBase = null;
+    this.pickedRecipeId = null;
+    this.pickedBrand = undefined;
+    this.pickedServingG = null;
+    clearRawTexts(this.rawTexts, ADD_FORM_TEXT_KEYS);
+    this.unitTouched = false;
+    this.hint.set(null);
+    this.sourceNote.set(null);
+    this.isAiEstimate.set(false);
+    this.isPartialSource = false;
+    this.error.set(null);
+  }
 
   closeAdd(): void {
+    this.recipeLoad.cancel();
     this.addDirty = false;
     this.closed.emit();
   }
@@ -312,6 +315,7 @@ export class AddEntrySheetComponent implements OnChanges {
   }
 
   showView(next: AddView): void {
+    this.recipeLoad.cancel();
     this.error.set(null);
     this.view.set(next);
   }
@@ -330,6 +334,7 @@ export class AddEntrySheetComponent implements OnChanges {
       case 'recipes': return 'Rezept wählen';
       case 'saved': return 'Eigene Lebensmittel';
       case 'meals': return 'Gespeicherte Mahlzeit';
+      case 'describe': return 'Essen beschreiben';
       default: return `Zu ${this.selectedMealLabel()}`;
     }
   }
@@ -381,22 +386,10 @@ export class AddEntrySheetComponent implements OnChanges {
 
   /** Blendet das Formular für eine manuelle Eingabe ein; kcal sind Pflicht, daher offen. */
   openManualEntry(): void {
-    this.scaleBase = null;
-    this.pickedRecipeId = null;
-    this.pickedBrand = undefined;
-    this.pickedServingG = null;
     const label = this.foodSearch?.query.trim() ?? '';
-    this.addDirty = false;
-    this.kcalManual = false;
+    this.resetSource();
     this.form = { ...this.form, ...EMPTY_FIELDS, label, amountG: null, servings: null };
-    clearRawTexts(this.rawTexts, ADD_FORM_TEXT_KEYS);
     this.amountUnit = unitForName(label);
-    this.unitTouched = false;
-    this.formHint.set(null);
-    this.sourceNote.set(null);
-    this.isAiEstimate.set(false);
-    this.isPartialSource = false;
-    this.error.set(null);
     this.adjustOpen.set('adjust');
     this.view.set('form');
   }
@@ -511,7 +504,7 @@ export class AddEntrySheetComponent implements OnChanges {
       amountG,
       servings,
     };
-    this.formHint.set(opts.hint ?? null);
+    this.hint.set(opts.hint ?? null);
     this.sourceNote.set(null);
     this.isAiEstimate.set(opts.isAi ?? false);
     this.isPartialSource = opts.isPartial ?? false;
@@ -522,12 +515,17 @@ export class AddEntrySheetComponent implements OnChanges {
   }
 
   /** Übernimmt ein Rezept (Nährwerte je Portion) ins Formular; Menge = Portionen. */
-  selectRecipe(recipe: Recipe): void {
-    if (!recipe.factsPerServing) return;
-    this.applyFacts(recipe.title, recipe.factsPerServing, {
-      recipeId: recipe.id,
-      isPartial: countMissingFacts(recipe.ingredients) > 0,
-    });
+  async selectRecipe(recipe: StoredRecipe): Promise<void> {
+    this.retryQuick = false;
+    const loaded = await this.recipeLoad.load(recipe);
+    if (!loaded) return;
+    this.applyFacts(recipe.title, loaded.facts, { recipeId: recipe.id, isPartial: countMissingFacts(loaded.recipe.ingredients) > 0 });
+  }
+
+  /** „Erneut versuchen“ nach einem Ladefehler: wiederholt die letzte Rezeptwahl. */
+  retryRecipe(): void {
+    const state = this.recipeLoad.state();
+    if (state.kind === 'error') void (this.retryQuick ? this.quickAddRecipe(state.recipe) : this.selectRecipe(state.recipe));
   }
 
   /** Übernimmt ein gespeichertes eigenes Lebensmittel ins Formular. */
@@ -578,8 +576,10 @@ export class AddEntrySheetComponent implements OnChanges {
   }
 
   /** Loggt eine Portion eines Rezepts sofort. */
-  quickAddRecipe(recipe: Recipe): void {
-    const entry = entryFromRecipe(recipe, this.date(), this.form.meal);
+  async quickAddRecipe(recipe: StoredRecipe): Promise<void> {
+    this.retryQuick = true;
+    const loaded = await this.recipeLoad.load(recipe);
+    const entry = loaded && entryFromRecipe({ ...loaded.recipe, factsPerServing: loaded.facts }, this.date(), this.form.meal);
     if (entry) this.addAndConfirm([entry]);
   }
 
@@ -628,10 +628,9 @@ export class AddEntrySheetComponent implements OnChanges {
 
   /** Realen Preis (Open Prices) best-effort ergänzen — blockiert nichts. */
   private async addPriceHint(code: string): Promise<void> {
+    const token = this.hint.begin();
     const price = await this.prices.priceByBarcode(code);
-    if (!price) return;
-    this.formHint.set(`Realer Preis ca. ${formatNum(price.avg, 2, 2)} ${price.currency}.`);
-    this.sourceNote.set(sourceAttribution('barcode', true));
+    if (price && this.hint.setIfCurrent(token, priceHintText(price))) this.sourceNote.set(sourceAttribution('barcode', true));
   }
 
   // --- Speichern ---

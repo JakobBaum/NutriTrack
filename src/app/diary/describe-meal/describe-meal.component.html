@@ -1,0 +1,122 @@
+<ion-content class="sheet-content">
+  <div class="nt-page dm">
+    <div class="meal-picker" role="radiogroup" aria-label="Essenszeit">
+      @for (opt of mealOptions; track opt.value) {
+        <button type="button" class="meal-chip" role="radio" [attr.aria-checked]="meal() === opt.value" [class.meal-chip--on]="meal() === opt.value" [attr.aria-label]="opt.label" (click)="mealChange.emit(opt.value)">{{ opt.short }}</button>
+      }
+    </div>
+
+    @if (phase() !== 'results') {
+      <label class="dm__label" for="describe-text">Was hast du gegessen?</label>
+      <ion-textarea
+        id="describe-text"
+        class="nt-field dm__text"
+        data-testid="describe-text"
+        aria-label="Beschreibung des Essens"
+        placeholder="2 Semmeln mit Butter und Schinken, ein Apfel, Cappuccino"
+        [autoGrow]="true"
+        rows="4"
+        autocapitalize="sentences"
+        [disabled]="phase() === 'loading'"
+        [ngModel]="text()"
+        (ngModelChange)="setText($event)"
+      ></ion-textarea>
+      <p class="dm__counter" [class.dm__counter--over]="textState() === 'tooLong'" data-testid="describe-counter" [attr.role]="textState() === 'tooLong' ? 'alert' : null">
+        {{ textLength() }} / {{ maxChars }}
+        @if (textState() === 'tooLong') { · Der Text ist zu lang. Kürze ihn. }
+      </p>
+      <p class="scan-hint dm__tip">Tipp: Mit der Mikrofon-Taste der Tastatur kannst du diktieren.</p>
+      @if (!isLive) {
+        <p class="form-error" role="status" data-testid="describe-not-live">{{ notLiveHint }}</p>
+      }
+    }
+
+    @if (phase() === 'loading') {
+      <p class="nt-source-status dm__loading" role="status" data-testid="describe-loading"><ion-spinner name="crescent"></ion-spinner> Ich erkenne dein Essen (bis zu 30 s)…</p>
+      <ion-button fill="clear" class="touch-btn touch-btn--text" data-testid="describe-cancel" (click)="cancel()">Abbrechen</ion-button>
+    }
+
+    <div aria-live="polite" data-testid="describe-live">
+      @if (phase() === 'error' && errorText()) {
+        <p class="form-error dm__msg" role="alert" data-testid="describe-error">{{ errorText() }}</p>
+      }
+      @if (phase() === 'empty') {
+        <p class="form-error dm__msg" data-testid="describe-empty">{{ nothingRecognized }}</p>
+        <ion-button fill="clear" class="touch-btn touch-btn--text" data-testid="describe-manual" (click)="manual.emit()">Von Hand eintragen</ion-button>
+      }
+
+      @if (phase() === 'results') {
+        <div class="dm__head">
+          <h3 class="nt-section-header dm__title">Erkannt</h3>
+          <ion-button size="small" fill="clear" class="touch-btn touch-btn--text" data-testid="describe-edit-text" (click)="editText()">Text ändern</ion-button>
+        </div>
+        <p class="scan-hint dm__note" role="note" data-testid="describe-note">{{ note }}</p>
+        @if (droppedCount() > 0) {
+          <p class="scan-hint" data-testid="describe-dropped">{{ droppedCount() }} {{ droppedCount() === 1 ? 'Zeile war' : 'Zeilen waren' }} unplausibel und {{ droppedCount() === 1 ? 'wurde' : 'wurden' }} nicht übernommen.</p>
+        }
+        <ul class="dm__list" data-testid="describe-list">
+          @for (row of rows(); track row.id) {
+            <li class="dm__row" data-testid="describe-row">
+              <div class="dm__row-head">
+                <div class="dm__row-title">
+                  <span class="dm__name" data-testid="describe-name">{{ row.name }}</span>
+                  <span class="ai-badge">KI-Schätzung</span>
+                  @if (row.quantityLabel) { <span class="dm__qty">{{ row.quantityLabel }}</span> }
+                </div>
+                <ion-button fill="clear" class="touch-btn dm__remove" data-testid="describe-remove" (click)="remove(row)" [attr.aria-label]="row.name + ' entfernen'">
+                  <ion-icon slot="icon-only" name="trash-outline" aria-hidden="true"></ion-icon>
+                </ion-button>
+              </div>
+              @if (row.isKcalDoubtful) {
+                <p class="dm__doubt" role="note" data-testid="describe-doubt">Werte prüfen</p>
+              }
+              <app-amount-row
+                class="dm__amount"
+                data-testid="describe-amount"
+                [compact]="true"
+                [label]="'Menge in g für ' + row.name"
+                suffix="g"
+                [text]="row.amountText"
+                (textChange)="setAmount(row, $event)"
+                (stepped)="step(row, $event)"
+              ></app-amount-row>
+              @if (row.amountG === null) {
+                <p class="dm__doubt" role="alert">Gib eine Menge von 1 bis 2000 g ein.</p>
+              }
+              <p class="dm__meta" data-testid="describe-row-totals">
+                {{ totalsOf(row).kcal | ntNum:0 }} kcal · <span class="protein-val">{{ totalsOf(row).proteinG | ntNum }} g Eiweiß</span>
+              </p>
+            </li>
+          }
+        </ul>
+        <div class="preview dm__sum" data-testid="describe-sum">
+          <p class="preview__main">
+            <span><strong class="preview__kcal">{{ totals().kcal | ntNum:0 }}</strong> kcal</span>
+            <span><strong class="preview__protein protein-val">{{ totals().proteinG | ntNum }}</strong> g Eiweiß</span>
+          </p>
+          <p class="preview__rest">Summe aller Zeilen</p>
+        </div>
+      }
+    </div>
+  </div>
+</ion-content>
+
+<ion-footer class="ion-no-border add-footer">
+  <div class="nt-page">
+    <div class="nt-sheet-footer">
+      @if (phase() === 'results') {
+        <ion-button expand="block" class="nt-btn nt-btn--block" data-testid="describe-log" [disabled]="!canLog()" (click)="log()">
+          Eintragen
+        </ion-button>
+      } @else {
+        <ion-button expand="block" class="nt-btn nt-btn--block" data-testid="describe-run" [disabled]="!canRun()" (click)="recognize()">
+          @if (phase() === 'loading') {
+            <ion-spinner name="dots" slot="start"></ion-spinner> Erkenne…
+          } @else {
+            <ion-icon slot="start" name="sparkles-outline"></ion-icon> Erkennen
+          }
+        </ion-button>
+      }
+    </div>
+  </div>
+</ion-footer>

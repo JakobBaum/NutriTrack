@@ -36,7 +36,6 @@ import {
 } from './recipe-form';
 import { askPortionsSheet, cardMenuSheet, mealLabel, pickMealSheet } from './recipe-sheets';
 import { TOAST_SWIPE_GESTURE } from '../shared/toast-options';
-import { recipeCookIngredients } from '../core/cook/recipe-cook-ingredients';
 import { confirmDiscard } from '../meals/confirm-discard';
 import { MealType, NutritionFacts, Recipe, RecipeIngredient } from '../core/models';
 import { AiService } from '../core/ai/ai.service';
@@ -55,6 +54,13 @@ import { MealsListComponent } from '../meals/meals-list.component';
 import { UNDO_TOAST_BUTTONS, UNDO_TOAST_MS, UndoableDelete, settleUndoToast } from '../meals/undoable-delete';
 import { recipeSourceView } from './recipe-source';
 import { shrinkPhotoForUpload } from '../core/scan/label-image';
+import { OnlineRecipeDetailsService } from '../core/recipes/online/online-recipe-details.service';
+import { StoredRecipe, isOnlineRef } from '../core/recipes/online/online-recipe-ref';
+import { fileToBase64 } from './file-base64';
+import { OnlineDetailLoader } from './online-detail-loader';
+import { onlineMetaLine } from './online-ref-view';
+import { RecipeDetailFlow } from './recipe-detail-flow';
+import { RequestGuard } from './request-guard';
 import {
   APPROX_UNITS,
   isUnknownUnit,
@@ -97,6 +103,17 @@ export class RecipesPage implements OnDestroy {
   private readonly router = inject(Router);
   private readonly alerts = inject(AlertController);
   private readonly modals = inject(ModalController);
+  private readonly onlineDetails = inject(OnlineRecipeDetailsService);
+  /** Nur die jüngste Import-Antwort darf das Formular füllen (Nr. 11). */
+  private readonly importGuard = new RequestGuard();
+  readonly isRef = isOnlineRef;
+  /** Detail und Kochmodus; Online-Verweise werden vor jeder Aktion nachgeladen. */
+  readonly detail = new RecipeDetailFlow(new OnlineDetailLoader(this.onlineDetails), {
+    toast: (m) => this.toastMessage.set(m),
+    remove: (id) => this.remove(id),
+    edit: (r) => this.openEdit(r),
+    diary: (r) => this.logToDiary(r),
+  });
 
   /** Segment „Rezepte | Mahlzeiten“; per `?view=meals` vorwählbar (alte Route /meals). */
   readonly view = signal<RecipesView>('recipes');
@@ -130,7 +147,7 @@ export class RecipesPage implements OnDestroy {
 
   /** Verlässt den Import Richtung Profil (KI-Status). */
   openAiSettings(): void {
-    this.importOpen.set(false);
+    this.closeImport();
     void this.router.navigate(['/settings']);
   }
 
@@ -145,10 +162,16 @@ export class RecipesPage implements OnDestroy {
   readonly lowerBoundNote = lowerBoundNote;
   readonly optionalGramsLabel = optionalGramsLabel;
   readonly servingsLabel = servingsLabel;
-  readonly recipeFacts = recipeDisplayFacts;
 
-  /** Meta-Zeile „2 Portionen · 1 Zutat · 4 kcal gesamt“. */
-  metaLine(recipe: Recipe): string {
+  /** Nährwerte; bei Online-Verweisen nur, solange die Details im Speicher-Cache liegen. */
+  recipeFacts(recipe: StoredRecipe): NutritionFacts | null {
+    if (isOnlineRef(recipe)) return this.onlineDetails.peek(recipe.onlineRef.externalId)?.facts ?? null;
+    return recipeDisplayFacts(recipe) ?? null;
+  }
+
+  /** Meta-Zeile „2 Portionen · 1 Zutat · 4 kcal gesamt“; Verweise: „Online-Rezept“. */
+  metaLine(recipe: StoredRecipe): string {
+    if (isOnlineRef(recipe)) return onlineMetaLine(this.onlineDetails.peek(recipe.onlineRef.externalId));
     return recipeMetaLine(recipe, recipeDisplayFacts(recipe)?.kcal);
   }
 
@@ -225,7 +248,7 @@ export class RecipesPage implements OnDestroy {
     this.importError.set(null);
     this.importPhotoScanning.set(true);
     try {
-      const base64 = await this.fileToBase64(file);
+      const base64 = await fileToBase64(file);
       await this.runImportFromBase64(base64);
     } catch (e: unknown) {
       this.importError.set(importErrorMessage(e, this.isOffline()));
@@ -237,29 +260,29 @@ export class RecipesPage implements OnDestroy {
 
   private async runImportFromBase64(base64: string): Promise<void> {
     if (!this.isLive()) throw new Error('Foto-Import braucht die KI, sie ist gerade nicht verbunden.');
+    const token = this.importGuard.begin();
     const res = await this.ai.importRecipe({ imageBase64: await shrinkPhotoForUpload(base64) });
+    if (!this.importGuard.isCurrent(token)) return;
     if (res.ingredients.length === 0) throw new Error('Auf dem Foto wurden keine Zutaten erkannt.');
+    this.applyImport(res, 'photo', undefined, 'Rezept aus Foto erkannt — bitte prüfen und speichern.');
+  }
+
+  /** Übernimmt ein Import-Ergebnis ins Formular und öffnet das Rezept-Sheet. */
+  private applyImport(
+    res: Parameters<typeof formFromImport>[0],
+    origin: 'photo' | 'tiktok' | 'url' | 'text',
+    sourceUrl: string | undefined,
+    toast: string,
+  ): void {
     this.form = formFromImport(res);
-    this._importOrigin = 'photo';
-    this._importSourceUrl = undefined;
+    this._importOrigin = origin;
+    this._importSourceUrl = sourceUrl;
     this.baseline = '';
     this.editId.set(null);
     this.error.set(null);
     this.importOpen.set(false);
     this.isModalOpen.set(true);
-    this.toastMessage.set('Rezept aus Foto erkannt — bitte prüfen und speichern.');
-  }
-
-  private fileToBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = String(reader.result);
-        resolve(result.includes(',') ? result.split(',')[1] : result);
-      };
-      reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden.'));
-      reader.readAsDataURL(file);
-    });
+    this.toastMessage.set(toast);
   }
 
   constructor() {
@@ -341,6 +364,7 @@ export class RecipesPage implements OnDestroy {
 
   // --- Modal öffnen/schließen ---
   openAdd(): void {
+    this.importGuard.cancel();
     this._importOrigin = 'own';
     this._importSourceUrl = undefined;
     this.form = emptyForm();
@@ -352,6 +376,7 @@ export class RecipesPage implements OnDestroy {
   }
 
   openEdit(recipe: Recipe): void {
+    this.importGuard.cancel();
     this.form = formFromRecipe(recipe);
     this._importOrigin = recipe.origin ?? 'own';
     this._importSourceUrl = undefined;
@@ -391,6 +416,7 @@ export class RecipesPage implements OnDestroy {
 
   // --- Import ---
   openImport(): void {
+    this.importGuard.cancel();
     this.importText = '';
     this.importUrl = '';
     this.importError.set(null);
@@ -399,6 +425,8 @@ export class RecipesPage implements OnDestroy {
   }
 
   closeImport(): void {
+    this.importGuard.cancel();
+    this.importBusy.set(false);
     this.importOpen.set(false);
   }
 
@@ -422,27 +450,24 @@ export class RecipesPage implements OnDestroy {
     }
     this.importError.set(null);
     this.importBusy.set(true);
+    const token = this.importGuard.begin();
     const isTikTok = url && this.isTikTokUrl(url);
     try {
       const res = await this.ai.importRecipe({ text: text || undefined, url: url || undefined });
+      if (!this.importGuard.isCurrent(token)) return;
       if (res.ingredients.length === 0) throw new Error('Keine Zutaten erkannt.');
-      this.form = formFromImport(res);
-      this._importOrigin = isTikTok ? 'tiktok' : (url ? 'url' : 'text');
-      this._importSourceUrl = url ? res.sourceUrl : undefined;
-      this.baseline = '';
-      this.editId.set(null);
-      this.error.set(null);
-      this.importOpen.set(false);
-      this.isModalOpen.set(true);
-      this.toastMessage.set(
+      this.applyImport(
+        res,
+        isTikTok ? 'tiktok' : (url ? 'url' : 'text'),
+        url ? res.sourceUrl : undefined,
         this.isLive()
           ? `Rezept${isTikTok ? ' aus TikTok' : ''} importiert — bitte prüfen und speichern.`
           : 'Rezept aus Text erkannt — Nährwerte je Zutat prüfen oder ergänzen.',
       );
     } catch (e: unknown) {
-      this.importError.set(importErrorMessage(e, this.isOffline()));
+      if (this.importGuard.isCurrent(token)) this.importError.set(importErrorMessage(e, this.isOffline()));
     } finally {
-      this.importBusy.set(false);
+      if (this.importGuard.isCurrent(token)) this.importBusy.set(false);
     }
   }
 
@@ -608,46 +633,9 @@ export class RecipesPage implements OnDestroy {
   }
 
   // --- Karten-Menü (Bearbeiten/Löschen) ---
-  async openCardMenu(recipe: Recipe): Promise<void> {
+  async openCardMenu(recipe: StoredRecipe): Promise<void> {
     const choice = await cardMenuSheet(this.actionSheets, recipe.title);
-    if (choice === 'edit') this.openEdit(recipe);
+    if (choice === 'edit') await this.detail.edit(recipe);
     if (choice === 'delete') this.remove(recipe.id);
-  }
-
-  // --- Nur-Lesen-Detail ---
-  readonly detailRecipe = signal<Recipe | null>(null);
-
-  openDetail(recipe: Recipe): void {
-    this.detailRecipe.set(recipe);
-  }
-
-  closeDetail(): void {
-    this.detailRecipe.set(null);
-  }
-
-  /** Schließt das Detail und führt dann die Aktion aus. */
-  detailThen(action: (r: Recipe) => void): void {
-    const r = this.detailRecipe();
-    this.closeDetail();
-    if (r) action(r);
-  }
-
-  readonly editAction = (r: Recipe): void => this.openEdit(r);
-  readonly diaryAction = (r: Recipe): void => void this.logToDiary(r);
-  readonly cookAction = (r: Recipe): void => this.startCook(r);
-
-  // --- Kochmodus ---
-  readonly cookRecipe = signal<Recipe | null>(null);
-  readonly cookIngredients = computed(() => recipeCookIngredients(this.cookRecipe()?.ingredients ?? []));
-
-  startCook(recipe: Recipe): void {
-    // Offene Hinweise würden „Weiter“ verdecken.
-    this.toastMessage.set(null);
-    this.detailRecipe.set(null);
-    this.cookRecipe.set(recipe);
-  }
-
-  closeCook(): void {
-    this.cookRecipe.set(null);
   }
 }

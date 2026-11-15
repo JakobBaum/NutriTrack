@@ -600,7 +600,7 @@ export function register({ test }) {
       await modal.locator('.nt-sheet-header__title', { hasText: 'Neues Rezept' }).waitFor();
       await modal.locator('ion-input input[aria-label="Name"]').fill('Offline Suppe');
       await modal.locator('ion-input input[aria-label="Name"]').press('Tab');
-      await modal.locator('.nt-add-btn', { hasText: 'manuelle Zutat' }).click();
+      await modal.locator('.nt-btn--tonal.nt-btn--block', { hasText: 'manuelle Zutat' }).click();
       const ingredient = modal.locator('ion-input input[aria-label="Zutatname"]');
       await ingredient.fill('Karotten');
       await ingredient.press('Tab');

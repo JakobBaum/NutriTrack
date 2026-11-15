@@ -8,6 +8,7 @@ import { ActivityLevel, DailyTarget, DietForm, Goal, Intolerance, Sex, UserProfi
 import { PROTEIN_NOTE_ABOVE_G_PER_KG, manualKcalWarning } from '../../core/nutrition/manual-target';
 import { NutritionCalcService } from '../../core/nutrition/nutrition-calc.service';
 import { ProfileNote, profileNotes } from '../../core/nutrition/profile-plausibility';
+import { FASTFOOD_COUNTRIES } from '../../core/ai/fastfood-countries';
 import { ProfileStore } from '../../core/state/profile.store';
 import { formatDecimal, parseDecimal } from '../../core/util/number-input';
 import { PROFILE_FIELD_ORDER, ProfileField, ProfileFieldErrors, targetWeightError, validateProfileForm } from '../profile-form';
@@ -61,6 +62,7 @@ export class ProfileSheetComponent {
   readonly saving = signal(false);
   readonly dislikeInput = signal('');
 
+  readonly countries = FASTFOOD_COUNTRIES;
   readonly dietOptions = DIET_FORM_OPTIONS;
   readonly intoleranceOptions = INTOLERANCE_OPTIONS;
   readonly dietHint = DIET_HINT;
@@ -94,7 +96,7 @@ export class ProfileSheetComponent {
   }
 
   private load(): void {
-    const base = formStateFromProfile(this.profileStore.profile());
+    const base = formStateFromProfile(this.profileStore.profile(), this.profileStore.fastfoodCountry());
     const prefill = this.prefillWeightKg();
     this.form.set(prefill === null ? base : { ...base, weightKg: prefill });
     this.touched.set(prefill === null ? {} : { weightKg: true });
@@ -260,6 +262,9 @@ export class ProfileSheetComponent {
   }
   setManualProtein(text: string): void {
     this.form.update((f) => ({ ...f, manualProteinText: text }));
+  }
+  setFastfoodCountry(country: string): void {
+    this.form.update((f) => ({ ...f, fastfoodCountry: country }));
   }
   setDiet(diet: DietForm): void {
     this.form.update((f) => ({ ...f, dietPrefs: { ...f.dietPrefs, diet } }));

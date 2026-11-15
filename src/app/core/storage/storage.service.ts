@@ -26,6 +26,9 @@ export interface Sanitized<T> {
   readonly repaired: number;
 }
 
+/** Ausgang von {@link StorageService.replaceAll}: ersetzt, zurückgerollt oder (schlimmster Fall) Rückrollen gescheitert. */
+export type ReplaceOutcome = 'ok' | 'failed' | 'rollbackFailed';
+
 const QUOTA_ERROR_NAMES = new Set(['QuotaExceededError', 'NS_ERROR_DOM_QUOTA_REACHED']);
 
 function classifyError(error: unknown): StorageErrorKind {
@@ -118,11 +121,15 @@ export class StorageService implements OnDestroy {
    * Lesen (`get`, `snapshot`, …) sieht sofort den neuesten Wert; beim Verlassen der Seite
    * (`pagehide`, `visibilitychange`, `beforeunload`) wird sofort geschrieben.
    * Scheitert das Schreiben, bleibt der Wert vorgemerkt, `lastError` wird gesetzt und es folgen Wiederholungen
-   * (siehe {@link RETRY_DELAYS_MS}).
+   * (siehe {@link RETRY_DELAYS_MS}). Stammt der Speicher von einer neueren App-Version, wird nichts geschrieben.
+   * @returns `false`, wenn der Wert wegen eines neueren Schemas verworfen wurde (nichts vorgemerkt).
    */
-  set<T>(key: string, value: T): void {
+  set<T>(key: string, value: T): boolean {
+    // Daten einer neueren App-Version dürfen von dieser App nicht überschrieben werden (Hinweis: Status-Banner).
+    if (this._schemaNewer()) return false;
     this.pending.set(key, value);
     this.flushTimer ??= setTimeout(() => this.flush(), StorageService.WRITE_DELAY_MS);
+    return true;
   }
 
   /** Anzahl noch nicht dauerhaft geschriebener Schlüssel. */
@@ -164,8 +171,9 @@ export class StorageService implements OnDestroy {
     return this.flush();
   }
 
-  /** Entfernt einen Schlüssel. */
+  /** Entfernt einen Schlüssel (bei neuerem Schema nicht: die Daten gehören der neueren App-Version). */
   remove(key: string): void {
+    if (this._schemaNewer()) return;
     this.pending.delete(key);
     try {
       this.backend()?.removeItem(this.prefix + key);
@@ -174,17 +182,22 @@ export class StorageService implements OnDestroy {
     }
   }
 
-  /** Löscht alle NutriTrack-Schlüssel (für "Daten zurücksetzen"), auch die Quarantäne. Die Schema-Version bleibt gesetzt. */
-  clearAll(): void {
+  /** Löscht alle NutriTrack-Schlüssel (für "Daten zurücksetzen"), auch die Quarantäne. Die Schema-Version bleibt gesetzt.
+   * @returns `false`, wenn das Löschen scheiterte (Daten können noch auf dem Gerät liegen).
+   */
+  clearAll(): boolean {
     this.pending.clear();
     this.markWritten();
     const b = this.backend();
-    if (!b) return;
+    if (!b) return true;
     try {
       Object.keys(this.rawEntries()).forEach((k) => b.removeItem(this.prefix + k));
       b.setItem(this.prefix + SCHEMA_KEY, JSON.stringify(CURRENT_SCHEMA_VERSION));
+      this.reevaluateSchema();
+      return true;
     } catch (e) {
       console.error('NutriTrack: Zurücksetzen fehlgeschlagen', e);
+      return false;
     }
   }
 
@@ -213,23 +226,23 @@ export class StorageService implements OnDestroy {
    * Ersetzt alle NutriTrack-Schlüssel (außer der Quarantäne) durch `data` (z. B. Backup-Import).
    * Die Schema-Version wird dabei entfernt; der nächste Start migriert die Daten erneut.
    * Schlägt das Schreiben fehl (Speicher voll), wird der vorherige Stand wiederhergestellt.
-   * @returns `true` bei Erfolg.
+   * @returns `ok`; `failed` (alter Stand wiederhergestellt); `rollbackFailed` (auch die Wiederherstellung scheiterte, Daten evtl. unvollständig).
    */
-  replaceAll(data: Readonly<Record<string, unknown>>): boolean {
+  replaceAll(data: Readonly<Record<string, unknown>>): ReplaceOutcome {
     this.pending.clear();
     const b = this.backend();
-    if (!b) return false;
+    if (!b) return 'failed';
     const previous = this.rawEntries();
     const removable = Object.fromEntries(Object.entries(previous).filter(([k]) => !isQuarantineKey(k)));
     try {
       this.writeRaw(b, removable, {});
       Object.entries(data).forEach(([key, value]) => b.setItem(this.prefix + key, JSON.stringify(value)));
       this.markWritten();
-      return true;
+      this.reevaluateSchema();
+      return 'ok';
     } catch (e) {
       console.error('NutriTrack: Ersetzen der Daten fehlgeschlagen, vorheriger Stand wird wiederhergestellt', e);
-      this.restoreRaw(b, previous);
-      return false;
+      return this.restoreRaw(b, previous) ? 'failed' : 'rollbackFailed';
     }
   }
 
@@ -239,12 +252,12 @@ export class StorageService implements OnDestroy {
    */
   quarantine(source: string, items: readonly unknown[], reason: QuarantineReason, raw?: string): void {
     if (items.length === 0 && raw === undefined) return;
-    const b = this.backend();
+    const b = this._schemaNewer() ? null : this.backend();
     const now = new Date();
     const record = buildQuarantineRecord(source, reason, raw === undefined ? { items } : { raw }, now);
     let saved = false;
     try {
-      if (!b) throw new Error('Speicher nicht verfügbar');
+      if (!b) throw new Error(this._schemaNewer() ? 'Speicher gehört einer neueren App-Version' : 'Speicher nicht verfügbar');
       b.setItem(this.prefix + quarantineKey(source, now.getTime()), JSON.stringify(record));
       keysToPrune(Object.keys(this.rawEntries())).forEach((k) => b.removeItem(this.prefix + k));
       saved = true;
@@ -263,6 +276,11 @@ export class StorageService implements OnDestroy {
     if (this.corruptSeen.get(key) === raw) return;
     this.corruptSeen.set(key, raw);
     this.quarantine(key, [], 'parse', raw);
+  }
+
+  /** Bewertet das Schema nach einem Löschen/Ersetzen neu: der Speicher hat dann kein neueres Schema mehr. */
+  private reevaluateSchema(): void {
+    this._schemaNewer.set(readSchemaVersion(this.readParsed(SCHEMA_KEY)) > CURRENT_SCHEMA_VERSION);
   }
 
   private markWritten(): void {
@@ -359,11 +377,14 @@ export class StorageService implements OnDestroy {
     Object.entries(write).forEach(([k, v]) => b.setItem(this.prefix + k, v));
   }
 
-  private restoreRaw(b: Storage, previous: Record<string, string>): void {
+  /** @returns `false`, wenn der vorherige Stand nicht (vollständig) wiederhergestellt werden konnte. */
+  private restoreRaw(b: Storage, previous: Record<string, string>): boolean {
     try {
       this.writeRaw(b, this.rawEntries(), previous);
+      return true;
     } catch (e) {
       console.error('NutriTrack: Wiederherstellung des vorherigen Stands fehlgeschlagen', e);
+      return false;
     }
   }
 
