@@ -68,8 +68,8 @@ async function geminiRequest(model, body, env, timeoutMs) {
 }
 
 /**
- * Erstes Modell mit Retry (Backoff + Jitter, innerhalb des Gesamtbudgets),
- * danach das jeweils andere als Fallback. Gibt die erste erfolgreiche Response zurück;
+ * Erstes Modell mit Retry bei 429/500/503 (Backoff + Jitter, innerhalb des Gesamtbudgets),
+ * danach das jeweils andere als Fallback; antwortet ein Modell gar nicht, sofort das andere. Gibt die erste erfolgreiche Response zurück;
  * bleibt alles transient kaputt → OverloadedError, sonst Error mit Status.
  */
 /** Reihenfolge der Modelle: das zur Aufgabe passende zuerst, das andere als Fallback. Per Worker-Variable überschreibbar. */
@@ -95,6 +95,8 @@ async function geminiWithFallback(body, models, env, deadline) {
         resp = null;
       }
       if (resp?.ok) return resp;
+      // Keine Antwort (Zeitüberschreitung, Netz): nicht dasselbe Modell erneut abwarten, sondern das andere fragen.
+      if (!resp && model !== models[models.length - 1]) break;
       if (resp) {
         const errBody = await resp.text().catch(() => '');
         let msg = errBody.slice(0, 200);
