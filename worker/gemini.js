@@ -1,9 +1,10 @@
 import { ClientError, OverloadedError } from './http.js';
 
-const GEMINI_MODEL = 'gemini-3.6-flash';
+// Standard: das genauere Modell (Nährwerte, Fotos, Rezeptimport, Listen).
+const GEMINI_STRONG_MODEL = 'gemini-3.6-flash';
 
-// Zweites, leichteres Modell, falls das Hauptmodell überlastet oder unbekannt ist.
-const GEMINI_FALLBACK_MODEL = 'gemini-3.5-flash-lite';
+// Nur für einfache Aufgaben mit festem Antwortschema (opts.fast, z. B. Übersetzungen) und als Fallback.
+const GEMINI_FAST_MODEL = 'gemini-3.5-flash-lite';
 
 const GEMINI_RETRIES = 1; // zusätzliche Versuche pro Modell bei 500/503/429
 
@@ -42,7 +43,14 @@ export const TOKENS_TRANSLATE = 4096;
 
 export const TOKENS_QUERY = 128;
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/** Leere oder nicht lesbare Antwort: Anlass, einmal das andere Modell zu fragen. */
+class UnusableAnswerError extends ClientError {
+  constructor() {
+    super(422, EMPTY_ANSWER_MESSAGE);
+  }
+}
+
+const sleep =(ms) => new Promise((r) => setTimeout(r, ms));
 
 /** True, wenn Gemini das Modell ablehnt (unbekannt/nicht verfügbar) statt die Eingabe. */
 function isModelError(status, message) {
@@ -60,16 +68,20 @@ async function geminiRequest(model, body, env, timeoutMs) {
 }
 
 /**
- * Hauptmodell mit Retry (Backoff + Jitter, innerhalb des Gesamtbudgets),
- * danach Fallback-Modell. Gibt die erste erfolgreiche Response zurück;
+ * Erstes Modell mit Retry (Backoff + Jitter, innerhalb des Gesamtbudgets),
+ * danach das jeweils andere als Fallback. Gibt die erste erfolgreiche Response zurück;
  * bleibt alles transient kaputt → OverloadedError, sonst Error mit Status.
  */
-async function geminiWithFallback(body, env) {
-  const deadline = Date.now() + GEMINI_TOTAL_BUDGET_MS;
+/** Reihenfolge der Modelle: das zur Aufgabe passende zuerst, das andere als Fallback. Per Worker-Variable überschreibbar. */
+function modelOrder(env, fast) {
+  const fastModel = env.GEMINI_FAST_MODEL || GEMINI_FAST_MODEL;
+  const strongModel = env.GEMINI_STRONG_MODEL || GEMINI_STRONG_MODEL;
+  return fast ? [fastModel, strongModel] : [strongModel, fastModel];
+}
+
+async function geminiWithFallback(body, models, env, deadline) {
   let lastTransient = false;
   let lastError = null;
-  // Modellnamen per Worker-Variable überschreibbar (wrangler.toml [vars]), ohne Code-Deploy.
-  const models = [env.GEMINI_MODEL || GEMINI_MODEL, env.GEMINI_FALLBACK_MODEL || GEMINI_FALLBACK_MODEL];
   for (const model of models) {
     for (let attempt = 0; attempt <= GEMINI_RETRIES; attempt++) {
       const remaining = deadline - Date.now();
@@ -124,12 +136,12 @@ function extractAnswer(data) {
   }
   if (!answer) {
     console.warn('Gemini-Antwort leer, finishReason:', candidate?.finishReason);
-    throw new ClientError(422, EMPTY_ANSWER_MESSAGE);
+    throw new UnusableAnswerError();
   }
   return answer;
 }
 
-export async function gemini(prompt, env, imageBase64 = null, { maxOutputTokens = TOKENS_LIST, temperature = 0, responseSchema = null } = {}) {
+export async function gemini(prompt, env, imageBase64 = null, { maxOutputTokens = TOKENS_LIST, temperature = 0, responseSchema = null, fast = false } = {}) {
   const parts = imageBase64
     ? [{ inlineData: { mimeType: 'image/jpeg', data: imageBase64 } }, { text: prompt }]
     : [{ text: prompt }];
@@ -144,10 +156,23 @@ export async function gemini(prompt, env, imageBase64 = null, { maxOutputTokens 
       ...(env.GEMINI_THINKING_LEVEL ? { thinkingConfig: { thinkingLevel: env.GEMINI_THINKING_LEVEL } } : {}),
     },
   });
-  const resp = await geminiWithFallback(body, env);
+  const deadline = Date.now() + GEMINI_TOTAL_BUDGET_MS;
+  const [first, second] = modelOrder(env, fast);
+  try {
+    return await askForJson(body, [first, second], env, deadline);
+  } catch (e) {
+    // Leere oder nicht lesbare Antwort: einmal das andere Modell fragen, im selben Zeitbudget.
+    if (!(e instanceof UnusableAnswerError) || second === first) throw e;
+    return askForJson(body, [second], env, deadline);
+  }
+}
 
-  const answer = extractAnswer(await resp.json());
+async function askForJson(body, models, env, deadline) {
+  const resp = await geminiWithFallback(body, models, env, deadline);
+  return parseJsonAnswer(extractAnswer(await resp.json()));
+}
 
+function parseJsonAnswer(answer) {
   const match = answer.match(/```json\s*([\s\S]*?)```/) ?? answer.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
   if (match) {
     try {
@@ -160,6 +185,6 @@ export async function gemini(prompt, env, imageBase64 = null, { maxOutputTokens 
     return JSON.parse(answer);
   } catch {
     console.warn('Gemini-Antwort kein JSON, Länge:', answer.length);
-    throw new ClientError(422, EMPTY_ANSWER_MESSAGE);
+    throw new UnusableAnswerError();
   }
 }

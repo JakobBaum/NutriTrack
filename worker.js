@@ -16,7 +16,7 @@
  * Secrets (über Wrangler/Dashboard setzen):
  *   wrangler secret put GEMINI_API_KEY
  *   wrangler secret put SPOONACULAR_API_KEY  (Rezept-Suche)
- * Optional: GEMINI_MODEL, GEMINI_FALLBACK_MODEL (Modellnamen überschreiben)
+ * Optional: GEMINI_FAST_MODEL, GEMINI_STRONG_MODEL (Modellnamen überschreiben)
  * Optional:
  *   ALLOWED_ORIGINS  kommagetrennte Browser-Origins (ersetzt DEFAULT_ORIGINS)
  *   AI_LIMITER       Rate-Limiting-Binding (wrangler.toml [[ratelimits]]) für POST / und die Rezept-Suche

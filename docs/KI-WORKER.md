@@ -9,11 +9,11 @@
 - `GET /recipes/:id/information` - spoonacular-Einzelrezept (siehe unten)
 - `GET /health` - Status: `{ "ok": true }`. Die Route ist ohne Anmeldung erreichbar und gibt bewusst keine Konfigurationsdetails preis (keine Schluessel-Hinweise, keine Bindings, keine Modellnamen). Ob Secrets und Bindings gesetzt sind, zeigt das Cloudflare-Dashboard.
 
-Modelle: Hauptmodell `gemini-3.6-flash`, Fallback `gemini-3.5-flash-lite`. Ist ein Modell unbekannt (404 oder 400 "model"), wechselt der Worker sofort aufs Fallback. Zeitbudget: 25 s gesamt, 12 s je Versuch, 1 Wiederholung. Die App bricht nach 30 s mit einer klaren Meldung ab.
+Modelle: Standard ist das staerkere `gemini-3.6-flash` (Etikett-Foto, Rezeptimport, Essen beschreiben, Fastfood, Einkaufsliste). Nur die beiden Uebersetzungen nutzen das schnelle `gemini-3.5-flash-lite`. Einkaufsliste, Fastfood, Essen beschreiben und Uebersetzungen haben ein festes Antwortschema. Das jeweils andere Modell ist der Fallback: bei Ueberlastung nach einer Wiederholung, bei unbekanntem Modell (404 oder 400 "model") sofort. Liefert ein Modell eine leere oder nicht lesbare Antwort, fragt der Worker einmal das andere Modell (im selben Zeitbudget); blockierte Antworten werden nicht wiederholt. Zeitbudget: 25 s gesamt, 12 s je Versuch, 1 Wiederholung. Die App bricht nach 30 s mit einer klaren Meldung ab.
 
 **Gemini-Bedingungen:** Laut den Gemini-API-Zusatzbedingungen (abgerufen 2026-11-14) duerfen Clients fuer Nutzer im EWR, der Schweiz und dem UK nur mit bezahlten Diensten betrieben werden; im unbezahlten Tarif darf Google Eingaben zur Produktverbesserung nutzen. Welcher Tarif fuer den Schluessel gilt, ist aus dem Code nicht erkennbar und muss der Betreiber in der Google-Cloud-Konsole pruefen (Billing, Quota, Budgetalarm).
 
-Aenderbar ohne Code (Variablen in `wrangler.toml` oder Dashboard): `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`, `ALLOWED_ORIGINS`, `DAILY_AI_CAP`, `DAILY_RECIPE_CAP`, `REQUIRE_ORIGIN`.
+Aenderbar ohne Code (Variablen in `wrangler.toml` oder Dashboard): `GEMINI_STRONG_MODEL` (Standard, Flash), `GEMINI_FAST_MODEL` (Uebersetzungen und Fallback, Flash-Lite), `ALLOWED_ORIGINS`, `DAILY_AI_CAP`, `DAILY_RECIPE_CAP`, `REQUIRE_ORIGIN`.
 
 ## Kostenschutz und Missbrauch
 - **Rate-Limit je IP** (`AI_LIMITER`, 20/min) fuer KI und Rezept-Suche; `/off-search` nutzt `OFF_LIMITER` (optional, sonst `AI_LIMITER`) und zaehlt nur Cache-Misses.

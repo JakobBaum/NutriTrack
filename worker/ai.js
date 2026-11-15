@@ -49,6 +49,56 @@ function dailyWeight(fn, payload) {
   return (fn === 'recognizeLabel' || fn === 'importRecipe') && payload.imageBase64 ? PHOTO_CALL_WEIGHT : 1;
 }
 
+// Feste Antwortschemata: Gemini darf nur diese Form liefern (kein Freitext, kein kaputtes JSON-Gerüst).
+const SHOPPING_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    items: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          name: { type: 'STRING' },
+          amount: { type: 'NUMBER' },
+          unit: { type: 'STRING' },
+          checked: { type: 'BOOLEAN' },
+          estPrice: { type: 'NUMBER' },
+        },
+        required: ['name', 'amount', 'unit'],
+      },
+    },
+    suggestedDishes: { type: 'ARRAY', items: { type: 'STRING' } },
+    estTotal: { type: 'NUMBER' },
+    note: { type: 'STRING', nullable: true },
+  },
+  required: ['items'],
+};
+
+const FASTFOOD_SCHEMA = {
+  type: 'ARRAY',
+  items: {
+    type: 'OBJECT',
+    properties: {
+      restaurant: { type: 'STRING' },
+      itemName: { type: 'STRING' },
+      facts: {
+        type: 'OBJECT',
+        properties: {
+          kcal: { type: 'NUMBER' },
+          proteinG: { type: 'NUMBER' },
+          carbsG: { type: 'NUMBER' },
+          fatG: { type: 'NUMBER' },
+          basis: { type: 'STRING' },
+        },
+        required: ['kcal', 'proteinG', 'carbsG', 'fatG', 'basis'],
+      },
+      rationale: { type: 'STRING' },
+      estPrice: { type: 'NUMBER' },
+    },
+    required: ['restaurant', 'itemName', 'facts'],
+  },
+};
+
 async function generateShoppingList(req, env) {
   const prompt = `Du bist ein Ernährungs-Assistent. Erstelle eine Einkaufsliste für ${req.persons} Person(en) für ${req.days} Tag(e).
 Mahlzeiten: ${req.meals.join(', ')}.
@@ -63,7 +113,7 @@ Antworte NUR mit gültigem JSON (kein Markdown):
   "estTotal": number,
   "note": "string oder null"
 }`;
-  return gemini(prompt, env, null, { maxOutputTokens: TOKENS_LIST });
+  return gemini(prompt, env, null, { maxOutputTokens: TOKENS_LIST, responseSchema: SHOPPING_SCHEMA });
 }
 
 async function recognizeLabel(req, env) {
@@ -110,7 +160,7 @@ Antworte NUR mit gültigem JSON-Array:
   "rationale": "string",
   "estPrice": number
 }]`;
-  return gemini(prompt, env, null, { maxOutputTokens: TOKENS_FASTFOOD });
+  return gemini(prompt, env, null, { maxOutputTokens: TOKENS_FASTFOOD, responseSchema: FASTFOOD_SCHEMA });
 }
 
 const IMPORT_SCHEMA = `Antworte NUR mit gültigem JSON:
@@ -188,6 +238,7 @@ ${req.steps.map((n, i) => `${i + 1}. ${n}`).join('\n')}`;
     maxOutputTokens: TOKENS_TRANSLATE,
     temperature: 0,
     responseSchema: TRANSLATE_SCHEMA,
+    fast: true,
   });
   return {
     title: typeof out?.title === 'string' && out.title.trim() ? out.title.trim() : req.title,
@@ -203,6 +254,7 @@ Suchbegriff: ${req.query}`;
     maxOutputTokens: TOKENS_QUERY,
     temperature: 0,
     responseSchema: QUERY_SCHEMA,
+    fast: true,
   });
   const query = typeof out?.query === 'string' ? out.query.trim().slice(0, MAX_TR_QUERY_CHARS) : '';
   return { query: query || req.query };

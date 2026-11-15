@@ -241,7 +241,7 @@ describe('POST / — Gemini überlastet (Retry, Fallback, 503)', () => {
   });
 
   it('fällt nach erschöpften Retries auf das Fallback-Modell zurück', async () => {
-    mockFetch((url) => (url.includes('flash-lite') ? geminiReply(OK) : errReply(503)));
+    mockFetch((url) => (url.includes('gemini-3.5-flash-lite:') ? geminiReply(OK) : errReply(503)));
     const res = await run();
     assert.equal(res.status, 200);
     assert.equal(upstream.length, 3);
@@ -328,7 +328,7 @@ describe('GET /health und Modellwechsel', () => {
 
   it('meldet nur ok:true und keine Konfigurationsdetails (R19)', async () => {
     const env = {
-      ...ENV, SPOONACULAR_API_KEY: 'spoon-secret', GEMINI_MODEL: 'm1', GEMINI_FALLBACK_MODEL: 'm2',
+      ...ENV, SPOONACULAR_API_KEY: 'spoon-secret', GEMINI_FAST_MODEL: 'm1', GEMINI_STRONG_MODEL: 'm2',
       AI_LIMITER: { limit: async () => ({ success: true }) },
     };
     const res = await worker.fetch(get('/health'), env);
@@ -345,7 +345,7 @@ describe('GET /health und Modellwechsel', () => {
   });
 
   it('wechselt bei 404 (Modell unbekannt) sofort auf das Fallback-Modell', async () => {
-    mockFetch((url) => (url.includes('flash-lite')
+    mockFetch((url) => (url.includes('gemini-3.5-flash-lite:')
       ? geminiReply(OK)
       : new Response(JSON.stringify({ error: { message: 'model not found' } }), { status: 404 })));
     const res = await run();
@@ -355,7 +355,7 @@ describe('GET /health und Modellwechsel', () => {
   });
 
   it('wechselt bei 400 mit "model" im Text auf das Fallback-Modell', async () => {
-    mockFetch((url) => (url.includes('flash-lite')
+    mockFetch((url) => (url.includes('gemini-3.5-flash-lite:')
       ? geminiReply(OK)
       : new Response(JSON.stringify({ error: { message: 'Invalid model name' } }), { status: 400 })));
     const res = await run();
@@ -1761,5 +1761,102 @@ describe('GET /recipes/:id/information (spoonacular)', () => {
     assert.equal(foreign.status, 403);
     assert.equal(rateLimited.status, 429);
     assert.equal(upstream.length, 0);
+  });
+});
+
+describe('Modellwahl je Funktion', () => {
+  const FAST = 'gemini-3.5-flash-lite:';
+  const STRONG = 'gemini-3.6-flash:';
+  const geminiCalls = () => upstream.filter((u) => u.url.includes('generativelanguage'));
+  const SHOPPING = { persons: 2, days: 3, meals: ['breakfast'] };
+  const call = (fn, payload, env = ENV) => worker.fetch(post({ fn, payload }), env);
+
+  beforeEach(() => mockFetch(() => geminiReply({ items: [] })));
+
+  for (const [fn, payload] of [
+    ['translateSearchQuery', { query: 'Linsensuppe', lang: 'de' }],
+  ]) {
+    it(`${fn} nutzt das schnelle Modell`, async () => {
+      await call(fn, payload);
+      assert.equal(geminiCalls().length, 1);
+      assert.ok(geminiCalls()[0].url.includes(FAST));
+    });
+  }
+
+  for (const [name, fn, payload] of [
+    ['suggestFastfood', 'suggestFastfood', FASTFOOD],
+    ['generateShoppingList', 'generateShoppingList', SHOPPING],
+    ['parseMeal', 'parseMeal', { text: 'zwei Semmeln mit Butter' }],
+    ['recognizeLabel (Foto)', 'recognizeLabel', { imageBase64: 'QUJD' }],
+    ['importRecipe (Foto)', 'importRecipe', { imageBase64: 'QUJD' }],
+    ['importRecipe (Text)', 'importRecipe', { text: 'Linsensuppe: 200 g Linsen kochen.' }],
+  ]) {
+    it(`${name} nutzt das starke Modell`, async () => {
+      await call(fn, payload);
+      assert.equal(geminiCalls().length, 1);
+      assert.ok(geminiCalls()[0].url.includes(STRONG));
+    });
+  }
+
+  it('starke Funktionen fallen bei unbekanntem Modell auf das schnelle zurück', async () => {
+    mockFetch((url) => (url.includes(FAST)
+      ? geminiReply({ name: 'X', facts: {} })
+      : new Response(JSON.stringify({ error: { message: 'model not found' } }), { status: 404 })));
+    const res = await call('recognizeLabel', { imageBase64: 'QUJD' });
+    assert.equal(res.status, 200);
+    assert.ok(geminiCalls()[1].url.includes(FAST));
+  });
+
+  const textReply = (text) => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] }), { status: 200 });
+
+  it('fragt bei nicht lesbarer Antwort einmal das andere Modell', async () => {
+    mockFetch((url) => (url.includes(STRONG) ? textReply('{"items": [') : geminiReply([{ itemName: 'Wrap' }])));
+    const res = await call('suggestFastfood', FASTFOOD);
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), [{ itemName: 'Wrap' }]);
+    assert.equal(geminiCalls().length, 2);
+    assert.ok(geminiCalls()[1].url.includes(FAST));
+  });
+
+  it('fragt bei leerer Antwort einmal das andere Modell', async () => {
+    mockFetch((url) => (url.includes(STRONG)
+      ? new Response(JSON.stringify({ candidates: [{ finishReason: 'MAX_TOKENS' }] }), { status: 200 })
+      : geminiReply([])));
+    const res = await call('suggestFastfood', FASTFOOD);
+    assert.equal(res.status, 200);
+    assert.equal(geminiCalls().length, 2);
+  });
+
+  it('gibt 422 zurück, wenn auch das andere Modell nichts Lesbares liefert (höchstens 2 Aufrufe)', async () => {
+    mockFetch(() => textReply('kein json'));
+    const res = await call('suggestFastfood', FASTFOOD);
+    assert.equal(res.status, 422);
+    assert.equal(geminiCalls().length, 2);
+  });
+
+  it('wiederholt blockierte Antworten nicht mit dem anderen Modell', async () => {
+    mockFetch(() => new Response(JSON.stringify({ promptFeedback: { blockReason: 'SAFETY' } }), { status: 200 }));
+    const res = await call('suggestFastfood', FASTFOOD);
+    assert.equal(res.status, 422);
+    assert.equal(geminiCalls().length, 1);
+  });
+
+  for (const [fn, payload, type] of [
+    ['suggestFastfood', FASTFOOD, 'ARRAY'],
+    ['generateShoppingList', SHOPPING, 'OBJECT'],
+  ]) {
+    it(`${fn} schickt ein festes Antwortschema mit`, async () => {
+      await call(fn, payload);
+      const schema = JSON.parse(geminiCalls()[0].init.body).generationConfig.responseSchema;
+      assert.equal(schema?.type, type);
+    });
+  }
+
+  it('Modellnamen sind per GEMINI_FAST_MODEL und GEMINI_STRONG_MODEL überschreibbar', async () => {
+    const env = { ...ENV, GEMINI_FAST_MODEL: 'schnell-x', GEMINI_STRONG_MODEL: 'stark-x' };
+    await call('translateSearchQuery', { query: 'Linsensuppe', lang: 'de' }, env);
+    await call('recognizeLabel', { imageBase64: 'QUJD' }, env);
+    assert.ok(geminiCalls()[0].url.includes('/schnell-x:'));
+    assert.ok(geminiCalls()[1].url.includes('/stark-x:'));
   });
 });
