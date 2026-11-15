@@ -1870,6 +1870,35 @@ describe('Modellwahl je Funktion', () => {
     assert.equal(geminiCalls().length, 3);
   });
 
+  describe('Protokoll bei fehlgeschlagenem Versuch', () => {
+    const realWarn = console.warn;
+    let warnings = [];
+    beforeEach(() => {
+      warnings = [];
+      console.warn = (...args) => { warnings.push(args.join(' ')); };
+    });
+    afterEach(() => { console.warn = realWarn; });
+
+    it('nennt Modell und HTTP-Status, aber keinen Fehlertext von Gemini', async () => {
+      mockFetch((url) => (url.includes(STRONG)
+        ? new Response(JSON.stringify({ error: { message: 'quota GEHEIM exceeded' } }), { status: 429 })
+        : geminiReply([])));
+      await call('suggestFastfood', FASTFOOD);
+      const line = warnings.find((w) => w.includes('gemini-3.6-flash'));
+      assert.match(line ?? '', /429/);
+      assert.ok(!warnings.some((w) => w.includes('GEHEIM')));
+    });
+
+    it('nennt "keine Antwort" bei Zeitüberschreitung', async () => {
+      mockFetch((url) => {
+        if (url.includes(STRONG)) throw new DOMException('The operation timed out.', 'TimeoutError');
+        return geminiReply([]);
+      });
+      await call('suggestFastfood', FASTFOOD);
+      assert.ok(warnings.some((w) => w.includes('gemini-3.6-flash') && w.includes('keine Antwort (TimeoutError)')));
+    });
+  });
+
   it('Modellnamen sind per GEMINI_FAST_MODEL und GEMINI_STRONG_MODEL überschreibbar', async () => {
     const env = { ...ENV, GEMINI_FAST_MODEL: 'schnell-x', GEMINI_STRONG_MODEL: 'stark-x' };
     await call('translateSearchQuery', { query: 'Linsensuppe', lang: 'de' }, env);

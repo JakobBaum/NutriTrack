@@ -79,6 +79,11 @@ function modelOrder(env, fast) {
   return fast ? [fastModel, strongModel] : [strongModel, fastModel];
 }
 
+/** Nur Modellname und Art des Fehlers: Fehlertexte von Gemini können Eingaben oder Schlüsselhinweise enthalten. */
+function logFailedAttempt(model, reason) {
+  console.warn(`Gemini-Versuch fehlgeschlagen: ${model}, ${reason}`);
+}
+
 async function geminiWithFallback(body, models, env, deadline) {
   let lastTransient = false;
   let lastError = null;
@@ -93,8 +98,10 @@ async function geminiWithFallback(body, models, env, deadline) {
         lastTransient = true;
         lastError = new Error(`Gemini nicht erreichbar: ${fetchErr.message}`);
         resp = null;
+        logFailedAttempt(model, `keine Antwort (${fetchErr?.name ?? 'Fehler'})`);
       }
       if (resp?.ok) return resp;
+      if (resp) logFailedAttempt(model, `HTTP ${resp.status}`);
       // Keine Antwort (Zeitüberschreitung, Netz): nicht dasselbe Modell erneut abwarten, sondern das andere fragen.
       if (!resp && model !== models[models.length - 1]) break;
       if (resp) {
