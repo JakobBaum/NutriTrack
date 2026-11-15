@@ -219,3 +219,6 @@ Eigener Review-Agent: 0 kritisch, 1 hoch, 6 mittel, 4 niedrig. Behoben: Nr 1 bis
 - Der Übersetzungs-Cache speichert übersetzte Rezepttexte dauerhaft.
 - Backup-Export in der iOS-App braucht `@capacitor/share` und `@capacitor/filesystem` für einen verlässlichen Weg.
 - `REQUIRE_ORIGIN` einschalten, sobald die App mit dem Header installiert ist; die Diagnose in `settings.page.ts` braucht dann den Header.
+
+### Merge und Deploy (2026-11-15)
+In main gemergt (`2785b4b`), Worker ausgerollt (Version `82fb7c69`). Nach dem Deploy mit echten Diensten geprüft: `parseMeal` (Gemini, 5 plausible Zeilen für "2 Semmeln mit Butter und Schinken, ein Apfel, Cappuccino"), Rezeptsuche und Rezeptdetails (Spoonacular), `/health`, Eingabefehler 400.
