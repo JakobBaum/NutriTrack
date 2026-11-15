@@ -243,3 +243,10 @@ Jakob: bei fast allem das bessere Modell, damit keine kaputten Antworten kommen.
 - Einkaufsliste und Fastfood haben jetzt ein festes Antwortschema (`SHOPPING_SCHEMA`, `FASTFOOD_SCHEMA`).
 - Der zweite Versuch mit dem anderen Modell bei leerer oder nicht lesbarer Antwort bleibt.
 - Worker-Tests 219 grün, Lint sauber.
+
+### Welle 7: Merge und Deploy (2026-11-15)
+
+- main: Merge `7c3e9a5`, gepusht. Worker Version `702b6ac4-f2cd-4c14-a9db-1b1a3c5d9884`.
+- Echt geprüft: `/health` ok; Fastfood (3 plausible Vorschläge, 20,5 s), Einkaufsliste (11,6 s), Suchbegriff-Übersetzung (1,0 s), "Essen beschreiben" dreimal ok (je rund 10 s).
+- Auffällig: Der erste Aufruf von "Essen beschreiben" endete nach 25,2 s mit 503 (überlastet). Das starke Modell braucht rund 10 s und liegt damit nah an der Grenze von 12 s je Versuch; zwei Zeitüberschreitungen verbrauchen das ganze Budget, der Fallback kommt dann nicht mehr dran. Nicht behoben.
+- Nicht geprüft: Etikett-Foto und Rezeptimport gegen echtes Gemini, iPhone.
