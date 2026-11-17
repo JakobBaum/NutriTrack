@@ -72,3 +72,35 @@ describe('FavoriteStore', () => {
     expect(TestBed.inject(FavoriteStore).favorites()).toEqual([]);
   });
 });
+
+describe('FavoriteStore Laden (D7, D19)', () => {
+  function load(raw: unknown): FavoriteStore {
+    localStorage.clear();
+    localStorage.setItem('nutritrack:favorites', JSON.stringify(raw));
+    TestBed.resetTestingModule();
+    return TestBed.inject(FavoriteStore);
+  }
+  const fav = (over: Record<string, unknown> = {}) => ({
+    id: 'f1', label: 'Skyr', facts: { kcal: 90, proteinG: 16, carbsG: 6, fatG: 0.3, basis: 'perPortion' }, createdAt: '2026-11-06T10:00:00.000Z', ...over,
+  });
+
+  it('verwirft Favoriten mit negativen oder fehlenden Pflicht-Nährwerten', () => {
+    const store = load([fav(), fav({ id: 'f2', facts: { kcal: -1, proteinG: 1, carbsG: 1, fatG: 1 } }), fav({ id: 'f3', facts: { kcal: 1 } })]);
+    expect(store.favorites().map((f) => f.id)).toEqual(['f1']);
+  });
+
+  it('entfernt kaputte baseFacts, behält den Favoriten', () => {
+    const store = load([fav({ baseFacts: { kcal: 'x' } })]);
+    expect(store.favorites()).toHaveLength(1);
+    expect(store.favorites()[0].baseFacts).toBeUndefined();
+  });
+
+  it('verwirft negative Mengen', () => {
+    const store = load([fav({ amountG: -5 })]);
+    expect(store.favorites()).toEqual([]);
+  });
+
+  it('bietet Schreibsperre', () => {
+    expect(load([]).isReadOnly()).toBe(false);
+  });
+});

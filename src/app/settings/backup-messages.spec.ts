@@ -33,3 +33,37 @@ describe('Backup-Meldungen (Review 3, Befunde 2, 3, 12)', () => {
     expect(JSON.stringify(unverified)).not.toContain('heruntergeladen');
   });
 });
+
+describe('Backup-Meldungen: nicht lesbare Bereiche (D11)', () => {
+  it('meldet ein unvollständiges Backup mit lesbaren Bereichsnamen statt Schlüsseln', () => {
+    const feedback = exportMessage('shared', ['diary', 'week-plan']);
+    expect(feedback?.kind).toBe('alert');
+    if (feedback?.kind !== 'alert') return;
+    expect(feedback.header).toBe('Backup unvollständig');
+    expect(feedback.message).toContain('Tagebuch');
+    expect(feedback.message).toContain('Wochenplan');
+    expect(feedback.message).not.toContain('diary');
+    expect(feedback.message).not.toContain('week-plan');
+  });
+
+  it('nennt unbekannte Schlüssel nicht roh, sondern als "weitere Daten"', () => {
+    const feedback = exportMessage('downloaded', ['geheim-xyz']);
+    if (feedback?.kind !== 'alert') throw new Error('Alert erwartet');
+    expect(feedback.message).toContain('weitere Daten');
+    expect(feedback.message).not.toContain('geheim-xyz');
+  });
+
+  it('nennt jeden Bereich nur einmal', () => {
+    const feedback = exportMessage('shared', ['weight', 'weightHintDismissedAtKg']);
+    if (feedback?.kind !== 'alert') throw new Error('Alert erwartet');
+    expect(feedback.message.match(/Gewicht/g)?.length).toBe(1);
+  });
+
+  it('abgebrochener Export bleibt still, auch mit übersprungenen Schlüsseln', () => {
+    expect(exportMessage('cancelled', ['diary'])).toBeNull();
+  });
+
+  it('nicht bestätigter Export bleibt die Fehlermeldung', () => {
+    expect(exportMessage('unverified', ['diary'])).toMatchObject({ kind: 'alert', header: 'Backup nicht bestätigt' });
+  });
+});

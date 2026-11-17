@@ -55,7 +55,7 @@ describe('ShoppingStore.generatePlan mit Online-Verweisen', () => {
     const list = await store.generatePlan({ persons: 1, days: 1, meals: ['dinner'] });
 
     expect(list.items.some((i) => i.name === 'Reis')).toBe(true);
-    expect(list.note).toBe('Nicht geladen: Linsensuppe');
+    expect(list.notice).toBe('Nicht geladen: Linsensuppe');
   });
 
   it('wirft einen klaren Fehler, wenn kein einziges Rezept geladen werden konnte', async () => {

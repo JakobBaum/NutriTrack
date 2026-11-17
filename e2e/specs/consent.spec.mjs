@@ -190,7 +190,7 @@ export function register({ test }) {
     await go(page, 'settings');
     assert.notEqual(await readStore(page, 'consent'), null, 'Ausgangslage: Zustimmung liegt vor');
     await page.locator('.danger-row').click();
-    await page.locator('ion-alert button', { hasText: 'Löschen' }).click();
+    await page.locator('ion-alert button', { hasText: 'Zurücksetzen' }).click();
     await settle(page, 600);
     assert.equal(await readStore(page, 'consent'), null, 'die Zustimmung muss mit allen Daten gelöscht sein');
     assert.match(await page.locator('[data-testid="consent-status"]').innerText(), /Nicht zugestimmt/);

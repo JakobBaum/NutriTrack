@@ -3,7 +3,7 @@ import { PORTION_RANGE_G } from '../../core/ai/meal-parse-sanitize';
 import { MealType, NutritionFacts } from '../../core/models';
 import type { NewDiaryEntry } from '../../core/state/diary.store';
 import { stepAmount } from '../diary-edit';
-import { scaleFacts, toNumberOrNull } from '../diary-helpers';
+import { numberToInputText, scaleFacts, toNumberOrNull } from '../diary-helpers';
 
 /** Hinweis über der Ergebnisliste (Muster wie HEALTH_NOTES.fastfood; gehört bei Gelegenheit nach core/messages/health-notes.ts). */
 export const DESCRIBE_NOTE = 'KI-Schätzung aus deiner Beschreibung. Allergene und Unverträglichkeiten werden nicht geprüft.';
@@ -42,6 +42,19 @@ function validAmount(value: number | null): number | null {
   return value !== null && value >= PORTION_RANGE_G.min && value <= PORTION_RANGE_G.max ? value : null;
 }
 
+const amountTextOf = (grams: number): string => numberToInputText(grams);
+
+const MAX_LABEL_CHARS = 60;
+
+/** Name für den manuellen Eintrag aus der Beschreibung: getrimmt, an einer Wortgrenze gekürzt. */
+export function labelFromDescription(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= MAX_LABEL_CHARS) return trimmed;
+  const cut = trimmed.slice(0, MAX_LABEL_CHARS);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut).trimEnd();
+}
+
 function quantityLabelOf(item: ParsedMealItem): string {
   return item.unit.toLowerCase() === 'g' ? '' : `${item.amount} ${item.unit}`;
 }
@@ -51,7 +64,7 @@ export function rowsFromItems(items: readonly ParsedMealItem[]): MealRow[] {
     id: `row-${index}`,
     name: item.name,
     amountG: item.portionG,
-    amountText: String(item.portionG),
+    amountText: amountTextOf(item.portionG),
     quantityLabel: quantityLabelOf(item),
     per100g: item.per100g,
     isKcalDoubtful: item.isKcalDoubtful,
@@ -65,7 +78,7 @@ export function withAmountText(row: MealRow, text: string): MealRow {
 /** Menge um einen Schritt ändern (10 g, höchstens 2000 g). */
 export function withSteppedAmount(row: MealRow, direction: 1 | -1): MealRow {
   const next = Math.min(PORTION_RANGE_G.max, stepAmount(row.amountG, 'g', direction));
-  return withAmountText(row, String(next));
+  return withAmountText(row, amountTextOf(next));
 }
 
 export function removeRow(rows: readonly MealRow[], id: string): MealRow[] {

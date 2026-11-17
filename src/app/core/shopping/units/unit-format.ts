@@ -26,7 +26,10 @@ function numberText(value: number, maxDigits = 2): string {
 
 function metricText(amount: number, small: 'g' | 'ml', large: 'kg' | 'l'): string {
   if (amount >= GRAM_KILO) return `${numberText(roundTo(amount / GRAM_KILO, 0.05))} ${large}`;
-  return `${numberText(roundTo(amount, metricStep(amount)))} ${small}`;
+  const rounded = roundTo(amount, metricStep(amount));
+  // 975 bis 999 runden auf 1.000: dann als 1 kg / 1 l zeigen.
+  if (rounded >= GRAM_KILO) return `${numberText(rounded / GRAM_KILO)} ${large}`;
+  return `${numberText(rounded)} ${small}`;
 }
 
 function imperialWeight(grams: number): string {

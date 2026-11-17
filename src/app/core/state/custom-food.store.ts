@@ -24,6 +24,8 @@ export interface CustomFood {
 @Injectable({ providedIn: 'root' })
 export class CustomFoodStore {
   private readonly storage = inject(StorageService);
+  /** True, wenn Schreiben gesperrt ist (neueres Schema oder Änderung in anderem Fenster); Änderungen werden dann nicht gespeichert. */
+  readonly isReadOnly = this.storage.isLockedFor(KEY_CUSTOM);
 
   private readonly _foods = signal<CustomFood[]>(
     this.storage.getSanitized<CustomFood>(KEY_CUSTOM, (raw) => sanitizeList<CustomFood>(raw, ARRAY_CHECKS['customFoods'])),
@@ -59,7 +61,7 @@ export class CustomFoodStore {
     this.persist();
   }
 
-  private persist(): void {
-    this.storage.set(KEY_CUSTOM, this._foods());
+  private persist(): boolean {
+    return this.storage.set(KEY_CUSTOM, this._foods());
   }
 }

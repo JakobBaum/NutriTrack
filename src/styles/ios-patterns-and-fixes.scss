@@ -111,7 +111,6 @@ ion-segment-button {
   --padding-end: var(--nt-space-2);
   flex: 1 1 auto;
   min-width: 0;
-  height: var(--nt-touch);
   min-height: var(--nt-touch);
   font-size: var(--nt-fs-body);
   font-weight: 500;
@@ -119,11 +118,15 @@ ion-segment-button {
   letter-spacing: 0;
   white-space: nowrap;
 
+  // Bei großer Schrift (150 %) darf die Beschriftung umbrechen und wächst in der Höhe, statt Unterlängen abzuschneiden.
   &::part(native) {
     min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    min-height: var(--nt-touch);
+    padding-block: 4px;
+    line-height: 1.25;
+    white-space: normal;
+    overflow: visible;
+    text-align: center;
   }
 }
 
@@ -332,7 +335,15 @@ ion-item {
   &:active { opacity: 0.7; }
   &:disabled { opacity: 0.5; }
   &:focus-visible { outline: 2px solid var(--nt-focus); outline-offset: 2px; }
-  ion-icon { font-size: 24px; }
+  ion-icon { font-size: 24px; flex: none; }
+  // Große Schrift (150 %): Text bricht in der Kachel um, ohne Silbentrennung und ohne über den Rand zu laufen.
+  span {
+    min-width: 0;
+    max-width: 100%;
+    text-align: center;
+    overflow-wrap: anywhere;
+    hyphens: none;
+  }
 }
 
 .nt-source-error {

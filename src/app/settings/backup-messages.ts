@@ -41,8 +41,39 @@ export function restoreFailure(result: RestoreResult, source: keyof typeof RESTO
   };
 }
 
-/** Rückmeldung zum Export; `null`, wenn der Nutzer abgebrochen hat. */
-export function exportMessage(result: ExportResult): ExportFeedback | null {
+/** Lesbare Bereichsnamen zu den Speicherschlüsseln (Reihenfolge = Anzeige). */
+const AREA_LABELS: Readonly<Record<string, string>> = {
+  profile: 'Profil',
+  diary: 'Tagebuch',
+  weight: 'Gewichtsverlauf',
+  weightHintDismissedAtKg: 'Gewichtsverlauf',
+  favorites: 'Favoriten',
+  recipes: 'Rezepte',
+  savedMeals: 'gespeicherte Mahlzeiten',
+  customFoods: 'eigene Lebensmittel',
+  shopping: 'Einkaufsliste',
+  'week-plan': 'Wochenplan',
+  'week-plan-blocked': 'Wochenplan',
+  'app-settings': 'Einstellungen',
+};
+const OTHER_AREA = 'weitere Daten';
+
+/** Übersetzt Speicherschlüssel in eindeutige, lesbare Bereichsnamen (unbekannte Schlüssel erscheinen nie roh). */
+export function describeSkippedAreas(keys: readonly string[]): string[] {
+  return Array.from(new Set(keys.map((k) => AREA_LABELS[k] ?? OTHER_AREA)));
+}
+
+function incompleteBackup(keys: readonly string[]): ExportFeedback {
+  return {
+    kind: 'alert',
+    header: 'Backup unvollständig',
+    message: `Diese Bereiche konnten nicht gelesen werden und fehlen im Backup: ${describeSkippedAreas(keys).join(', ')}. Sie sind weiterhin auf diesem Gerät gespeichert. Versuche den Export nach einem Neustart der App erneut.`,
+  };
+}
+
+/** Rückmeldung zum Export; `null`, wenn der Nutzer abgebrochen hat. Fehlende Bereiche werden auch bei erfolgreichem Export gemeldet. */
+export function exportMessage(result: ExportResult, skippedKeys: readonly string[] = []): ExportFeedback | null {
+  if ((result === 'shared' || result === 'downloaded') && skippedKeys.length > 0) return incompleteBackup(skippedKeys);
   if (result === 'shared') return { kind: 'toast', text: 'Backup erstellt.' };
   if (result === 'downloaded') return { kind: 'toast', text: 'Backup heruntergeladen.' };
   if (result === 'unverified') {

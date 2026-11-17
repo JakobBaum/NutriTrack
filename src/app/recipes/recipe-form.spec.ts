@@ -2,6 +2,7 @@ import { Recipe } from '../core/models';
 import {
   IngredientForm,
   applyFact,
+  expandedAfterRemove,
   buildRecipeDraft,
   cookedWeightIsEstimate,
   cookedWeightValue,
@@ -61,13 +62,40 @@ describe('recipe-form', () => {
   describe('applyFact', () => {
     it('setzt kcal immutabel und laesst das Original unveraendert', () => {
       const next = applyFact(FACTS, 'kcal', '350');
-      expect(next.kcal).toBe(350);
+      expect(next?.kcal).toBe(350);
       expect(FACTS.kcal).toBe(200);
     });
 
     it('ungueltige Pflichtwerte werden 0, optionale undefined', () => {
-      expect(applyFact(FACTS, 'proteinG', 'abc').proteinG).toBe(0);
-      expect(applyFact(FACTS, 'fiberG', 'abc').fiberG).toBeUndefined();
+      expect(applyFact(FACTS, 'proteinG', 'abc')?.proteinG).toBe(0);
+      expect(applyFact(FACTS, 'fiberG', 'abc')?.fiberG).toBeUndefined();
+    });
+
+    it('leeres oder ungueltiges kcal-Feld gilt als fehlend (keine Werte), nicht als 0 kcal', () => {
+      expect(applyFact(FACTS, 'kcal', '')).toBeUndefined();
+      expect(applyFact(FACTS, 'kcal', '  ')).toBeUndefined();
+      expect(applyFact(FACTS, 'kcal', 'abc')).toBeUndefined();
+    });
+
+    it('klemmt negative Werte auf 0', () => {
+      expect(applyFact(FACTS, 'kcal', '-5')?.kcal).toBe(0);
+      expect(applyFact(FACTS, 'fatG', '-1,5')?.fatG).toBe(0);
+      expect(applyFact(FACTS, 'fiberG', '-2')?.fiberG).toBe(0);
+    });
+  });
+
+  describe('expandedAfterRemove', () => {
+    it('bleibt ohne Auswahl leer', () => {
+      expect(expandedAfterRemove(null, 1)).toBeNull();
+    });
+    it('klappt zu, wenn die aufgeklappte Zutat entfernt wird', () => {
+      expect(expandedAfterRemove(2, 2)).toBeNull();
+    });
+    it('rutscht mit, wenn davor eine Zutat entfernt wird', () => {
+      expect(expandedAfterRemove(3, 1)).toBe(2);
+    });
+    it('bleibt, wenn dahinter entfernt wird', () => {
+      expect(expandedAfterRemove(1, 3)).toBe(1);
     });
   });
 
@@ -77,6 +105,22 @@ describe('recipe-form', () => {
       expect(form.servings).toBe(2);
       expect(form.steps).toEqual(['']);
       expect(form.cookedWeightG).toBeNull();
+    });
+
+    it('formFromRecipe behandelt ein altes, nur berechnetes Gesamtgewicht wieder als Schaetzung', () => {
+      const recipe = {
+        id: 'r1', title: 'Reis', servings: 2, cookedWeightG: 200, steps: [],
+        ingredients: [{ name: 'Reis', amount: 200, unit: 'g' }],
+      } as unknown as Recipe;
+      expect(formFromRecipe(recipe).cookedWeightG).toBeNull();
+    });
+
+    it('formFromRecipe behaelt ein abweichendes, von Hand eingegebenes Gewicht', () => {
+      const recipe = {
+        id: 'r1', title: 'Reis', servings: 2, cookedWeightG: 450, steps: [],
+        ingredients: [{ name: 'Reis', amount: 200, unit: 'g' }],
+      } as unknown as Recipe;
+      expect(formFromRecipe(recipe).cookedWeightG).toBe(450);
     });
 
     it('formFromRecipe kopiert Zutaten und entkoppelt die Schritte', () => {
@@ -106,13 +150,23 @@ describe('recipe-form', () => {
       expect('error' in result && result.error).toMatch(/Portion/);
     });
 
-    it('nutzt berechnetes Gewicht, wenn keins eingegeben wurde', () => {
+    it('speichert das berechnete Gewicht nicht als eigenes Gewicht', () => {
       const form = { ...emptyForm(), title: 'X', servings: 2, ingredients: [ing({ amount: 200 })], steps: [' a ', ''] };
       const result = buildRecipeDraft(form, 'text');
       if ('error' in result) throw new Error(result.error);
-      expect(result.draft.cookedWeightG).toBe(200);
+      expect(result.draft.cookedWeightG).toBeUndefined();
       expect(result.draft.steps).toEqual(['a']);
       expect(result.draft.origin).toBe('text');
+    });
+
+    it('aendert sich die Schaetzung mit den Zutaten, wenn nichts von Hand eingegeben wurde', () => {
+      const first = buildRecipeDraft({ ...emptyForm(), title: 'X', ingredients: [ing({ amount: 200 })] }, 'own');
+      if ('error' in first) throw new Error(first.error);
+      const reopened = formFromRecipe({ ...first.draft, id: 'r', createdAt: 'a', updatedAt: 'a' } as unknown as Recipe);
+      const edited = { ...reopened, ingredients: [{ ...reopened.ingredients[0], amount: 400 }] };
+
+      expect(cookedWeightValue(edited.cookedWeightG, 400)).toBe(400);
+      expect(cookedWeightIsEstimate(edited.cookedWeightG, 400)).toBe(true);
     });
 
     it('bevorzugt die eigene Gewichtseingabe', () => {

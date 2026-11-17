@@ -1,4 +1,5 @@
-import { Injectable, OnDestroy, signal } from '@angular/core';
+import { Injectable, OnDestroy, Signal, computed, signal } from '@angular/core';
+import { isConsentKey, isLockExemptKey } from './storage-foreign';
 import { CURRENT_SCHEMA_VERSION, SCHEMA_KEY, applyMigrations, readSchemaVersion } from './storage-schema';
 import {
   QuarantineNotice,
@@ -29,6 +30,28 @@ export interface Sanitized<T> {
 /** Ausgang von {@link StorageService.replaceAll}: ersetzt, zurückgerollt oder (schlimmster Fall) Rückrollen gescheitert. */
 export type ReplaceOutcome = 'ok' | 'failed' | 'rollbackFailed';
 
+/** Ergebnis von {@link StorageService.snapshotDetailed}. */
+export interface SnapshotResult {
+  readonly data: Record<string, unknown>;
+  /** Schlüssel (ohne Präfix), die nicht lesbar waren und deshalb in `data` fehlen. */
+  readonly skippedKeys: readonly string[];
+}
+
+/** Was für eine erneute Quarantäne-Sicherung nötig ist. */
+interface UnsecuredData {
+  readonly items: readonly unknown[];
+  readonly reason: QuarantineReason;
+  readonly raw?: string;
+  /** Bereinigter Stand, der nach nachgeholter Sicherung zurückgeschrieben wird (`null` = Schlüssel entfernen). */
+  readonly cleaned?: { readonly value: unknown };
+}
+
+/** Änderung eines nicht sperrenden Schlüssels in einem anderen Fenster (`seq` macht gleiche Schlüssel unterscheidbar). */
+export interface ForeignChange {
+  readonly key: string;
+  readonly seq: number;
+}
+
 const QUOTA_ERROR_NAMES = new Set(['QuotaExceededError', 'NS_ERROR_DOM_QUOTA_REACHED']);
 
 function classifyError(error: unknown): StorageErrorKind {
@@ -56,16 +79,35 @@ export class StorageService implements OnDestroy {
   private retryIndex = 0;
   private readonly corruptSeen = new Map<string, string>();
   private readonly onHide = (): void => void this.flush();
+  private readonly onStorageEvent = (e: StorageEvent): void => this.handleForeignChange(e);
 
   private readonly _writeFailures = signal(0);
   /** Zähler fehlgeschlagener Schreibvorgänge (Speicher voll/gesperrt). */
   readonly writeFailures = this._writeFailures.asReadonly();
   private readonly _lastError = signal<StorageError | null>(null);
-  /** Aktueller Schreibfehler; `null`, sobald alles geschrieben ist. */
-  readonly lastError = this._lastError.asReadonly();
+  /** Migrationsfehler: bleibt, bis eine Migration wirklich gelingt (nicht durch Schreiben/Löschen zu beheben). */
+  private readonly _migrationError = signal<StorageError | null>(null);
+  /** Aktueller Schreib- oder Migrationsfehler; `null`, sobald alles geschrieben und migriert ist. */
+  readonly lastError = computed(() => this._lastError() ?? this._migrationError());
+  /** Schlüssel, deren Rohdaten (noch) nicht in die Quarantäne gesichert werden konnten: Schreiben/Löschen wird abgelehnt. */
+  private readonly unsecured = new Map<string, UnsecuredData>();
+  /** Spiegel von `unsecured` als Signal, damit Stores ihre Schreibsperre reaktiv ableiten können. */
+  private readonly _unsecuredKeys = signal<ReadonlySet<string>>(new Set());
+  /** Zähler der Änderungen an der Zustimmung in einem anderen Fenster (Ereignisse im selben Takt gehen nicht verloren). */
+  private readonly _consentChanges = signal(0);
+  readonly consentChanges = this._consentChanges.asReadonly();
+  private foreignSeq = 0;
+  private readonly _foreignChange = signal<ForeignChange | null>(null);
+  /** Letzte Änderung eines Schlüssels in einem anderen Fenster, die nicht sperrt (z. B. Zustimmung): neu einlesen. */
+  readonly foreignChange = this._foreignChange.asReadonly();
   private readonly _schemaNewer = signal(false);
   /** True, wenn der Speicher von einer neueren App-Version stammt (wird dann nicht verändert). */
   readonly schemaNewer = this._schemaNewer.asReadonly();
+  private readonly _externalChange = signal(false);
+  /** True, wenn ein anderes Fenster/Tab App-Daten geändert hat (dieses Fenster schreibt dann nichts mehr; Neuladen nötig). */
+  readonly externalChange = this._externalChange.asReadonly();
+  /** True, wenn dieses Fenster nichts schreiben darf (neueres Schema oder Änderung in einem anderen Fenster). */
+  readonly writeLocked = computed(() => this._schemaNewer() || this._externalChange());
   private readonly _notices = signal<readonly QuarantineNotice[]>([]);
   /** Aussortierte Daten dieser Sitzung (für einen Hinweis in der Oberfläche). */
   readonly quarantineNotices = this._notices.asReadonly();
@@ -74,6 +116,7 @@ export class StorageService implements OnDestroy {
     if (typeof window !== 'undefined') {
       window.addEventListener('pagehide', this.onHide);
       window.addEventListener('beforeunload', this.onHide);
+      window.addEventListener('storage', this.onStorageEvent);
     }
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', this.onHide);
     this.migrate();
@@ -87,6 +130,7 @@ export class StorageService implements OnDestroy {
     if (typeof window !== 'undefined') {
       window.removeEventListener('pagehide', this.onHide);
       window.removeEventListener('beforeunload', this.onHide);
+      window.removeEventListener('storage', this.onStorageEvent);
     }
     if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', this.onHide);
   }
@@ -110,9 +154,46 @@ export class StorageService implements OnDestroy {
    */
   getSanitized<T>(key: string, sanitize: (raw: unknown) => Sanitized<T>): T[] {
     const result = sanitize(this.get<unknown>(key, null));
-    if (result.rejected.length > 0) this.quarantine(key, result.rejected, 'invalid');
-    if (result.rejected.length > 0 || result.repaired > 0) this.set(key, result.items);
+    // Bei Schreibsperre (Migration, anderes Fenster, neueres Schema) bleiben die Rohdaten unverändert und es wird nichts
+    // geschrieben: Das folgende set würde abgelehnt, und jeder Start legte sonst einen neuen Quarantäne-Eintrag an.
+    // Bei Migrationssperre wird das Verworfene aber vorgemerkt und nach der Sperre vor dem ersten Schreiben gesichert.
+    if (this.isWriteBlocked(key)) {
+      this.deferQuarantine(key, result.rejected, { value: result.items });
+      return [...result.items];
+    }
+    const hasRejected = result.rejected.length > 0;
+    // Ohne gelungene Sicherung bleibt der Roh-Schlüssel unverändert; die bereinigten Daten gelten nur im Speicher.
+    const secured = !hasRejected || this.quarantine(key, result.rejected, 'invalid');
+    if (secured && (hasRejected || result.repaired > 0)) this.set(key, result.items);
     return [...result.items];
+  }
+
+  /**
+   * Liest einen Objekt-Wert (z. B. Profil, Wochenplan) und bereinigt ihn mit `sanitize` (`null` = unbrauchbar).
+   * Ein unbrauchbarer Wert kommt in Quarantäne; der Roh-Schlüssel wird nur entfernt, wenn die Sicherung gelang.
+   */
+  getObject<T>(key: string, sanitize: (raw: unknown) => T | null): T | null {
+    const stored = this.get<unknown>(key, null);
+    if (stored === null) return null;
+    const clean = sanitize(stored);
+    if (clean !== null) return clean;
+    if (this.isWriteBlocked(key)) {
+      this.deferQuarantine(key, [stored], { value: null }); // siehe getSanitized: Rohdaten unverändert, Sicherung später
+      return clean;
+    }
+    if (this.quarantine(key, [stored], 'invalid')) this.remove(key);
+    return clean;
+  }
+
+  /**
+   * Bei Migrationssperre: merkt Verworfenes als ungesichert vor (ohne zu schreiben), damit der Store gesperrt bleibt
+   * und `retryNow`/`ensureSecured` die Quarantäne vor dem ersten Schreiben nachholen. Bei Schreibsperre durch ein
+   * anderes Fenster oder ein neueres Schema bleibt alles unangetastet. Ein bereits vorgemerkter Schlüssel bleibt unverändert.
+   */
+  private deferQuarantine(key: string, items: readonly unknown[], cleaned: { readonly value: unknown }): void {
+    if (items.length === 0 || this.writeLocked() || this.unsecured.has(key)) return;
+    this.setUnsecured(key, { items, reason: 'invalid', cleaned });
+    this._notices.update((list) => [...list, { key, count: items.length, saved: false }]);
   }
 
   /**
@@ -122,11 +203,17 @@ export class StorageService implements OnDestroy {
    * (`pagehide`, `visibilitychange`, `beforeunload`) wird sofort geschrieben.
    * Scheitert das Schreiben, bleibt der Wert vorgemerkt, `lastError` wird gesetzt und es folgen Wiederholungen
    * (siehe {@link RETRY_DELAYS_MS}). Stammt der Speicher von einer neueren App-Version, wird nichts geschrieben.
-   * @returns `false`, wenn der Wert wegen eines neueren Schemas verworfen wurde (nichts vorgemerkt).
+   * `undefined` als Wert entfernt den Schlüssel (wie {@link remove}).
+   * @returns `false`, wenn der Wert wegen Schreibsperre (neueres Schema, Änderung in anderem Fenster) verworfen wurde (nichts vorgemerkt).
    */
   set<T>(key: string, value: T): boolean {
-    // Daten einer neueren App-Version dürfen von dieser App nicht überschrieben werden (Hinweis: Status-Banner).
-    if (this._schemaNewer()) return false;
+    // Daten einer neueren App-Version oder eines anderen Fensters dürfen nicht überschrieben werden (Hinweis: Status-Banner).
+    if (this.writeLocked() || this.isMigrationBlocked(key)) return false;
+    if (!this.ensureSecured(key)) return false;
+    if (value === undefined) {
+      this.remove(key);
+      return true;
+    }
     this.pending.set(key, value);
     this.flushTimer ??= setTimeout(() => this.flush(), StorageService.WRITE_DELAY_MS);
     return true;
@@ -141,7 +228,12 @@ export class StorageService implements OnDestroy {
   flush(): boolean {
     clearTimeout(this.flushTimer);
     this.flushTimer = undefined;
-    if (this.pending.size === 0) return true;
+    if (this.pending.size === 0) {
+      this.markWritten();
+      return this.unsecured.size === 0;
+    }
+    // Bei Schreibsperre (neueres Schema, anderes Fenster) bleibt alles vorgemerkt, nichts wird geschrieben.
+    if (this.writeLocked()) return false;
     const backend = this.backend();
     const failed: string[] = [];
     let kind: StorageErrorKind = backend ? 'unknown' : 'unavailable';
@@ -160,21 +252,46 @@ export class StorageService implements OnDestroy {
       this.markWritten();
       return true;
     }
-    this._writeFailures.update((n) => n + 1);
-    this._lastError.set({ kind, keys: failed, at: Date.now() });
+    this.reportFailure(kind, failed);
     this.scheduleRetry();
     return false;
   }
 
   /** Wiederholt das Schreiben sofort (Knopf im Fehler-Banner). */
   retryNow(): boolean {
-    return this.flush();
+    if (this._migrationError()) this.migrate();
+    Array.from(this.unsecured.keys()).forEach((key) => this.ensureSecured(key));
+    return this.flush() && !this._migrationError() && this.unsecured.size === 0;
   }
 
-  /** Entfernt einen Schlüssel (bei neuerem Schema nicht: die Daten gehören der neueren App-Version). */
+  /** True, wenn die Rohdaten dieses Schlüssels nicht in die Quarantäne gesichert werden konnten (Schreiben wird abgelehnt). */
+  hasUnsecured(key: string): boolean {
+    return this._unsecuredKeys().has(key);
+  }
+
+  /**
+   * Schreibsperre für Stores, die `keys` besitzen: allgemeine Sperre, ungesicherte Schlüssel
+   * und ein Migrationsfehler (App-Daten dürfen dann nicht als aktuell markiert werden).
+   */
+  isLockedFor(...keys: readonly string[]): Signal<boolean> {
+    return computed(() => this.writeLocked() || keys.some((k) => this.hasUnsecured(k) || this.isMigrationBlocked(k)));
+  }
+
+  /** True, wenn Schreiben/Löschen dieses Schlüssels abgelehnt wird (Schreibsperre oder Migrationsfehler). */
+  private isWriteBlocked(key: string): boolean {
+    return this.writeLocked() || this.isMigrationBlocked(key);
+  }
+
+  private isMigrationBlocked(key: string): boolean {
+    return this._migrationError() !== null && !isLockExemptKey(key);
+  }
+
+  /** Entfernt einen Schlüssel (bei Schreibsperre nicht: die Daten gehören der neueren App-Version bzw. dem anderen Fenster). */
   remove(key: string): void {
-    if (this._schemaNewer()) return;
+    if (this.writeLocked() || this.isMigrationBlocked(key)) return;
+    if (!this.ensureSecured(key)) return;
     this.pending.delete(key);
+    if (this.pending.size === 0) this.markWritten();
     try {
       this.backend()?.removeItem(this.prefix + key);
     } catch (e) {
@@ -187,12 +304,14 @@ export class StorageService implements OnDestroy {
    */
   clearAll(): boolean {
     this.pending.clear();
+    this.setUnsecured(null);
     this.markWritten();
     const b = this.backend();
     if (!b) return true;
     try {
       Object.keys(this.rawEntries()).forEach((k) => b.removeItem(this.prefix + k));
       b.setItem(this.prefix + SCHEMA_KEY, JSON.stringify(CURRENT_SCHEMA_VERSION));
+      this._migrationError.set(null);
       this.reevaluateSchema();
       return true;
     } catch (e) {
@@ -203,23 +322,19 @@ export class StorageService implements OnDestroy {
 
   /**
    * Liest alle NutriTrack-Schlüssel (ohne Präfix) als geparste JSON-Werte, z. B. für ein Backup.
-   * Nicht lesbare Einträge und die Schema-Version werden ausgelassen.
+   * Nicht lesbare Einträge und die Schema-Version werden ausgelassen (Schlüssel siehe {@link snapshotDetailed}).
    */
   snapshot(): Record<string, unknown> {
+    return this.snapshotDetailed().data;
+  }
+
+  /** Wie {@link snapshot}, meldet aber zusätzlich die Schlüssel, die nicht lesbar waren und deshalb fehlen. */
+  snapshotDetailed(): SnapshotResult {
     this.flush();
-    const stored = Object.fromEntries(
-      Object.entries(this.rawEntries()).flatMap(([key, raw]) => {
-        if (key === SCHEMA_KEY) return [];
-        try {
-          return [[key, JSON.parse(raw) as unknown]];
-        } catch {
-          return [];
-        }
-      }),
-    );
+    const { data, skippedKeys } = this.readStored(true);
     // Werte, die gerade nicht geschrieben werden konnten, gehören trotzdem in die Sicherung.
     const unsaved = Object.fromEntries(Array.from(this.pending).map(([k, v]) => [k, JSON.parse(JSON.stringify(v)) as unknown]));
-    return { ...stored, ...unsaved };
+    return { data: { ...data, ...unsaved }, skippedKeys: skippedKeys.filter((k) => !(k in unsaved)) };
   }
 
   /**
@@ -229,42 +344,97 @@ export class StorageService implements OnDestroy {
    * @returns `ok`; `failed` (alter Stand wiederhergestellt); `rollbackFailed` (auch die Wiederherstellung scheiterte, Daten evtl. unvollständig).
    */
   replaceAll(data: Readonly<Record<string, unknown>>): ReplaceOutcome {
+    const queued = new Map(this.pending);
     this.pending.clear();
     const b = this.backend();
-    if (!b) return 'failed';
+    if (!b) return this.keepPending(queued, 'failed');
     const previous = this.rawEntries();
     const removable = Object.fromEntries(Object.entries(previous).filter(([k]) => !isQuarantineKey(k)));
     try {
       this.writeRaw(b, removable, {});
       Object.entries(data).forEach(([key, value]) => b.setItem(this.prefix + key, JSON.stringify(value)));
+      this.setUnsecured(null);
       this.markWritten();
+      this._migrationError.set(null);
       this.reevaluateSchema();
       return 'ok';
     } catch (e) {
       console.error('NutriTrack: Ersetzen der Daten fehlgeschlagen, vorheriger Stand wird wiederhergestellt', e);
-      return this.restoreRaw(b, previous) ? 'failed' : 'rollbackFailed';
+      return this.keepPending(queued, this.restoreRaw(b, previous) ? 'failed' : 'rollbackFailed');
     }
+  }
+
+  /** Stellt nicht geschriebene Werte nach einem gescheiterten Import wieder her (sie gehören dem alten Stand). */
+  private keepPending(queued: ReadonlyMap<string, unknown>, outcome: ReplaceOutcome): ReplaceOutcome {
+    queued.forEach((value, key) => this.pending.set(key, value));
+    if (queued.size > 0) this.flushTimer ??= setTimeout(() => this.flush(), StorageService.WRITE_DELAY_MS);
+    return outcome;
   }
 
   /**
    * Legt Verworfenes (Datensätze oder unlesbaren Rohtext) unter einem Quarantäne-Schlüssel ab
    * und merkt einen Hinweis für die Oberfläche. Wirft nie.
+   * @returns `true`, wenn die Sicherung geschrieben wurde (oder nichts zu sichern war); sonst darf der Aufrufer die Originale nicht löschen.
    */
-  quarantine(source: string, items: readonly unknown[], reason: QuarantineReason, raw?: string): void {
-    if (items.length === 0 && raw === undefined) return;
-    const b = this._schemaNewer() ? null : this.backend();
+  quarantine(source: string, items: readonly unknown[], reason: QuarantineReason, raw?: string): boolean {
+    if (items.length === 0 && raw === undefined) return true;
+    const data: UnsecuredData = raw === undefined ? { items, reason } : { items, reason, raw };
+    const saved = this.writeQuarantine(source, data);
+    this.setUnsecured(source, saved ? null : data);
+    this._notices.update((list) => [...list, { key: source, count: raw === undefined ? items.length : 1, saved }]);
+    return saved;
+  }
+
+  /** Schreibt einen Quarantäne-Eintrag. Wirft nie. */
+  private writeQuarantine(source: string, data: UnsecuredData): boolean {
+    const b = this.writeLocked() ? null : this.backend();
     const now = new Date();
-    const record = buildQuarantineRecord(source, reason, raw === undefined ? { items } : { raw }, now);
-    let saved = false;
+    const record = buildQuarantineRecord(source, data.reason, data.raw === undefined ? { items: data.items } : { raw: data.raw }, now);
     try {
-      if (!b) throw new Error(this._schemaNewer() ? 'Speicher gehört einer neueren App-Version' : 'Speicher nicht verfügbar');
+      if (!b) throw new Error(this.writeLocked() ? 'Speicher ist für Schreibzugriffe gesperrt' : 'Speicher nicht verfügbar');
       b.setItem(this.prefix + quarantineKey(source, now.getTime()), JSON.stringify(record));
       keysToPrune(Object.keys(this.rawEntries())).forEach((k) => b.removeItem(this.prefix + k));
-      saved = true;
+      return true;
     } catch (e) {
       console.error(`NutriTrack: Quarantäne für "${source}" konnte nicht gesichert werden`, e);
+      return false;
     }
-    this._notices.update((list) => [...list, { key: source, count: raw === undefined ? items.length : 1, saved }]);
+  }
+
+  /**
+   * Schreib-/Löschschutz: Sind die Rohdaten eines Schlüssels nicht gesichert, wird die Quarantäne erneut versucht.
+   * Gelingt sie nicht, wird der Zugriff abgelehnt (Fehler im Banner), damit die Originaldaten nicht verloren gehen.
+   */
+  private ensureSecured(key: string): boolean {
+    const data = this.unsecured.get(key);
+    if (!data) return true;
+    if (this.writeQuarantine(key, data)) {
+      this.setUnsecured(key, null);
+      this._notices.update((list) => list.map((n) => (n.key === key ? { ...n, saved: true } : n)));
+      this.writeCleaned(key, data);
+      if (this.unsecured.size === 0 && this.pending.size === 0) this.markWritten();
+      return true;
+    }
+    this.reportFailure('quota', [key]);
+    return false;
+  }
+
+  /**
+   * Nach nachgeholter Sicherung: schreibt den bereinigten Stand zurück, damit der nächste Start das Verworfene
+   * nicht erneut sichert. Ist der Schlüssel noch gesperrt, lehnen `set`/`remove` ab und der Rohwert bleibt.
+   */
+  private writeCleaned(key: string, data: UnsecuredData): void {
+    if (!data.cleaned) return;
+    if (data.cleaned.value === null) this.remove(key);
+    else this.set(key, data.cleaned.value);
+  }
+
+  /** Setzt oder entfernt (`data` = `null`) einen ungesicherten Schlüssel; ohne Schlüssel (`null`) werden alle entfernt. */
+  private setUnsecured(key: string | null, data: UnsecuredData | null = null): void {
+    if (key === null) this.unsecured.clear();
+    else if (data) this.unsecured.set(key, data);
+    else this.unsecured.delete(key);
+    this._unsecuredKeys.set(new Set(this.unsecured.keys()));
   }
 
   /** Blendet die Quarantäne-Hinweise aus. */
@@ -272,22 +442,52 @@ export class StorageService implements OnDestroy {
     this._notices.set([]);
   }
 
-  private quarantineRaw(key: string, raw: string): void {
-    if (this.corruptSeen.get(key) === raw) return;
+  private quarantineRaw(key: string, raw: string): boolean {
+    if (this.corruptSeen.get(key) === raw) return false;
     this.corruptSeen.set(key, raw);
-    this.quarantine(key, [], 'parse', raw);
+    return this.quarantine(key, [], 'parse', raw);
+  }
+
+  /** Ein anderes Fenster hat App-Daten geändert: Schreibsperre, damit dessen Stand nicht überschrieben wird. */
+  private handleForeignChange(e: StorageEvent): void {
+    const isOwnStorage = !e.storageArea || e.storageArea === this.backend();
+    const key = e.key === null ? null : e.key.startsWith(this.prefix) ? e.key.slice(this.prefix.length) : undefined;
+    if (!isOwnStorage || key === undefined || (key !== null && isQuarantineKey(key))) return;
+    if (key !== null && isLockExemptKey(key)) {
+      this.noteExemptChange(key);
+      return;
+    }
+    if (key === null) this.pending.clear();
+    else this.pending.delete(key);
+    this._externalChange.set(true);
+  }
+
+  /** Cache/Meta in anderem Fenster: keine Sperre; die Zustimmung gilt dort neu und wird hier neu eingelesen. */
+  private noteExemptChange(key: string): void {
+    if (isConsentKey(key)) {
+      this.pending.delete(key);
+      this._consentChanges.update((n) => n + 1);
+    }
+    this._foreignChange.set({ key, seq: ++this.foreignSeq });
+  }
+
+  private reportFailure(kind: StorageErrorKind, keys: readonly string[]): void {
+    this._writeFailures.update((n) => n + 1);
+    this._lastError.set({ kind, keys, at: Date.now() });
   }
 
   /** Bewertet das Schema nach einem Löschen/Ersetzen neu: der Speicher hat dann kein neueres Schema mehr. */
   private reevaluateSchema(): void {
     this._schemaNewer.set(readSchemaVersion(this.readParsed(SCHEMA_KEY)) > CURRENT_SCHEMA_VERSION);
+    this._externalChange.set(false);
   }
 
   private markWritten(): void {
     clearTimeout(this.retryTimer);
     this.retryTimer = undefined;
     this.retryIndex = 0;
-    this._lastError.set(null);
+    // Ein abgelehnter Schreibzugriff auf einen ungesicherten Schlüssel bleibt Fehler, bis die Quarantäne gelingt.
+    if (this.unsecured.size === 0) this._lastError.set(null);
   }
 
   private scheduleRetry(): void {
@@ -305,10 +505,11 @@ export class StorageService implements OnDestroy {
   private migrate(): void {
     const b = this.backend();
     if (!b) return;
+    this._migrationError.set(null);
     try {
       const from = readSchemaVersion(this.readParsed(SCHEMA_KEY));
       if (from === CURRENT_SCHEMA_VERSION) return;
-      const data = this.snapshotWithoutFlush();
+      const data = this.readStored(false).data;
       const result = applyMigrations(data, from);
       if (result.newer) {
         this._schemaNewer.set(true);
@@ -321,20 +522,24 @@ export class StorageService implements OnDestroy {
       b.setItem(this.prefix + SCHEMA_KEY, JSON.stringify(result.version));
     } catch (e) {
       console.error('NutriTrack: Migration des Speichers fehlgeschlagen', e);
+      this._writeFailures.update((n) => n + 1);
+      this._migrationError.set({ kind: classifyError(e), keys: [SCHEMA_KEY], at: Date.now() });
     }
   }
 
-  private snapshotWithoutFlush(): Record<string, unknown> {
-    return Object.fromEntries(
-      Object.entries(this.rawEntries()).flatMap(([key, raw]) => {
-        if (key === SCHEMA_KEY || isQuarantineKey(key)) return [];
-        try {
-          return [[key, JSON.parse(raw) as unknown]];
-        } catch {
-          return [];
-        }
-      }),
-    );
+  /** Parst alle Einträge; nicht lesbare werden übersprungen und gemeldet. `withQuarantine`: Quarantäne-Schlüssel mitlesen. */
+  private readStored(withQuarantine: boolean): SnapshotResult {
+    const data: Record<string, unknown> = {};
+    const skippedKeys: string[] = [];
+    for (const [key, raw] of Object.entries(this.rawEntries())) {
+      if (key === SCHEMA_KEY || (!withQuarantine && isQuarantineKey(key))) continue;
+      try {
+        data[key] = JSON.parse(raw) as unknown;
+      } catch {
+        if (!isQuarantineKey(key)) skippedKeys.push(key);
+      }
+    }
+    return { data, skippedKeys };
   }
 
   private readRaw(key: string): string | null {

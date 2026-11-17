@@ -49,7 +49,9 @@ const RECIPE_TIMEOUT_MESSAGE = 'Die Rezept-Suche antwortet gerade nicht.';
 
 const RECIPE_CACHE_TTL_S = 3600; // Spoonacular-Bedingungen: Cache höchstens 1 Stunde
 
-const RECIPE_CACHED_HEADERS = ['Content-Type', 'X-Api-Quota-Left'];
+const RECIPE_FAILURE_HEADERS = ['Retry-After'];
+
+const RECIPE_UPSTREAM_FAILED = 'Rezept-Suche ist gerade nicht erreichbar.';
 
 /** Behält nur Werte der festen Unverträglichkeiten-Liste (unbekannte fallen weg); '' wenn nichts übrig bleibt. */
 function onlyKnownIntolerances(value) {
@@ -92,11 +94,8 @@ function recipeResponseHeaders(resp, cors) {
 }
 
 async function cacheRecipeResponse(cache, cacheKey, body, resp) {
-  const headers = { 'Cache-Control': `public, max-age=${RECIPE_CACHE_TTL_S}` };
-  for (const name of RECIPE_CACHED_HEADERS) {
-    const value = resp.headers.get(name);
-    if (value) headers[name] = value;
-  }
+  // Nur der Inhalt wird gecacht: der Quota-Header gehört zum Live-Aufruf und gehört nicht an andere Nutzer.
+  const headers = { 'Content-Type': resp.headers.get('Content-Type') ?? 'application/json', 'Cache-Control': `public, max-age=${RECIPE_CACHE_TTL_S}` };
   try {
     await cache.put(cacheKey, new Response(body, { status: 200, headers }));
   } catch (e) {
@@ -116,6 +115,17 @@ export async function recipeInformation(request, url, id, env, cors) {
   const target = new URL(`${SPOONACULAR_BASE}/${id}/information`);
   if (url.searchParams.get('includeNutrition') === 'true') target.searchParams.set('includeNutrition', 'true');
   return fetchSpoonacular(request, target, env, cors);
+}
+
+/** Upstream-Fehler: Statuscode (der Client wertet 402/404/429 aus) und Retry-After bleiben, der Upstream-Text nicht. */
+function upstreamFailure(resp, cors) {
+  console.warn(`Spoonacular antwortet mit HTTP ${resp.status}.`);
+  const headers = { ...cors };
+  for (const name of RECIPE_FAILURE_HEADERS) {
+    const value = resp.headers.get(name);
+    if (value) headers[name] = value;
+  }
+  return json({ error: RECIPE_UPSTREAM_FAILED }, resp.status, headers);
 }
 
 /** Cache, Rate-Limit, Tagesdeckel und Upstream-Aufruf; Fehlerstatus (auch 404) gehen unverändert durch. */
@@ -140,8 +150,9 @@ async function fetchSpoonacular(request, target, env, cors) {
     });
     // Ungültiger/gesperrter Server-Key ist kein Fehler des Nutzers.
     if (resp.status === 401 || resp.status === 403) return json({ error: RECIPE_UNAVAILABLE }, 502, cors);
+    if (!resp.ok) return upstreamFailure(resp, cors);
     const body = await resp.text();
-    if (resp.ok && cache) await cacheRecipeResponse(cache, cacheKey, body, resp);
+    if (cache) await cacheRecipeResponse(cache, cacheKey, body, resp);
     return new Response(body, { status: resp.status, headers: recipeResponseHeaders(resp, cors) });
   } catch (e) {
     if (e?.name === 'AbortError') return json({ error: RECIPE_TIMEOUT_MESSAGE }, 504, cors);

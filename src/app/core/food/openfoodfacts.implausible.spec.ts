@@ -73,3 +73,84 @@ describe('OpenFoodFactsProvider mit offensichtlich fehlerhaften Werten', () => {
     expect(dropped.every((e) => e.level === 'info')).toBe(true);
   });
 });
+
+describe('OpenFoodFactsProvider — Energie gegen Makros (K4)', () => {
+  const kjInKcal = {
+    code: '111', product_name: 'Joghurt', nutriments: { 'energy-kcal_100g': 418, 'energy-kj_100g': 418, proteins_100g: 5, carbohydrates_100g: 15, fat_100g: 2 },
+  };
+  const zeroKcal = {
+    code: '222', product_name: 'Nussmix', nutriments: { 'energy-kcal_100g': 0, proteins_100g: 20, carbohydrates_100g: 10, fat_100g: 50 },
+  };
+
+  it('verwirft in der Suche einen kJ-Wert im kcal-Feld und kcal 0 bei vollen Makros', async () => {
+    const promise = provider.searchByText('x');
+    http.expectOne((r) => r.url === SEARCH_URL).flush({ hits: [kjInKcal, zeroKcal] });
+    await expect(promise).resolves.toEqual([]);
+  });
+
+  it('meldet beim Barcode "fehlerhaft" statt eines falschen Treffers', async () => {
+    const promise = provider.lookupByBarcode('222');
+    http.expectOne((r) => r.url.startsWith(PRODUCT_URL)).flush({ status: 'success', product: zeroKcal });
+    const error = await promise.catch((e: unknown) => e);
+    expect((error as FoodLookupError).reason).toBe('implausible');
+  });
+});
+
+describe('OpenFoodFactsProvider — Produkt ohne Nährwerte (K13)', () => {
+  const noNutrition = { code: '333', product_name: 'Mystery-Riegel', brands: 'Marke', nutriments: {} };
+
+  it('wirft beim Barcode einen eigenen Fehlergrund statt "kein Produkt gefunden"', async () => {
+    const promise = provider.lookupByBarcode('333');
+    http.expectOne((r) => r.url.startsWith(PRODUCT_URL)).flush({ status: 'success', product: noNutrition });
+    const error = await promise.catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(FoodLookupError);
+    expect((error as FoodLookupError).reason).toBe('no-nutrition');
+  });
+
+  it('nennt die Meldung mit dem Weg zur Handeingabe', async () => {
+    const promise = provider.lookupByBarcode('333');
+    http.expectOne((r) => r.url.startsWith(PRODUCT_URL)).flush({ status: 'success', product: noNutrition });
+    const error = await promise.catch((e: unknown) => e);
+    expect(foodErrorMessage(error)).toBe('Produkt gefunden, aber ohne Nährwerte. Bitte manuell eintragen.');
+  });
+
+  it('lässt solche Produkte in der Textsuche weiter still weg', async () => {
+    const promise = provider.searchByText('mystery');
+    http.expectOne((r) => r.url === SEARCH_URL).flush({ hits: [noNutrition] });
+    await expect(promise).resolves.toEqual([]);
+  });
+});
+
+describe('OpenFoodFactsProvider — Zahlen aus OFF (K15)', () => {
+  it('liest "1.500" als 1,5 und nicht als 1500', async () => {
+    const promise = provider.lookupByBarcode('444');
+    http.expectOne((r) => r.url.startsWith(PRODUCT_URL)).flush({
+      status: 'success',
+      product: {
+        code: '444', product_name: 'Tee', nutriments: { 'energy-kcal_100g': '10', proteins_100g: '1.500', carbohydrates_100g: '1.500', fat_100g: '0' },
+      },
+    });
+    const item = await promise;
+    expect(item?.facts.proteinG).toBe(1.5);
+  });
+});
+
+describe('OpenFoodFactsProvider — zweifelhafte Energie wird markiert statt verworfen (Prüfrunde 2)', () => {
+  const wine = {
+    code: '444', product_name: 'Rotwein',
+    nutriments: { 'energy-kcal_100g': 80, proteins_100g: 0.1, carbohydrates_100g: 2.6, fat_100g: 0 },
+  };
+  const erythritol = {
+    code: '555', product_name: 'Erythrit',
+    nutriments: { 'energy-kcal_100g': 0, proteins_100g: 0, carbohydrates_100g: 100, fat_100g: 0 },
+  };
+
+  it('liefert Wein und Erythrit; nur Erythrit ist "bitte prüfen"', async () => {
+    const promise = provider.searchByText('x');
+    http.expectOne((r) => r.url === SEARCH_URL).flush({ hits: [wine, erythritol] });
+    const items = await promise;
+    expect(items.map((i) => i.name).sort()).toEqual(['Erythrit', 'Rotwein']);
+    expect(items.find((i) => i.name === 'Rotwein')?.isKcalDoubtful).toBeUndefined();
+    expect(items.find((i) => i.name === 'Erythrit')?.isKcalDoubtful).toBe(true);
+  });
+});

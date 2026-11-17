@@ -8,6 +8,7 @@ import { SpoonacularProvider } from '../recipes/online/spoonacular.provider';
 import { ProfileStore } from '../state/profile.store';
 import { ShoppingStore } from '../state/shopping.store';
 import { WeekPlanStore } from '../state/week-plan.store';
+import { GenerationCancelledError } from '../shopping/generation-cancelled';
 import { NO_RECIPES_FOUND_MESSAGE, WeekPlanService } from './week-plan.service';
 
 const recipe = (id: string): OnlineRecipe => ({
@@ -143,5 +144,42 @@ describe('WeekPlanService.removeRecipe / replaceRecipe', () => {
     const store = TestBed.inject(WeekPlanStore);
     expect(store.plan()?.recipes.map((r) => r.id)).toEqual(['1', '2']);
     expect(store.blocked()).toEqual([]);
+  });
+});
+
+describe('WeekPlanService Abbruch und leerer Plan', () => {
+  beforeEach(() => vi.restoreAllMocks());
+  const page = (ids: string[]) => ({ recipes: ids.map(recipe), totalResults: ids.length, quotaLeft: null });
+
+  it('verwirft das Ergebnis, wenn die Anfrage nicht mehr aktuell ist (E2)', async () => {
+    const service = setup(vi.fn().mockResolvedValue(page(['1', '2'])));
+
+    await expect(service.generate({ ...OPTS, isCurrent: () => false })).rejects.toBeInstanceOf(GenerationCancelledError);
+
+    expect(TestBed.inject(WeekPlanStore).plan()).toBeNull();
+    expect(TestBed.inject(ShoppingStore).list()).toBeNull();
+  });
+
+  it('verwirft den Plan, wenn das letzte Rezept entfernt wird (E17), und behält die Sperrliste', async () => {
+    const service = setup(vi.fn().mockResolvedValue(page(['1'])));
+    await service.generate({ ...OPTS, days: 1 });
+
+    service.removeRecipe('1', true);
+
+    const store = TestBed.inject(WeekPlanStore);
+    expect(store.plan()).toBeNull();
+    expect(store.blocked()).toEqual(['1']);
+  });
+
+  it('discardPlan entfernt nur den Plan, nicht die Sperrliste (E7)', async () => {
+    const service = setup(vi.fn().mockResolvedValue(page(['1', '2'])));
+    await service.generate(OPTS);
+    TestBed.inject(WeekPlanStore).block(['7']);
+
+    service.discardPlan();
+
+    const store = TestBed.inject(WeekPlanStore);
+    expect(store.plan()).toBeNull();
+    expect(store.blocked()).toEqual(['7']);
   });
 });

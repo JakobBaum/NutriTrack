@@ -1,5 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { AiService } from '../ai/ai.service';
+import { errorText } from '../ai/ai-errors';
+import { DebugLogService } from '../debug/debug-log.service';
 import { ConsentService } from '../consent/consent.service';
 import { AppSettingsStore } from '../state/app-settings.store';
 import { sanitizeEnglishTerm } from './diet-prefs';
@@ -35,6 +37,7 @@ function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
 @Injectable({ providedIn: 'root' })
 export class DietTranslateService {
   private readonly ai = inject(AiService);
+  private readonly log = inject(DebugLogService);
   private readonly settings = inject(AppSettingsStore);
   private readonly consent = inject(ConsentService);
 
@@ -59,7 +62,7 @@ export class DietTranslateService {
       // Ein identisches Ergebnis (z. B. "Avocado") gilt als übersetzt; nur leere/ungültige Antworten sind Fehlfälle.
       return sanitizeEnglishTerm(raw);
     } catch (e: unknown) {
-      console.error('NutriTrack: Übersetzung einer Abneigung fehlgeschlagen', e);
+      this.log.error(`✗ Übersetzung einer Abneigung fehlgeschlagen: ${errorText(e)}`);
       return '';
     }
   }

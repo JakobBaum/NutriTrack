@@ -54,7 +54,17 @@ describe('OpenFoodFactsProvider — fehlende Nährwerte', () => {
     expect(items.map((i) => i.name)).toEqual(['Mit Werten', 'Wasser']);
   });
 
-  it('liefert bei Barcode-Produkt ohne kcal null', async () => {
+  it('markiert Produkte ohne Eiweiß-, Kohlenhydrat- oder Fettwert als unvollständig', async () => {
+    const promise = provider.searchByText('reis');
+    const req = http.expectOne((r) => r.url === SEARCH_URL);
+    const full = { 'energy-kcal_100g': 100, proteins_100g: 1, carbohydrates_100g: 2, fat_100g: 3 };
+    req.flush({ hits: [product('Voll', { nutriments: full }), product('Lücke')] });
+    const items = await promise;
+    expect(items.find((i) => i.name === 'Voll')?.isIncomplete).toBeUndefined();
+    expect(items.find((i) => i.name === 'Lücke')?.isIncomplete).toBe(true);
+  });
+
+  it('meldet bei Barcode-Produkt ohne kcal no-nutrition', async () => {
     // Arrange
     const promise = provider.lookupByBarcode('111');
     const req = http.expectOne((r) => r.url.startsWith(PRODUCT_URL));
@@ -63,7 +73,7 @@ describe('OpenFoodFactsProvider — fehlende Nährwerte', () => {
     req.flush({ status: 'success', product: product('Ohne Werte', { nutriments: {} }) });
 
     // Assert
-    expect(await promise).toBeNull();
+    await expect(promise).rejects.toMatchObject({ reason: 'no-nutrition' });
   });
 });
 

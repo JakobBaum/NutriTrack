@@ -5,9 +5,8 @@
  */
 import { DiaryEntry, MealType, NutritionFacts } from '../models';
 import { makeId } from '../util/id';
-import { toDateISO } from '../util/date';
-
-type Rec = Record<string, unknown>;
+import { isIsoDay, toDateISO } from '../util/date';
+import { Rec, isNonNegative, isPositive, isRec, isStr } from '../util/guards';
 
 export interface SanitizeResult<T> {
   /** Verwendbare (ggf. reparierte) Datensätze. */
@@ -19,24 +18,21 @@ export interface SanitizeResult<T> {
 }
 
 const MEALS: ReadonlySet<string> = new Set(['breakfast', 'lunch', 'dinner', 'snack']);
-const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 const FALLBACK_LABEL = 'Eintrag';
 const FALLBACK_MEAL: MealType = 'snack';
 const NOON_HOUR = 12;
 
-const isRec = (v: unknown): v is Rec => typeof v === 'object' && v !== null && !Array.isArray(v);
-const isStr = (v: unknown): v is string => typeof v === 'string';
-const isNonNegative = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
-const isPositive = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0;
 const isValidDate = (v: unknown): v is string => isStr(v) && v !== '' && !Number.isNaN(Date.parse(v));
-const isValidDay = (v: unknown): v is string => isStr(v) && ISO_DAY.test(v) && !Number.isNaN(Date.parse(v));
+/** Zeitstempel in der einheitlichen UTC-Form (`...T..:..:...sssZ`), nach der der Text-Vergleich richtig sortiert. */
+const UTC_ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+const toUtcIso = (v: string): string => (UTC_ISO_RE.test(v) ? v : new Date(v).toISOString());
 
 /** Ohne `undefined`-Werte kopieren (damit JSON und Vergleiche sauber bleiben). */
 const compact = <T extends Rec>(obj: T): T =>
   Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
 
 /** Pflichtwerte müssen endlich und nicht negativ sein, sonst null; optionale ungültige Werte entfallen. */
-function cleanFacts(raw: unknown): NutritionFacts | null {
+export function cleanFacts(raw: unknown): NutritionFacts | null {
   if (!isRec(raw)) return null;
   const { kcal, proteinG, carbsG, fatG } = raw;
   if (![kcal, proteinG, carbsG, fatG].every(isNonNegative)) return null;
@@ -78,14 +74,19 @@ function cleanEntry(raw: Rec, usedIds: ReadonlySet<string>): Cleaned | null {
 
   const rawDay = raw['dateISO'];
   const rawCreated = raw['createdAt'];
-  const day = isValidDay(rawDay) ? rawDay : isValidDate(rawCreated) ? dayOf(rawCreated) : null;
+  const day = isIsoDay(rawDay) ? rawDay : isValidDate(rawCreated) ? dayOf(rawCreated) : null;
   if (!day) return null;
   const idOk = isStr(raw['id']) && raw['id'] !== '' && !usedIds.has(raw['id']);
   const label = isStr(raw['label']) && raw['label'].trim() !== '' ? raw['label'] : null;
   const ref = isRec(raw['ref']) && isStr(raw['ref']['kind']) ? (raw['ref'] as unknown as DiaryEntry['ref']) : null;
   const amount = raw['amountG'];
   const servings = raw['servings'];
-  if (!isValidDay(rawDay)) repaired = true;
+  if (!isIsoDay(rawDay)) repaired = true;
+  const baseFacts = raw['baseFacts'] === undefined ? undefined : cleanFacts(raw['baseFacts']);
+  if (raw['baseFacts'] !== undefined && baseFacts === null) repaired = true;
+  const createdOk = isValidDate(rawCreated);
+  const createdAt = createdOk ? toUtcIso(rawCreated) : noonOf(day);
+  if (createdOk && createdAt !== rawCreated) repaired = true;
 
   const entry = compact({
     ...raw,
@@ -95,9 +96,10 @@ function cleanEntry(raw: Rec, usedIds: ReadonlySet<string>): Cleaned | null {
     label: fix(label as string, label !== null, FALLBACK_LABEL),
     ref: fix(ref as DiaryEntry['ref'], ref !== null, { kind: 'manual' } as DiaryEntry['ref']),
     facts,
+    baseFacts: baseFacts ?? undefined,
     amountG: fix(amount as number | undefined, amount === undefined || amount === null || isPositive(amount), undefined),
     servings: fix(servings as number | undefined, servings === undefined || servings === null || isPositive(servings), undefined),
-    createdAt: fix(rawCreated as string, isValidDate(rawCreated), noonOf(day)),
+    createdAt: fix(createdAt, createdOk, createdAt),
   }) as unknown as DiaryEntry;
   return { entry, repaired };
 }

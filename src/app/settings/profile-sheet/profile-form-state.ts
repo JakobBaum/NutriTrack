@@ -73,6 +73,11 @@ export function rateForGoal(goal: Goal, rate: number | null | undefined): number
   );
 }
 
+/** Tempo nach Zielwechsel: von „Halten“ kommend gibt es keinen sinnvollen Altwert, dann gilt die Vorgabe. */
+export function rateOnGoalChange(from: Goal, to: Goal, rate: number): number {
+  return rateForGoal(to, from === 'maintain' ? null : rate);
+}
+
 export function emptyFormState(): ProfileFormState {
   return {
     weightKg: null, heightCm: null, age: null, sex: DEFAULT_SEX, activityLevel: DEFAULT_ACTIVITY,

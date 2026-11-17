@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseNutritionLabel } from './nutrition-label-parser';
 import { PHOTO_PREPARE_ERROR, UPLOAD_JPEG_QUALITY, UPLOAD_MAX_EDGE_PX, downscaleFactor, shrinkPhotoForUpload, type PhotoShrinkDeps } from './label-image';
-import { LABEL_FAILED_MESSAGE, LABEL_READ_HINT, blankFieldsFor, evaluateLabelParse } from './label-scan';
+import { LABEL_DOUBTFUL_HINT, LABEL_FAILED_MESSAGE, LABEL_READ_HINT, PORTION_ONLY_HINT, blankFieldsFor, evaluateLabelParse } from './label-scan';
 
 describe('evaluateLabelParse', () => {
   it('accepts kcal plus at least two macros', () => {
@@ -105,5 +105,18 @@ describe('shrinkPhotoForUpload', () => {
       createCanvas: () => canvas as unknown as HTMLCanvasElement,
     };
     await expect(shrinkPhotoForUpload('ORIGINAL', 1600, empty)).rejects.toThrow(PHOTO_PREPARE_ERROR);
+  });
+});
+
+describe('evaluateLabelParse — K16/K17', () => {
+  it('weist bei reiner Portionsspalte auf die fehlende Portionsgröße hin', () => {
+    const out = evaluateLabelParse(parseNutritionLabel('pro Portion\nEnergie 240 kcal\nFett 10 g\nKohlenhydrate 30 g\nEiweiß 6 g\nBallaststoffe 2 g\nZucker 4 g'));
+    expect(out.ok && out.facts.basis).toBe('perPortion');
+    expect(out.ok && out.hint).toContain(PORTION_ONLY_HINT);
+  });
+
+  it('markiert Energie, die nicht zu den Makros passt, als bitte prüfen', () => {
+    const out = evaluateLabelParse(parseNutritionLabel('pro 100 g\nEnergie 800 kcal\nFett 2 g\nKohlenhydrate 10 g\nEiweiß 3 g\nBallaststoffe 3 g\nZucker 4 g'));
+    expect(out.ok && out.hint).toContain(LABEL_DOUBTFUL_HINT);
   });
 });

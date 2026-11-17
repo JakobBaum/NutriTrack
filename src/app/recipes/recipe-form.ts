@@ -43,11 +43,21 @@ function stepsOrBlank(steps: readonly string[]): string[] {
   return steps.length ? [...steps] : [''];
 }
 
+/**
+ * Eigenes Gewicht eines gespeicherten Rezepts. Ältere Rezepte haben das berechnete Gesamtgewicht
+ * mitgespeichert; stimmt der Wert mit der Berechnung überein, gilt er wieder als Schätzung (null).
+ */
+function ownWeightOf(recipe: Recipe): number | null {
+  const stored = recipe.cookedWeightG;
+  if (stored == null || stored <= 0) return null;
+  return stored === totalWeightG(recipe.ingredients) ? null : stored;
+}
+
 export function formFromRecipe(recipe: Recipe): RecipeForm {
   return {
     title: recipe.title,
     servings: recipe.servings,
-    cookedWeightG: recipe.cookedWeightG ?? null,
+    cookedWeightG: ownWeightOf(recipe),
     ingredients: recipe.ingredients.map((i) => ({
       name: i.name,
       amount: i.amount,
@@ -108,11 +118,22 @@ export function nextCookedWeight(input: unknown, autoWeightG: number): number | 
   return parsed !== null && parsed > 0 && parsed !== autoWeightG ? parsed : null;
 }
 
-/** Setzt einen Nährwert immutabel; Ballast und Zucker bleiben bei ungültiger Eingabe leer. */
-export function applyFact(facts: NutritionFacts, key: FactKey, value: unknown): NutritionFacts {
+/**
+ * Setzt einen Nährwert immutabel. Negative Werte werden auf 0 geklemmt; Ballast und Zucker bleiben bei
+ * ungültiger Eingabe leer. Ein leeres oder ungültiges kcal-Feld heißt „keine Werte“ (undefined), nicht 0 kcal.
+ */
+export function applyFact(facts: NutritionFacts, key: FactKey, value: unknown): NutritionFacts | undefined {
   const parsed = parseDecimal(value);
+  if (key === 'kcal' && parsed === null) return undefined;
+  const clamped = parsed === null ? null : Math.max(0, parsed);
   const optional = key === 'fiberG' || key === 'sugarG';
-  return { ...facts, [key]: optional ? parsed ?? undefined : parsed ?? 0 };
+  return { ...facts, [key]: optional ? clamped ?? undefined : clamped ?? 0 };
+}
+
+/** Welche Zutat nach dem Entfernen von `removed` aufgeklappt bleibt (Index verschiebt sich mit). */
+export function expandedAfterRemove(expanded: number | null, removed: number): number | null {
+  if (expanded === null || expanded === removed) return null;
+  return removed < expanded ? expanded - 1 : expanded;
 }
 
 export type DraftResult = { draft: RecipeDraft } | { error: string };
@@ -124,10 +145,8 @@ export function buildRecipeDraft(form: RecipeForm, origin: RecipeOrigin): DraftR
   const servings = parseDecimal(form.servings);
   if (!isValidYield(servings)) return { error: YIELD_INVALID };
   const ingredients = toRecipeIngredients(form.ingredients);
-  const autoWeight = totalWeightG(ingredients);
-  const cookedWeightG = hasOwnWeight(form.cookedWeightG)
-    ? Number(form.cookedWeightG)
-    : autoWeight > 0 ? autoWeight : undefined;
+  // Nur von Hand eingegebenes Gewicht speichern; die Schätzung wird immer neu aus den Zutaten berechnet.
+  const cookedWeightG = hasOwnWeight(form.cookedWeightG) ? Number(form.cookedWeightG) : undefined;
   return {
     draft: {
       title,

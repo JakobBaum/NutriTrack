@@ -76,7 +76,7 @@
   z-index: 20999;
   box-sizing: border-box;
   padding: calc(env(safe-area-inset-top, 0px) + var(--nt-space-2, 8px)) var(--nt-page-gutter, 16px) var(--nt-space-2, 8px);
-  color: var(--ion-color-primary-shade);
+  color: var(--nt-accent-on-tint);
   background: var(--nt-accent-tint);
   border-bottom: 0.5px solid var(--nt-separator);
   pointer-events: none;

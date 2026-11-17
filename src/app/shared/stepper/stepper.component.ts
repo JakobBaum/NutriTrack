@@ -21,12 +21,14 @@ export class NtStepperComponent {
   readonly unit = input('');
   readonly label = input('');
   readonly decimals = input(0);
+  /** Ganze Zahlen ohne Nachkommastelle anzeigen ("2 Portionen" statt "2,0"). */
+  readonly trimZeros = input(false);
   /** Wert beim ersten Tippen auf einen leeren Stepper (Standard: min). */
   readonly start = input<number | null>(null);
 
   readonly valueChange = output<number>();
 
-  protected readonly display = computed(() => formatNum(this.value(), this.decimals(), this.decimals()));
+  protected readonly display = computed(() => formatNum(this.value(), this.decimals(), this.trimZeros() ? 0 : this.decimals()));
   protected readonly isEmpty = computed(() => this.value() === null);
   protected readonly canDecrease = computed(() => this.value() === null || (this.value() as number) > this.min());
   protected readonly canIncrease = computed(() => this.value() === null || (this.value() as number) < this.max());

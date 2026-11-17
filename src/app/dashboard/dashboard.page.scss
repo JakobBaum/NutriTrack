@@ -246,10 +246,13 @@ ion-content {
     min-width: 0;
   }
 
-  &--empty &__icon,
-  &--empty &__label,
-  &--empty &__note {
-    opacity: 0.5;
+  // Leere Essenszeit: nur Icon und Name zurückgenommen, per Farbe statt Opazität (Text bleibt >= 4,5:1).
+  &--empty &__icon {
+    color: var(--nt-secondary);
+  }
+
+  &--empty &__label {
+    color: var(--nt-secondary);
   }
 
   &__note {

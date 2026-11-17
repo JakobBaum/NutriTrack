@@ -1,4 +1,4 @@
-// Welle 1: Zoom (Felder >= 16 px), Einkauf-Sheet mit Tastatur, Preis-Tag nicht abgeschnitten, Nutri-Score auf Meta-Hoehe, Toasts.
+// Welle 1: Zoom (Felder >= 16 px), Einkauf-Sheet mit Tastatur, Preis-Button nicht abgeschnitten, Nutri-Score auf Meta-Hoehe, Toasts.
 import { assert, go, settle } from '../lib/harness.mjs';
 import { seed } from '../lib/fixtures.mjs';
 
@@ -45,7 +45,7 @@ const measureAddSheet = (page) => page.evaluate(() => {
 const measureBadges = (page) => page.evaluate(() => {
   const parentOf = (n) => n.parentElement ?? (n.getRootNode() instanceof ShadowRoot ? n.getRootNode().host : null);
   const problems = [];
-  const badges = [...document.querySelectorAll('ion-router-outlet .ion-page:not(.ion-page-hidden) .est-badge')];
+  const badges = [...document.querySelectorAll('ion-router-outlet .ion-page:not(.ion-page-hidden) .price-btn')];
   for (const badge of badges) {
     const b = badge.getBoundingClientRect();
     const row = badge.closest('ion-item');
@@ -87,7 +87,7 @@ export function register({ test }) {
   }
 
   for (const vp of NARROW_VIEWPORTS) {
-    test(`w1 einkauf: Preis-Tag nicht abgeschnitten bei ${vp.width}`, seed({ shopping: LONG_LIST }), async (page) => {
+    test(`w1 einkauf: Preis-Button nicht abgeschnitten bei ${vp.width}`, seed({ shopping: LONG_LIST }), async (page) => {
       await page.setViewportSize({ width: vp.width, height: 667 });
       await go(page, 'shopping');
       await settle(page, 600);

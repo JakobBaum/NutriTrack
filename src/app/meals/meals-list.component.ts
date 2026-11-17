@@ -8,6 +8,7 @@ import { MealsStore } from '../core/state/meals.store';
 import { CustomFoodStore } from '../core/state/custom-food.store';
 import { RecipeStore } from '../core/state/recipe.store';
 import { OnlineRecipeDetailsService } from '../core/recipes/online/online-recipe-details.service';
+import { DebugLogService } from '../core/debug/debug-log.service';
 import { StoredRecipe } from '../core/recipes/online/online-recipe-ref';
 import { isLoggableRecipe } from '../diary/add-entry-sheet/add-entry-logic';
 import { RecipeFactsLoader } from './recipe-facts-loader';
@@ -15,10 +16,12 @@ import { FoodSourceResult } from '../shared/food-sources/food-sources.component'
 import { formatDecimal, parseDecimal, parseNutrientInput } from '../core/util/number-input';
 import { selectAllOnFocus } from '../core/keyboard/select-all';
 import { toDateISO } from '../core/util/date';
+import { WRITE_BLOCKED_MESSAGE } from '../core/storage/storage-messages';
+import { countMissingFacts } from '../core/nutrition/units-weight';
 import { TOAST_SWIPE_GESTURE } from '../shared/toast-options';
 import { confirmDiscard } from './confirm-discard';
-import { isMealDraftChanged, mealSaveBlockReason, rescaleEntryAmount } from './meal-draft';
-import { UNDO_TOAST_BUTTONS, UNDO_TOAST_MS, UndoableDelete, settleUndoToast } from './undoable-delete';
+import { entryCountLabel, isMealDraftChanged, manualBlockReason, mealSaveBlockReason, rescaleDraftEntry } from './meal-draft';
+import { UNDO_TOAST_BUTTONS, UNDO_TOAST_MS, UndoableDelete, settleUndoToast, undoDeleteMessage } from './undoable-delete';
 
 const MEAL_OPTIONS: { value: MealType; label: string }[] = [
   { value: 'breakfast', label: 'Frühstück' },
@@ -63,18 +66,21 @@ export class MealsListComponent implements OnDestroy {
   private readonly alerts = inject(AlertController);
   private allowClose = false;
 
-  private readonly deletion = new UndoableDelete((id) => this.store.remove(id));
+  private readonly deletion = new UndoableDelete((id) => this.store.remove(id), { stack: true });
 
   /** Gespeicherte Mahlzeiten ohne die gerade zum Löschen vorgemerkte. */
-  readonly meals = computed(() => this.store.meals().filter((m) => m.id !== this.deletion.pendingId()));
+  readonly meals = computed(() => this.store.meals().filter((m) => !this.deletion.pendingIds().includes(m.id)));
   /** Rezepte mit Werten oder Online-Verweise (deren Werte kommen beim Hinzufügen). */
   readonly recipes = computed(() => this.recipeStore.recipes().filter(isLoggableRecipe));
   /** Lädt Nährwerte gespeicherter Online-Verweise nach (Ladezustand, Fehler, Sequenz-Token). */
-  readonly recipeLoad = new RecipeFactsLoader(inject(OnlineRecipeDetailsService));
+  readonly recipeLoad = new RecipeFactsLoader(inject(OnlineRecipeDetailsService), inject(DebugLogService));
   readonly mealOptions = MEAL_OPTIONS;
 
   readonly toastMessage = signal<string | null>(null);
   readonly undoOpen = signal(false);
+  /** Schlüssel und Text des Hinweises: jedes Löschen startet ihn neu, mehrere zeigen „n Mahlzeiten gelöscht“. */
+  readonly undoSeq = this.deletion.seq;
+  readonly undoMessage = computed(() => undoDeleteMessage(this.deletion.count(), 'Mahlzeit', 'Mahlzeiten'));
   readonly undoDuration = UNDO_TOAST_MS;
   readonly toastSwipe = TOAST_SWIPE_GESTURE;
   readonly undoButtons = UNDO_TOAST_BUTTONS;
@@ -83,6 +89,8 @@ export class MealsListComponent implements OnDestroy {
   readonly createOpen = signal(false);
   draftName = '';
   draftEntries: SavedMealEntry[] = [];
+  /** Ursprungseinträge (parallel zu draftEntries): Mengenänderungen skalieren immer von hier, nie vom gerundeten Wert. */
+  private draftOrigins: SavedMealEntry[] = [];
   /** id der gerade bearbeiteten Mahlzeit; null = neue Mahlzeit. */
   readonly editingId = signal<string | null>(null);
   /** Ausgangszustand des Entwurfs (für „Verwerfen?“). */
@@ -126,6 +134,7 @@ export class MealsListComponent implements OnDestroy {
     this.editingId.set(id);
     this.draftName = name;
     this.draftEntries = [...entries];
+    this.draftOrigins = [...entries];
     this.baseline = { name, entries: [...entries] };
     this.rawAmounts.clear();
     this.createOpen.set(true);
@@ -147,6 +156,10 @@ export class MealsListComponent implements OnDestroy {
 
   saveMeal(): void {
     if (this.saveBlockReason()) return;
+    if (this.store.isReadOnly()) {
+      this.toastMessage.set(WRITE_BLOCKED_MESSAGE);
+      return;
+    }
     const draft = { name: this.draftName, entries: this.draftEntries };
     const id = this.editingId();
     if (id) this.store.update(id, draft);
@@ -159,6 +172,12 @@ export class MealsListComponent implements OnDestroy {
   removeEntry(index: number): void {
     this.rawAmounts.clear();
     this.draftEntries = this.draftEntries.filter((_, i) => i !== index);
+    this.draftOrigins = this.draftOrigins.filter((_, i) => i !== index);
+  }
+
+  private appendEntry(entry: SavedMealEntry): void {
+    this.draftEntries = [...this.draftEntries, entry];
+    this.draftOrigins = [...this.draftOrigins, entry];
   }
 
   totalDraftKcal(): number {
@@ -178,14 +197,15 @@ export class MealsListComponent implements OnDestroy {
     this.rawAmounts.set(index, text);
     const value = parseDecimal(text);
     if (value === null || !(value > 0)) return;
-    this.draftEntries = this.draftEntries.map((e, i) => (i === index ? rescaleEntryAmount(e, value) : e));
+    this.draftEntries = rescaleDraftEntry(this.draftEntries, this.draftOrigins, index, value);
   }
 
   /** Fügt eine Portion des Rezepts hinzu; Online-Verweise laden ihre Nährwerte vorher nach. */
   async addRecipeToDraft(recipe: StoredRecipe): Promise<void> {
     const loaded = await this.recipeLoad.load(recipe);
     if (!loaded) return;
-    this.draftEntries = [...this.draftEntries, { label: recipe.title, facts: loaded.facts, ref: { kind: 'manual' } }];
+    const isPartial = countMissingFacts(loaded.recipe.ingredients) > 0;
+    this.appendEntry({ label: recipe.title, facts: loaded.facts, ref: { kind: 'manual' }, ...(isPartial ? { isPartial: true } : {}) });
   }
 
   /** „Erneut versuchen“ nach einem Ladefehler. */
@@ -217,7 +237,7 @@ export class MealsListComponent implements OnDestroy {
       basis: 'perPortion',
     };
     const label = res.name.trim() || 'Eingescanntes Lebensmittel';
-    this.draftEntries = [...this.draftEntries, { label, facts: scaled, amountG, ref: { kind: 'manual' } }];
+    this.appendEntry({ label, facts: scaled, amountG, ref: { kind: 'manual' } });
     this.closePicker();
   }
 
@@ -227,8 +247,13 @@ export class MealsListComponent implements OnDestroy {
     this.pickerView.set('manual');
   }
 
+  /** Grund, warum „Hinzufügen“ gerade gesperrt ist (leer = bereit). */
+  manualBlocked(): string {
+    return manualBlockReason(this.manual.name, this.manual.kcal);
+  }
+
   manualValid(): boolean {
-    return this.manual.name.trim() !== '' && (parseDecimal(this.manual.kcal) ?? 0) > 0;
+    return this.manualBlocked() === '';
   }
 
   addManual(): void {
@@ -246,7 +271,7 @@ export class MealsListComponent implements OnDestroy {
       fatG: v('fatG'),
       basis: 'perPortion',
     };
-    this.draftEntries = [...this.draftEntries, { label: m.name.trim(), facts, ref: { kind: 'manual' } }];
+    this.appendEntry({ label: m.name.trim(), facts, ref: { kind: 'manual' } });
     this.customFoods.save(m.name, facts);
     this.closePicker();
   }
@@ -263,6 +288,10 @@ export class MealsListComponent implements OnDestroy {
     await sheet.present();
     const { data, role } = await sheet.onDidDismiss<MealType>();
     if (role === 'cancel' || !data) return;
+    if (this.diary.isReadOnly()) {
+      this.toastMessage.set(WRITE_BLOCKED_MESSAGE);
+      return;
+    }
 
     const date = toDateISO();
     for (const entry of meal.entries) {
@@ -272,11 +301,14 @@ export class MealsListComponent implements OnDestroy {
         label: entry.label,
         facts: entry.facts,
         amountG: entry.amountG,
+        servings: entry.servings,
+        unit: entry.unit,
+        isPartial: entry.isPartial,
         ref: entry.ref,
       });
     }
     const mealLabel = this.mealOptions.find((m) => m.value === data)?.label ?? 'Tagebuch';
-    this.toastMessage.set(`„${meal.name}" als ${mealLabel} eingetragen (${meal.entries.length} Einträge).`);
+    this.toastMessage.set(`„${meal.name}" als ${mealLabel} eingetragen (${entryCountLabel(meal.entries.length)}).`);
   }
 
   /** Blendet die Mahlzeit aus und zeigt „Mahlzeit gelöscht – Rückgängig“. */
@@ -289,6 +321,8 @@ export class MealsListComponent implements OnDestroy {
     settleUndoToast(this.deletion, event.detail?.role);
     this.undoOpen.set(false);
   }
+
+  readonly entryCountLabel = entryCountLabel;
 
   totalKcal(meal: SavedMeal): number {
     return this.store.totalKcal(meal);

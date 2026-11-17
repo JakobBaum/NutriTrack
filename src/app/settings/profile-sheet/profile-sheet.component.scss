@@ -1,3 +1,4 @@
+@use '../../diary/diary-sheets';
 ion-content {
   --background: var(--nt-ground);
 }
@@ -25,9 +26,9 @@ ion-item {
 .preview {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 5;
   margin: 0 0 var(--nt-space-3);
-  padding: var(--nt-space-3) var(--nt-space-4);
+  padding: var(--nt-space-2) var(--nt-space-4);
   background: var(--nt-card);
   border-radius: var(--nt-radius-card);
   // Ground-Farbe als Schatten nach oben deckt durchscrollenden Inhalt oberhalb der Karte ab.
@@ -47,7 +48,8 @@ ion-item {
     font-variant-numeric: tabular-nums;
 
     strong {
-      font-size: 1.75rem;
+      // Auf 320 px nimmt die feste Zusammenfassung so weniger Höhe ein.
+      font-size: clamp(1.375rem, 6vw, 1.75rem);
       font-weight: 700;
     }
 
@@ -78,7 +80,8 @@ ion-item {
 }
 
 .row-sub--block {
-  margin: var(--nt-space-1) var(--nt-space-1) var(--nt-space-3);
+  // Gleicher Einzug wie die Hinweise darunter (kein seitlicher Versatz).
+  margin: var(--nt-space-1) 0 var(--nt-space-3);
 }
 
 .row-error {
@@ -150,7 +153,7 @@ ion-item {
   border: 0;
   border-radius: var(--nt-radius-pill);
   background: var(--nt-accent-tint);
-  color: var(--ion-color-primary-shade);
+  color: var(--nt-accent-on-tint);
   font: inherit;
   font-size: var(--nt-fs-body);
   font-weight: 600;
@@ -198,6 +201,7 @@ ion-item {
 .dislike-add {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--nt-space-2);
   margin-top: var(--nt-space-2);
   min-width: 0;
@@ -205,7 +209,7 @@ ion-item {
 
 ion-input.dislike-input {
   --min-height: var(--diet-tap-min);
-  flex: 1 1 0;
+  flex: 1 1 140px;
   min-width: 0;
   min-height: var(--diet-tap-min);
   font-size: max(16px, var(--nt-fs-body));

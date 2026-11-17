@@ -25,7 +25,7 @@ const parseMeal = vi.fn<(text: string) => Promise<MealParseResult>>();
 const add = vi.fn<(e: NewDiaryEntry) => { id: string }>();
 const remove = vi.fn<(id: string) => void>();
 const toastCreate = vi.fn();
-const state = { isLive: true };
+const state = { isLive: true, readOnly: false };
 
 function setup() {
   parseMeal.mockReset();
@@ -39,7 +39,7 @@ function setup() {
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     providers: [
       { provide: AiService, useValue: { isLive: () => state.isLive, parseMeal } },
-      { provide: DiaryStore, useValue: { add, remove } },
+      { provide: DiaryStore, useValue: { add, remove, isReadOnly: () => state.readOnly } },
       { provide: ToastController, useValue: { create: toastCreate, getTop: vi.fn().mockResolvedValue(undefined) } },
     ],
   });
@@ -52,7 +52,7 @@ function setup() {
 const flush = (): Promise<void> => new Promise((r) => setTimeout(r));
 
 describe('DescribeMealComponent', () => {
-  beforeEach(() => { state.isLive = true; });
+  beforeEach(() => { state.isLive = true; state.readOnly = false; });
 
   it('sperrt Erkennen bei leerem und zu langem Text', () => {
     const c = setup();
@@ -142,7 +142,7 @@ describe('DescribeMealComponent', () => {
     expect(c.phase()).toBe('empty');
   });
 
-  it('entfernt Zeilen; ohne Zeilen bleibt der Leerzustand', async () => {
+  it('entfernt Zeilen; ohne Zeilen geht es zurück zum Text, ohne "nichts erkannt"', async () => {
     const c = setup();
     parseMeal.mockResolvedValue(result(item('A'), item('B')));
     c.setText('x');
@@ -150,7 +150,8 @@ describe('DescribeMealComponent', () => {
     c.remove(c.rows()[0]);
     expect(c.rows().map((r) => r.name)).toEqual(['B']);
     c.remove(c.rows()[0]);
-    expect(c.phase()).toBe('empty');
+    expect(c.phase()).toBe('idle');
+    expect(c.text()).toBe('x');
   });
 
   it('rechnet bei Mengenänderung live neu und sperrt Eintragen bei ungültiger Menge', async () => {
@@ -186,5 +187,53 @@ describe('DescribeMealComponent', () => {
     toast.buttons[0].handler();
     expect(remove).toHaveBeenCalledWith('id-1');
     expect(remove).toHaveBeenCalledWith('id-2');
+  });
+
+  it('ist nach dem Eintragen sauber und trägt nicht erneut ein (S1)', async () => {
+    const c = setup();
+    parseMeal.mockResolvedValue(result(item('A', 100)));
+    c.setText('x');
+    await c.recognize();
+    c.log();
+    expect(c.isDirty()).toBe(false);
+    expect(c.phase()).toBe('idle');
+    c.log();
+    expect(add).toHaveBeenCalledTimes(1);
+  });
+
+  it('meldet ungesicherte Eingaben erst, wenn Text oder Ergebnis da sind (T3)', async () => {
+    const c = setup();
+    expect(c.isDirty()).toBe(false);
+    c.setText('   ');
+    expect(c.isDirty()).toBe(false);
+    c.setText('Apfel');
+    expect(c.isDirty()).toBe(true);
+    parseMeal.mockResolvedValue(result(item('Apfel')));
+    await c.recognize();
+    expect(c.isDirty()).toBe(true);
+  });
+
+  it('gibt den Text beim Weg zur manuellen Eingabe mit (T17)', () => {
+    const c = setup();
+    const manual = vi.fn();
+    c.manual.subscribe(manual);
+    c.setText('  2 Semmeln mit Butter ');
+    c.openManual();
+    expect(manual).toHaveBeenCalledWith('2 Semmeln mit Butter');
+  });
+
+  it('trägt bei Schreibsperre nichts ein, schließt nicht und zeigt die Sperrmeldung (F4)', async () => {
+    const c = setup();
+    const logged = vi.fn();
+    c.logged.subscribe(logged);
+    parseMeal.mockResolvedValue(result(item('A', 100)));
+    c.setText('x');
+    await c.recognize();
+    state.readOnly = true;
+    c.log();
+    await flush();
+    expect(add).not.toHaveBeenCalled();
+    expect(logged).not.toHaveBeenCalled();
+    expect(toastCreate.mock.calls[0][0].message).toContain('Nicht gespeichert');
   });
 });

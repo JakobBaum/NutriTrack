@@ -11,6 +11,11 @@ export const UNIT_WEIGHT_G: Readonly<Record<string, number>> = {
   Scheibe: 25, Tasse: 240,
 };
 
+/** Einheiten, die 1:1 als Gramm/Milliliter gelten (Bezug je 100 g), in Kleinschreibung. */
+export const GRAM_UNITS: ReadonlySet<string> = new Set([
+  'g', 'gramm', 'gr', 'kg', 'kilogramm', 'ml', 'milliliter', 'l', 'liter',
+]);
+
 /** Schreibweisen (klein) → Schlüssel der Tabelle. */
 const UNIT_ALIASES: Readonly<Record<string, string>> = {
   gramm: 'g', gr: 'g', kilogramm: 'kg', milliliter: 'ml', liter: 'l',
@@ -36,7 +41,8 @@ function tokens(name: string): string[] {
 export function canonicalUnitKey(unit: string): string | undefined {
   const raw = (unit ?? '').trim();
   if (raw in UNIT_WEIGHT_G) return raw;
-  return UNIT_ALIASES[raw.toLowerCase()];
+  const lower = raw.toLowerCase();
+  return UNIT_ALIASES[lower] ?? (lower in UNIT_WEIGHT_G ? lower : undefined);
 }
 
 /** Gramm je Einheit; bei „Stk“ mit Namensbezug (Ei 60 g, Zwiebel 80 g). Unbekannte Einheit → undefined. */
@@ -56,7 +62,21 @@ export function hasIncompleteFacts(facts: NutritionFacts | undefined): boolean {
   return !!facts && (facts.kcal || 0) > 0 && !(facts.proteinG > 0) && !(facts.carbsG > 0) && !(facts.fatG > 0);
 }
 
+/**
+ * True, wenn die Werte je 100 g gelten, die Einheit der Zutat aber unbekannt ist (z. B. "Msp"): ihr Gewicht ist
+ * nicht bekannt, die Nährwerte lassen sich nicht berechnen und zählen als fehlend.
+ */
+export function hasUnknownUnitForPer100g(
+  ingredient: Partial<Pick<RecipeIngredient, 'unit' | 'name'>> & Pick<RecipeIngredient, 'facts'>,
+): boolean {
+  if (ingredient.facts?.basis !== 'per100g') return false;
+  const unit = (ingredient.unit ?? '').trim() || 'g';
+  return unitGrams(unit, ingredient.name ?? '') === undefined;
+}
+
 /** Anzahl Zutaten ohne (vollständige) Nährwerte; sie zählen in der Summe nur mit, was bekannt ist. */
-export function countMissingFacts(ingredients: readonly Pick<RecipeIngredient, 'facts'>[]): number {
-  return ingredients.filter((i) => !i.facts || hasIncompleteFacts(i.facts)).length;
+export function countMissingFacts(
+  ingredients: readonly (Partial<Pick<RecipeIngredient, 'unit' | 'name'>> & Pick<RecipeIngredient, 'facts'>)[],
+): number {
+  return ingredients.filter((i) => !i.facts || hasIncompleteFacts(i.facts) || hasUnknownUnitForPer100g(i)).length;
 }

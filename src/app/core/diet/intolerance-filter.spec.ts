@@ -98,3 +98,26 @@ describe('filterByIntolerances', () => {
     expect(filterByIntolerances(list, [])).toBe(list);
   });
 });
+
+describe('matchesIntolerance — Ei, Milch, Fisch und Meeresfrüchte in zusammengesetzten Titeln (K11)', () => {
+  it.each([
+    ['egg', 'Rührei mit Speck'], ['egg', 'Spiegelei'], ['egg', 'Eiersalat'], ['egg', 'Omelett mit Pilzen'], ['egg', 'Omelette'],
+    ['egg', 'Eierkuchen'], ['egg', 'scrambled eggs on toast'], ['egg', 'fried egg'], ['egg', 'Eierlikör'],
+    ['dairy', 'Pecorino Romano'], ['dairy', 'Gorgonzola'], ['dairy', 'Burrata mit Tomaten'], ['dairy', 'Emmentaler'],
+    ['dairy', 'Provolone'], ['dairy', 'Paneer Tikka'], ['dairy', 'grated pecorino'], ['dairy', 'Parmigiano Reggiano'],
+    ['seafood', 'Seelachsfilet'], ['seafood', 'Zanderfilet'], ['seafood', 'Pangasius'], ['seafood', 'Calamari'],
+    ['seafood', 'Venusmuscheln'], ['seafood', 'Hummerschwanz'], ['seafood', 'Karpfen blau'], ['seafood', 'pollock fillet'],
+    ['shellfish', 'Hummerschwanz'], ['shellfish', 'Venusmuscheln'], ['shellfish', 'Kaisergranat'], ['shellfish', 'Calamari'],
+  ] as const)('%s trifft "%s"', (intolerance, text) => {
+    expect(hit(text, intolerance)).toBe(true);
+  });
+
+  it.each([
+    ['egg', 'Eisbergsalat'], ['egg', 'Reis'], ['egg', 'Eiweißpulver'], ['egg', 'Eiswürfel'], ['egg', 'Reis mit Gemüse'],
+    ['egg', 'Einkorn'], ['egg', 'Eintopf'],
+    ['dairy', 'Reismilch'], ['dairy', 'Kokosmilch'], ['dairy', 'Haferdrink'],
+    ['seafood', 'Fischer'], ['shellfish', 'Lachs'],
+  ] as const)('%s trifft "%s" nicht', (intolerance, text) => {
+    expect(hit(text, intolerance)).toBe(false);
+  });
+});

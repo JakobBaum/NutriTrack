@@ -5,6 +5,7 @@ import { ShoppingItem } from '../models';
 import { AiService } from '../ai/ai.service';
 import { RecipeStore } from './recipe.store';
 import { ShoppingStore, mergeKept, sumItems } from './shopping.store';
+import { StorageService } from '../storage/storage.service';
 
 const item = (name: string, estPrice?: number, checked = false): ShoppingItem => ({
   name, amount: 1, unit: 'Stk', checked, estPrice,
@@ -58,15 +59,15 @@ describe('ShoppingStore — Verhalten', () => {
   });
 
   it('ignoriert toggle/remove ohne Liste', () => {
-    store.toggleItem(0);
-    store.removeItem(0);
+    store.toggleItem('x');
+    store.removeItem('x');
     expect(store.list()).toBeNull();
   });
 
-  it('ignoriert einen Index außerhalb der Liste', () => {
+  it('ignoriert eine unbekannte id', () => {
     store.addItem(item('a', 2));
-    store.removeItem(5);
-    store.toggleItem(-1);
+    store.removeItem('unbekannt');
+    store.toggleItem('unbekannt');
     expect(store.list()?.items).toHaveLength(1);
     expect(store.list()?.items[0].checked).toBe(false);
   });
@@ -121,7 +122,7 @@ describe('ShoppingStore — Verhalten', () => {
 
   it('entfernt einen Hinweis zur alten Summe, sobald sich die Positionen ändern', () => {
     store.addItem(item('a', 2));
-    store.removeItem(0);
+    store.removeItem(store.list()!.items[0].id!);
     expect(store.list()?.note).toBeUndefined();
   });
 });
@@ -173,5 +174,47 @@ describe('ShoppingStore — KI-Fehler', () => {
     });
     const list = await store.generatePlan({ persons: 1, days: 1, meals: ['lunch'] });
     expect(list.items[0].estPrice).toBeGreaterThan(0);
+  });
+});
+
+describe('ShoppingStore Laden (D8) und Zahlenschutz (D18)', () => {
+  function load(raw: unknown): { store: ShoppingStore; storage: StorageService } {
+    localStorage.clear();
+    localStorage.setItem('nutritrack:shopping', JSON.stringify(raw));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideHttpClient()] });
+    return { store: TestBed.inject(ShoppingStore), storage: TestBed.inject(StorageService) };
+  }
+
+  it('stürzt bei items ohne Array nicht ab, sichert die Liste und entfernt sie', () => {
+    const { store, storage } = load({ id: 'x', items: 'kaputt' });
+    expect(store.list()).toBeNull();
+    expect(storage.quarantineNotices()).toHaveLength(1);
+    expect(localStorage.getItem('nutritrack:shopping')).toBeNull();
+  });
+
+  it('filtert defekte Positionen in die Quarantäne und behält die gültigen', () => {
+    const ok = { id: 'i1', name: 'Milch', amount: 1, unit: 'l', checked: false };
+    const { store, storage } = load({ id: 'x', dishes: 1, persons: 1, items: [ok, { name: 'X', amount: -1, unit: 'g', checked: false }] });
+    expect(store.list()?.items).toEqual([ok]);
+    expect(storage.quarantineNotices()[0].count).toBe(1);
+  });
+
+  it('lädt eine gültige Liste unverändert', () => {
+    const list = { id: 'x', dishes: 1, persons: 1, items: [{ id: 'i1', name: 'Milch', amount: 1, unit: 'l', checked: false }] };
+    const { store, storage } = load(list);
+    expect(store.list()).toEqual(list);
+    expect(storage.quarantineNotices()).toHaveLength(0);
+  });
+
+  it('generatePlan liefert bei NaN-Angaben endliche Zahlen', async () => {
+    const { store } = load(null);
+    const ai = TestBed.inject(AiService);
+    expect(ai.isLive()).toBe(false);
+    TestBed.inject(RecipeStore).add({ id: 'r1', title: 'Reis', servings: 1, ingredients: [{ name: 'Reis', amount: 100, unit: 'g' }], steps: [] } as never);
+    const list = await store.generatePlan({ persons: Number.NaN, days: Number.NaN, meals: ['lunch'] });
+    expect([list.persons, list.days, list.dishes].every(Number.isFinite)).toBe(true);
+    expect(list.persons).toBe(1);
+    expect(list.days).toBe(1);
   });
 });

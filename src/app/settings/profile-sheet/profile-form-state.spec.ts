@@ -7,6 +7,7 @@ import {
   profileFromFormState,
   rateChoicesFor,
   rateForGoal,
+  rateOnGoalChange,
   withManualEnabled,
 } from './profile-form-state';
 
@@ -26,6 +27,20 @@ describe('rateChoicesFor / rateForGoal', () => {
     expect(rateForGoal('gain', 0.5)).toBe(0.4);
     expect(rateForGoal('gain', null)).toBe(0.25);
     expect(rateForGoal('lose', undefined)).toBe(0.5);
+  });
+});
+
+describe('rateOnGoalChange', () => {
+  it('nimmt beim Wechsel von Halten zu Zunehmen die Vorgabe 0,25 statt 0,4', () => {
+    expect(rateOnGoalChange('maintain', 'gain', 0.5)).toBe(0.25);
+  });
+
+  it('nimmt beim Wechsel von Halten zu Abnehmen die Vorgabe 0,5', () => {
+    expect(rateOnGoalChange('maintain', 'lose', 0.25)).toBe(0.5);
+  });
+
+  it('behält zwischen Abnehmen und Zunehmen das nächstliegende Tempo', () => {
+    expect(rateOnGoalChange('lose', 'gain', 0.5)).toBe(0.4);
   });
 });
 

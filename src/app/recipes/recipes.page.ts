@@ -18,12 +18,14 @@ import { ModalController } from '@ionic/angular/lazy';
 import { OnlineSearchComponent } from './online-search/online-search.component';
 import { hasIncompleteFacts } from '../core/nutrition/units-weight';
 import { importBlockReason, importErrorMessage } from './recipe-view';
+import { importOutcome } from './import-outcome';
 import {
   FactKey,
   IngredientForm,
   RecipeForm,
   applyFact,
   buildRecipeDraft,
+  expandedAfterRemove,
   cookedWeightIsEstimate,
   cookedWeightValue,
   emptyForm,
@@ -36,6 +38,7 @@ import {
 } from './recipe-form';
 import { askPortionsSheet, cardMenuSheet, mealLabel, pickMealSheet } from './recipe-sheets';
 import { TOAST_SWIPE_GESTURE } from '../shared/toast-options';
+import { WRITE_BLOCKED_MESSAGE } from '../core/storage/storage-messages';
 import { confirmDiscard } from '../meals/confirm-discard';
 import { MealType, NutritionFacts, Recipe, RecipeIngredient } from '../core/models';
 import { AiService } from '../core/ai/ai.service';
@@ -51,7 +54,7 @@ import {
 } from '../core/nutrition/recipe-nutrition';
 import { toDateISO } from '../core/util/date';
 import { MealsListComponent } from '../meals/meals-list.component';
-import { UNDO_TOAST_BUTTONS, UNDO_TOAST_MS, UndoableDelete, settleUndoToast } from '../meals/undoable-delete';
+import { UNDO_TOAST_BUTTONS, UNDO_TOAST_MS, UndoableDelete, settleUndoToast, undoDeleteMessage } from '../meals/undoable-delete';
 import { recipeSourceView } from './recipe-source';
 import { shrinkPhotoForUpload } from '../core/scan/label-image';
 import { OnlineRecipeDetailsService } from '../core/recipes/online/online-recipe-details.service';
@@ -64,13 +67,12 @@ import { RequestGuard } from './request-guard';
 import {
   APPROX_UNITS,
   isUnknownUnit,
-  isValidYield,
   lowerBoundNote,
   optionalGramsLabel,
   countMissingFacts,
   hasApproxUnits,
   isAiOrigin,
-  lowerBoundPrefix,
+  factsBasisLabel,
   missingFactsLabel,
   servingsLabel,
   totalWeightG,
@@ -120,8 +122,11 @@ export class RecipesPage implements OnDestroy {
   private readonly queryParams = toSignal(this.route.queryParamMap);
   private readonly mealsList = viewChild(MealsListComponent);
 
-  private readonly deletion = new UndoableDelete((id) => this.store.remove(id));
+  private readonly deletion = new UndoableDelete((id) => this.store.remove(id), { stack: true });
   readonly undoOpen = signal(false);
+  /** Schlüssel und Text des Hinweises: jedes Löschen startet ihn neu, mehrere zeigen „n Rezepte gelöscht“. */
+  readonly undoSeq = this.deletion.seq;
+  readonly undoMessage = computed(() => undoDeleteMessage(this.deletion.count(), 'Rezept', 'Rezepte'));
   readonly undoDuration = UNDO_TOAST_MS;
   readonly toastSwipe = TOAST_SWIPE_GESTURE;
   readonly undoButtons = UNDO_TOAST_BUTTONS;
@@ -152,13 +157,12 @@ export class RecipesPage implements OnDestroy {
   }
 
   /** Rezepte ohne das gerade zum Löschen vorgemerkte. */
-  readonly recipes = computed(() => this.store.recipes().filter((r) => r.id !== this.deletion.pendingId()));
+  readonly recipes = computed(() => this.store.recipes().filter((r) => !this.deletion.pendingIds().includes(r.id)));
   readonly approxUnits = APPROX_UNITS;
   readonly isAiOrigin = isAiOrigin;
   readonly sourceOf = recipeSourceView;
   readonly countMissingFacts = countMissingFacts;
   readonly missingFactsLabel = missingFactsLabel;
-  readonly lowerBoundPrefix = lowerBoundPrefix;
   readonly lowerBoundNote = lowerBoundNote;
   readonly optionalGramsLabel = optionalGramsLabel;
   readonly servingsLabel = servingsLabel;
@@ -199,11 +203,12 @@ export class RecipesPage implements OnDestroy {
     ing.amount = parseDecimal(text);
   }
 
-  readonly parseDecimal = parseDecimal;
   readonly formatDecimal = formatDecimal;
 
   readonly isModalOpen = signal(false);
   readonly editId = signal<string | null>(null);
+  /** True ab dem ersten Tipp auf „Speichern“: ein zweiter Tipp (Doppel-Tipp) legt kein zweites Rezept an. */
+  readonly saving = signal(false);
   readonly error = signal<string | null>(null);
   readonly toastMessage = signal<string | null>(null);
 
@@ -278,8 +283,7 @@ export class RecipesPage implements OnDestroy {
     this._importOrigin = origin;
     this._importSourceUrl = sourceUrl;
     this.baseline = '';
-    this.editId.set(null);
-    this.error.set(null);
+    this.resetEditorState(null);
     this.importOpen.set(false);
     this.isModalOpen.set(true);
     this.toastMessage.set(toast);
@@ -369,9 +373,7 @@ export class RecipesPage implements OnDestroy {
     this._importSourceUrl = undefined;
     this.form = emptyForm();
     this.baseline = JSON.stringify(this.form);
-    this.allowClose = false;
-    this.editId.set(null);
-    this.error.set(null);
+    this.resetEditorState(null);
     this.isModalOpen.set(true);
   }
 
@@ -381,10 +383,17 @@ export class RecipesPage implements OnDestroy {
     this._importOrigin = recipe.origin ?? 'own';
     this._importSourceUrl = undefined;
     this.baseline = JSON.stringify(this.form);
-    this.allowClose = false;
-    this.editId.set(recipe.id);
-    this.error.set(null);
+    this.resetEditorState(recipe.id);
     this.isModalOpen.set(true);
+  }
+
+  /** Setzt Fehler, Aufklappzustand, Schließ- und Speichersperre für ein frisch geöffnetes Rezept-Sheet zurück. */
+  private resetEditorState(editId: string | null): void {
+    this.allowClose = false;
+    this.saving.set(false);
+    this.expandedIndex.set(null);
+    this.editId.set(editId);
+    this.error.set(null);
   }
 
   /** X-Taste: erst fragen (canDismiss-Logik), nur bei Ja schließen; bei „Weiter bearbeiten“ bleibt der Zustand offen. */
@@ -456,14 +465,8 @@ export class RecipesPage implements OnDestroy {
       const res = await this.ai.importRecipe({ text: text || undefined, url: url || undefined });
       if (!this.importGuard.isCurrent(token)) return;
       if (res.ingredients.length === 0) throw new Error('Keine Zutaten erkannt.');
-      this.applyImport(
-        res,
-        isTikTok ? 'tiktok' : (url ? 'url' : 'text'),
-        url ? res.sourceUrl : undefined,
-        this.isLive()
-          ? `Rezept${isTikTok ? ' aus TikTok' : ''} importiert — bitte prüfen und speichern.`
-          : 'Rezept aus Text erkannt — Nährwerte je Zutat prüfen oder ergänzen.',
-      );
+      const outcome = importOutcome(res, { url, isTikTok: !!isTikTok, isLive: this.isLive() });
+      this.applyImport(res, outcome.origin, outcome.sourceUrl, outcome.toast);
     } catch (e: unknown) {
       if (this.importGuard.isCurrent(token)) this.importError.set(importErrorMessage(e, this.isOffline()));
     } finally {
@@ -482,6 +485,7 @@ export class RecipesPage implements OnDestroy {
   // --- Zutaten ---
   removeIngredient(index: number): void {
     this.form.ingredients = this.form.ingredients.filter((_, i) => i !== index);
+    this.expandedIndex.set(expandedAfterRemove(this.expandedIndex(), index));
   }
 
   /** „Manuell eintragen“ aus der Suche: leere Zutat mit dem Suchbegriff als Name. */
@@ -533,11 +537,6 @@ export class RecipesPage implements OnDestroy {
     this.setFact(ing, 'kcal', kcal);
   }
 
-  /** True, wenn die Zutat (noch) keine Nährwerte hat → Hinweis zum Eintragen. */
-  needsManualFacts(ing: IngredientForm): boolean {
-    return !ing.facts;
-  }
-
   // --- Schritte ---
   addStep(): void {
     this.form.steps = [...this.form.steps, ''];
@@ -573,6 +572,21 @@ export class RecipesPage implements OnDestroy {
     this.toastMessage.set(`„${name}" als Zutat hinzugefügt.`);
   }
 
+  /** Bezugsgröße der hinterlegten Zutaten-Werte: „je 100 g“ oder „je Portion (30 g)“. */
+  basisLabel(ing: IngredientForm): string {
+    return ing.facts ? factsBasisLabel(ing.facts) : 'je 100 g';
+  }
+
+  /** Beschriftung des kcal-Feldes (je 100 g oder je Portion). */
+  kcalFieldLabel(ing: IngredientForm): string {
+    return ing.facts?.basis === 'perPortion' ? 'kcal/Portion' : 'kcal/100g';
+  }
+
+  /** Screenreader-Name eines Nährwert-Feldes („kcal je 100g“ bzw. „kcal je Portion“). */
+  factAria(ing: IngredientForm, name: string): string {
+    return `${name} ${ing.facts?.basis === 'perPortion' ? 'je Portion' : 'je 100g'}`;
+  }
+
   setFact(ing: IngredientForm, key: FactKey, value: unknown): void {
     if (!ing.facts) return;
     ing.facts = applyFact(ing.facts, key, value);
@@ -580,11 +594,17 @@ export class RecipesPage implements OnDestroy {
 
   // --- Speichern ---
   save(): void {
+    if (this.saving()) return;
     const result = buildRecipeDraft(this.form, this._importOrigin);
     if ('error' in result) {
       this.error.set(result.error);
       return;
     }
+    if (this.store.isReadOnly()) {
+      this.error.set(WRITE_BLOCKED_MESSAGE);
+      return;
+    }
+    this.saving.set(true);
     this.error.set(null);
     const draft = this._importSourceUrl ? { ...result.draft, sourceUrl: this._importSourceUrl } : result.draft;
     this._importOrigin = 'own';
@@ -622,6 +642,10 @@ export class RecipesPage implements OnDestroy {
   }
 
   private logMeal(recipe: Recipe, meal: MealType, portions: number): void {
+    if (this.diary.isReadOnly()) {
+      this.toastMessage.set(WRITE_BLOCKED_MESSAGE);
+      return;
+    }
     const missing = countMissingFacts(recipe.ingredients);
     this.diary.add(recipeDiaryEntry(recipe, meal, portions, toDateISO()));
     const hint = missing > 0 ? ` Unvollständig: ${missingFactsLabel(missing)}, Werte sind eine Untergrenze.` : '';

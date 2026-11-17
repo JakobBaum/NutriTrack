@@ -6,7 +6,8 @@ import {
   translateQueryWithDictionary,
 } from './ingredient-dictionary';
 import { normalizeTranslatedTexts } from './translate-normalize';
-import { MAX_CACHED_TRANSLATIONS, TranslationCache, hashTexts } from './translation-cache';
+import { StorageService } from '../../storage/storage.service';
+import { MAX_CACHED_TRANSLATIONS, TRANSLATION_CACHE_KEY, TranslationCache, hashTexts } from './translation-cache';
 
 const SOURCE = { title: 'Soup', ingredients: ['a', 'b'], steps: ['x', 'y', 'z'] };
 
@@ -38,10 +39,26 @@ describe('normalizeTranslatedTexts', () => {
       .toEqual({ title: 'Suppe', ingredients: ['A', 'B'], steps: ['1', '2', '3'] });
   });
 
-  it('falls back to the original on wrong counts, wrong types and empty entries', () => {
-    expect(normalizeTranslatedTexts({ title: '', ingredients: ['A'], steps: [1, 2, 3] }, SOURCE)).toEqual(SOURCE);
-    expect(normalizeTranslatedTexts(null, SOURCE)).toEqual(SOURCE);
+  it('falls back to the original for empty entries and an empty title', () => {
     expect(normalizeTranslatedTexts({ ingredients: ['A', ' '], steps: ['1', '2', '3'] }, SOURCE).ingredients).toEqual(['A', 'b']);
+    expect(normalizeTranslatedTexts({ title: '', ingredients: ['A', 'B'], steps: ['1', '2', '3'] }, SOURCE).title).toBe('Soup');
+  });
+
+  it('accepts a missing steps field when the source has no steps (Prüfrunde 2)', () => {
+    const source = { title: 'Soup', ingredients: ['a'], steps: [] };
+    expect(normalizeTranslatedTexts({ title: 'Suppe', ingredients: ['A'] }, source).steps).toEqual([]);
+    expect(() => normalizeTranslatedTexts({ title: 'Suppe', ingredients: ['A'] }, SOURCE)).toThrow();
+  });
+
+  it('rejects an answer with wrong line counts instead of passing the original off as translated (K3)', () => {
+    expect(() => normalizeTranslatedTexts({ title: 'Suppe', ingredients: ['A'], steps: ['1', '2', '3'] }, SOURCE)).toThrow();
+    expect(() => normalizeTranslatedTexts({ ingredients: ['A', 'B'], steps: [1, 2, 3] }, SOURCE)).toThrow();
+    expect(() => normalizeTranslatedTexts(null, SOURCE)).toThrow();
+  });
+
+  it('accepts empty lists when the source has none', () => {
+    const empty = { title: 'Soup', ingredients: [], steps: [] };
+    expect(normalizeTranslatedTexts({ title: 'Suppe', ingredients: [], steps: [] }, empty).title).toBe('Suppe');
   });
 });
 
@@ -63,6 +80,14 @@ describe('TranslationCache', () => {
     for (let i = 0; i < MAX_CACHED_TRANSLATIONS + 5; i++) cache.set(`de:${i}`, SOURCE);
     expect(cache.get('de:0')).toBeNull();
     expect(cache.get(`de:${MAX_CACHED_TRANSLATIONS + 4}`)).toEqual(SOURCE);
+  });
+
+  it('ignores stored entries whose elements are not strings (K12)', () => {
+    localStorage.clear();
+    const cache = TestBed.inject(TranslationCache);
+    const storage = TestBed.inject(StorageService);
+    storage.set(TRANSLATION_CACHE_KEY, { bad: { title: 'T', ingredients: [1, null], steps: ['x'] } });
+    expect(cache.get('bad')).toBeNull();
   });
 
   it('hash changes with the text', () => {

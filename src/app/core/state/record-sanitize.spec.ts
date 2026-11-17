@@ -123,3 +123,30 @@ describe('sanitizeList', () => {
     expect(sanitizeList(undefined, check).items).toEqual([]);
   });
 });
+
+describe('sanitizeDiaryEntries Review 4 (D7, D12, D13)', () => {
+  it('entfernt kaputte baseFacts und behält den Eintrag', () => {
+    const r = sanitizeDiaryEntries([entry({ baseFacts: { kcal: 'x' } })]);
+    expect(r.items).toHaveLength(1);
+    expect('baseFacts' in r.items[0]).toBe(false);
+    expect(r.repaired).toBe(1);
+  });
+
+  it('behält gültige baseFacts', () => {
+    const base = { kcal: 50, proteinG: 1, carbsG: 2, fatG: 3, basis: 'per100g' };
+    const r = sanitizeDiaryEntries([entry({ baseFacts: base })]);
+    expect(r.items[0].baseFacts).toEqual(base);
+    expect(r.repaired).toBe(0);
+  });
+
+  it('normalisiert createdAt mit Offset auf UTC', () => {
+    const r = sanitizeDiaryEntries([entry({ createdAt: '2026-11-08T12:00:00+02:00' })]);
+    expect(r.items[0].createdAt).toBe('2026-11-08T10:00:00.000Z');
+    expect(r.repaired).toBe(1);
+  });
+
+  it('behandelt unmögliche Tage wie ungültige (Tag aus createdAt)', () => {
+    const r = sanitizeDiaryEntries([entry({ dateISO: '2026-02-31' })]);
+    expect(r.items[0].dateISO).toBe('2026-11-08');
+  });
+});

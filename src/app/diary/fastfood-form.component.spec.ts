@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { describe, expect, it, vi } from 'vitest';
+import { NumPipe } from '../shared/num.pipe';
 import { FastfoodFormComponent } from './fastfood-form.component';
 import { FastFoodForm } from './fastfood-options';
 
@@ -12,7 +13,7 @@ function setup() {
   const navigate = vi.fn().mockResolvedValue(true);
   TestBed.configureTestingModule({
     declarations: [FastfoodFormComponent],
-    imports: [FormsModule],
+    imports: [FormsModule, NumPipe],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     providers: [{ provide: Router, useValue: { navigate } }],
   });

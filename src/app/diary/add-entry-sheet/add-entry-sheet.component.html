@@ -23,9 +23,9 @@
     </ion-header>
 
     @if (view() === 'describe') {
-      <app-describe-meal [meal]="form.meal" [date]="date()" (mealChange)="setMeal($event)" (logged)="closeAdd()" (manual)="openManualEntry()"></app-describe-meal>
-    } @else {
-    <ion-content class="sheet-content">
+      <app-describe-meal [meal]="form.meal" [date]="date()" (mealChange)="setMeal($event)" (logged)="closeAdd()" (manual)="openManualEntry($event)"></app-describe-meal>
+    }
+    <ion-content class="sheet-content" [hidden]="view() === 'describe'">
       @if (storageError(); as storageMessage) {
         <p class="form-error form-error--banner" role="alert" data-testid="sheet-storage-error">{{ storageMessage }}</p>
       }
@@ -44,99 +44,99 @@
 
       <div class="meal-picker" role="radiogroup" aria-label="Essenszeit">
         @for (opt of mealOptions; track opt.value) {
-          <button type="button" class="meal-chip" role="radio" [attr.aria-checked]="form.meal === opt.value" [class.meal-chip--on]="form.meal === opt.value" [attr.aria-label]="opt.label" (click)="setMeal(opt.value)">{{ opt.short }}</button>
+          <button type="button" class="meal-chip" role="radio" [attr.aria-checked]="form.meal === opt.value" [class.meal-chip--on]="form.meal === opt.value" [attr.aria-label]="opt.label" (click)="setMeal(opt.value)">{{ opt.label }}</button>
+        }
+      </div>
+
+      <div class="search-view" [hidden]="view() !== 'search'">
+        <nt-food-sources #foodSearch (result)="onSource($event)" (manual)="openManualEntry()" (scanFailed)="onScanFailed($event)">
+          @if (hasLoggableRecipes()) {
+            <button type="button" class="nt-source-btn" (click)="showView('recipes')">
+              <ion-icon name="book-outline" aria-hidden="true"></ion-icon> <span>Rezept</span>
+            </button>
+          }
+          @if (hasCustomFoods()) {
+            <button type="button" class="nt-source-btn" (click)="showView('saved')">
+              <ion-icon name="bookmark-outline" aria-hidden="true"></ion-icon> <span>Eigene</span>
+            </button>
+          }
+          @if (hasSavedMeals()) {
+            <button type="button" class="nt-source-btn" (click)="showView('meals')">
+              <ion-icon name="albums-outline" aria-hidden="true"></ion-icon> <span>Mahlzeiten</span>
+            </button>
+          }
+        </nt-food-sources>
+
+        <button type="button" class="describe-entry" data-testid="describe-open" (click)="showView('describe')">
+          <ion-icon name="sparkles-outline" aria-hidden="true"></ion-icon>
+          <span class="describe-entry__text">
+            <span class="describe-entry__title">Essen beschreiben</span>
+            <span class="describe-entry__sub">Per Text oder Diktat, die KI schätzt die Werte</span>
+          </span>
+        </button>
+
+        @if (!foodSearch.query.trim() && favoriteList().length) {
+          <h3 class="nt-section-header">Favoriten</h3>
+          <ion-list class="diary-list" lines="none" data-testid="favorites-list">
+            @for (fav of favoriteList(); track fav.id) {
+              <ion-item class="recent" lines="none">
+                <button type="button" class="recent__main" data-testid="favorite-add" (click)="quickAddFavorite(fav)" [attr.aria-label]="fav.label + ' direkt eintragen'">
+                  <span class="recent__text">
+                    <span class="recent__name">{{ fav.label }}@if (fav.brand) { <span class="entry-brand"> · {{ fav.brand }}</span> }</span>
+                    <span class="recent__meta">
+                      @if (fav.amountG) { {{ formatAmount(fav.amountG, fav.unit) }} · }{{ fav.isPartial ? 'mind. ' : '' }}{{ fav.facts.kcal | ntNum:0 }} kcal · <span class="protein-val">{{ fav.facts.proteinG | ntNum:0 }} g Eiweiß</span>
+                    </span>
+                  </span>
+                  <span class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
+                </button>
+                <ion-button slot="end" fill="clear" class="touch-btn" (click)="removeFavorite(fav.id)" [attr.aria-label]="fav.label + ' aus den Favoriten entfernen'">
+                  <ion-icon slot="icon-only" name="star" aria-hidden="true"></ion-icon>
+                </ion-button>
+              </ion-item>
+            }
+          </ion-list>
+        }
+
+        @if (!foodSearch.query.trim() && (recentFoods().length || recentRecipes().length)) {
+          <h3 class="nt-section-header">Zuletzt benutzt · für {{ selectedMealLabel() }}</h3>
+          <ion-list class="diary-list" lines="none">
+            @for (entry of recentFoods(); track entry.id) {
+              <ion-item class="recent" lines="none">
+                <button type="button" class="recent__main" (click)="quickAddRecent(entry)" [attr.aria-label]="entry.label + ' direkt eintragen'">
+                  <span class="recent__text">
+                    <span class="recent__name">{{ entry.label }}@if (entry.brand) { <span class="entry-brand"> · {{ entry.brand }}</span> }</span>
+                    <span class="recent__meta">
+                      @if (entry.amountG) { {{ formatAmount(entry.amountG, entry.unit) }} · }{{ entry.isPartial ? 'mind. ' : '' }}{{ entry.facts.kcal | ntNum:0 }} kcal · <span class="protein-val">{{ entry.facts.proteinG | ntNum:0 }} g Eiweiß</span>
+                    </span>
+                  </span>
+                  <span class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
+                </button>
+                <ion-button slot="end" fill="clear" class="touch-btn" data-testid="recent-favorite" (click)="toggleRecentFavorite(entry)" [attr.aria-pressed]="isFavorite(entry)" [attr.aria-label]="entry.label + (isFavorite(entry) ? ' aus den Favoriten entfernen' : ' als Favorit merken')">
+                  <ion-icon slot="icon-only" [name]="isFavorite(entry) ? 'star' : 'star-outline'" aria-hidden="true"></ion-icon>
+                </ion-button>
+                <ion-button slot="end" fill="clear" class="touch-btn touch-btn--text recent__edit" (click)="editRecent(entry)" [attr.aria-label]="entry.label + ' vor dem Eintragen anpassen'">Anpassen</ion-button>
+              </ion-item>
+            }
+            @for (recipe of recentRecipes(); track recipe.id) {
+              <ion-item class="recent" lines="none">
+                <button type="button" class="recent__main" (click)="quickAddRecipe(recipe)" [attr.aria-label]="recipe.title + ' direkt eintragen'">
+                  <span class="recent__text">
+                    <span class="recent__name">{{ recipe.title }}</span>
+                    <span class="recent__meta">@if (recipe.factsPerServing; as f) { 1 Portion · {{ f.kcal | ntNum:0 }} kcal · <span class="protein-val">{{ f.proteinG | ntNum:0 }} g Eiweiß</span> } @else { Online-Rezept, Nährwerte werden geladen }</span>
+                  </span>
+                  <span class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
+                </button>
+                <ion-button slot="end" fill="clear" class="touch-btn touch-btn--text recent__edit" (click)="selectRecipe(recipe)" [attr.aria-label]="recipe.title + ' vor dem Eintragen anpassen'">Anpassen</ion-button>
+              </ion-item>
+            }
+          </ion-list>
+          <p class="scan-hint">Tippe auf einen Eintrag, um ihn mit der letzten Menge einzutragen.</p>
+        } @else {
+          <p class="scan-hint scan-hint--empty">Suche oder scanne ein Lebensmittel.</p>
         }
       </div>
 
       @switch (view()) {
-        @case ('search') {
-          <nt-food-sources #foodSearch (result)="onSource($event)" (manual)="openManualEntry()" (scanFailed)="onScanFailed($event)">
-            @if (hasLoggableRecipes()) {
-              <button type="button" class="nt-source-btn" (click)="showView('recipes')">
-                <ion-icon name="book-outline" aria-hidden="true"></ion-icon> <span>Rezept</span>
-              </button>
-            }
-            @if (hasCustomFoods()) {
-              <button type="button" class="nt-source-btn" (click)="showView('saved')">
-                <ion-icon name="bookmark-outline" aria-hidden="true"></ion-icon> <span>Eigene</span>
-              </button>
-            }
-            @if (hasSavedMeals()) {
-              <button type="button" class="nt-source-btn" (click)="showView('meals')">
-                <ion-icon name="albums-outline" aria-hidden="true"></ion-icon> <span>Mahlzeiten</span>
-              </button>
-            }
-          </nt-food-sources>
-
-          <button type="button" class="describe-entry" data-testid="describe-open" (click)="showView('describe')">
-            <ion-icon name="sparkles-outline" aria-hidden="true"></ion-icon>
-            <span class="describe-entry__text">
-              <span class="describe-entry__title">Essen beschreiben</span>
-              <span class="describe-entry__sub">Per Text oder Diktat, die KI schätzt die Werte</span>
-            </span>
-          </button>
-
-          @if (!foodSearch.query.trim() && favoriteList().length) {
-            <h3 class="nt-section-header">Favoriten</h3>
-            <ion-list class="diary-list" lines="none" data-testid="favorites-list">
-              @for (fav of favoriteList(); track fav.id) {
-                <ion-item class="recent" lines="none">
-                  <button type="button" class="recent__main" data-testid="favorite-add" (click)="quickAddFavorite(fav)" [attr.aria-label]="fav.label + ' direkt eintragen'">
-                    <span class="recent__text">
-                      <span class="recent__name">{{ fav.label }}@if (fav.brand) { <span class="entry-brand"> · {{ fav.brand }}</span> }</span>
-                      <span class="recent__meta">
-                        @if (fav.amountG) { {{ formatAmount(fav.amountG, fav.unit) }} · }{{ fav.isPartial ? 'mind. ' : '' }}{{ fav.facts.kcal | ntNum:0 }} kcal · <span class="protein-val">{{ fav.facts.proteinG | ntNum:0 }} g Eiweiß</span>
-                      </span>
-                    </span>
-                    <span class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
-                  </button>
-                  <ion-button slot="end" fill="clear" class="touch-btn" (click)="removeFavorite(fav.id)" [attr.aria-label]="fav.label + ' aus den Favoriten entfernen'">
-                    <ion-icon slot="icon-only" name="star" aria-hidden="true"></ion-icon>
-                  </ion-button>
-                </ion-item>
-              }
-            </ion-list>
-          }
-
-          @if (!foodSearch.query.trim() && (recentFoods().length || recentRecipes().length)) {
-            <h3 class="nt-section-header">Zuletzt benutzt · für {{ selectedMealLabel() }}</h3>
-            <ion-list class="diary-list" lines="none">
-              @for (entry of recentFoods(); track entry.id) {
-                <ion-item class="recent" lines="none">
-                  <button type="button" class="recent__main" (click)="quickAddRecent(entry)" [attr.aria-label]="entry.label + ' direkt eintragen'">
-                    <span class="recent__text">
-                      <span class="recent__name">{{ entry.label }}@if (entry.brand) { <span class="entry-brand"> · {{ entry.brand }}</span> }</span>
-                      <span class="recent__meta">
-                        @if (entry.amountG) { {{ formatAmount(entry.amountG, entry.unit) }} · }{{ entry.isPartial ? 'mind. ' : '' }}{{ entry.facts.kcal | ntNum:0 }} kcal · <span class="protein-val">{{ entry.facts.proteinG | ntNum:0 }} g Eiweiß</span>
-                      </span>
-                    </span>
-                    <span class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
-                  </button>
-                  <ion-button slot="end" fill="clear" class="touch-btn" data-testid="recent-favorite" (click)="toggleRecentFavorite(entry)" [attr.aria-pressed]="isFavorite(entry)" [attr.aria-label]="entry.label + (isFavorite(entry) ? ' aus den Favoriten entfernen' : ' als Favorit merken')">
-                    <ion-icon slot="icon-only" [name]="isFavorite(entry) ? 'star' : 'star-outline'" aria-hidden="true"></ion-icon>
-                  </ion-button>
-                  <ion-button slot="end" fill="clear" class="touch-btn touch-btn--text recent__edit" (click)="editRecent(entry)" [attr.aria-label]="entry.label + ' vor dem Eintragen anpassen'">Anpassen</ion-button>
-                </ion-item>
-              }
-              @for (recipe of recentRecipes(); track recipe.id) {
-                <ion-item class="recent" lines="none">
-                  <button type="button" class="recent__main" (click)="quickAddRecipe(recipe)" [attr.aria-label]="recipe.title + ' direkt eintragen'">
-                    <span class="recent__text">
-                      <span class="recent__name">{{ recipe.title }}</span>
-                      <span class="recent__meta">@if (recipe.factsPerServing; as f) { 1 Portion · {{ f.kcal | ntNum:0 }} kcal · <span class="protein-val">{{ f.proteinG | ntNum:0 }} g Eiweiß</span> } @else { Online-Rezept, Nährwerte werden geladen }</span>
-                    </span>
-                    <span class="tint-circle" aria-hidden="true"><ion-icon name="add"></ion-icon></span>
-                  </button>
-                  <ion-button slot="end" fill="clear" class="touch-btn touch-btn--text recent__edit" (click)="selectRecipe(recipe)" [attr.aria-label]="recipe.title + ' vor dem Eintragen anpassen'">Anpassen</ion-button>
-                </ion-item>
-              }
-            </ion-list>
-            <p class="scan-hint">Tippe auf einen Eintrag, um ihn mit der letzten Menge einzutragen.</p>
-          } @else {
-            <p class="scan-hint scan-hint--empty">Suche oder scanne ein Lebensmittel.</p>
-          }
-        }
-
         @case ('recipes') {
           <ion-searchbar
             class="nt-searchbar"
@@ -239,7 +239,7 @@
             <p class="preview__rest">Kohlenhydrate {{ form.carbsG | ntNum }} g · Fett {{ form.fatG | ntNum }} g</p>
           </div>
 
-          <ion-accordion-group class="diary-list diary-list--spaced adjust-group" [value]="adjustOpen()" (ionChange)="onAdjustChange($any($event))">
+          <ion-accordion-group #adjustGroup class="diary-list diary-list--spaced adjust-group" [value]="adjustOpen()" (ionChange)="onAdjustChange($any($event))">
             <ion-accordion value="adjust">
               <ion-item slot="header" lines="none">
                 <ion-label>Nährwerte anpassen</ion-label>
@@ -280,7 +280,6 @@
         }
       }
     </ion-content>
-    }
 
     @if (view() === 'form') {
       <ion-footer class="ion-no-border add-footer">

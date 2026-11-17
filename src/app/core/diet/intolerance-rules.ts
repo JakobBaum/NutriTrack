@@ -27,9 +27,10 @@ const DAIRY: IntoleranceRule = {
     'milk', 'butter', 'buttermilk', 'cheese', 'cream', 'yogurt', 'yoghurt', 'whey', 'ghee', 'kefir', 'skyr', 'custard',
     'mozzarella', 'parmesan', 'cheddar', 'feta', 'ricotta', 'mascarpone', 'gouda', 'brie', 'camembert', 'halloumi',
     'creme fraiche', 'crème fraîche', 'crème', 'creme', 'milch', 'käse', 'sahne', 'joghurt', 'jogurt', 'quark', 'butter',
-    'schmand', 'topfen', 'rahm', 'molke', 'obers',
+    'schmand', 'topfen', 'rahm', 'molke', 'obers', 'pecorino', 'gorgonzola', 'burrata', 'emmentaler', 'emmental', 'provolone',
+    'taleggio', 'paneer', 'labneh', 'parmigiano', 'grana padano', 'asiago', 'manchego', 'gruyère', 'gruyere', 'raclette',
   ],
-  stems: ['milch', 'käse', 'sahne', 'joghurt', 'butter', 'rahm', 'quark', 'molke'],
+  stems: ['milch', 'käse', 'sahne', 'joghurt', 'butter', 'rahm', 'quark', 'molke', 'pecorino', 'gorgonzola', 'burrata', 'parmigiano'],
   exceptions: [
     ...PLANT_MILKS, ...PLANT_YOGURTS, ...NUT_BUTTERS, 'coconut cream', 'cream of coconut', 'kokoscreme', 'kokossahne',
     'cream of tartar', 'cocoa butter', 'shea butter', 'kakaobutter', 'butter bean', 'butter beans', 'butterbohnen',
@@ -40,7 +41,10 @@ const DAIRY: IntoleranceRule = {
 
 const EGG: IntoleranceRule = {
   words: ['egg', 'yolk', 'egg white', 'albumen', 'mayonnaise', 'mayo', 'meringue', 'ei', 'eigelb', 'eiweiß', 'eiweiss', 'eischnee', 'mayonnaise'],
-  stems: ['eigelb', 'eischnee', 'eiernudel', 'mayonnaise'],
+  stems: [
+    'eigelb', 'eischnee', 'eiernudel', 'mayonnaise', 'rührei', 'spiegelei', 'eiersalat', 'omelett', 'eierkuchen', 'eierlikör',
+    'eiersuppe', 'eierspeise',
+  ],
   exceptions: ['eggplant', 'egg plant', 'aubergine'],
   safeIf: ['eggless', 'egg free', 'eifrei'],
 };
@@ -88,9 +92,11 @@ const TREE_NUT: IntoleranceRule = {
 const SHELLFISH_WORDS = [
   'shellfish', 'shrimp', 'shrimps', 'prawn', 'crab', 'lobster', 'crayfish', 'langoustine', 'scampi', 'mussel', 'clam', 'oyster',
   'scallop', 'squid', 'calamari', 'octopus', 'garnele', 'krabbe', 'hummer', 'krebs', 'muschel', 'auster', 'jakobsmuschel',
-  'tintenfisch', 'schalentiere', 'meeresfrüchte',
+  'tintenfisch', 'schalentiere', 'meeresfrüchte', 'kaisergranat', 'langustine', 'calamari', 'venusmuschel', 'krebse',
 ];
-const SHELLFISH_STEMS = ['garnele', 'krabbe', 'muschel', 'tintenfisch', 'meeresfrüchte', 'schalentier'];
+const SHELLFISH_STEMS = [
+  'garnele', 'krabbe', 'muschel', 'tintenfisch', 'meeresfrüchte', 'schalentier', 'hummer', 'kaisergranat', 'calamari', 'langustine',
+];
 
 const SHELLFISH: IntoleranceRule = { words: SHELLFISH_WORDS, stems: SHELLFISH_STEMS, exceptions: [], safeIf: [] };
 
@@ -98,9 +104,13 @@ const SEAFOOD: IntoleranceRule = {
   words: [
     ...SHELLFISH_WORDS, 'fish', 'seafood', 'salmon', 'tuna', 'cod', 'tilapia', 'trout', 'haddock', 'mackerel', 'sardine', 'anchovy',
     'herring', 'halibut', 'sea bass', 'surimi', 'caviar', 'fisch', 'lachs', 'thunfisch', 'forelle', 'kabeljau', 'dorade', 'makrele',
-    'sardelle', 'anchovis', 'hering', 'meeresfrüchte',
+    'sardelle', 'anchovis', 'hering', 'meeresfrüchte', 'pollock', 'swordfish', 'zander', 'karpfen', 'pangasius', 'scholle', 'seelachs',
+    'rotbarsch', 'seezunge', 'sprotte', 'forelle', 'saibling', 'barsch', 'wels', 'aal',
   ],
-  stems: [...SHELLFISH_STEMS, 'fisch', 'lachs', 'thunfisch', 'forelle', 'kabeljau', 'makrele'],
+  stems: [
+    ...SHELLFISH_STEMS, 'fisch', 'lachs', 'thunfisch', 'forelle', 'kabeljau', 'makrele', 'zander', 'karpfen', 'pangasius', 'scholle',
+    'seelachs', 'rotbarsch', 'seezunge', 'sardine', 'sardelle', 'anchovis', 'hering',
+  ],
   exceptions: ['fischer', 'cat fish food'],
   safeIf: [],
 };

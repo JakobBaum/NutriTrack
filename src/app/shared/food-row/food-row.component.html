@@ -6,6 +6,12 @@
       @if (subline()) { <span class="sub__text">{{ subline() }}</span> }
     </span>
   }
+  @if (isIncomplete()) {
+    <span class="incomplete">Nährwerte unvollständig</span>
+  }
+  @if (isKcalDoubtful()) {
+    <span class="incomplete" data-testid="kcal-doubtful">Kalorien bitte prüfen</span>
+  }
   <div class="meta-row">
     <span class="meta">{{ kcalText() }}@if (proteinText(); as protein) { · <strong class="meta__protein">{{ protein }}</strong>}{{ baseText() }}</span>
     @if (scoreLabel(); as label) {

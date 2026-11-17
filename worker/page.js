@@ -9,6 +9,8 @@ const BLOCKED_PAGE_HOSTS = ['tiktok.com', 'instagram.com', 'facebook.com', 'x.co
 
 const PAGE_NOT_ALLOWED_MESSAGE = 'Von dieser Seite können wir keine Rezepte abrufen. Kopiere den Rezepttext und füge ihn ein.';
 
+const PAGE_UNREACHABLE_MESSAGE = 'Die Rezeptseite ist gerade nicht abrufbar. Kopiere den Rezepttext und füge ihn ein.';
+
 const PAGE_NOT_ALLOWED_STATUS = 422;
 
 const ROBOTS_TIMEOUT_MS = 5000;
@@ -65,7 +67,11 @@ export async function fetchPublicPage(startUrl) {
     timeoutMs: FETCH_TIMEOUT_MS,
     beforeHop: assertPageAllowed,
   });
-  if (!resp.ok) throw new ClientError(422, `Rezeptseite antwortet mit HTTP ${resp.status}.`);
+  if (!resp.ok) {
+    // Statuscode nur ins Log: der Client kann damit nichts anfangen, und er verrät das Verhalten fremder Seiten.
+    console.warn(`Rezeptseite nicht abrufbar (HTTP ${resp.status}).`);
+    throw new ClientError(422, PAGE_UNREACHABLE_MESSAGE);
+  }
   const type = resp.headers.get('Content-Type') ?? '';
   if (!/text\/html|application\/xhtml|text\/plain/i.test(type)) {
     throw new ClientError(422, 'Link zeigt auf keine Webseite.');

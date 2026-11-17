@@ -36,7 +36,7 @@ export class WeekPlanCardsComponent {
   readonly untranslated = computed(() => (this.plan()?.recipes ?? []).filter((r) => r.lang === 'en').length);
 
   constructor() {
-    void this.service.ensureTranslated();
+    this.runTranslation(() => this.service.ensureTranslated());
   }
 
   readonly plan = this.store.plan;
@@ -44,7 +44,15 @@ export class WeekPlanCardsComponent {
 
   /** „Erneut übersetzen“ nach einem Fehlschlag (hebt die Sitzungssperre auf). */
   retryTranslation(): void {
-    void this.service.retryTranslation();
+    this.runTranslation(() => this.service.retryTranslation());
+  }
+
+  /** Übersetzung starten; ein Fehlschlag wird gezeigt statt verschluckt. */
+  private runTranslation(job: () => Promise<unknown>): void {
+    job().catch((e: unknown) => {
+      console.error('Übersetzung fehlgeschlagen', e);
+      this.error.set('Rezepte konnten nicht übersetzt werden. Bitte später erneut versuchen.');
+    });
   }
 
   meta(recipe: WeekPlanRecipe): string {

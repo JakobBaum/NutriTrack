@@ -19,6 +19,11 @@ beforeEach(() => {
   TestBed.configureTestingModule({ providers: [provideHttpClient(), provideRouter([])] });
 });
 
+/** id der Position an der Stelle `index` (Zeilen werden über die id angesprochen). */
+function idAt(store: ShoppingStore, index: number): string {
+  return store.list()!.items[index].id!;
+}
+
 describe('ShoppingPage add FAB', () => {
   it('opens and closes the add sheet', () => {
     const { page } = createPage();
@@ -55,7 +60,7 @@ describe('ShoppingPage manual add', () => {
     const item = store.list()?.items.at(-1);
     expect(item?.name).toBe('Salz');
     expect(item?.amount).toBe(0);
-    expect(item?.unit).toBe('g');
+    expect(item?.unit).toBe('Stk');
   });
 
   it('parses a decimal comma amount', () => {
@@ -126,7 +131,7 @@ describe('ShoppingPage view switch', () => {
     const { page, store } = createPage();
     store.addItem({ name: 'Reis', amount: 500, unit: 'g', checked: false });
     store.addItem({ name: 'Nudeln', amount: 500, unit: 'g', checked: false });
-    page.removeItem(0);
+    page.removeItem(idAt(store, 0));
     expect(page.undoOpen()).toBe(true);
     expect(page.rows().map((r) => r.item.name)).toEqual(['Nudeln']);
 
@@ -173,18 +178,18 @@ describe('ShoppingPage checking items', () => {
     const { page, store } = createPage();
     store.addItem({ name: 'Reis', amount: 500, unit: 'g', checked: false });
 
-    page.setChecked(0, true);
-    page.setChecked(0, true);
+    page.setChecked(idAt(store, 0), true);
+    page.setChecked(idAt(store, 0), true);
 
     expect(page.list()?.items[0].checked).toBe(true);
 
-    page.setChecked(0, false);
+    page.setChecked(idAt(store, 0), false);
     expect(page.list()?.items[0].checked).toBe(false);
   });
 
-  it('ignores unknown indexes', () => {
+  it('ignores unknown ids', () => {
     const { page } = createPage();
-    expect(() => page.setChecked(3, true)).not.toThrow();
+    expect(() => page.setChecked('unbekannt', true)).not.toThrow();
   });
 });
 
@@ -194,7 +199,7 @@ describe('ShoppingPage totals and undo delete', () => {
     store.addItem({ name: 'Reis', amount: 1, unit: 'kg', checked: false, userPrice: 2 });
     store.addItem({ name: 'Brot', amount: 1, unit: 'Stk', checked: false, userPrice: 3 });
 
-    page.removeItem(0);
+    page.removeItem(idAt(store, 0));
     expect(page.rows().map((r) => r.item.name)).toEqual(['Brot']);
     expect(page.totals().total).toBe(3);
     expect(page.list()?.items).toHaveLength(2);
@@ -208,7 +213,7 @@ describe('ShoppingPage totals and undo delete', () => {
     const { page, store } = createPage();
     store.addItem({ name: 'Reis', amount: 1, unit: 'kg', checked: false });
 
-    page.removeItem(0);
+    page.removeItem(idAt(store, 0));
     page.onUndoDismiss({ detail: { role: 'timeout' } } as CustomEvent<{ role?: string }>);
 
     expect(page.list()?.items).toHaveLength(0);
@@ -228,7 +233,7 @@ describe('ShoppingPage done section', () => {
     const { page, store } = createPage();
     store.addItem({ name: 'Reis', amount: 1, unit: 'kg', checked: false });
     store.addItem({ name: 'Brot', amount: 1, unit: 'Stk', checked: false });
-    page.setChecked(0, true);
+    page.setChecked(idAt(store, 0), true);
 
     expect(page.openGroups().flatMap((g) => g.rows.map((r) => r.item.name))).toEqual(['Brot']);
     expect(page.doneRows().map((r) => r.item.name)).toEqual(['Reis']);
@@ -262,14 +267,14 @@ describe('ShoppingPage done section', () => {
     expect(store.list()?.items.map((i) => i.name)).toEqual(['B']);
   });
 
-  it('adjusts a single delete while a bulk removal is pending', () => {
+  it('keeps a single delete valid while a bulk removal is pending (by id)', () => {
     const { page, store } = createPage();
     store.addItem({ name: 'A', amount: 1, unit: 'Stk', checked: true });
     store.addItem({ name: 'B', amount: 1, unit: 'Stk', checked: false });
     store.addItem({ name: 'C', amount: 1, unit: 'Stk', checked: false });
 
     page.removeChecked();
-    page.removeItem(2);
+    page.removeItem(idAt(store, 2));
     expect(page.rows().map((r) => r.item.name)).toEqual(['B']);
     page.onUndoDismiss({ detail: { role: 'timeout' } } as CustomEvent<{ role?: string }>);
     expect(store.list()?.items.map((i) => i.name)).toEqual(['B']);
@@ -287,7 +292,7 @@ describe('ShoppingPage share', () => {
 
     await page.shareList();
 
-    expect(share).toHaveBeenCalledWith({ title: 'Einkaufsliste', text: 'Einkaufsliste\n\nTrockenware/Nudeln/Reis:\n- Reis (500 g)' });
+    expect(share).toHaveBeenCalledWith({ title: 'Einkaufsliste', text: 'Einkaufsliste\n\nTrockenware, Nudeln, Reis:\n- Reis (500 g)' });
     expect(page.shareToastOpen()).toBe(false);
   });
 
@@ -299,7 +304,7 @@ describe('ShoppingPage share', () => {
 
     await page.shareList();
 
-    expect(writeText).toHaveBeenCalledWith('Einkaufsliste\n\nTrockenware/Nudeln/Reis:\n- Reis');
+    expect(writeText).toHaveBeenCalledWith('Einkaufsliste\n\nTrockenware, Nudeln, Reis:\n- Reis');
     expect(page.shareToastOpen()).toBe(true);
     expect(page.shareToastMessage()).toContain('Zwischenablage');
   });
@@ -383,8 +388,90 @@ describe('ShoppingPage ohne KI und Rezepte', () => {
     const { page, store } = createPage();
     store.addItem({ name: 'Brot', amount: 1, unit: 'Stk', checked: false });
     store.addItem({ name: 'Milch', amount: 1, unit: 'l', checked: false });
-    store.setItemPrice(0, 2.5);
+    store.setItemPrice(idAt(store, 0), 2.5);
     expect(page.showTotals()).toBe(true);
     expect(page.totals()).toMatchObject({ total: 4, unpriced: 0, priced: 2 });
+  });
+});
+
+describe('ShoppingPage Abbruch, Doppeltipp, Löschen mehrfach', () => {
+  const ownRecipe = { title: 'Reis', servings: 1, steps: [], origin: 'own' as const, ingredients: [{ name: 'Reis', amount: 100, unit: 'g' }] };
+
+  it('Abbrechen während der Erstellung verwirft das Ergebnis (E2)', async () => {
+    TestBed.inject(RecipeStore).add(ownRecipe);
+    const { page, store } = createPage();
+    const real = store.generatePlan.bind(store);
+    vi.spyOn(store, 'generatePlan').mockImplementation(async (opts) => {
+      page.cancelGenerator();
+      return real(opts);
+    });
+    await page.generate();
+    expect(store.list()).toBeNull();
+    expect(page.loading()).toBe(false);
+    expect(page.error()).toBeNull();
+  });
+
+  it('ein zweiter Tipp startet keinen zweiten Lauf (E3)', async () => {
+    TestBed.inject(RecipeStore).add(ownRecipe);
+    const { page, store } = createPage();
+    const spy = vi.spyOn(store, 'generatePlan');
+    await Promise.all([page.generate(), page.generate()]);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('mehrere Löschungen bleiben zusammen rückgängig machbar (E9)', () => {
+    const { page, store } = createPage();
+    store.addItem({ name: 'A', amount: 1, unit: 'Stk', checked: false });
+    store.addItem({ name: 'B', amount: 1, unit: 'Stk', checked: false });
+    page.removeItem(idAt(store, 0));
+    page.removeItem(idAt(store, 1));
+    expect(page.undoMessage()).toBe('2 Positionen gelöscht');
+    page.onUndoDismiss({ detail: { role: 'undo' } } as CustomEvent<{ role?: string }>);
+    expect(page.rows()).toHaveLength(2);
+  });
+
+  it('Löschen trifft die richtige Position, auch wenn sich die Liste dazwischen ändert (E1)', () => {
+    const { page, store } = createPage();
+    store.addItem({ name: 'A', amount: 1, unit: 'Stk', checked: false });
+    store.addItem({ name: 'B', amount: 1, unit: 'Stk', checked: false });
+    const idB = idAt(store, 1);
+    store.removeItem(idAt(store, 0));
+    page.removeItem(idB);
+    page.onUndoDismiss({ detail: { role: 'timeout' } } as CustomEvent<{ role?: string }>);
+    expect(store.list()?.items).toHaveLength(0);
+  });
+
+  it('Teilen einer leeren Liste meldet „leer“ (E14)', async () => {
+    const { page } = createPage();
+    await page.shareList();
+    expect(page.shareToastMessage()).toBe('Die Liste ist leer.');
+  });
+});
+
+describe('ShoppingPage Hinzufügen-Sheet Fehler und Vorgaben', () => {
+  it('Vorgabe-Einheit ist Stk und kehrt nach dem Hinzufügen zurück (U22)', () => {
+    const { page, store } = createPage();
+    expect(page.newItemUnit).toBe('Stk');
+    page.newItemName = 'Mehl';
+    page.newItemUnit = 'kg';
+    page.addManual();
+    expect(store.list()?.items.at(-1)?.unit).toBe('kg');
+    expect(page.newItemUnit).toBe('Stk');
+  });
+
+  it('leerer Name zeigt einen Fehler, Eingabe löscht ihn (E11)', () => {
+    const { page } = createPage();
+    page.addManual();
+    expect(page.addNameError()).toBe('Name eingeben.');
+    page.clearAddErrors();
+    expect(page.addNameError()).toBeNull();
+  });
+
+  it('Preis 0 wird gespeichert (E12)', () => {
+    const { page, store } = createPage();
+    page.newItemName = 'Wasser';
+    page.newItemPriceText = '0';
+    page.addManual();
+    expect(store.list()?.items.at(-1)?.userPrice).toBe(0);
   });
 });

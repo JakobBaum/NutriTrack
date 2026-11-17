@@ -1,53 +1,66 @@
 /**
  * Inhaltsprüfung der Backup-Datensätze (QAE-01): Pflichtfelder und Typen, damit ein
  * beschädigtes oder fremdes Backup die Stores nicht zum Absturz bringt.
+ * Dieselben Prüfungen gelten beim lokalen Laden (Stores), damit Laden nicht schwächer prüft als Import.
  */
 
 import { MAX_WEIGHT_KG, MIN_WEIGHT_KG } from '../weight/weight-math';
 import { isValidOnlineRef } from '../recipes/online/online-recipe-ref';
-
-type Rec = Record<string, unknown>;
+import { isIsoDay } from '../util/date';
+import {
+  isFactsRecord,
+  isNonNegative,
+  isNum,
+  isOptNonNegative,
+  isOptPositive,
+  isPositive,
+  isRec,
+  isStr,
+} from '../util/guards';
 
 const MEALS = new Set(['breakfast', 'lunch', 'dinner', 'snack']);
-const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
-
-const isRec = (v: unknown): v is Rec => typeof v === 'object' && v !== null && !Array.isArray(v);
-const isStr = (v: unknown): v is string => typeof v === 'string';
-const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-const isOptNum = (v: unknown): boolean => v === undefined || v === null || isNum(v);
-
-/** Nährwerte: kcal, Eiweiß, Kohlenhydrate, Fett endlich; optionale Werte endlich oder fehlend. */
-function isFacts(v: unknown): boolean {
-  if (!isRec(v)) return false;
-  const required = [v['kcal'], v['proteinG'], v['carbsG'], v['fatG']].every(isNum);
-  return required && [v['fiberG'], v['sugarG'], v['saltG']].every(isOptNum);
-}
 
 export function isDiaryEntry(v: unknown): boolean {
   if (!isRec(v)) return false;
   return (
     isStr(v['id']) &&
-    isStr(v['dateISO']) && ISO_DAY.test(v['dateISO']) &&
+    isIsoDay(v['dateISO']) &&
     isStr(v['meal']) && MEALS.has(v['meal']) &&
     isStr(v['label']) &&
     isStr(v['createdAt']) && !Number.isNaN(Date.parse(v['createdAt'])) &&
-    isFacts(v['facts']) &&
-    isOptNum(v['amountG']) && isOptNum(v['servings'])
+    isFactsRecord(v['facts']) &&
+    isOptPositive(v['amountG']) && isOptPositive(v['servings'])
   );
 }
 
-function isIngredient(v: unknown): boolean {
-  return isRec(v) && isStr(v['name']) && isNum(v['amount']) && isStr(v['unit']);
+/** Zutat: Name und Einheit als Text, Menge endlich und >= 0, Nährwerte (falls vorhanden) gültig. */
+export function isIngredient(v: unknown): boolean {
+  return (
+    isRec(v) && isStr(v['name']) && isNonNegative(v['amount']) && isStr(v['unit']) &&
+    (v['facts'] === undefined || isFactsRecord(v['facts']))
+  );
 }
 
 export function isRecipe(v: unknown): boolean {
   if (!isRec(v)) return false;
   const ingredients = v['ingredients'];
+  const steps = v['steps'];
   return (
-    isStr(v['id']) && isStr(v['title']) && isNum(v['servings']) &&
+    isStr(v['id']) && isStr(v['title']) && isPositive(v['servings']) &&
     (ingredients === undefined || (Array.isArray(ingredients) && ingredients.every(isIngredient))) &&
-    (v['steps'] === undefined || Array.isArray(v['steps'])) &&
+    (steps === undefined || (Array.isArray(steps) && steps.every(isStr))) &&
     (v['onlineRef'] === undefined || isValidOnlineRef(v['onlineRef']))
+  );
+}
+
+const AMOUNT_UNITS = new Set(['g', 'kg', 'ml', 'l']);
+
+/** Eintrag einer gespeicherten Mahlzeit; `isPartial` und `unit` sind optional (Altbestand ohne Felder bleibt gültig). */
+function isSavedMealEntry(e: unknown): boolean {
+  return (
+    isRec(e) && isStr(e['label']) && isFactsRecord(e['facts']) &&
+    (e['isPartial'] === undefined || typeof e['isPartial'] === 'boolean') &&
+    (e['unit'] === undefined || (isStr(e['unit']) && AMOUNT_UNITS.has(e['unit'])))
   );
 }
 
@@ -56,36 +69,33 @@ function isSavedMeal(v: unknown): boolean {
   const entries = v['entries'];
   return (
     isStr(v['id']) && isStr(v['name']) && Array.isArray(entries) &&
-    entries.every((e) => isRec(e) && isStr(e['label']) && isFacts(e['facts']))
+    entries.every(isSavedMealEntry)
   );
 }
 
 function isCustomFood(v: unknown): boolean {
-  return isRec(v) && isStr(v['id']) && isStr(v['name']) && isFacts(v['facts']);
+  return isRec(v) && isStr(v['id']) && isStr(v['name']) && isFactsRecord(v['facts']);
 }
 
+/** Einkaufsposition: Menge >= 0, Preise (falls vorhanden) >= 0, Kategorie Text, `manual` Wahrheitswert. */
 export function isShoppingItem(v: unknown): boolean {
-  return isRec(v) && isStr(v['name']) && isNum(v['amount']) && isStr(v['unit']) && typeof v['checked'] === 'boolean';
-}
-
-function isShoppingList(v: unknown): boolean {
-  if (v === null || v === undefined) return true;
-  return isRec(v) && Array.isArray(v['items']) && v['items'].every(isShoppingItem);
+  return (
+    isRec(v) && isStr(v['name']) && isNonNegative(v['amount']) && isStr(v['unit']) && typeof v['checked'] === 'boolean' &&
+    isOptNonNegative(v['estPrice']) && isOptNonNegative(v['userPrice']) &&
+    (v['category'] === undefined || isStr(v['category'])) &&
+    (v['manual'] === undefined || typeof v['manual'] === 'boolean')
+  );
 }
 
 export function isWeightEntry(v: unknown): boolean {
-  return isRec(v) && isStr(v['dateISO']) && ISO_DAY.test(v['dateISO']) && isNum(v['kg']) && v['kg'] >= MIN_WEIGHT_KG && v['kg'] <= MAX_WEIGHT_KG;
+  return isRec(v) && isIsoDay(v['dateISO']) && isNum(v['kg']) && v['kg'] >= MIN_WEIGHT_KG && v['kg'] <= MAX_WEIGHT_KG;
 }
 
-/** Gewichtsverlauf: gültige Einträge und höchstens einer je Tag. */
-function isWeightList(v: unknown): boolean {
-  if (!Array.isArray(v) || !v.every(isWeightEntry)) return false;
-  const days = v.map((e) => (e as Rec)['dateISO']);
-  return new Set(days).size === days.length;
-}
-
-function isFavorite(v: unknown): boolean {
-  return isRec(v) && isStr(v['id']) && isStr(v['label']) && v['label'].trim() !== '' && isFacts(v['facts']) && isOptNum(v['amountG']) && isOptNum(v['servings']);
+export function isFavorite(v: unknown): boolean {
+  return (
+    isRec(v) && isStr(v['id']) && isStr(v['label']) && v['label'].trim() !== '' && isFactsRecord(v['facts']) &&
+    isOptPositive(v['amountG']) && isOptPositive(v['servings'])
+  );
 }
 
 export const ARRAY_CHECKS: Readonly<Record<string, (v: unknown) => boolean>> = {
@@ -96,11 +106,3 @@ export const ARRAY_CHECKS: Readonly<Record<string, (v: unknown) => boolean>> = {
   favorites: isFavorite,
 };
 
-/** True, wenn alle bekannten Datensätze vollständig und typrichtig sind. */
-export function hasValidRecords(data: Rec): boolean {
-  const arraysOk = Object.entries(ARRAY_CHECKS).every(
-    ([key, check]) => !(key in data) || (Array.isArray(data[key]) && (data[key] as unknown[]).every(check)),
-  );
-  const weightOk = !('weight' in data) || isWeightList(data['weight']);
-  return arraysOk && weightOk && (!('shopping' in data) || isShoppingList(data['shopping']));
-}

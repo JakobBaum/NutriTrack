@@ -24,6 +24,9 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+const diaryAdd = vi.fn().mockReturnValue({ id: 'e1' });
+const toastCreate = vi.fn().mockResolvedValue({ present: vi.fn() });
+const lock = { readOnly: false };
 const suggestFastfood = vi.fn<(req: FastFoodRequest) => Promise<FastFoodSuggestion[]>>();
 
 function setup() {
@@ -34,8 +37,8 @@ function setup() {
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     providers: [
       { provide: AiService, useValue: { isLive: () => true, suggestFastfood } },
-      { provide: DiaryStore, useValue: { add: vi.fn(), remove: vi.fn() } },
-      { provide: ToastController, useValue: { create: vi.fn() } },
+      { provide: DiaryStore, useValue: { add: diaryAdd, remove: vi.fn(), isReadOnly: () => lock.readOnly } },
+      { provide: ToastController, useValue: { create: toastCreate, getTop: vi.fn().mockResolvedValue(undefined) } },
     ],
   });
   const fixture = TestBed.createComponent(FastfoodSheetComponent);
@@ -48,7 +51,7 @@ const open = (c: FastfoodSheetComponent): void => c.ngOnChanges({ isOpen: new Si
 const flush = (): Promise<void> => new Promise((r) => setTimeout(r));
 
 describe('FastfoodSheetComponent', () => {
-  beforeEach(() => suggestFastfood.mockReset());
+  beforeEach(() => { suggestFastfood.mockReset(); diaryAdd.mockClear(); toastCreate.mockClear(); lock.readOnly = false; });
 
   it('sendet Kriterien, Land, Kurztext und leere Ausschlussliste', async () => {
     const c = setup();
@@ -267,5 +270,42 @@ describe('FastfoodSheetComponent', () => {
     c.ff.update((f) => ({ ...f, kcalBudget: 500 }));
     expect(c.overBudget(sug('A', 700))).toBe(true);
     expect(c.overBudget(sug('A', 450))).toBe(false);
+  });
+});
+
+describe('FastfoodSheetComponent: Budget ohne Tagesziel (T5)', () => {
+  beforeEach(() => suggestFastfood.mockReset());
+
+  it('sendet den angezeigten Wert (1500 kcal), wenn kein Tagesziel existiert', async () => {
+    const c = setup();
+    suggestFastfood.mockResolvedValue([sug('Wrap')]);
+    open(c);
+    await c.runFastfood();
+    expect(suggestFastfood.mock.calls[0][0].kcalBudget).toBe(1500);
+  });
+
+  it('markiert ohne Tagesziel nicht fast alles als über Budget', () => {
+    const c = setup();
+    expect(c.overBudget(sug('Burger', 1200))).toBe(false);
+  });
+});
+
+describe('FastfoodSheetComponent: Eintragen (T8, F4)', () => {
+  beforeEach(() => { diaryAdd.mockClear(); toastCreate.mockClear(); lock.readOnly = false; });
+
+  it('trägt bei Doppeltipp nur einmal ein (T8)', () => {
+    const c = setup();
+    c.logFastfood(sug('Wrap'));
+    c.logFastfood(sug('Wrap'));
+    expect(diaryAdd).toHaveBeenCalledTimes(1);
+  });
+
+  it('trägt bei Schreibsperre nichts ein und zeigt die Sperrmeldung (F4)', async () => {
+    const c = setup();
+    lock.readOnly = true;
+    c.logFastfood(sug('Wrap'));
+    await flush();
+    expect(diaryAdd).not.toHaveBeenCalled();
+    expect(toastCreate.mock.calls[0][0].message).toContain('Nicht gespeichert');
   });
 });

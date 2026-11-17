@@ -10,6 +10,8 @@ const KEY_BLOCKED = 'week-plan-blocked';
 @Injectable({ providedIn: 'root' })
 export class WeekPlanStore {
   private readonly storage = inject(StorageService);
+  /** True, wenn Schreiben gesperrt ist (neueres Schema oder Änderung in anderem Fenster); Änderungen werden dann nicht gespeichert. */
+  readonly isReadOnly = this.storage.isLockedFor(KEY_WEEK_PLAN, KEY_BLOCKED);
 
   private readonly _plan = signal<WeekPlan | null>(this.loadPlan());
 
@@ -22,27 +24,21 @@ export class WeekPlanStore {
   readonly blocked = this._blocked.asReadonly();
 
   /** Merkt Rezepte als "nie wieder vorschlagen" (ohne Duplikate). */
-  block(ids: readonly string[]): void {
+  block(ids: readonly string[]): boolean {
     const next = [...new Set([...this._blocked(), ...ids])];
     this._blocked.set(next);
-    this.storage.set(KEY_BLOCKED, next);
+    return this.storage.set(KEY_BLOCKED, next);
   }
 
-  set(plan: WeekPlan): void {
+  /** Setzt den Plan. @returns `false`, wenn er wegen Schreibsperre nicht gespeichert wurde (siehe `isReadOnly`). */
+  set(plan: WeekPlan): boolean {
     this._plan.set(plan);
-    this.storage.set(KEY_WEEK_PLAN, plan);
+    return this.storage.set(KEY_WEEK_PLAN, plan);
   }
 
-  /** Liest den Plan und prüft ihn; ein unbrauchbarer Plan kommt in Quarantäne und wird entfernt. */
+  /** Liest den Plan und prüft ihn; ein unbrauchbarer Plan kommt in Quarantäne und wird nur nach gelungener Sicherung entfernt. */
   private loadPlan(): WeekPlan | null {
-    const stored = this.storage.get<unknown>(KEY_WEEK_PLAN, null);
-    if (stored === null) return null;
-    const clean = sanitizeWeekPlan(stored);
-    if (clean === null) {
-      this.storage.quarantine(KEY_WEEK_PLAN, [stored], 'invalid');
-      this.storage.remove(KEY_WEEK_PLAN);
-    }
-    return clean;
+    return this.storage.getObject(KEY_WEEK_PLAN, sanitizeWeekPlan);
   }
 
   /** Verwirft den Plan (auch für "Daten zurücksetzen"). */

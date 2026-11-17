@@ -6,9 +6,9 @@ import { MAX_MEAL_TEXT_CHARS, MEAL_NOTHING_RECOGNIZED_MESSAGE, MealParseResult }
 import { MealType } from '../../core/models';
 import { DiaryStore } from '../../core/state/diary.store';
 import { MEAL_DEFS } from '../diary-helpers';
-import { mealShortLabel } from '../diary-edit';
 import { entryAddedMessage } from '../entry-message';
 import { showEntryToast } from '../entry-toast';
+import { ensureWritable } from '../write-guard';
 import { lightHaptic } from '../haptics';
 import {
   DESCRIBE_NOTE,
@@ -16,6 +16,7 @@ import {
   canLogRows,
   checkDescription,
   entriesFromRows,
+  labelFromDescription,
   mealTotals,
   removeRow,
   rowTotals,
@@ -27,7 +28,6 @@ import {
 type Phase = 'idle' | 'loading' | 'results' | 'empty' | 'error';
 
 const NOT_LIVE_HINT = 'Ohne KI-Verbindung geht das nicht. Trag das Essen stattdessen von Hand ein.';
-const MAX_ROWS_LABEL = 12;
 
 /**
  * "Essen beschreiben": Freitext -> KI-Erkennung (geprüft) -> Bestätigungsliste -> Tagebuch.
@@ -51,15 +51,14 @@ export class DescribeMealComponent implements OnDestroy {
   readonly mealChange = output<MealType>();
   /** Eingetragen: das Sheet kann schließen. */
   readonly logged = output<void>();
-  /** Weg zur manuellen Eingabe. */
-  readonly manual = output<void>();
+  /** Weg zur manuellen Eingabe; gibt den eingetippten Text als Namensvorschlag mit. */
+  readonly manual = output<string>();
 
   readonly maxChars = MAX_MEAL_TEXT_CHARS;
-  readonly maxRows = MAX_ROWS_LABEL;
   readonly note = DESCRIBE_NOTE;
   readonly notLiveHint = NOT_LIVE_HINT;
   readonly nothingRecognized = MEAL_NOTHING_RECOGNIZED_MESSAGE;
-  readonly mealOptions = MEAL_DEFS.map((m) => ({ value: m.type, label: m.label, short: mealShortLabel(m.type) }));
+  readonly mealOptions = MEAL_DEFS.map((m) => ({ value: m.type, label: m.label }));
 
   readonly text = signal('');
   readonly phase = signal<Phase>('idle');
@@ -73,6 +72,8 @@ export class DescribeMealComponent implements OnDestroy {
   readonly canRun = computed(() => this.isLive && this.textState() === 'ok' && this.phase() !== 'loading');
   readonly canLog = computed(() => canLogRows(this.rows()));
   readonly totals = computed(() => mealTotals(this.rows()));
+  /** Text oder Ergebnisliste vorhanden: Schließen fragt dann "Verwerfen?". */
+  readonly isDirty = computed(() => this.textLength() > 0 || this.rows().length > 0);
 
   /** Zähler der Anfragen: Nur die jüngste darf Ergebnis oder Fehler setzen. */
   private seq = 0;
@@ -132,26 +133,42 @@ export class DescribeMealComponent implements OnDestroy {
   remove(row: MealRow): void {
     const rest = removeRow(this.rows(), row.id);
     this.rows.set(rest);
-    if (rest.length === 0) this.phase.set('empty');
+    // Letzte Zeile entfernt: zurück zum Text (nicht "nichts erkannt"; die Erkennung war ja erfolgreich).
+    if (rest.length === 0) this.phase.set('idle');
   }
 
   private replaceRow(next: MealRow): void {
     this.rows.update((rows) => rows.map((r) => (r.id === next.id ? next : r)));
   }
 
+  openManual(): void {
+    this.manual.emit(labelFromDescription(this.text()));
+  }
+
   totalsOf(row: MealRow): { kcal: number; proteinG: number } {
     return rowTotals(row);
   }
 
+  /** Nach dem Eintragen ist nichts mehr ungesichert (kein "Verwerfen?" beim Schließen) und ein neuer Lauf ist möglich. */
+  private resetAfterLog(): void {
+    this.seq++;
+    this.text.set('');
+    this.rows.set([]);
+    this.droppedCount.set(0);
+    this.phase.set('idle');
+    this.isLogging = false;
+  }
+
   /** Schreibt je Zeile einen Eintrag; "Rückgängig" nimmt alle gemeinsam zurück. */
   log(): void {
-    if (this.isLogging || !this.canLog()) return;
+    if (this.isLogging || !this.canLog() || !ensureWritable(this.diary, this.toastCtrl)) return;
     this.isLogging = true;
     const meal = this.meal();
     const added = entriesFromRows(this.rows(), this.date(), meal).map((entry) => this.diary.add(entry));
     lightHaptic();
-    this.logged.emit();
     const message = entryAddedMessage(meal, mealTotals(this.rows()));
+    this.resetAfterLog();
+    this.logged.emit();
     void showEntryToast(this.toastCtrl, message, () => added.forEach((e) => this.diary.remove(e.id)));
   }
 }

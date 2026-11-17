@@ -152,9 +152,10 @@ describe('ShoppingStore', () => {
     shopping.addItem({ name: 'Reis', amount: 100, unit: 'g', checked: false });
     shopping.addItem({ name: 'Brot', amount: 1, unit: 'Stk', checked: false });
     const count = shopping.list()!.items.length;
-    shopping.toggleItem(0);
+    const firstId = shopping.list()!.items[0].id!;
+    shopping.toggleItem(firstId);
     expect(shopping.list()!.items[0].checked).toBe(true);
-    shopping.removeItem(0);
+    shopping.removeItem(firstId);
     expect(shopping.list()!.items).toHaveLength(count - 1);
   });
 

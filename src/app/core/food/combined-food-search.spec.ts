@@ -31,4 +31,13 @@ describe('withCustomFoods', () => {
     list = [own];
     expect(await search.searchByText('joghurt')).toHaveLength(1);
   });
+
+  it('meldet den Ausfall der Online-Quelle bei weiter gezeigten eigenen Treffern (F6)', async () => {
+    const status: boolean[] = [];
+    const failing = withCustomFoods({ searchByText: async () => { throw new Error('offline'); } }, () => [own], (f) => status.push(f));
+    await failing.searchByText('joghurt');
+    const ok = withCustomFoods({ searchByText: async () => [off('Joghurt Bio')] }, () => [own], (f) => status.push(f));
+    await ok.searchByText('joghurt');
+    expect(status).toEqual([true, false]);
+  });
 });

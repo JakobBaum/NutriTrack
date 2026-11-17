@@ -15,10 +15,12 @@ import { RecipeTexts, TranslateLanguage } from '../recipes/translate/translate.m
 import { ProxyAiProvider } from './proxy-ai-provider';
 import { MockAiProvider } from './mock-ai-provider';
 import { defaultAiProxyUrl } from './ai-endpoint';
+import { ConsentService } from '../consent/consent.service';
 import { AI_ERROR_MESSAGES } from './ai-errors';
 import { MealParseResult } from './meal-parse';
 
 export const NO_AI_MESSAGE = 'Kein KI-Dienst konfiguriert.';
+export const NO_CONSENT_TEST_MESSAGE = 'Ohne Zustimmung wird keine Verbindung zum KI-Dienst aufgebaut.';
 
 /** Ergebnis des Erreichbarkeitstests des globalen KI-Dienstes. */
 export interface AiTestResult {
@@ -35,6 +37,7 @@ export interface AiTestResult {
 export class AiService implements AiProvider {
   private readonly mock = inject(MockAiProvider);
   private readonly proxy = inject(ProxyAiProvider);
+  private readonly consent = inject(ConsentService);
 
   /** True, wenn der globale KI-Server konfiguriert ist (sonst Mock). */
   isLive(): boolean {
@@ -72,6 +75,8 @@ export class AiService implements AiProvider {
   /** Prüft ohne KI-Kosten, ob der globale KI-Dienst erreichbar ist. */
   async testConnection(): Promise<AiTestResult> {
     if (!this.isLive()) return { ok: false, message: NO_AI_MESSAGE };
+    // Auch der Test sendet eine Anfrage an den Server; nach Widerruf darf nichts mehr hinausgehen (K9).
+    if (!this.consent.isGranted()) return { ok: false, message: NO_CONSENT_TEST_MESSAGE };
     try {
       await this.proxy.ping();
       return { ok: true, message: 'KI-Dienst ist erreichbar.' };

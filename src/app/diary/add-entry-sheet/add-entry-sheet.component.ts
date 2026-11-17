@@ -3,6 +3,7 @@ import {
   Component,
   OnChanges,
   SimpleChanges,
+  ElementRef,
   ViewChild,
   computed,
   inject,
@@ -15,20 +16,22 @@ import { AmountUnit, DiaryEntry, FoodItem, MealType, NutritionFacts, SavedMeal }
 import { sourceAttribution } from '../../core/messages/source-attribution';
 import { OpenPricesProvider } from '../../core/price/open-prices.provider';
 import { StorageService } from '../../core/storage/storage.service';
-import { describeStorageError } from '../../core/storage/storage-messages';
+import { WRITE_BLOCKED_MESSAGE, describeStorageError } from '../../core/storage/storage-messages';
 import { DiaryStore, NewDiaryEntry } from '../../core/state/diary.store';
 import { FavoriteFood, FavoriteStore, newEntryFromFavorite } from '../../core/state/favorite.store';
 import { CustomFood, CustomFoodStore } from '../../core/state/custom-food.store';
 import { MealsStore } from '../../core/state/meals.store';
 import { RecipeStore } from '../../core/state/recipe.store';
 import { OnlineRecipeDetailsService } from '../../core/recipes/online/online-recipe-details.service';
-import { StoredRecipe } from '../../core/recipes/online/online-recipe-ref';
+import { StoredRecipe, isOnlineRef } from '../../core/recipes/online/online-recipe-ref';
 import { RecipeFactsLoader } from '../../meals/recipe-facts-loader';
 import { countMissingFacts } from '../../recipes/recipe-view';
 import { plausibleServingG } from '../../core/food/serving';
+import { DescribeMealComponent } from '../describe-meal/describe-meal.component';
+import { ensureWritable } from '../write-guard';
 import { AmountRowComponent } from '../../shared/amount-row/amount-row.component';
 import { FoodSourceResult, NtFoodSourcesComponent } from '../../shared/food-sources/food-sources.component';
-import { AmountChip, StepDirection, amountChips, mealShortLabel, stepAmount, stepServings } from '../diary-edit';
+import { AmountChip, StepDirection, amountChips, stepAmount, stepServings } from '../diary-edit';
 import {
   AMOUNT_UNITS,
   EMPTY_FIELDS,
@@ -43,7 +46,8 @@ import {
   fromBaseAmount,
   inputTextFor,
   isValidAmount,
-  lastAmountForLabel,
+  lastAmountFromIndex,
+  buildLastAmountIndex,
   mealForHour,
   mealLabel,
   perServingFacts,
@@ -59,6 +63,22 @@ import { lightHaptic } from '../haptics';
 import { hasMacros, withDerivedKcal } from '../nutrient-fields';
 import { clearRawTexts } from '../raw-texts';
 import { showEntryToast } from '../entry-toast';
+import {
+  AddView,
+  QuantityUnit,
+  ScaleBase,
+  EntryForm,
+  ApplyOptions,
+  EMPTY_FORM,
+  DEFAULT_AMOUNT_G,
+  MAX_RECENT_FOODS,
+  SEARCH_FOCUS_DELAY_MS,
+  QUICK_ADD_LOCK_MS,
+  QUICK_ENTRY_LABEL,
+  AMOUNT_FOCUS_DELAY_MS,
+  ADJUST_SCROLL_DELAY_MS,
+  ADD_FORM_TEXT_KEYS,
+} from './add-entry-types';
 import { PriceHint, priceHintText } from './price-hint';
 import { dismissKeyboard } from '../../core/keyboard/dismiss-keyboard';
 import { entryAddedMessage } from '../entry-message';
@@ -68,6 +88,8 @@ import {
   entriesFromSavedMeal,
   entryFromRecent,
   entryFromRecipe,
+  NO_RECIPE_FACTS_MESSAGE,
+  rebaseScaleBase,
   filterLoggableRecipes,
   isLoggableRecipe,
   recentLoggableRecipes,
@@ -76,54 +98,6 @@ import {
   savedMealProtein,
   sumEntryTotals,
 } from './add-entry-logic';
-
-type AddView = 'search' | 'form' | 'recipes' | 'saved' | 'meals' | 'describe';
-type QuantityUnit = 'g' | 'portion';
-
-/** Bezugswerte, aus denen die Formularfelder bei Mengenänderung neu berechnet werden. */
-interface ScaleBase {
-  facts: NutritionFacts;
-  unit: QuantityUnit;
-}
-
-interface EntryForm extends EntryFields {
-  label: string;
-  meal: MealType;
-  amountG: number | null;
-  servings: number | null;
-}
-
-interface ApplyOptions {
-  amountG?: number;
-  unit?: AmountUnit;
-  servings?: number;
-  recipeId?: string;
-  isAi?: boolean;
-  isPartial?: boolean;
-  hint?: string;
-  brand?: string;
-  /** Plausible Packungsportion in g/ml (Vorbelegung der Menge und Chip). */
-  servingG?: number;
-}
-
-const EMPTY_FORM: EntryForm = {
-  ...EMPTY_FIELDS,
-  label: '',
-  meal: 'breakfast',
-  amountG: null,
-  servings: null,
-};
-
-const DEFAULT_AMOUNT_G = 100;
-const MAX_RECENT_FOODS = 8;
-const SEARCH_FOCUS_DELAY_MS = 60;
-/** Kurze Sperre nach einem Schnell-Eintrag gegen versehentliches Doppeltippen (das Sheet bleibt offen). */
-const QUICK_ADD_LOCK_MS = 400;
-/** Name, wenn nur Kalorien (und ggf. Makros) eingetragen werden. */
-const QUICK_ENTRY_LABEL = 'Schnell-Eintrag';
-const AMOUNT_FOCUS_DELAY_MS = 150;
-/** rawTexts-Schlüssel des Add-Formulars (Menge, Portionen, Nährwerte). */
-const ADD_FORM_TEXT_KEYS: readonly string[] = ['amount', 'servings', ...Object.keys(EMPTY_FIELDS)];
 
 /**
  * Eintragen-Sheet: Suchen → Menge → Speichern. Wird vom Tagebuch und von „Heute“
@@ -162,6 +136,8 @@ export class AddEntrySheetComponent implements OnChanges {
 
   @ViewChild(NtFoodSourcesComponent) foodSearch?: NtFoodSourcesComponent;
   @ViewChild(AmountRowComponent) amountRow?: AmountRowComponent;
+  @ViewChild(DescribeMealComponent) describeMeal?: DescribeMealComponent;
+  @ViewChild('adjustGroup', { read: ElementRef }) adjustGroup?: ElementRef<HTMLElement>;
 
   /** Roher Tipptext je Zahlenfeld (erhält z. B. "1," beim Tippen mit Komma). */
   private readonly rawTexts: Record<string, string> = {};
@@ -207,14 +183,15 @@ export class AddEntrySheetComponent implements OnChanges {
   scaleBase: ScaleBase | null = null;
   /** Gewählte Einheit der Mengeneingabe; form.amountG zeigt den Wert in dieser Einheit. */
   amountUnit: AmountUnit = 'g';
+  /** True, wenn von Hand geänderte Werte noch nicht zur Basis wurden (Menge oder kcal fehlten dabei). */
+  private isBaseStale = false;
   /** True, sobald die Einheit manuell gewählt wurde (stoppt die Namens-Vorgabe). */
   private unitTouched = false;
   readonly formatAmount = formatAmount;
 
-  readonly mealOptions: { value: MealType; label: string; short: string }[] = MEAL_DEFS.map((m) => ({
+  readonly mealOptions: { value: MealType; label: string }[] = MEAL_DEFS.map((m) => ({
     value: m.type,
     label: m.label,
-    short: mealShortLabel(m.type),
   }));
 
   readonly recipeOptions = computed(() => filterLoggableRecipes(this.recipeStore.recipes(), this.recipeQuery()));
@@ -238,6 +215,9 @@ export class AddEntrySheetComponent implements OnChanges {
 
   readonly recentRecipes = computed(() => recentLoggableRecipes(this.diary.recentRecipeIds(3), this.recipeStore.recipes()));
 
+  /** Letzte Mengen je Name, nur bei geändertem Tagebuch neu aufgebaut (nicht bei jedem Tastendruck). */
+  private readonly lastAmounts = computed(() => buildLastAmountIndex(this.diary.entries()));
+
   readonly canDismissAdd = (): Promise<boolean> => this.confirmAddClose();
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -246,11 +226,14 @@ export class AddEntrySheetComponent implements OnChanges {
 
   /** Sperrt „Eintragen“ nach dem ersten Klick (kein doppelter Eintrag durch Doppeltippen). */
   private isSaving = false;
+  /** True nach absichtlichem Schließen; canDismiss fragt dann nicht mehr (Reset beim nächsten Öffnen). */
+  private skipCloseConfirm = false;
 
   /** Setzt Formular und Zustand für einen neuen Eintrag zurück. */
   private startEntry(meal: MealType): void {
     this.recipeLoad.cancel();
     this.isSaving = false;
+    this.skipCloseConfirm = false;
     this.resetSource();
     this.form = { ...EMPTY_FORM, meal };
     this.selectedMeal.set(meal);
@@ -268,6 +251,7 @@ export class AddEntrySheetComponent implements OnChanges {
     this.addDirty = false;
     this.kcalManual = false;
     this.scaleBase = null;
+    this.isBaseStale = false;
     this.pickedRecipeId = null;
     this.pickedBrand = undefined;
     this.pickedServingG = null;
@@ -280,9 +264,11 @@ export class AddEntrySheetComponent implements OnChanges {
     this.error.set(null);
   }
 
+  /** Absichtliches Schließen (Erfolg oder bestätigtes Verwerfen): die Rückfrage des Modals entfällt bis zum nächsten Öffnen. */
   closeAdd(): void {
     this.recipeLoad.cancel();
     this.addDirty = false;
+    this.skipCloseConfirm = true;
     this.closed.emit();
   }
 
@@ -291,7 +277,12 @@ export class AddEntrySheetComponent implements OnChanges {
   }
 
   private async confirmAddClose(): Promise<boolean> {
-    return !this.addDirty || confirmDiscardSheet(this.sheetCtrl);
+    return this.skipCloseConfirm || !this.hasUnsavedInput() || confirmDiscardSheet(this.sheetCtrl);
+  }
+
+  /** True, wenn im Formular oder in „Essen beschreiben“ etwas eingegeben wurde, das beim Verlassen verloren ginge. */
+  private hasUnsavedInput(): boolean {
+    return this.addDirty || (this.view() === 'describe' && !!this.describeMeal?.isDirty());
   }
 
   /** True, wenn Favoriten oder Zuletzt benutzt sichtbar sind (die Tastatur würde sie verdecken). */
@@ -320,7 +311,10 @@ export class AddEntrySheetComponent implements OnChanges {
     this.view.set(next);
   }
 
-  backToSearch(): void {
+  /** Zurück zur Suche (Suchtext und Treffer bleiben); fragt „Verwerfen?“, wenn schon etwas eingegeben wurde. */
+  async backToSearch(): Promise<void> {
+    if (this.hasUnsavedInput() && !(await confirmDiscardSheet(this.sheetCtrl))) return;
+    this.resetSource();
     this.showView('search');
     this.focusSearch();
   }
@@ -335,7 +329,7 @@ export class AddEntrySheetComponent implements OnChanges {
       case 'saved': return 'Eigene Lebensmittel';
       case 'meals': return 'Gespeicherte Mahlzeit';
       case 'describe': return 'Essen beschreiben';
-      default: return `Zu ${this.selectedMealLabel()}`;
+      default: return `In ${this.selectedMealLabel()} eintragen`;
     }
   }
 
@@ -385,13 +379,19 @@ export class AddEntrySheetComponent implements OnChanges {
   }
 
   /** Blendet das Formular für eine manuelle Eingabe ein; kcal sind Pflicht, daher offen. */
-  openManualEntry(): void {
-    const label = this.foodSearch?.query.trim() ?? '';
+  openManualEntry(typed?: string): void {
+    const label = typed ?? this.foodSearch?.query.trim() ?? '';
     this.resetSource();
     this.form = { ...this.form, ...EMPTY_FIELDS, label, amountG: null, servings: null };
     this.amountUnit = unitForName(label);
     this.adjustOpen.set('adjust');
     this.view.set('form');
+    this.scrollAdjustIntoView();
+  }
+
+  /** Scrollt „Nährwerte anpassen“ nach dem Aufklappen an den oberen Rand, damit die Felder sichtbar sind. */
+  private scrollAdjustIntoView(): void {
+    setTimeout(() => this.adjustGroup?.nativeElement.scrollIntoView?.({ block: 'start', behavior: 'smooth' }), ADJUST_SCROLL_DELAY_MS);
   }
 
   /** Anzeigetext eines Zahlenfelds (Dezimalkomma, Tipptext bleibt erhalten). */
@@ -413,6 +413,18 @@ export class AddEntrySheetComponent implements OnChanges {
     const next = { ...this.form, [key]: toNumberOrNull(value) };
     const isMacro = key === 'proteinG' || key === 'carbsG' || key === 'fatG';
     this.form = isMacro && !this.kcalManual ? { ...next, ...withDerivedKcal(next) } : next;
+    this.rebaseScaleBase();
+  }
+
+  /** Von Hand geänderte Werte werden zur neuen Basis, damit eine Mengenänderung sie mitnimmt statt zu überschreiben (T1). */
+  private rebaseScaleBase(): void {
+    const base = this.scaleBase;
+    if (!base) return;
+    const facts = factsFromFields(this.form);
+    const next = facts ? rebaseScaleBase(facts, base.unit, this.baseAmount, this.form.servings) : null;
+    // Ohne gültige Menge oder kcal bleibt die alte Basis veraltet; rescale() darf die Eingaben dann nicht überschreiben.
+    this.isBaseStale = next === null;
+    if (next) this.scaleBase = { ...base, facts: next };
   }
 
   /** Schalter „kcal selbst eingeben“; aus = kcal wieder aus den Makros berechnen. */
@@ -443,7 +455,7 @@ export class AddEntrySheetComponent implements OnChanges {
 
   /** Letzte geloggte Menge (in aktueller Einheit) für das gewählte Lebensmittel, sonst null. */
   lastAmountFor(label: string, unit: AmountUnit): number | null {
-    const amount = lastAmountForLabel(this.diary.entries(), label);
+    const amount = lastAmountFromIndex(this.lastAmounts(), label);
     return amount == null ? null : fromBaseAmount(amount, unit);
   }
 
@@ -467,11 +479,15 @@ export class AddEntrySheetComponent implements OnChanges {
   }
 
   onAdjustChange(event: AccordionChangeEvent): void {
-    this.adjustOpen.set(resolveAdjustOpen(event, this.adjustOpen()));
+    const next = resolveAdjustOpen(event, this.adjustOpen());
+    this.adjustOpen.set(next);
+    if (next === 'adjust') this.scrollAdjustIntoView();
   }
 
   /** Rechnet die Nährwert-Felder aus den Bezugswerten und der aktuellen Menge neu. */
   private rescale(): void {
+    if (this.isBaseStale) this.rebaseScaleBase();
+    if (this.isBaseStale) return;
     const base = this.scaleBase;
     if (!base) return;
     const factor = base.unit === 'g' ? (this.baseAmount ?? 0) / 100 : (this.form.servings ?? 0);
@@ -489,6 +505,7 @@ export class AddEntrySheetComponent implements OnChanges {
     const factor = unit === 'g' ? (baseAmount ?? 0) / 100 : (servings ?? 0);
 
     this.scaleBase = { facts, unit };
+    this.isBaseStale = false;
     this.addDirty = false;
     this.kcalManual = true;
     clearRawTexts(this.rawTexts, ADD_FORM_TEXT_KEYS);
@@ -557,11 +574,26 @@ export class AddEntrySheetComponent implements OnChanges {
   }
 
   toggleRecentFavorite(entry: DiaryEntry): void {
-    this.favoriteStore.toggle(entry);
+    if (ensureWritable(this.favoriteStore, this.toastCtrl)) this.favoriteStore.toggle(entry);
   }
 
+  /** Entfernt einen Favoriten; „Rückgängig“ merkt ihn mit denselben Werten erneut (T20). */
   removeFavorite(id: string): void {
+    const fav = this.favoriteList().find((f) => f.id === id);
+    if (!fav || !ensureWritable(this.favoriteStore, this.toastCtrl)) return;
     this.favoriteStore.remove(id);
+    this.showToast(`„${fav.label}“ aus den Favoriten entfernt.`, () => this.restoreFavorite(fav));
+  }
+
+  private restoreFavorite(fav: FavoriteFood): void {
+    if (!ensureWritable(this.favoriteStore, this.toastCtrl) || this.favoriteStore.isFavorite(fav)) return;
+    const entry: DiaryEntry = {
+      ...newEntryFromFavorite(fav, this.date(), 'snack'),
+      ref: fav.ref ?? { kind: 'manual' },
+      id: fav.id,
+      createdAt: fav.createdAt,
+    };
+    this.favoriteStore.toggle(entry);
   }
 
   /** Loggt einen Favoriten sofort mit seiner gemerkten Menge. */
@@ -579,8 +611,13 @@ export class AddEntrySheetComponent implements OnChanges {
   async quickAddRecipe(recipe: StoredRecipe): Promise<void> {
     this.retryQuick = true;
     const loaded = await this.recipeLoad.load(recipe);
-    const entry = loaded && entryFromRecipe({ ...loaded.recipe, factsPerServing: loaded.facts }, this.date(), this.form.meal);
+    if (!loaded) {
+      if (!isOnlineRef(recipe) && !recipe.factsPerServing) this.showToast(NO_RECIPE_FACTS_MESSAGE);
+      return;
+    }
+    const entry = entryFromRecipe({ ...loaded.recipe, factsPerServing: loaded.facts }, this.date(), this.form.meal);
     if (entry) this.addAndConfirm([entry]);
+    else this.showToast(NO_RECIPE_FACTS_MESSAGE);
   }
 
   /** Loggt alle Einträge einer gespeicherten Mahlzeit sofort in die gewählte Mahlzeit. */
@@ -599,14 +636,20 @@ export class AddEntrySheetComponent implements OnChanges {
 
   /** Schnell-Eintrag: das Sheet bleibt offen, die Bestätigung kommt als Toast mit Essenszeit, kcal und Eiweiß. */
   private addAndConfirm(inputs: NewDiaryEntry[]): void {
-    if (this.isSaving) return;
+    if (this.isSaving || !ensureWritable(this.diary, this.toastCtrl)) return;
     this.isSaving = true;
     setTimeout(() => (this.isSaving = false), QUICK_ADD_LOCK_MS);
     lightHaptic();
-    const added = inputs.map((input) => this.diary.add(input));
+    const added = inputs.flatMap((input) => this.diary.tryAdd(input) ?? []);
+    if (added.length < inputs.length) {
+      added.forEach((e) => this.diary.remove(e.id));
+      void showEntryToast(this.toastCtrl, WRITE_BLOCKED_MESSAGE);
+      return;
+    }
     this.addedCount.update((n) => n + added.length);
     const totals = sumEntryTotals(added);
     this.showToast(entryAddedMessage(this.form.meal, totals), () => {
+      if (!ensureWritable(this.diary, this.toastCtrl)) return;
       added.forEach((e) => this.diary.remove(e.id));
       this.addedCount.update((n) => Math.max(0, n - added.length));
     });
@@ -656,10 +699,11 @@ export class AddEntrySheetComponent implements OnChanges {
       return;
     }
 
+    if (!ensureWritable(this.diary, this.toastCtrl)) return;
     this.isSaving = true;
     const isPortion = base?.unit === 'portion';
     const recipeId = this.pickedRecipeId;
-    const entry = this.diary.add({
+    const entry = this.diary.tryAdd({
       dateISO: this.date(),
       meal: this.form.meal,
       label,
@@ -673,12 +717,19 @@ export class AddEntrySheetComponent implements OnChanges {
       isPartial: this.isPartialSource || undefined,
       unit: this.baseAmount ? this.amountUnit : undefined,
     });
+    if (!entry) {
+      this.isSaving = false;
+      void showEntryToast(this.toastCtrl, WRITE_BLOCKED_MESSAGE);
+      return;
+    }
     const remember = !isQuickEntry && shouldRememberAsCustomFood({ recipeId, baseUnit: base?.unit, isEstimate: this.isAiEstimate() });
     if (remember) this.customFoods.save(label, facts);
 
     lightHaptic();
     this.closeAdd();
-    this.showToast(entryAddedMessage(this.form.meal, facts), () => this.diary.remove(entry.id));
+    this.showToast(entryAddedMessage(this.form.meal, facts), () => {
+      if (ensureWritable(this.diary, this.toastCtrl)) this.diary.remove(entry.id);
+    });
   }
 
   private showToast(message: string, onUndo?: () => void): void {

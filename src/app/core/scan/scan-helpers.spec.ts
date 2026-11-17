@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import {
+  CAMERA_DENIED_MESSAGE, CameraCancelledError, CameraDeniedError, isCameraDenied, toCameraError,
+} from './camera-errors';
+import {
   BarcodeScannerService, SCAN_ATTEMPT_DELAY_MS, SCAN_FORMAT_NAMES, SCAN_VIDEO_CONSTRAINTS,
 } from './barcode-scanner.service';
 
@@ -67,3 +70,45 @@ describe('BarcodeScannerService.start', () => {
 
 // CameraService.takePhotoBase64 ist hier nicht testbar: Das Capacitor-Plugin ist ein Proxy,
 // auf dem sich getPhoto nicht per vi.spyOn ersetzen lässt ("property not defined").
+
+describe('BarcodeScannerService.loadReader — gescheiterter Import (K7)', () => {
+  it('lädt die Bibliothek nach einem Fehlschlag beim nächsten Versuch erneut', async () => {
+    // Arrange
+    TestBed.configureTestingModule({});
+    const service = TestBed.inject(BarcodeScannerService);
+    const importZxing = vi
+      .spyOn(service as unknown as { importZxing(): Promise<unknown> }, 'importZxing')
+      .mockRejectedValue(new Error('Chunk fehlt'));
+    const load = (): Promise<unknown> => (service as unknown as { loadReader(): Promise<unknown> }).loadReader();
+
+    // Act
+    await expect(load()).rejects.toThrow('Chunk fehlt');
+    await expect(load()).rejects.toThrow('Chunk fehlt');
+
+    // Assert: kein dauerhaft gemerktes Fehlversprechen
+    expect(importZxing).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('toCameraError (K2)', () => {
+  it('meldet den Abbruch der nativen Kamera als CameraCancelledError', () => {
+    const err = toCameraError(new Error('User cancelled photos app'));
+    expect(err).toBeInstanceOf(CameraCancelledError);
+  });
+
+  it('meldet verweigerte Berechtigung mit deutscher Meldung', () => {
+    const err = toCameraError(new Error('User denied access to camera'));
+    expect(err).toBeInstanceOf(CameraDeniedError);
+    expect(err.message).toBe(CAMERA_DENIED_MESSAGE);
+  });
+
+  it('erkennt NotAllowedError aus getUserMedia als verweigert', () => {
+    expect(isCameraDenied(new DOMException('x', 'NotAllowedError'))).toBe(true);
+    expect(isCameraDenied(new DOMException('x', 'NotFoundError'))).toBe(false);
+  });
+
+  it('reicht andere Fehler unverändert weiter', () => {
+    const other = new Error('Kein Foto erhalten.');
+    expect(toCameraError(other)).toBe(other);
+  });
+});

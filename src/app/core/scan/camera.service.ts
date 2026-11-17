@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Capacitor } from '@capacitor/core';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { toCameraError } from './camera-errors';
 
 /**
  * Dünner Wrapper um das Capacitor-Camera-Plugin für Etiketten-Fotos.
@@ -19,7 +20,8 @@ export class CameraService {
 
   /**
    * Nimmt ein Foto auf und gibt den reinen Base64-String zurück (ohne
-   * Data-URL-Präfix). Wirft, wenn der Nutzer abbricht oder keine Kamera da ist.
+   * Data-URL-Präfix). Wirft `CameraCancelledError` bei Abbruch und `CameraDeniedError`
+   * bei verweigerter Berechtigung (siehe `toCameraError`).
    */
   async takePhotoBase64(): Promise<string> {
     const photo = await Camera.getPhoto({
@@ -27,6 +29,8 @@ export class CameraService {
       source: CameraSource.Camera,
       quality: 80,
       correctOrientation: true,
+    }).catch((e: unknown) => {
+      throw toCameraError(e);
     });
     const base64 = photo.base64String;
     if (!base64) {

@@ -1,5 +1,7 @@
 import { NutritionFacts } from '../models';
-import { isPlausiblePer100g } from '../food/facts-plausibility';
+import {
+  ATWATER_SLACK_PER_100G, MAX_GRAMS_PER_100G, MAX_KCAL_PER_100G, isAtwaterDoubtful, isWithinPer100gLimits,
+} from '../food/facts-plausibility';
 import { MAX_MEAL_ITEMS, MealParseResult, ParsedMealItem } from './meal-parse';
 import { boundedList, cleanText, isInRange } from './sanitize-common';
 
@@ -8,17 +10,8 @@ const MAX_UNIT_CHARS = 20;
 const FALLBACK_UNIT = 'g';
 /** Gewicht einer Zeile in g oder ml. */
 export const PORTION_RANGE_G = { min: 1, max: 2000 } as const;
-const MAX_KCAL_PER_100G = 900;
-const MAX_MACRO_PER_100G = 100;
 /** Obergrenze der angezeigten Menge (nur Anzeige, z. B. "2 Stk"). */
 const MAX_DISPLAY_AMOUNT = 10000;
-/** kcal darf um diesen Anteil von 4*Eiweiß + 4*KH + 9*Fett abweichen, bevor die Zeile markiert wird. */
-const ATWATER_TOLERANCE = 0.25;
-/** Fester Spielraum je 100 g für Getränke und Gewürze mit winzigen Werten (Kaffee, Wasser). */
-const ATWATER_SLACK_KCAL = 10;
-const KCAL_PER_G_PROTEIN = 4;
-const KCAL_PER_G_CARBS = 4;
-const KCAL_PER_G_FAT = 9;
 
 type RawRecord = Record<string, unknown>;
 
@@ -31,17 +24,11 @@ function cleanPer100g(raw: unknown): NutritionFacts | null {
   if (!f) return null;
   const { kcal, proteinG, carbsG, fatG } = f;
   if (!isInRange(kcal, 0, MAX_KCAL_PER_100G)) return null;
-  if (!isInRange(proteinG, 0, MAX_MACRO_PER_100G)) return null;
-  if (!isInRange(carbsG, 0, MAX_MACRO_PER_100G)) return null;
-  if (!isInRange(fatG, 0, MAX_MACRO_PER_100G)) return null;
+  if (!isInRange(proteinG, 0, MAX_GRAMS_PER_100G)) return null;
+  if (!isInRange(carbsG, 0, MAX_GRAMS_PER_100G)) return null;
+  if (!isInRange(fatG, 0, MAX_GRAMS_PER_100G)) return null;
   const facts: NutritionFacts = { kcal, proteinG, carbsG, fatG, basis: 'per100g' };
-  return isPlausiblePer100g(facts) ? facts : null;
-}
-
-/** True, wenn kcal deutlich von dem abweicht, was die Makros nach 4/4/9 ergeben. */
-function isAtwaterDoubtful(facts: NutritionFacts): boolean {
-  const expected = KCAL_PER_G_PROTEIN * facts.proteinG + KCAL_PER_G_CARBS * facts.carbsG + KCAL_PER_G_FAT * facts.fatG;
-  return Math.abs(facts.kcal - expected) > expected * ATWATER_TOLERANCE + ATWATER_SLACK_KCAL;
+  return isWithinPer100gLimits(facts) ? facts : null;
 }
 
 /** Menge und Einheit sind nur Anzeige; ungültig heißt: Gewicht in Gramm. */
@@ -60,7 +47,7 @@ function cleanItem(raw: unknown): ParsedMealItem | null {
   if (!name || !isInRange(portionG, PORTION_RANGE_G.min, PORTION_RANGE_G.max)) return null;
   const per100g = cleanPer100g(r['per100g']);
   if (!per100g) return null;
-  return { name, ...cleanAmountAndUnit(r, portionG), portionG, per100g, isKcalDoubtful: isAtwaterDoubtful(per100g) };
+  return { name, ...cleanAmountAndUnit(r, portionG), portionG, per100g, isKcalDoubtful: isAtwaterDoubtful(per100g, ATWATER_SLACK_PER_100G) };
 }
 
 /**

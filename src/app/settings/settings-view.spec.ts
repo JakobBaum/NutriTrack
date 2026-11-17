@@ -45,8 +45,10 @@ describe('consentStatusLabel', () => {
     expect(consentStatusLabel(true, null)).toBe('Zugestimmt');
   });
 
-  it('sagt ohne Zustimmung, dass nichts an Dritte gesendet wird', () => {
-    expect(consentStatusLabel(false, null)).toBe('Nicht zugestimmt. Es wird nichts an Dritte gesendet.');
+  it('sagt ohne Zustimmung, dass KI und Rezeptsuche nichts senden, Open Food Facts aber weiter abgefragt wird', () => {
+    expect(consentStatusLabel(false, null)).toBe(
+      'Nicht zugestimmt. KI und Rezeptsuche senden nichts. Lebensmittelsuche und Barcode-Scan fragen weiterhin Open Food Facts ab.',
+    );
   });
 
   it("nennt die Altersgrenze, wenn das Profil unter 18 ist", () => {

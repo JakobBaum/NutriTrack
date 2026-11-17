@@ -1,4 +1,4 @@
-import { DiaryEntry } from '../core/models';
+import { DiaryEntry, NutritionFacts } from '../core/models';
 import { formatNum } from '../shared/num.pipe';
 
 /** kcal je Gramm (Atwater). */
@@ -61,4 +61,78 @@ export function proteinOfEntries(entries: readonly Pick<DiaryEntry, 'facts'>[]):
 /** Label mit weichen Trennstellen (nur für die Anzeige, nicht für aria-label). */
 export function softHyphenLabel(label: string): string {
   return SOFT_HYPHEN_LABELS[label] ?? label;
+}
+
+export interface DrillItem {
+  label: string;
+  value: number;
+  percent: number;
+}
+
+export interface DrillData {
+  label: string;
+  unit: string;
+  total: number;
+  /** Tagesziel dieses Werts und Anteil der Tagessumme daran (Prozent, 0 ohne Ziel). */
+  target: number;
+  targetPercent: number;
+  color: string;
+  /** True, wenn das Ziel dieses Werts deutlich überschritten ist (Warnfarbe). */
+  over: boolean;
+  /** Erklärung zum Wert (z. B. Zucker: Gesamtzucker gegen Richtwert für freien Zucker). */
+  note: string | null;
+  items: DrillItem[];
+}
+
+/** Angaben der Nährwert-Kachel, die der Drill-Down braucht. */
+export interface DrillMacro {
+  label: string;
+  color: string;
+  warn: boolean;
+  overBy: number;
+  target: number;
+}
+
+const FACT_KEYS: Readonly<Record<string, keyof NutritionFacts>> = {
+  kcal: 'kcal', protein: 'proteinG', carbs: 'carbsG',
+  fat: 'fatG', fiber: 'fiberG', sugar: 'sugarG',
+};
+
+/** Wert eines Nährwerts (nach Schlüssel wie "protein") aus den Angaben; unbekannt oder fehlend ergibt 0. */
+export function factValue(facts: NutritionFacts, key: string): number {
+  const prop = FACT_KEYS[key];
+  if (!prop) return 0;
+  const v = facts[prop];
+  return typeof v === 'number' ? v : 0;
+}
+
+const round1 = (n: number): number => Math.round(n * 10) / 10;
+
+/** Aufschlüsselung eines Nährwerts nach Einträgen (größte zuerst, Einträge ohne Wert entfallen). */
+export function buildDrillData(
+  key: string,
+  entries: readonly Pick<DiaryEntry, 'label' | 'facts'>[],
+  macro: DrillMacro | undefined,
+): DrillData {
+  const items = entries
+    .map((e) => ({ label: e.label, value: factValue(e.facts, key) }))
+    .filter((d) => d.value > 0)
+    .sort((a, b) => b.value - a.value);
+  const total = items.reduce((s, i) => s + i.value, 0);
+  const target = macro?.target ?? 0;
+  return {
+    label: macro?.label ?? (key === 'kcal' ? 'Kalorien' : key),
+    unit: key === 'kcal' ? 'kcal' : 'g',
+    color: macro?.color ?? (key === 'kcal' ? 'var(--nt-kcal)' : 'var(--ion-color-primary)'),
+    over: !!macro && macro.warn && macro.overBy > 0,
+    target,
+    note: macroNote(key),
+    targetPercent: target > 0 ? Math.round((total / target) * 100) : 0,
+    total: round1(total),
+    items: items.map((i) => ({
+      ...i,
+      value: round1(i.value),
+      percent: total > 0 ? Math.round((i.value / total) * 100) : 0,
+    })),
+  };
 }

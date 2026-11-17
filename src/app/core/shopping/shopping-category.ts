@@ -1,4 +1,5 @@
 import { ShoppingItem } from '../models';
+import { PreparedName, foldAccents, matchesPrepared, prepareName } from './keyword-match';
 
 /** Feste Supermarkt-Kategorien (Gruppen erscheinen in Reihenfolge des ersten Auftretens). */
 export const SHOPPING_CATEGORIES = [
@@ -20,7 +21,7 @@ export type ShoppingCategory = (typeof SHOPPING_CATEGORIES)[number];
 export const DEFAULT_SHOPPING_CATEGORY: ShoppingCategory = 'Sonstiges';
 
 /**
- * Stichwort-Schreibweise: normal = Teilwort (ab 4 Zeichen, kürzere nur als ganzes Wort),
+ * Stichwort-Schreibweise: normal = Wortanfang oder Wortende (ab 4 Zeichen, nie mitten im Wort; kürzere nur als ganzes Wort),
  * `=wort` = ganzes Wort, `wort$` = Wortende.
  */
 interface CategoryRule {
@@ -49,7 +50,7 @@ const RULES: readonly CategoryRule[] = [
   {
     category: 'Getränke',
     keywords: [
-      'saft', 'juice', 'wasser', 'water', 'cola', 'limo', 'bier', 'beer', '=wein', 'rotwein', 'weißwein', 'weisswein', 'wine', 'sekt', 'prosecco', '=tee',
+      'saft', 'juice', 'wasser', 'water', 'cola', 'limo', 'bier', '=beer', '=wein', 'rotwein', 'weißwein', 'weisswein', 'wine', 'sekt', 'prosecco', '=tee',
       'kaffee', 'coffee', 'getränk', 'drink', 'sprudel', 'smoothie', 'wodka', 'vodka', '=rum',
     ],
   },
@@ -123,23 +124,28 @@ function normalizeText(text: string): string {
   return text.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+/** Regeln mit akzentfreien Stichwörtern (einmal berechnet), passend zum akzentfreien Namen in {@link categorizeName}. */
+const FOLDED_RULES: readonly CategoryRule[] = RULES.map((r) => ({ ...r, keywords: r.keywords.map(foldAccents) }));
+
 /** Prüft ein Stichwort gegen den normalisierten Namen und seine Wörter. */
-function matchesKeyword(name: string, words: readonly string[], keyword: string): boolean {
+function matchesKeyword(name: PreparedName, words: readonly string[], keyword: string): boolean {
   if (keyword.startsWith('=')) return words.includes(keyword.slice(1));
   if (keyword.endsWith('$')) {
     const suffix = keyword.slice(0, -1);
     return words.some((w) => w.endsWith(suffix));
   }
   if (keyword.length < 4) return words.includes(keyword);
-  return name.includes(keyword);
+  return matchesPrepared(name, keyword, 'edge');
 }
 
 /** Ordnet einen Zutatennamen (de/en) einer Kategorie zu; ohne Treffer „Sonstiges“. */
 export function categorizeName(name: string): ShoppingCategory {
-  const normalized = normalizeText(name);
+  const normalized = foldAccents(normalizeText(name));
   if (!normalized) return DEFAULT_SHOPPING_CATEGORY;
-  const words = normalized.split(/[^a-zäöüß-]+/).filter(Boolean);
-  const rule = RULES.find((r) => r.keywords.some((k) => matchesKeyword(normalized, words, k)));
+  const words = normalized.split(/[^\p{L}-]+/u).filter(Boolean);
+  // Name einmal vorbereiten (Akzente, Wörter); die Regex je Stichwort liegen im Zwischenspeicher von keyword-match.
+  const prepared = prepareName(normalized);
+  const rule = FOLDED_RULES.find((r) => r.keywords.some((k) => matchesKeyword(prepared, words, k)));
   return rule?.category ?? DEFAULT_SHOPPING_CATEGORY;
 }
 
@@ -150,9 +156,14 @@ export function normalizeCategory(raw: unknown): ShoppingCategory | null {
   return SHOPPING_CATEGORIES.find((c) => c.toLowerCase() === wanted) ?? null;
 }
 
+/** Gültige Kategorie einer Position: eine vorhandene gültige bleibt, sonst Stichwort-Zuordnung. */
+export function resolveCategory(item: Pick<ShoppingItem, 'name' | 'category'>): ShoppingCategory {
+  return normalizeCategory(item.category) ?? categorizeName(item.name);
+}
+
 /** Liefert die Position mit gültiger Kategorie; eine vorhandene gültige bleibt, sonst Stichwort-Zuordnung. */
 export function withCategory<T extends ShoppingItem>(item: T): T {
-  const category = normalizeCategory(item.category) ?? categorizeName(item.name);
+  const category = resolveCategory(item);
   return item.category === category ? item : { ...item, category };
 }
 

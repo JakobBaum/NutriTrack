@@ -17,13 +17,13 @@
     } @else {
       <p class="consent__lead">Diese Funktionen senden Daten an Dritte. Ohne deine Zustimmung geht nichts davon hinaus.</p>
       <ul class="consent__list">
-        <li><strong>KI (Google Gemini, USA):</strong> Fotos von Etiketten und Rezepten, Rezepttexte und Links, Fastfood-Wünsche mit deinem Kalorien-Budget. Sie gehen über unseren Zwischenserver bei Cloudflare (USA).</li>
+        <li><strong>KI (Google Gemini, USA):</strong> Fotos von Etiketten und Rezepten, Rezepttexte und Links, freie Beschreibungen von Mahlzeiten, Fastfood-Wünsche mit Kalorien-Budget, Einkaufslisten-Angaben (Titel, Budget, Markt), Suchbegriffe zur Übersetzung und deine Abneigungen/Unverträglichkeiten. Sie gehen über unseren Zwischenserver bei Cloudflare (USA).</li>
         <li><strong>Rezeptsuche (Spoonacular, USA):</strong> Suchbegriffe sowie Ernährungsform, Unverträglichkeiten und ausgeschlossene Zutaten aus deinem Profil.</li>
       </ul>
       <p class="consent__note">Angaben zu Unverträglichkeiten können Gesundheitsdaten sein. Ergebnisse der KI sind Schätzungen.</p>
       <p class="consent__note">Du kannst die Zustimmung jederzeit unter Profil widerrufen.</p>
       <ion-checkbox
-        class="consent__adult"
+        class="consent__adult ion-text-wrap"
         labelPlacement="end"
         justify="start"
         alignment="center"
@@ -31,6 +31,9 @@
         [checked]="isAdult()"
         (ionChange)="setAdult($event.detail.checked)"
       >Ich bin mindestens 18 Jahre alt.</ion-checkbox>
+    }
+    @if (acceptError(); as err) {
+      <p class="consent__error" role="alert" data-testid="consent-accept-error">{{ err }}</p>
     }
     <ion-button fill="clear" class="nt-btn nt-btn--text consent__privacy" data-testid="consent-privacy" (click)="openPrivacy()">Datenschutzerklärung lesen</ion-button>
   </div>

@@ -39,6 +39,16 @@ describe('NtFoodRowComponent', () => {
     expect(el.querySelector('.text > .score')).toBeNull();
   });
 
+  it('weist auf unvollständige Nährwerte hin, sonst nicht', () => {
+    expect(render({ ...item, isIncomplete: true }).querySelector('.incomplete')?.textContent).toBe('Nährwerte unvollständig');
+    expect(render(item).querySelector('.incomplete')).toBeNull();
+  });
+
+  it('weist auf zweifelhafte Kalorien hin, sonst nicht', () => {
+    expect(render({ ...item, isKcalDoubtful: true }).querySelector('[data-testid="kcal-doubtful"]')?.textContent).toBe('Kalorien bitte prüfen');
+    expect(render(item).querySelector('[data-testid="kcal-doubtful"]')).toBeNull();
+  });
+
   it('zeigt keine Bilder und keine Platzhalter-Icons', () => {
     const el = render({ ...item, imageUrl: 'https://img/x.jpg' } as FoodItem);
     expect(el.querySelector('img')).toBeNull();

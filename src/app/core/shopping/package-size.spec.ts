@@ -59,3 +59,16 @@ describe('roundToPackage', () => {
     expect(original.amount).toBe(100);
   });
 });
+
+describe('roundToPackage an Wortgrenzen (E5)', () => {
+  it('rundet Preiselbeeren nicht wie Reis und Zuckerschoten nicht wie Zucker', () => {
+    expect(roundToPackage(item('Preiselbeeren', 120, 'g')).amount).toBe(120);
+    expect(roundToPackage(item('Zuckerschoten', 200, 'g')).amount).toBe(200);
+  });
+
+  it('erkennt Zusammensetzungen und Mehrzahl weiterhin', () => {
+    expect(roundToPackage(item('Vollkornreis', 200, 'g')).amount).toBe(500);
+    expect(roundToPackage(item('Puderzucker', 200, 'g')).amount).toBe(1000);
+    expect(roundToPackage(item('Rote Zwiebeln', 300, 'g')).unit).toBe('Stk');
+  });
+});

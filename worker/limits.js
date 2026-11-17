@@ -32,9 +32,37 @@ export const RECIPE_COUNTER = {
   limitMessage: RECIPE_DAILY_LIMIT_MESSAGE, unavailableMessage: RECIPE_DAILY_UNAVAILABLE_MESSAGE,
 };
 
+const IPV6_GROUPS = 8;
+
+const IPV6_PREFIX_GROUPS = 4; // /64
+
+/** Alle 8 Gruppen einer IPv6-Adresse (mit "::" aufgefüllt); null bei unlesbarer Form. */
+function ipv6Groups(ip) {
+  const halves = ip.split('::');
+  if (halves.length > 2) return null;
+  const [left, right] = halves.map((h) => (h ? h.split(':') : []));
+  const missing = IPV6_GROUPS - left.length - (right?.length ?? 0);
+  if (right === undefined ? missing !== 0 : missing < 1) return null;
+  const groups = [...left, ...Array(right === undefined ? 0 : missing).fill('0'), ...(right ?? [])]
+    .map((g) => (/^[0-9a-f]{1,4}$/i.test(g) ? Number.parseInt(g, 16) : -1));
+  return groups.every((g) => g >= 0) ? groups : null;
+}
+
+/**
+ * Schlüssel für das Rate-Limit: IPv4 unverändert, IPv6 auf das /64-Präfix gekürzt
+ * (ein Anschluss bekommt meist ein ganzes /64; sonst würde Adress-Rotation das Limit umgehen).
+ */
+export function rateLimitKey(ip) {
+  if (!ip) return 'unknown';
+  if (!ip.includes(':') || ip.includes('.')) return ip;
+  const groups = ipv6Groups(ip);
+  if (!groups) return ip;
+  return `${groups.slice(0, IPV6_PREFIX_GROUPS).map((g) => g.toString(16)).join(':')}::/64`;
+}
+
 export async function isRateLimited(limiter, request) {
   if (!hasBinding(limiter, 'limit')) return false;
-  const key = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+  const key = rateLimitKey(request.headers.get('CF-Connecting-IP'));
   const { success } = await limiter.limit({ key });
   return !success;
 }
@@ -47,7 +75,7 @@ export function rateLimitedResponse(message, cors) {
  * Globaler Tageszähler (UTC) über KV. Ergebnis: 'ok' | 'limit' (Deckel erreicht) | 'unavailable'.
  * Ohne Binding: fail-open ('ok', kein Deckel).
  * Binding konfiguriert, KV aber nicht erreichbar: fail-closed ('unavailable'), damit ein
- * KV-Ausfall den Kostenschutz nicht aushebelt. KV ist nicht atomar, bei gleichzeitigen
+ * KV-Ausfall den Kostenschutz nicht aushebelt; ein nicht numerischer Zählerwert gilt ebenso als 'unavailable'. KV ist nicht atomar, bei gleichzeitigen
  * Anfragen kann der Deckel daher knapp überschritten werden.
  * `weight` = Gewicht des Aufrufs (Foto-Aufrufe zählen doppelt).
  */
@@ -57,7 +85,13 @@ export async function takeDailySlot(env, weight = 1, counter = AI_COUNTER) {
   const cap = Number.isFinite(parsedCap) && parsedCap > 0 ? parsedCap : counter.defaultCap;
   const key = `${counter.keyPrefix}:${new Date().toISOString().slice(0, 10)}`;
   try {
-    const used = Number(await env.DAILY_KV.get(key)) || 0;
+    const stored = await env.DAILY_KV.get(key);
+    const used = stored === null || stored === undefined ? 0 : Number(stored);
+    if (!Number.isInteger(used) || used < 0) {
+      // Kaputter Zähler: nicht bei 0 neu beginnen (der Deckel wäre ausgehebelt), sondern wie bei KV-Ausfall ablehnen.
+      console.error('Tageszähler (KV) enthält keinen gültigen Wert — Aufruf wird abgelehnt.');
+      return 'unavailable';
+    }
     if (used + weight > cap) return 'limit';
     await env.DAILY_KV.put(key, String(used + weight), { expirationTtl: DAILY_KEY_TTL_S });
     return 'ok';

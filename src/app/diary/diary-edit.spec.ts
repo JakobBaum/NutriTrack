@@ -1,5 +1,5 @@
 import { DiaryEntry } from '../core/models';
-import { amountChips, editModeFor, mealShortLabel, stepAmount, stepServings, withServings } from './diary-edit';
+import { amountChips, editModeFor, stepAmount, stepServings, withServings } from './diary-edit';
 
 const FACTS = { kcal: 200, proteinG: 10, carbsG: 20, fatG: 4, basis: 'perPortion' as const };
 const entry = (over: Partial<DiaryEntry> = {}): DiaryEntry => ({
@@ -62,7 +62,7 @@ describe('amountChips mit Portionsgröße', () => {
   });
 });
 
-describe('editModeFor / withServings / mealShortLabel', () => {
+describe('editModeFor / withServings', () => {
   it('detects the edit mode', () => {
     expect(editModeFor(entry(), FACTS)).toBe('amount');
     expect(editModeFor(entry({ servings: 2 }), null)).toBe('portion');
@@ -72,8 +72,5 @@ describe('editModeFor / withServings / mealShortLabel', () => {
     const next = withServings(entry({ servings: 2, facts: { ...FACTS, kcal: 400 } }), 3);
     expect(next.servings).toBe(3);
     expect(next.facts.kcal).toBe(600);
-  });
-  it('has short labels', () => {
-    expect(mealShortLabel('breakfast')).toBe('Früh');
   });
 });

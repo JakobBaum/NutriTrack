@@ -5,6 +5,7 @@ import { OnlineRecipe } from '../online/online-recipe.model';
 import { RecipeTranslateService, applyTranslation, recipeTexts } from './recipe-translate';
 import { ConsentStore } from '../../consent/consent.store';
 import { TranslationCache } from './translation-cache';
+import { DebugLogService } from '../../debug/debug-log.service';
 
 const BASE: OnlineRecipe = {
   id: '1', title: 'Lentil Soup', servings: 2,
@@ -106,7 +107,27 @@ describe('RecipeTranslateService', () => {
     const { service, ai } = setup(true);
     expect((await service.translateQuery('Hähnchen')).query).toBe('chicken');
     ai.translateSearchQuery.mockRejectedValueOnce(new Error('x'));
-    expect((await service.translateQuery('Hähnchen')).query).toBe('Hähnchen');
+    expect((await service.translateQuery('Xylophon')).query).toBe('Xylophon');
+  });
+
+  it('logs an AI failure on the search term and falls back to the dictionary (F2)', async () => {
+    const { service, ai } = setup(true);
+    const log = vi.spyOn(TestBed.inject(DebugLogService), 'error');
+    ai.translateSearchQuery.mockRejectedValueOnce(new Error('Limit erreicht'));
+
+    const out = await service.translateQuery('Hähnchen');
+
+    expect(out).toEqual({ query: 'chicken', viaAi: false });
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('Limit erreicht'));
+  });
+
+  it('logs a failed recipe translation (F9)', async () => {
+    const { service } = setup(true, vi.fn().mockRejectedValue(new Error('offline')));
+    const log = vi.spyOn(TestBed.inject(DebugLogService), 'error');
+
+    await service.translate(BASE);
+
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('offline'));
   });
 
   it('translates identical content only once, even under another recipe id', async () => {

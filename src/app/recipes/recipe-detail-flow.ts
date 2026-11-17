@@ -88,7 +88,8 @@ export class RecipeDetailFlow {
     this.host.toast(LOADING_TOAST);
     const full = await this.loader.load(recipe);
     this.host.toast(null);
-    if (!full) this.recipe.set(recipe);
+    // Nur ein echter Fehler öffnet das Detail wieder; eine veraltete Antwort (geschlossen, anderes Detail) nicht.
+    if (!full && this.loader.state().kind === 'error') this.recipe.set(recipe);
     return full;
   }
 

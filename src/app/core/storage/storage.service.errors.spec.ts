@@ -144,3 +144,195 @@ describe('StorageService Fehlerwege (Review 3, Befunde 2 bis 4)', () => {
     });
   });
 });
+
+describe('StorageService Review 4 (Daten)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  describe('D1 Fehlerzustand aufräumen', () => {
+    it('remove() des einzigen offenen Schlüssels beendet Fehler und Wiederholung', () => {
+      const store = fakeStorage();
+      vi.stubGlobal('localStorage', store);
+      const service = new StorageService();
+      store.failSet = () => true;
+      service.set('diary', [1]);
+      expect(service.flush()).toBe(false);
+      expect(service.lastError()).not.toBeNull();
+      service.remove('diary');
+      expect(service.lastError()).toBeNull();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('flush() ohne Vorgemerktes setzt einen alten Fehler zurück', () => {
+      const store = fakeStorage();
+      vi.stubGlobal('localStorage', store);
+      const service = new StorageService();
+      store.failSet = () => true;
+      service.set('x', 1);
+      service.flush();
+      expect(service.lastError()).not.toBeNull();
+      service.remove('x');
+      expect(service.flush()).toBe(true);
+      expect(service.lastError()).toBeNull();
+    });
+  });
+
+  describe('D2 Quarantäne-Erfolg', () => {
+    const rejectAll = (raw: unknown) => ({ items: [], rejected: Array.isArray(raw) ? raw : [], repaired: 0 });
+
+    it('quarantine() liefert true bei Erfolg und false, wenn die Sicherung scheitert', () => {
+      const store = fakeStorage();
+      vi.stubGlobal('localStorage', store);
+      const service = new StorageService();
+      expect(service.quarantine('diary', [{ a: 1 }], 'invalid')).toBe(true);
+      store.failSet = (k) => k.startsWith('nutritrack:quarantine');
+      expect(service.quarantine('diary', [{ a: 2 }], 'invalid')).toBe(false);
+    });
+
+    it('getSanitized() lässt den Roh-Schlüssel unverändert, wenn die Sicherung scheitert', () => {
+      const store = fakeStorage({ 'nutritrack:diary': '[{"kaputt":1}]' });
+      store.failSet = (k) => k.startsWith('nutritrack:quarantine');
+      vi.stubGlobal('localStorage', store);
+      const service = new StorageService();
+      expect(service.getSanitized('diary', rejectAll)).toEqual([]);
+      service.flush();
+      expect(store.getItem('nutritrack:diary')).toBe('[{"kaputt":1}]');
+    });
+
+    it('getSanitized() schreibt den bereinigten Stand, wenn die Sicherung gelang', () => {
+      const store = fakeStorage({ 'nutritrack:diary': '[{"kaputt":1}]' });
+      vi.stubGlobal('localStorage', store);
+      const service = new StorageService();
+      service.getSanitized('diary', rejectAll);
+      service.flush();
+      expect(store.getItem('nutritrack:diary')).toBe('[]');
+    });
+
+    it('getObject() entfernt den Roh-Schlüssel nur nach gelungener Sicherung', () => {
+      const store = fakeStorage({ 'nutritrack:profile': '{"x":1}' });
+      store.failSet = (k) => k.startsWith('nutritrack:quarantine');
+      vi.stubGlobal('localStorage', store);
+      expect(new StorageService().getObject('profile', () => null)).toBeNull();
+      expect(store.getItem('nutritrack:profile')).toBe('{"x":1}');
+      store.failSet = () => false;
+      expect(new StorageService().getObject('profile', () => null)).toBeNull();
+      expect(store.getItem('nutritrack:profile')).toBeNull();
+    });
+  });
+
+  describe('D4 replaceAll und Vorgemerktes', () => {
+    it('behält Vorgemerktes, wenn der Import scheitert', () => {
+      const store = fakeStorage();
+      vi.stubGlobal('localStorage', store);
+      const service = new StorageService();
+      service.set('diary', [{ id: 'neu' }]);
+      store.failSet = (k) => k === 'nutritrack:recipes';
+      expect(service.replaceAll({ recipes: [] })).toBe('failed');
+      expect(service.pendingCount()).toBe(1);
+      expect(service.get('diary', [])).toEqual([{ id: 'neu' }]);
+    });
+
+    it('behält Vorgemerktes ohne Speicher-Backend', () => {
+      vi.stubGlobal('localStorage', undefined);
+      const service = new StorageService();
+      service.set('diary', [1]);
+      expect(service.replaceAll({})).toBe('failed');
+      expect(service.pendingCount()).toBe(1);
+    });
+
+    it('verwirft Vorgemerktes bei erfolgreichem Import', () => {
+      vi.stubGlobal('localStorage', fakeStorage());
+      const service = new StorageService();
+      service.set('diary', [1]);
+      expect(service.replaceAll({ recipes: [] })).toBe('ok');
+      expect(service.pendingCount()).toBe(0);
+    });
+  });
+
+  describe('D5 Änderung in einem anderen Fenster', () => {
+    const foreign = (key: string | null): void => {
+      window.dispatchEvent(new StorageEvent('storage', { key }));
+    };
+
+    it('meldet die Änderung, sperrt Schreibzugriffe und verwirft den vorgemerkten Wert dieses Schlüssels', () => {
+      const store = fakeStorage();
+      vi.stubGlobal('localStorage', store);
+      const service = new StorageService();
+      service.set('diary', [1]);
+      service.set('profile', { a: 1 });
+      foreign('nutritrack:diary');
+      expect(service.externalChange()).toBe(true);
+      expect(service.writeLocked()).toBe(true);
+      expect(service.set('x', 1)).toBe(false);
+      service.flush();
+      expect(store.getItem('nutritrack:diary')).toBeNull();
+      expect(store.getItem('nutritrack:profile')).toBeNull(); // Sperre: flush schreibt nichts
+      service.ngOnDestroy();
+    });
+
+    it('ignoriert fremde Schlüssel und die Quarantäne', () => {
+      vi.stubGlobal('localStorage', fakeStorage());
+      const service = new StorageService();
+      foreign('other:key');
+      foreign('nutritrack:quarantine.diary.5');
+      expect(service.externalChange()).toBe(false);
+      expect(service.set('x', 1)).toBe(true);
+      service.ngOnDestroy();
+    });
+
+    it('behandelt "alles gelöscht" (key null) als Änderung', () => {
+      vi.stubGlobal('localStorage', fakeStorage());
+      const service = new StorageService();
+      foreign(null);
+      expect(service.externalChange()).toBe(true);
+      service.ngOnDestroy();
+    });
+
+    it('hebt die Sperre nach erfolgreichem replaceAll auf', () => {
+      vi.stubGlobal('localStorage', fakeStorage());
+      const service = new StorageService();
+      foreign('nutritrack:diary');
+      expect(service.replaceAll({})).toBe('ok');
+      expect(service.writeLocked()).toBe(false);
+      service.ngOnDestroy();
+    });
+  });
+
+  describe('D11 unlesbare Schlüssel im Snapshot', () => {
+    it('listet nicht lesbare Schlüssel in skippedKeys', () => {
+      vi.stubGlobal('localStorage', fakeStorage({ 'nutritrack:diary': '[]', 'nutritrack:kaputt': '{x' }));
+      const result = new StorageService().snapshotDetailed();
+      expect(result.data).toEqual({ diary: [] });
+      expect(result.skippedKeys).toEqual(['kaputt']);
+    });
+  });
+
+  describe('D14 set(undefined)', () => {
+    it('entfernt den Schlüssel wie remove()', () => {
+      const store = fakeStorage({ 'nutritrack:diary': '[1]' });
+      vi.stubGlobal('localStorage', store);
+      const service = new StorageService();
+      expect(service.set('diary', undefined)).toBe(true);
+      service.flush();
+      expect(store.getItem('nutritrack:diary')).toBeNull();
+      expect(service.snapshot()).toEqual({});
+    });
+  });
+
+  describe('D15 Migration', () => {
+    it('meldet einen Schreibfehler der Migration über lastError', () => {
+      const store = fakeStorage({ 'nutritrack:diary': '[]' });
+      store.failSet = (k) => k === 'nutritrack:schemaVersion';
+      vi.stubGlobal('localStorage', store);
+      const service = new StorageService();
+      expect(service.lastError()?.kind).toBe('quota');
+      expect(service.writeFailures()).toBe(1);
+    });
+  });
+});

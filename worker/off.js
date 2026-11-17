@@ -1,4 +1,4 @@
-import { ClientError, FETCH_TIMEOUT_MS, MAX_QUERY_CHARS, errorSummary, withHeaders } from './http.js';
+import { ClientError, FETCH_TIMEOUT_MS, MAX_QUERY_CHARS, errorSummary, json, withHeaders } from './http.js';
 import { isRateLimited, rateLimitedResponse } from './limits.js';
 
 const OFF_SEARCH_URL = 'https://search.openfoodfacts.org/search';
@@ -28,6 +28,16 @@ const SEARCH_TEXT_RULES = {
 };
 
 const SEARCH_CACHE_TTL_S = 3600;
+
+const HTTP_TOO_MANY_REQUESTS = 429;
+
+const HTTP_BAD_GATEWAY = 502;
+
+const OFF_RATE_LIMIT_MESSAGE = 'Die Lebensmittel-Suche ist gerade überlastet — bitte kurz warten.';
+
+const OFF_UNAVAILABLE_MESSAGE = 'Die Lebensmittel-Suche ist gerade nicht verfügbar.';
+
+const OFF_TIMEOUT_MESSAGE = 'Die Lebensmittel-Suche antwortet gerade nicht.';
 
 function invalidSearchParam() {
   return new ClientError(400, INVALID_SEARCH_PARAM_MESSAGE);
@@ -78,16 +88,23 @@ export async function offSearch(request, url, env, cors) {
     return rateLimitedResponse('Zu viele Suchanfragen — bitte kurz warten.', cors);
   }
 
-  const resp = await fetch(target.toString(), {
-    headers: { 'User-Agent': OFF_USER_AGENT, Accept: 'application/json' },
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
+  let resp;
+  try {
+    resp = await fetch(target.toString(), {
+      headers: { 'User-Agent': OFF_USER_AGENT, Accept: 'application/json' },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+  } catch (e) {
+    if (e?.name === 'TimeoutError' || e?.name === 'AbortError') return json({ error: OFF_TIMEOUT_MESSAGE }, 504, cors);
+    throw e;
+  }
   const passthrough = { 'Content-Type': 'application/json' };
   const retryAfter = resp.headers.get('Retry-After');
   if (retryAfter) passthrough['Retry-After'] = retryAfter;
+  if (!resp.ok) return offFailure(resp.status, passthrough, cors);
   const body = await resp.text();
 
-  if (resp.ok && cache) {
+  if (cache) {
     const toCache = new Response(body, {
       status: 200,
       headers: { ...passthrough, 'Cache-Control': `public, max-age=${SEARCH_CACHE_TTL_S}` },
@@ -99,4 +116,12 @@ export async function offSearch(request, url, env, cors) {
     }
   }
   return new Response(body, { status: resp.status, headers: { ...passthrough, ...cors } });
+}
+
+/** Fehler von OFF: nur die Statusklasse (429 bleibt 429, sonst 502); den Upstream-Text sieht der Client nie. */
+function offFailure(upstreamStatus, passthrough, cors) {
+  console.warn(`OFF antwortet mit HTTP ${upstreamStatus}.`);
+  const isRateLimit = upstreamStatus === HTTP_TOO_MANY_REQUESTS;
+  const message = isRateLimit ? OFF_RATE_LIMIT_MESSAGE : OFF_UNAVAILABLE_MESSAGE;
+  return json({ error: message }, isRateLimit ? HTTP_TOO_MANY_REQUESTS : HTTP_BAD_GATEWAY, { ...passthrough, ...cors });
 }

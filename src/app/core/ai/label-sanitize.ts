@@ -1,12 +1,12 @@
 import { NutritionBasis, NutritionFacts } from '../models';
-import { isPlausiblePer100g } from '../food/facts-plausibility';
+import {
+  ATWATER_SLACK_PER_100G, ATWATER_SLACK_PER_PORTION, PORTION_MAX_GRAMS, PORTION_MAX_KCAL, isAtwaterDoubtful,
+  isWithinPer100gLimits, isWithinPortionLimits,
+} from '../food/facts-plausibility';
 import { LabelResult } from './ai-provider';
 import { cleanText, isInRange, numberInRange } from './sanitize-common';
 
 const MAX_NAME_CHARS = 120;
-/** Grenzen je Portion (je 100 g gilt isPlausiblePer100g): eine Portion kann deutlich größer sein. */
-const PORTION_MAX_KCAL = 5000;
-const PORTION_MAX_GRAMS = 1000;
 const MAX_PORTION_G = 2000;
 
 /** Meldung, wenn die Werte vom Etikett nicht sicher gelesen werden konnten. */
@@ -40,14 +40,16 @@ function withOptionals(base: NutritionFacts, f: Record<string, unknown>): Nutrit
   };
 }
 
-function isWithinPortionGrams(facts: NutritionFacts): boolean {
-  const extras = [facts.fiberG, facts.sugarG, facts.saltG];
-  return extras.every((g) => g === undefined || g <= PORTION_MAX_GRAMS);
+/** kcal passen nicht zu den Makros: nicht verwerfen, sondern "bitte prüfen" melden. */
+function isDoubtful(facts: NutritionFacts): boolean {
+  const slack = facts.basis === 'per100g' ? ATWATER_SLACK_PER_100G : ATWATER_SLACK_PER_PORTION;
+  return isAtwaterDoubtful(facts, slack);
 }
 
 /**
  * Prüft die KI-Antwort der Etikett-Erkennung. Pflichtwerte müssen endliche Zahlen sein, je 100 g gilt
- * {@link isPlausiblePer100g}; unlesbare optionale Werte entfallen. Bei einem unplausiblen Ergebnis: null.
+ * {@link isWithinPer100gLimits}; unlesbare optionale Werte entfallen. Außerhalb der Grenzen: null. Passen kcal nicht
+ * zu den Makros (Atwater), bleibt das Ergebnis erhalten und wird mit `isDoubtful` markiert.
  * Die Basis kommt aus der Anfrage, nie aus der Antwort.
  */
 export function sanitizeLabelResult(raw: unknown, basis: NutritionBasis): LabelResult | null {
@@ -58,7 +60,8 @@ export function sanitizeLabelResult(raw: unknown, basis: NutritionBasis): LabelR
   const required = requiredFacts(f as Record<string, unknown>, basis);
   if (!required) return null;
   const facts = withOptionals(required, f as Record<string, unknown>);
-  const plausible = basis === 'per100g' ? isPlausiblePer100g(facts) : isWithinPortionGrams(facts);
-  if (!plausible) return null;
-  return { name: cleanText(r['name'], MAX_NAME_CHARS) ?? '', facts };
+  const withinLimits = basis === 'per100g' ? isWithinPer100gLimits(facts) : isWithinPortionLimits(facts);
+  if (!withinLimits) return null;
+  const name = cleanText(r['name'], MAX_NAME_CHARS) ?? '';
+  return isDoubtful(facts) ? { name, facts, isDoubtful: true } : { name, facts };
 }

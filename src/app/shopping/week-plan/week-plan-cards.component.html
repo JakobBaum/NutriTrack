@@ -16,6 +16,9 @@
   }
   <p class="wp-note" data-testid="wp-filter-note">{{ nameFilterNote }}</p>
   @if (error(); as err) { <p class="nt-card wp-error" role="alert" data-testid="wp-error">{{ err }}</p> }
+  @if (p.recipes.length === 0) {
+    <p class="nt-card wp-empty" role="status" data-testid="wp-empty">Alle Rezepte sind entfernt. Erstelle einen neuen Wochenplan.</p>
+  }
   @for (group of groups(); track group.meal) {
     <h2 class="nt-section-header">{{ group.label }}</h2>
     <ul class="wp-list" [attr.data-testid]="'wp-group-' + group.meal">
@@ -31,8 +34,6 @@
             </span>
             @if (busyId() === r.id) {
               <ion-spinner name="crescent" class="wp-card__spin" aria-label="Neues Rezept wird geladen"></ion-spinner>
-            } @else {
-              <ion-icon name="chevron-forward" class="wp-card__chev" aria-hidden="true"></ion-icon>
             }
           </button>
           <button type="button" class="wp-more" data-testid="wp-more" [disabled]="busyId() !== null || progress() !== null" (click)="openMenu(r)" [attr.aria-label]="'Optionen für ' + r.title">

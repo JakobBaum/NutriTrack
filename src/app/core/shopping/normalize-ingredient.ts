@@ -1,5 +1,6 @@
 import { displayName, nameKey } from './ingredient-name';
 import { CLOVES_PER_BULB, MAX_PIECE_COUNT, spiceUnitFor } from './spice-rules';
+import { round2 } from './round2';
 import { normalizeUnit } from './shopping-units';
 import { isUsUnit, spoonToMetric, toMetric } from './units/unit-convert';
 
@@ -12,7 +13,6 @@ export interface ShoppingIngredient {
   spice: boolean;
 }
 
-const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 function isGarlicClove(key: string, unit: string): boolean {
   return key.includes('knoblauch') && !key.includes('pulver') && (unit === 'Zehe' || key.includes('zehe'));

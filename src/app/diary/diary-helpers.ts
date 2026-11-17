@@ -158,6 +158,29 @@ export function lastAmountForLabel(
   return hit?.amountG ?? null;
 }
 
+/** Letzte Mengen je Name (neueste zuerst, höchstens zwei je Name), damit Chips nicht bei jedem Tastendruck das ganze Tagebuch sortieren. */
+export type LastAmountIndex = ReadonlyMap<string, readonly { id: string; amountG: number }[]>;
+
+const MAX_PER_LABEL = 2;
+const labelKey = (label: string): string => label.trim().toLowerCase();
+
+export function buildLastAmountIndex(entries: readonly DiaryEntry[]): LastAmountIndex {
+  const index = new Map<string, { id: string; amountG: number }[]>();
+  const newestFirst = [...entries].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  for (const e of newestFirst) {
+    if (e.ref?.kind === 'recipe' || !isValidAmount(e.amountG)) continue;
+    const key = labelKey(e.label);
+    const list = index.get(key) ?? [];
+    if (key && list.length < MAX_PER_LABEL) index.set(key, [...list, { id: e.id, amountG: e.amountG }]);
+  }
+  return index;
+}
+
+/** Letzte Menge (Basiseinheit) aus dem Index; `excludeId` zählt nicht. */
+export function lastAmountFromIndex(index: LastAmountIndex, label: string, excludeId?: string | null): number | null {
+  return index.get(labelKey(label))?.find((e) => e.id !== excludeId)?.amountG ?? null;
+}
+
 const LIQUID_PATTERN =
   /(milch|saft|wasser|cola|limo|getränk|getraenk|bier|wein|tee\b|kaffee|drink|juice|milk|water|smoothie|schorle|shake|sprudel|brause|latte|cappuccino|espresso)/i;
 
@@ -173,7 +196,22 @@ export function isValidAmount(value: number | null | undefined): value is number
 
 /** Rechnet angepasste Nährwerte für `amount` zurück auf Werte pro 100 g (Basis für spätere Mengenänderung). */
 export function rebaseTo100(facts: NutritionFacts, amount: number): NutritionFacts {
-  return { ...scaleFacts(facts, 100 / amount), basis: 'per100g' };
+  return scalePrecise(facts, 100 / amount, 'per100g');
+}
+
+/** Skaliert ohne Rundung (für Bezugswerte, damit kleine Mengen keine Werte verlieren). */
+export function scalePrecise(facts: NutritionFacts, factor: number, basis: NutritionFacts['basis']): NutritionFacts {
+  const scale = (v: number | undefined): number | undefined => (v != null ? v * factor : undefined);
+  return {
+    kcal: facts.kcal * factor,
+    proteinG: facts.proteinG * factor,
+    carbsG: facts.carbsG * factor,
+    fatG: facts.fatG * factor,
+    fiberG: scale(facts.fiberG),
+    sugarG: scale(facts.sugarG),
+    saltG: scale(facts.saltG),
+    basis,
+  };
 }
 
 /** True, wenn zwei Nährwert-Sätze sich in einem angezeigten Wert unterscheiden. */

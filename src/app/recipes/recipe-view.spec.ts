@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { NutritionFacts } from '../core/models';
 import {
   APPROX_UNITS,
+  factsBasisLabel,
   countMissingFacts,
   hasApproxUnits,
   isAiOrigin,
@@ -12,12 +13,9 @@ import {
   ingredientsLabel,
   recipeDisplayFacts,
   recipeMetaLine,
-  moreUnits,
-  unitChips,
   lowerBoundNote,
   optionalGramsLabel,
   scaleFacts,
-  lowerBoundPrefix,
   missingFactsLabel,
   servingsLabel,
   totalWeightG,
@@ -44,11 +42,6 @@ describe('recipe-view', () => {
     expect(missingFactsLabel(3)).toBe('3 Zutaten ohne Werte');
   });
 
-  it('prefixes a lower bound only when values are missing', () => {
-    expect(lowerBoundPrefix(0)).toBe('');
-    expect(lowerBoundPrefix(2)).toBe('≥ ');
-  });
-
   it('flags non-own origins as AI estimates', () => {
     expect(isAiOrigin('own')).toBe(false);
     expect(isAiOrigin(undefined)).toBe(false);
@@ -64,6 +57,17 @@ describe('recipe-view', () => {
       { amount: 3, unit: 'unbekannt' },
     ]);
     expect(weight).toBe(1230);
+  });
+
+  it('rechnet Schreibweisen und Namen wie die Gewichtstabelle (Gramm, el, Ei)', () => {
+    expect(totalWeightG([{ amount: 100, unit: 'Gramm' }])).toBe(100);
+    expect(totalWeightG([{ amount: 2, unit: 'el' }])).toBe(30);
+    expect(totalWeightG([{ amount: 2, unit: 'Stk', name: 'Eier' }])).toBe(120);
+  });
+
+  it('erkennt Gramm-Schreibweisen nicht als Naeherungseinheit', () => {
+    expect(hasApproxUnits([{ unit: 'Gramm' }, { unit: 'Liter' }])).toBe(false);
+    expect(hasApproxUnits([{ unit: 'el' }])).toBe(true);
   });
 
   it('detects approximate units', () => {
@@ -109,7 +113,8 @@ describe('recipe-view — Ergibt/Essen/Hinweise', () => {
 
   it('erklärt die Untergrenze einmalig', () => {
     expect(lowerBoundNote(0)).toBe('');
-    expect(lowerBoundNote(1)).toBe('≥ Mindestwerte: 1 Zutat ohne Werte');
+    expect(lowerBoundNote(1)).toBe('Werte unvollständig (1 Zutat ohne Nährwerte)');
+    expect(lowerBoundNote(4)).toBe('Werte unvollständig (4 Zutaten ohne Nährwerte)');
   });
 
   it('erkennt unbekannte Einheiten', () => {
@@ -119,14 +124,15 @@ describe('recipe-view — Ergibt/Essen/Hinweise', () => {
   });
 });
 
-describe('Einheiten-Chips und Import-Texte', () => {
-  it('moreUnits liefert nur Einheiten ohne Chip', () => {
-    expect(moreUnits(['g', 'EL', 'Dose', 'Pck'], ['g', 'EL'])).toEqual(['Dose', 'Pck']);
+describe('factsBasisLabel', () => {
+  it('nennt die Bezugsgröße der Nährwerte', () => {
+    expect(factsBasisLabel({ basis: 'per100g' })).toBe('je 100 g');
+    expect(factsBasisLabel({ basis: 'perPortion', portionG: 30 })).toBe('je Portion (30 g)');
+    expect(factsBasisLabel({ basis: 'perPortion' })).toBe('je Portion');
   });
-  it('unitChips hängt eine nicht-gängige aktuelle Einheit an', () => {
-    expect(unitChips('Dose', ['g', 'EL'])).toEqual(['g', 'EL', 'Dose']);
-    expect(unitChips('g', ['g', 'EL'])).toEqual(['g', 'EL']);
-  });
+});
+
+describe('Import-Texte', () => {
   it('importBlockReason ist bei leerer Eingabe gesetzt', () => {
     expect(importBlockReason(' ', '')).not.toBe('');
     expect(importBlockReason('', 'https://x.test')).toBe('');

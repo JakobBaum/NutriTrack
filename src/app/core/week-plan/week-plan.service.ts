@@ -1,6 +1,7 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { dietPrefsOf } from '../diet/diet-prefs';
 import { dietSearchPrefs } from '../diet/diet-search';
+import { assertCurrent } from '../shopping/generation-cancelled';
 import { MealType } from '../models';
 import { RecipeTranslateService } from '../recipes/translate/recipe-translate';
 import { RecipeSearchAccessService } from '../recipes/online/recipe-search-access';
@@ -11,7 +12,7 @@ import { ProfileStore } from '../state/profile.store';
 import { ShoppingStore } from '../state/shopping.store';
 import { WeekPlanStore } from '../state/week-plan.store';
 import { makeId } from '../util/id';
-import { WeekPlanDraft, buildWeekPlanRecipes } from './week-plan-builder';
+import { WeekPlanDraft, WeekPlanInput, buildWeekPlanRecipes } from './week-plan-builder';
 import { WeekPlan } from './week-plan.model';
 
 export const NO_RECIPES_FOUND_MESSAGE = 'Keine passenden Rezepte gefunden. Versuche es später oder mit weniger Essenszeiten.';
@@ -20,12 +21,21 @@ export const NO_REPLACEMENT_FOUND_MESSAGE = 'Kein anderes passendes Rezept gefun
 /** Beim Tauschen mehr Treffer anfragen, damit nach dem Ausschließen noch Auswahl bleibt. */
 const REPLACE_REQUEST_FLOOR = 10;
 
+/** Eine laufende Übersetzung (für den gemeinsamen Fortschritt). */
+interface TranslateJob {
+  id: number;
+  done: number;
+  total: number;
+}
+
 export interface WeekPlanOptions {
   persons: number;
   days: number;
   meals: MealType[];
   /** false: bisherige Einkaufsliste komplett ersetzen (Standard: abgehakte und eigene Positionen behalten). */
   keepExisting?: boolean;
+  /** Liefert false, sobald die Anfrage abgebrochen wurde; Plan und Liste bleiben dann unverändert. */
+  isCurrent?: () => boolean;
 }
 
 export interface WeekPlanResult {
@@ -45,13 +55,19 @@ export class WeekPlanService {
   private readonly planStore = inject(WeekPlanStore);
   private readonly shopping = inject(ShoppingStore);
   private readonly translator = inject(RecipeTranslateService);
-  private readonly _progress = signal<{ done: number; total: number } | null>(null);
+  /** Laufende Übersetzungen (mehrere können parallel laufen); der Fortschritt ist ihre Summe. */
+  private readonly jobs = signal<readonly TranslateJob[]>([]);
+  private nextJobId = 0;
   private ensuring: Promise<void> | null = null;
   /** Pläne, die in dieser Sitzung schon nachübersetzt wurden (kein erneutes KI-Hämmern bei Fehlern). */
   private readonly attempted = new Set<string>();
 
   /** Fortschritt der Übersetzung ("Übersetze Rezepte (n/m)"), sonst null. */
-  readonly translateProgress = this._progress.asReadonly();
+  readonly translateProgress = computed<{ done: number; total: number } | null>(() => {
+    const jobs = this.jobs();
+    if (jobs.length === 0) return null;
+    return { done: jobs.reduce((n, j) => n + j.done, 0), total: jobs.reduce((n, j) => n + j.total, 0) };
+  });
 
   /** Ernährungsfilter aus dem Profil (Plan und Tausch nutzen dieselben). */
   private dietPrefs(): ReturnType<typeof dietSearchPrefs> {
@@ -69,23 +85,16 @@ export class WeekPlanService {
    */
   async generate(opts: WeekPlanOptions): Promise<WeekPlanResult> {
     if (!this.access.isAvailable()) throw new OnlineSearchError('no-key', ONLINE_SEARCH_MESSAGES['no-key']);
-    const target = this.profile.target();
-    let draft: WeekPlanDraft;
-    try {
-      draft = await buildWeekPlanRecipes((f, o, n) => this.provider.search(f, o, n), {
-        persons: opts.persons,
-        days: opts.days,
-        meals: opts.meals,
-        dailyKcal: target?.kcal ?? null,
-        dailyProteinG: target?.proteinG ?? null,
-        excludeIds: this.planStore.blocked(),
-        dietPrefs: this.dietPrefs(),
-      });
-    } catch (e: unknown) {
-      throw toOnlineSearchError(e, typeof navigator !== 'undefined' && navigator.onLine === false);
-    }
+    const draft = await this.draftRecipes({
+      persons: opts.persons,
+      days: opts.days,
+      meals: opts.meals,
+      excludeIds: this.planStore.blocked(),
+    });
+    assertCurrent(opts.isCurrent);
     if (draft.recipes.length === 0) throw new Error(NO_RECIPES_FOUND_MESSAGE);
     const recipes = await this.translateRecipes(draft.recipes);
+    assertCurrent(opts.isCurrent);
     const plan: WeekPlan = {
       id: makeId('week'),
       generatedAt: new Date().toISOString(),
@@ -111,6 +120,15 @@ export class WeekPlanService {
     const next: WeekPlan = { ...plan, recipes: plan.recipes.filter((r) => r.id !== recipeId) };
     this.planStore.set(next);
     this.shopping.applyWeekPlan(next);
+    // Ein Plan ohne Rezepte wäre ein leerer Rahmen („0 Rezepte“): dann wieder „kein Plan“.
+    if (next.recipes.length === 0) this.discardPlan();
+  }
+
+  /** Verwirft den Plan, behält aber die „nie wieder vorschlagen“-Liste (z. B. wenn die Liste aus eigenen Rezepten entsteht). */
+  discardPlan(): void {
+    const blocked = this.planStore.blocked();
+    this.planStore.clear();
+    if (blocked.length > 0) this.planStore.block(blocked);
   }
 
   /**
@@ -122,22 +140,13 @@ export class WeekPlanService {
     const plan = this.planStore.plan();
     const old = plan?.recipes.find((r) => r.id === recipeId);
     if (!plan || !old) return;
-    const target = this.profile.target();
-    let draft: WeekPlanDraft;
-    try {
-      draft = await buildWeekPlanRecipes((f, o, n) => this.provider.search(f, o, n), {
-        persons: plan.persons,
-        days: 1,
-        meals: [old.meal],
-        dailyKcal: target?.kcal ?? null,
-        dailyProteinG: target?.proteinG ?? null,
-        excludeIds: [...this.planStore.blocked(), ...plan.recipes.map((r) => r.id)],
-        requestFloor: REPLACE_REQUEST_FLOOR,
-        dietPrefs: this.dietPrefs(),
-      });
-    } catch (e: unknown) {
-      throw toOnlineSearchError(e, typeof navigator !== 'undefined' && navigator.onLine === false);
-    }
+    const draft = await this.draftRecipes({
+      persons: plan.persons,
+      days: 1,
+      meals: [old.meal],
+      excludeIds: [...this.planStore.blocked(), ...plan.recipes.map((r) => r.id)],
+      requestFloor: REPLACE_REQUEST_FLOOR,
+    });
     if (draft.recipes.length === 0) throw new Error(NO_REPLACEMENT_FOUND_MESSAGE);
     const [fresh] = await this.translateRecipes(draft.recipes.slice(0, 1));
     // Plan kann sich während der Suche geändert haben: auf dem aktuellen Stand ersetzen.
@@ -183,11 +192,31 @@ export class WeekPlanService {
     this.shopping.applyWeekPlan(next);
   }
 
-  private async translateRecipes<T extends OnlineRecipe>(recipes: readonly T[]): Promise<T[]> {
+  /** Sucht Rezepte für den Plan; Fehler werden zu {@link OnlineSearchError} mit deutscher Meldung. */
+  private async draftRecipes(
+    input: Pick<WeekPlanInput, 'persons' | 'days' | 'meals' | 'excludeIds' | 'requestFloor'>,
+  ): Promise<WeekPlanDraft> {
+    const target = this.profile.target();
     try {
-      return await this.translator.translateAll(recipes, (done, total) => this._progress.set({ done, total }));
+      return await buildWeekPlanRecipes((f, o, n) => this.provider.search(f, o, n), {
+        ...input,
+        dailyKcal: target?.kcal ?? null,
+        dailyProteinG: target?.proteinG ?? null,
+        dietPrefs: this.dietPrefs(),
+      });
+    } catch (e: unknown) {
+      throw toOnlineSearchError(e, typeof navigator !== 'undefined' && navigator.onLine === false);
+    }
+  }
+
+  private async translateRecipes<T extends OnlineRecipe>(recipes: readonly T[]): Promise<T[]> {
+    const id = this.nextJobId++;
+    const setJob = (done: number, total: number): void =>
+      this.jobs.update((all) => [...all.filter((j) => j.id !== id), { id, done, total }]);
+    try {
+      return await this.translator.translateAll(recipes, setJob);
     } finally {
-      this._progress.set(null);
+      this.jobs.update((all) => all.filter((j) => j.id !== id));
     }
   }
 }

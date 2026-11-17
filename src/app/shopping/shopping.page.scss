@@ -62,9 +62,9 @@ ion-content {
 
   &.on {
     background: var(--nt-accent-tint);
-    color: var(--nt-accent);
+    color: var(--nt-accent-on-tint);
     font-weight: 600;
-    ion-icon { color: var(--nt-accent); }
+    ion-icon { color: var(--nt-accent-on-tint); }
   }
 
   &:focus-visible { outline: 2px solid var(--nt-focus); outline-offset: 2px; }
@@ -134,16 +134,7 @@ ion-list.nt-grouped {
 .qty { display: block; white-space: normal; font-size: var(--nt-fs-caption); color: var(--nt-secondary); font-variant-numeric: tabular-nums; }
 // Bleiben als Einheit zusammen, brechen aber innen um, wenn die Spalte schmaler ist als der Text
 // (breitere Schrift, 320 px), statt aus der Zeile zu ragen.
-.qty__sum, .est-badge { display: inline-block; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
-.est-badge {
-  margin-left: var(--nt-space-1);
-  padding: 0 var(--nt-space-2);
-  border-radius: var(--nt-radius-inner);
-  font-size: var(--nt-fs-caption);
-  line-height: 1.5;
-  background: var(--ion-color-step-100, rgba(128, 128, 128, 0.15));
-  color: var(--nt-secondary);
-}
+.qty__sum { display: inline-block; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 
 // Text-Button "Preis ändern": schmaleres Padding, damit der Artikelname Platz behaelt.
 .price-btn { --padding-start: var(--nt-space-2); --padding-end: var(--nt-space-2); }

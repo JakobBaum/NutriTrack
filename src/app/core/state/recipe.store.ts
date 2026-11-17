@@ -34,6 +34,8 @@ export type RecipeDraft = Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'> & { onl
 @Injectable({ providedIn: 'root' })
 export class RecipeStore {
   private readonly storage = inject(StorageService);
+  /** True, wenn Schreiben gesperrt ist (neueres Schema oder Änderung in anderem Fenster); Änderungen werden dann nicht gespeichert. */
+  readonly isReadOnly = this.storage.isLockedFor(KEY_RECIPES);
 
   private readonly _recipes = signal<StoredRecipe[]>(this.load());
 
@@ -109,7 +111,7 @@ export class RecipeStore {
     return snapshot !== null && this.storage.set(AUTO_SNAPSHOT_KEY, snapshot) && this.storage.flush();
   }
 
-  private persist(): void {
-    this.storage.set(KEY_RECIPES, this._recipes());
+  private persist(): boolean {
+    return this.storage.set(KEY_RECIPES, this._recipes());
   }
 }

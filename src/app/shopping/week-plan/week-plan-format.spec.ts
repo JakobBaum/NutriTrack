@@ -12,11 +12,11 @@ describe('recipeMetaLine', () => {
     const line = recipeMetaLine({
       ...base, readyInMinutes: 30, facts: { kcal: 420, proteinG: 37.6, carbsG: 1, fatG: 1, basis: 'perPortion' },
     });
-    expect(line).toBe('420 kcal · 38 g Eiweiß · 30 Min · 2 Portionen');
+    expect(line).toBe('420 kcal · 38 g Eiweiß · 30 Min · 2 Portionen');
   });
 
   it('omits missing values and uses the singular', () => {
-    expect(recipeMetaLine({ ...base, portions: 1 })).toBe('1 Portion');
+    expect(recipeMetaLine({ ...base, portions: 1 })).toBe('1 Portion');
   });
 });
 

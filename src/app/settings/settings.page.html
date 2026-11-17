@@ -124,10 +124,6 @@
           </ion-label>
         </ion-item>
       }
-      <ion-item button detail="false" class="danger-row" lines="none" (click)="confirmReset()">
-        <ion-icon slot="start" name="trash-outline" color="danger"></ion-icon>
-        <ion-label>Alle lokalen Daten zurücksetzen</ion-label>
-      </ion-item>
     </ion-list>
     <!-- Unsichtbare Dateiauswahl für den Backup-Import -->
     <input
@@ -139,6 +135,12 @@
       (change)="onBackupFileSelected($event)"
     />
     <p class="hint data-hint">Alle Daten liegen nur auf diesem Gerät. Exportiere regelmäßig ein Backup, um sie bei Gerätewechsel oder Neuinstallation wiederherzustellen.</p>
+    <ion-list class="nt-grouped data-reset" lines="none" data-testid="reset-group">
+      <ion-item button detail="false" class="danger-row" lines="none" (click)="confirmReset()">
+        <ion-icon slot="start" name="trash-outline" color="danger"></ion-icon>
+        <ion-label>Alle lokalen Daten zurücksetzen</ion-label>
+      </ion-item>
+    </ion-list>
 
     @if (debugMode) {
       <!-- Debug-Log: nur mit ?debug=1 -->

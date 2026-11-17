@@ -4,11 +4,14 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, ou
 import { DIET_FORM_OPTIONS, DIET_HINT, INTOLERANCE_HINT, INTOLERANCE_OPTIONS, MAX_DISLIKES, MAX_DISLIKE_LENGTH } from '../../core/diet/diet-options';
 import { addDislike, removeDislike, toggleIntolerance } from '../../core/diet/diet-prefs';
 import { DietTranslateService } from '../../core/diet/diet-translate.service';
+import { AlertController } from '@ionic/angular';
+import { confirmDiscard } from '../../meals/confirm-discard';
 import { ActivityLevel, DailyTarget, DietForm, Goal, Intolerance, Sex, UserProfile } from '../../core/models';
 import { PROTEIN_NOTE_ABOVE_G_PER_KG, manualKcalWarning } from '../../core/nutrition/manual-target';
 import { NutritionCalcService } from '../../core/nutrition/nutrition-calc.service';
 import { ProfileNote, profileNotes } from '../../core/nutrition/profile-plausibility';
 import { FASTFOOD_COUNTRIES } from '../../core/ai/fastfood-countries';
+import { WRITE_BLOCKED_MESSAGE } from '../../core/storage/storage-messages';
 import { ProfileStore } from '../../core/state/profile.store';
 import { formatDecimal, parseDecimal } from '../../core/util/number-input';
 import { PROFILE_FIELD_ORDER, ProfileField, ProfileFieldErrors, targetWeightError, validateProfileForm } from '../profile-form';
@@ -18,7 +21,7 @@ import {
   manualErrors,
   profileFromFormState,
   rateChoicesFor,
-  rateForGoal,
+  rateOnGoalChange,
   withManualEnabled,
 } from './profile-form-state';
 
@@ -46,6 +49,7 @@ export class ProfileSheetComponent {
   private readonly calc = inject(NutritionCalcService);
   private readonly doc = inject(DOCUMENT);
   private readonly dietTranslate = inject(DietTranslateService);
+  private readonly alerts = inject(AlertController);
 
   readonly isOpen = input(false);
   /** Gewicht, mit dem das Formular beim Öffnen vorbelegt wird (Hinweis „Ziel neu berechnen“). */
@@ -61,6 +65,12 @@ export class ProfileSheetComponent {
   /** True, solange das Speichern läuft (Übersetzung der Abneigungen). */
   readonly saving = signal(false);
   readonly dislikeInput = signal('');
+  /** Meldung, wenn das Speichern trotz geprüfter Eingaben nicht möglich war. */
+  readonly saveError = signal<string | null>(null);
+  /** Formularstand beim Öffnen (Vergleich für „Änderungen verwerfen?“). */
+  private initialSnapshot = '';
+  /** True nach Speichern oder bestätigtem Verwerfen: dann darf das Sheet ohne Rückfrage schließen. */
+  private allowClose = false;
 
   readonly countries = FASTFOOD_COUNTRIES;
   readonly dietOptions = DIET_FORM_OPTIONS;
@@ -103,6 +113,29 @@ export class ProfileSheetComponent {
     this.submitted.set(false);
     this.saving.set(false);
     this.dislikeInput.set('');
+    this.saveError.set(null);
+    this.allowClose = false;
+    this.initialSnapshot = JSON.stringify(this.form());
+  }
+
+  /** True, wenn das Formular seit dem Öffnen geändert wurde. */
+  isDirty(): boolean {
+    return JSON.stringify(this.form()) !== this.initialSnapshot;
+  }
+
+  /** canDismiss des Modals: Rückfrage nur bei ungespeicherten Änderungen. */
+  readonly canDismiss = async (): Promise<boolean> => {
+    if (this.allowClose) return true;
+    if (this.saving()) return false;
+    if (!this.isDirty()) return true;
+    return confirmDiscard(this.alerts);
+  };
+
+  /** X-Taste: erst fragen; bei „Weiter bearbeiten“ bleibt das Sheet offen (isOpen wird nicht angetastet). */
+  async requestClose(): Promise<void> {
+    if (!(await this.canDismiss())) return;
+    this.allowClose = true;
+    this.closed.emit();
   }
 
   // --- abgeleitete Werte ---
@@ -164,6 +197,7 @@ export class ProfileSheetComponent {
   readonly rateDeltaText = computed(() => {
     const f = this.form();
     const kcal = this.calc.dailyDeltaKcal(f.rateKgPerWeek, f.weightKg ?? 0, this.goalForRate());
+    if (kcal === 0) return '';
     return `≈ ${f.goal === 'lose' ? '−' : '+'}${kcal} kcal/Tag`;
   });
   readonly maxRateText = computed(() => {
@@ -237,7 +271,7 @@ export class ProfileSheetComponent {
   }
   setGoal(goal: Goal): void {
     if (goal === this.form().goal) return;
-    this.form.update((f) => ({ ...f, goal, rateKgPerWeek: rateForGoal(goal, f.rateKgPerWeek) }));
+    this.form.update((f) => ({ ...f, goal, rateKgPerWeek: rateOnGoalChange(f.goal, goal, f.rateKgPerWeek) }));
   }
   setRate(rate: number): void {
     this.form.update((f) => ({ ...f, rateKgPerWeek: rate }));
@@ -272,8 +306,12 @@ export class ProfileSheetComponent {
   toggleIntolerance(value: Intolerance): void {
     this.form.update((f) => ({ ...f, dietPrefs: toggleIntolerance(f.dietPrefs, value) }));
   }
+  /** Fügt die Abneigung hinzu und leert das Feld nur bei Erfolg (nicht bei Duplikat, leerem Text oder erreichtem Limit). */
   addDislike(): void {
-    this.form.update((f) => ({ ...f, dietPrefs: addDislike(f.dietPrefs, this.dislikeInput()) }));
+    const before = this.form().dietPrefs;
+    const next = addDislike(before, this.dislikeInput());
+    if (next === before) return;
+    this.form.update((f) => ({ ...f, dietPrefs: next }));
     this.dislikeInput.set('');
   }
   removeDislike(index: number): void {
@@ -303,13 +341,22 @@ export class ProfileSheetComponent {
       this.focusFirstInvalid();
       return;
     }
+    this.saveError.set(null);
     this.saving.set(true);
     try {
       const translation = await this.dietTranslate.translateDislikes(state.dietPrefs.dislikes, this.knownTranslations());
       const dietPrefs = { ...state.dietPrefs, dislikesEn: translation.dislikesEn };
       const profile = profileFromFormState({ ...state, dietPrefs }, new Date().toISOString());
-      if (profile === null) return;
-      this.profileStore.setProfile(profile);
+      if (profile === null) {
+        console.error('NutriTrack: Profil nach der Übersetzung nicht mehr gültig');
+        this.saveError.set('Speichern nicht möglich. Bitte prüfe deine Eingaben.');
+        return;
+      }
+      if (!this.profileStore.setProfile(profile)) {
+        this.saveError.set(WRITE_BLOCKED_MESSAGE);
+        return;
+      }
+      this.allowClose = true;
       this.saved.emit(translation.failedCount > 0 ? SAVED_UNTRANSLATED_MESSAGE : SAVED_MESSAGE);
       this.closed.emit();
     } finally {

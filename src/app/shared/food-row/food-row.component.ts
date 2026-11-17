@@ -25,6 +25,9 @@ export class NtFoodRowComponent {
     return [it.brand, it.quantity].filter((part): part is string => !!part).join(' · ');
   });
 
+  protected readonly isIncomplete = computed(() => this.item().isIncomplete === true);
+  protected readonly isKcalDoubtful = computed(() => this.item().isKcalDoubtful === true);
+
   protected readonly kcalText = computed(() => `${Math.round(this.item().facts.kcal)} kcal`);
 
   /** Eiweiß je Basis, hervorgehoben (Eiweiß-Farbe, halbfett); leer, wenn der Wert fehlt. */

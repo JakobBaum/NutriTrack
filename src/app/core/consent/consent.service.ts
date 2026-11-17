@@ -1,5 +1,7 @@
 import { Injectable, Injector, computed, inject } from '@angular/core';
 import { ModalController } from '@ionic/angular/lazy';
+import { errorText } from '../ai/ai-errors';
+import { DebugLogService } from '../debug/debug-log.service';
 import { ProfileStore } from '../state/profile.store';
 import { ConsentDialogComponent } from '../../shared/consent-dialog/consent-dialog.component';
 import { ConsentStore } from './consent.store';
@@ -16,6 +18,7 @@ export class ConsentService {
   private readonly store = inject(ConsentStore);
   private readonly profile = inject(ProfileStore);
   private readonly injector = inject(Injector);
+  private readonly log = inject(DebugLogService);
   private pending: Promise<boolean> | null = null;
 
   /** Das gespeicherte Profil hat ein Alter unter 18: eine Zustimmung ist dann nicht möglich. */
@@ -58,7 +61,7 @@ export class ConsentService {
       const { role } = await modal.onWillDismiss();
       return role === 'confirm' && this.granted();
     } catch (e: unknown) {
-      console.error('NutriTrack: Zustimmungsdialog konnte nicht geöffnet werden', e);
+      this.log.error(`✗ Zustimmungsdialog konnte nicht geöffnet werden: ${errorText(e)}`);
       return false;
     }
   }

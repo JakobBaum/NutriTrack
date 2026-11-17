@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildDrillData,
+  factValue,
   isWarnMacro,
   macroEnergyShares,
   proteinHint,
@@ -72,5 +74,45 @@ describe('softHyphenLabel', () => {
   it('trennt lange Nährwertnamen für schmale Kacheln', () => {
     expect(softHyphenLabel('Kohlenhydrate')).toContain('­');
     expect(softHyphenLabel('Fett')).toBe('Fett');
+  });
+});
+
+describe('factValue', () => {
+  it('liest den Wert zum Schlüssel und liefert sonst 0', () => {
+    const facts = { kcal: 200, proteinG: 12, carbsG: 30, fatG: 5, basis: 'perPortion' as const };
+    expect(factValue(facts, 'protein')).toBe(12);
+    expect(factValue(facts, 'kcal')).toBe(200);
+    expect(factValue(facts, 'fiber')).toBe(0);
+    expect(factValue(facts, 'unbekannt')).toBe(0);
+  });
+});
+
+describe('buildDrillData', () => {
+  const entry = (label: string, proteinG: number) => ({
+    label, facts: { kcal: 100, proteinG, carbsG: 0, fatG: 0, basis: 'perPortion' as const },
+  });
+
+  it('sortiert absteigend, rechnet Anteile und lässt Einträge ohne Wert weg', () => {
+    const macro = { label: 'Eiweiß', color: 'red', warn: false, overBy: 0, target: 100 };
+    const d = buildDrillData('protein', [entry('A', 10), entry('B', 30), entry('C', 0)], macro);
+    expect(d.items.map((i) => i.label)).toEqual(['B', 'A']);
+    expect(d.items.map((i) => i.percent)).toEqual([75, 25]);
+    expect(d.total).toBe(40);
+    expect(d.targetPercent).toBe(40);
+    expect(d.unit).toBe('g');
+  });
+
+  it('markiert nur Warnwerte über dem Ziel als überschritten und nutzt für kcal die Einheit kcal', () => {
+    const macro = { label: 'Kalorien', color: 'x', warn: true, overBy: 50, target: 100 };
+    const d = buildDrillData('kcal', [entry('A', 1)], macro);
+    expect(d.over).toBe(true);
+    expect(d.unit).toBe('kcal');
+  });
+
+  it('kommt ohne Makro-Ansicht zurecht (Ziel 0, Schlüssel als Name)', () => {
+    const d = buildDrillData('protein', [entry('A', 5)], undefined);
+    expect(d.target).toBe(0);
+    expect(d.targetPercent).toBe(0);
+    expect(d.label).toBe('protein');
   });
 });

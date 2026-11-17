@@ -38,9 +38,6 @@ const MIN_KCAL: Record<string, number> = { male: 1500, female: 1200, diverse: 13
 /** Protein-Zielwerte in g pro kg Referenzgewicht je Ziel. */
 const PROTEIN_G_PER_KG = { lose: 1.8, maintain: 1.6, gain: 2.0 } as const;
 
-/** Obergrenze für das Eiweißziel in g pro kg Referenzgewicht. */
-const MAX_PROTEIN_G_PER_KG = 2.2;
-
 /** Ab diesem BMI wird das Eiweißziel nicht mehr aus dem Ist-Gewicht gerechnet. */
 const REFERENCE_WEIGHT_BMI_THRESHOLD = 30;
 
@@ -115,7 +112,7 @@ export class NutritionCalcService {
     const kcal = manualKcalOf(p) ?? Math.round(this.applyMinKcal(p, this.uncappedKcal(p)));
 
     const manualPerKg = manualProteinPerKgOf(p);
-    const perKg = Math.min(PROTEIN_G_PER_KG[p.goal], MAX_PROTEIN_G_PER_KG);
+    const perKg = PROTEIN_G_PER_KG[p.goal];
     const proteinG = manualPerKg !== null
       ? Math.round(manualPerKg * p.weightKg)
       : Math.round(perKg * this.proteinReferenceWeightKg(p));
@@ -137,7 +134,7 @@ export class NutritionCalcService {
     if (manualKcalOf(p) !== null) return false;
     const uncapped = this.uncappedKcal(p);
     if (!Number.isFinite(uncapped)) return true;
-    return p.goal === 'lose' && uncapped < this.minKcal(p);
+    return p.goal === 'lose' && uncapped < this.minimumKcal(p);
   }
 
   /** Tägliches Defizit/Überschuss (kcal) für ein Tempo in kg/Woche (je Ziel auf 1 % bzw. 0,5 % des Körpergewichts begrenzt). */
@@ -153,7 +150,9 @@ export class NutritionCalcService {
   achievedRateKgPerWeek(p: UserProfile): number {
     if (p.goal === 'maintain') return 0;
     const wished = Math.min(Math.abs(p.rateKgPerWeek ?? DEFAULT_RATE_KG_PER_WEEK[p.goal]), this.maxRateKgPerWeek(p.weightKg, p.goal));
-    const actualDelta = Math.abs(this.totalDailyEnergy(p) - this.dailyTarget(p).kcal);
+    const surplus = this.dailyTarget(p).kcal - this.totalDailyEnergy(p);
+    // Vorzeichen beachten: Abnehmen braucht ein Defizit, Zunehmen einen Überschuss; sonst 0.
+    const actualDelta = Math.max(0, p.goal === 'lose' ? -surplus : surplus);
     return Math.min(wished, (actualDelta * 7) / KCAL_PER_KG);
   }
 
@@ -169,12 +168,8 @@ export class NutritionCalcService {
 
   /** Hebt das Ziel beim Abnehmen auf die Mindestzufuhr an; ohne gültigen Wert gilt die Mindestzufuhr. */
   private applyMinKcal(p: UserProfile, kcal: number): number {
-    if (!Number.isFinite(kcal)) return this.minKcal(p);
-    return p.goal === 'lose' ? Math.max(kcal, this.minKcal(p)) : kcal;
-  }
-
-  private minKcal(p: UserProfile): number {
-    return this.minimumKcal(p);
+    if (!Number.isFinite(kcal)) return this.minimumKcal(p);
+    return p.goal === 'lose' ? Math.max(kcal, this.minimumKcal(p)) : kcal;
   }
 
   /** Mindestzufuhr (kcal) für das Geschlecht; dient auch für Warnhinweise bei manuellen Zielen. */

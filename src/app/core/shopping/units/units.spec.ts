@@ -119,3 +119,11 @@ describe('convertStepText', () => {
     expect(convertStepText('20 Minuten köcheln', 'metric')).toBe('20 Minuten köcheln');
   });
 });
+
+describe('formatQuantity Rundung an der Kilogrenze (E13)', () => {
+  it('zeigt 975 bis 999 g als 1 kg statt 1.000 g', () => {
+    expect(formatQuantity(980, 'g', 'Reis', 'metric')).toBe('1 kg');
+    expect(formatQuantity(990, 'ml', 'Milch', 'metric')).toBe('1 l');
+    expect(formatQuantity(940, 'g', 'Reis', 'metric')).toBe('950 g');
+  });
+});

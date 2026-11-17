@@ -13,6 +13,7 @@ import {
   MAX_BACKUP_BYTES,
   backupFileName,
   buildBackup,
+  isNeverBackedUp,
   parseBackup,
   prepareRestore,
   serializeBackup,
@@ -24,6 +25,12 @@ import { SafetyReason, SafetySnapshot, buildSafetySnapshot, readSafetySnapshot }
  * in der WebView wirkungslos oder nicht prüfbar; es gilt nicht als gesichert.
  */
 export type ExportResult = 'shared' | 'downloaded' | 'cancelled' | 'unverified';
+
+/** Ergebnis von `exportBackupDetailed`: wie der Export ausgeliefert wurde und welche Schlüssel nicht lesbar waren (fehlen im Backup). */
+export interface ExportOutcome {
+  readonly result: ExportResult;
+  readonly skippedKeys: readonly string[];
+}
 
 /** Ergebnis von `restore`: ob ersetzt wurde und ob dabei die Auto-Sicherung des alten Stands entstand. */
 export interface RestoreResult {
@@ -60,12 +67,21 @@ export class BackupService {
 
   /** Erstellt das Backup und teilt es (iOS/Web Share) oder lädt es herunter. */
   async exportBackup(now: Date = new Date()): Promise<ExportResult> {
-    const backup = buildBackup(this.storage.snapshot(), now);
+    return (await this.exportBackupDetailed(now)).result;
+  }
+
+  /**
+   * Wie {@link exportBackup}, meldet aber zusätzlich nicht lesbare Schlüssel, die im Backup fehlen
+   * (nur Daten, die ein Backup sonst enthielte; Meta-Schlüssel zählen nicht).
+   */
+  async exportBackupDetailed(now: Date = new Date()): Promise<ExportOutcome> {
+    const { data, skippedKeys } = this.storage.snapshotDetailed();
+    const backup = buildBackup(data, now);
     const name = backupFileName(now);
     const blob = new Blob([serializeBackup(backup)], { type: JSON_MIME });
     const result = await this.deliver(blob, name);
     if (result === 'shared' || result === 'downloaded') this.markBackup(backup.exportedAt);
-    return result;
+    return { result, skippedKeys: skippedKeys.filter((k) => !isNeverBackedUp(k)) };
   }
 
   /** Liest und prüft eine ausgewählte Datei. Wirft nie. */
@@ -90,13 +106,14 @@ export class BackupService {
     const withSafety = safety ? { ...base, [AUTO_SNAPSHOT_KEY]: safety } : base;
     let safetySaved = safety !== null;
     let outcome = this.storage.replaceAll(withSafety);
-    if (outcome !== 'ok' && safety) {
+    // Nach `rollbackFailed` liegt halb geschriebener Stand vor: kein zweiter Versuch.
+    if (outcome === 'failed' && safety) {
       safetySaved = false;
       outcome = this.storage.replaceAll(base);
     }
     const ok = outcome === 'ok';
     if (ok && cleanup) this.quarantineCleanup(cleanup);
-    return { ok, safetySaved, ...(outcome === 'rollbackFailed' ? { rollbackFailed: true as const } : {}) };
+    return { ok, safetySaved: safetySaved && outcome !== 'rollbackFailed', ...(outcome === 'rollbackFailed' ? { rollbackFailed: true as const } : {}) };
   }
 
   /** Auto-Sicherung (falls vorhanden und lesbar), ohne die Daten zu verändern. */

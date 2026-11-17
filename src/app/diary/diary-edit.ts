@@ -57,18 +57,6 @@ export function amountChips(unit: AmountUnit, last: number | null, serving: numb
   return [...front, ...presets.slice(0, keep).map((value) => ({ value, isLast: false })), ...back];
 }
 
-const MEAL_SHORT: Record<MealType, string> = {
-  breakfast: 'Früh',
-  lunch: 'Mittag',
-  dinner: 'Abend',
-  snack: 'Snacks',
-};
-
-/** Kurzlabel der Mahlzeit für schmale Chips (320 px). */
-export function mealShortLabel(type: MealType): string {
-  return MEAL_SHORT[type];
-}
-
 export type EditMode = 'amount' | 'portion' | 'optional';
 
 /** Welche Mengenzeile der Bearbeiten-Dialog zeigt. */

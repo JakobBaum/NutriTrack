@@ -58,7 +58,7 @@ describe('sanitizeFastfoodSuggestions', () => {
   it('verwirft unplausible Zahlen (Grenzen, NaN, Infinity, negativ)', () => {
     const bad = (facts: Record<string, unknown>) => valid({ facts: { basis: 'perPortion', ...facts } });
     expect(sanitizeFastfoodSuggestions([
-      bad({ kcal: 0, proteinG: 0, carbsG: 0, fatG: 0 }),
+      bad({ kcal: -1, proteinG: 0, carbsG: 0, fatG: 0 }),
       bad({ kcal: 3500, proteinG: 100, carbsG: 300, fatG: 100 }),
       bad({ kcal: 440, proteinG: -1, carbsG: 34, fatG: 23 }),
       bad({ kcal: Number.NaN, proteinG: 25, carbsG: 34, fatG: 23 }),
@@ -69,7 +69,45 @@ describe('sanitizeFastfoodSuggestions', () => {
 
   it('verwirft Eintraege, deren kcal nicht zu Eiweiss, Kohlenhydraten und Fett passen (4/4/9)', () => {
     expect(sanitizeFastfoodSuggestions([valid({ facts: { kcal: 100, proteinG: 40, carbsG: 60, fatG: 40, basis: 'perPortion' } })])).toEqual([]);
-    expect(sanitizeFastfoodSuggestions([valid({ facts: { kcal: 1500, proteinG: 10, carbsG: 10, fatG: 5, basis: 'perPortion' } })])).toEqual([]);
+  });
+
+  it('verwirft Eintraege, deren kcal die Makro-Energie weit uebersteigen', () => {
+    const facts = (kcal: number, proteinG: number, carbsG: number, fatG: number) =>
+      valid({ facts: { kcal, proteinG, carbsG, fatG, basis: 'perPortion' } });
+    expect(sanitizeFastfoodSuggestions([facts(1500, 5, 5, 5)])).toEqual([]);
+    expect(sanitizeFastfoodSuggestions([facts(1500, 10, 10, 5)])).toEqual([]);
+  });
+
+  it('verwirft Eintraege ohne Makros mit nennenswerten kcal', () => {
+    const facts = (kcal: number) => valid({ facts: { kcal, proteinG: 0, carbsG: 0, fatG: 0, basis: 'perPortion' } });
+    expect(sanitizeFastfoodSuggestions([facts(600)])).toEqual([]);
+    expect(sanitizeFastfoodSuggestions([facts(250)])).toEqual([]);
+  });
+
+  it('laesst normale Gerichte durch (Burger, Pommes, Salat, Cola, Cola Zero)', () => {
+    const item = (itemName: string, kcal: number, proteinG: number, carbsG: number, fatG: number) =>
+      valid({ itemName, facts: { kcal, proteinG, carbsG, fatG, basis: 'perPortion' } });
+    const result = sanitizeFastfoodSuggestions([
+      item('Burger', 550, 25, 40, 30),
+      item('Pommes', 380, 4, 48, 19),
+      item('Salat', 120, 5, 8, 7),
+      item('Cola', 140, 0, 35, 0),
+      item('Cola Zero', 1, 0, 0, 0),
+    ]);
+    expect(result.map((s) => s.itemName)).toEqual(['Burger', 'Pommes', 'Salat', 'Cola', 'Cola Zero']);
+  });
+
+  it('laesst 0 kcal mit Makros nahe 0 durch (Wasser, Zero-Getraenke)', () => {
+    const item = (itemName: string, kcal: number, proteinG: number, carbsG: number, fatG: number) =>
+      valid({ itemName, facts: { kcal, proteinG, carbsG, fatG, basis: 'perPortion' } });
+    const result = sanitizeFastfoodSuggestions([item('Wasser', 0, 0, 0, 0), item('Zero', 0, 0, 0.5, 0)]);
+    expect(result.map((s) => s.itemName)).toEqual(['Wasser', 'Zero']);
+  });
+
+  it('verwirft 0 kcal mit nennenswerten Makros', () => {
+    const item = (proteinG: number, carbsG: number, fatG: number) =>
+      valid({ facts: { kcal: 0, proteinG, carbsG, fatG, basis: 'perPortion' } });
+    expect(sanitizeFastfoodSuggestions([item(0, 35, 0), item(25, 0, 0), item(0, 0, 10)])).toEqual([]);
   });
 
   it('akzeptiert kleine Abweichungen durch Ballaststoffe und Rundung', () => {

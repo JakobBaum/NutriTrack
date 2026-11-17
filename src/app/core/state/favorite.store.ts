@@ -2,7 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { AmountUnit, DiaryEntry, DiaryRef, MealType, NutritionFacts } from '../models';
 import { StorageService } from '../storage/storage.service';
 import { makeId } from '../util/id';
-import { sanitizeList } from './record-sanitize';
+import { sanitizeFavorites } from './favorite-sanitize';
 import type { NewDiaryEntry } from './diary.store';
 
 export const KEY_FAVORITES = 'favorites';
@@ -54,18 +54,15 @@ export function newEntryFromFavorite(fav: FavoriteFood, dateISO: string, meal: M
   return { ...rest, dateISO, meal };
 }
 
-function isUsable(raw: unknown): raw is FavoriteFood {
-  const f = raw as Partial<FavoriteFood> | null;
-  return !!f && typeof f.id === 'string' && typeof f.label === 'string' && f.label.trim() !== '' && !!f.facts && typeof f.facts === 'object';
-}
-
 /** Favoriten-Liste (neueste zuerst) mit Schutz gegen beschädigte Daten. */
 @Injectable({ providedIn: 'root' })
 export class FavoriteStore {
   private readonly storage = inject(StorageService);
+  /** True, wenn Schreiben gesperrt ist (neueres Schema oder Änderung in anderem Fenster); Änderungen werden dann nicht gespeichert. */
+  readonly isReadOnly = this.storage.isLockedFor(KEY_FAVORITES);
 
   private readonly _favorites = signal<readonly FavoriteFood[]>(
-    this.storage.getSanitized<FavoriteFood>(KEY_FAVORITES, (raw) => sanitizeList<FavoriteFood>(raw, isUsable)),
+    this.storage.getSanitized<FavoriteFood>(KEY_FAVORITES, sanitizeFavorites<FavoriteFood>),
   );
 
   readonly favorites = this._favorites.asReadonly();
@@ -98,7 +95,7 @@ export class FavoriteStore {
     this.storage.remove(KEY_FAVORITES);
   }
 
-  private persist(): void {
-    this.storage.set(KEY_FAVORITES, this._favorites());
+  private persist(): boolean {
+    return this.storage.set(KEY_FAVORITES, this._favorites());
   }
 }

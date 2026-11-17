@@ -4,11 +4,10 @@
  */
 import { isRecipe } from '../backup/backup-records';
 import { StoredRecipe, isValidOnlineRef } from '../recipes/online/online-recipe-ref';
+import { Rec, isRec } from '../util/guards';
 import { SanitizeResult, sanitizeList } from './record-sanitize';
+import { repairRecipe } from './recipe-repair';
 
-type Rec = Record<string, unknown>;
-
-const isRec = (v: unknown): v is Rec => typeof v === 'object' && v !== null && !Array.isArray(v);
 const hasIngredients = (rec: Rec): boolean => Array.isArray(rec['ingredients']) && rec['ingredients'].length > 0;
 const hasBrokenRef = (rec: Rec): boolean => rec['onlineRef'] !== undefined && !isValidOnlineRef(rec['onlineRef']);
 
@@ -24,14 +23,15 @@ export function sanitizeRecipes(raw: unknown): SanitizeResult<StoredRecipe> {
   const rejected: unknown[] = [];
   let repaired = 0;
   for (const rec of raw) {
-    const broken = isRec(rec) && hasBrokenRef(rec);
-    const cleaned = broken ? withoutRef(rec) : rec;
+    const fixed = repairRecipe(rec);
+    const broken = isRec(fixed.value) && hasBrokenRef(fixed.value);
+    const cleaned = broken ? withoutRef(fixed.value as Rec) : fixed.value;
     if (!isRecipe(cleaned) || (broken && !hasIngredients(cleaned as Rec))) {
       rejected.push(rec);
       continue;
     }
     items.push(cleaned as unknown as StoredRecipe);
-    if (broken) repaired++;
+    if (broken || fixed.isRepaired) repaired++;
   }
   return { items, rejected, repaired };
 }

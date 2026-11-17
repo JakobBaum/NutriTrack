@@ -2,7 +2,7 @@
   <div class="nt-page dm">
     <div class="meal-picker" role="radiogroup" aria-label="Essenszeit">
       @for (opt of mealOptions; track opt.value) {
-        <button type="button" class="meal-chip" role="radio" [attr.aria-checked]="meal() === opt.value" [class.meal-chip--on]="meal() === opt.value" [attr.aria-label]="opt.label" (click)="mealChange.emit(opt.value)">{{ opt.short }}</button>
+        <button type="button" class="meal-chip" role="radio" [attr.aria-checked]="meal() === opt.value" [class.meal-chip--on]="meal() === opt.value" [attr.aria-label]="opt.label" (click)="mealChange.emit(opt.value)">{{ opt.label }}</button>
       }
     </div>
 
@@ -42,7 +42,7 @@
       }
       @if (phase() === 'empty') {
         <p class="form-error dm__msg" data-testid="describe-empty">{{ nothingRecognized }}</p>
-        <ion-button fill="clear" class="touch-btn touch-btn--text" data-testid="describe-manual" (click)="manual.emit()">Von Hand eintragen</ion-button>
+        <ion-button fill="clear" class="touch-btn touch-btn--text" data-testid="describe-manual" (click)="openManual()">Von Hand eintragen</ion-button>
       }
 
       @if (phase() === 'results') {

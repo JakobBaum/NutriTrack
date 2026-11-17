@@ -1,5 +1,6 @@
 import { ShoppingItem } from '../models';
 import { ONION_PIECE_G, UNIT_WEIGHT_G } from '../nutrition/units-weight';
+import { matchesKeyword } from './keyword-match';
 
 /** Eine Rundungsregel auf einkaufbare Packungsgrößen. */
 interface PackRule {
@@ -73,7 +74,7 @@ export function roundToPackage(item: ShoppingItem): ShoppingItem {
   const unit = item.unit.trim().toLowerCase();
   const name = item.name.trim().toLowerCase();
   const rule = RULES.find(
-    (r) => r.keywords.some((k) => name.includes(k)) && !(r.exclude ?? []).some((e) => name.includes(e)),
+    (r) => r.keywords.some((k) => matchesKeyword(name, k)) && !(r.exclude ?? []).some((e) => name.includes(e)),
   );
   const rounded = (rule ? roundByRule(rule, item.amount, unit) : null) ?? roundCountUnit(item.amount, unit);
   if (!rounded) return item;

@@ -1,23 +1,14 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { StorageService } from '../storage/storage.service';
 import { isValidWeight, removeWeight, upsertWeight, WeightEntry } from '../weight/weight-math';
+import { commitSignal } from './commit-signal';
+import { sanitizeWeightEntries } from './weight-sanitize';
 
 export const KEY_WEIGHT = 'weight';
 const KEY_HINT = 'weightHintDismissedAtKg';
-const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 function readHintKg(raw: unknown): number | null {
   return isValidWeight(raw) ? raw : null;
-}
-
-/** Nur Einträge mit gültigem Tag und Gewicht, höchstens einer je Tag, nach Datum sortiert. */
-export function sanitizeWeights(raw: unknown): readonly WeightEntry[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.reduce<readonly WeightEntry[]>((list, item) => {
-    const e = item as Partial<WeightEntry> | null;
-    const ok = !!e && typeof e.dateISO === 'string' && ISO_DAY.test(e.dateISO) && isValidWeight(e.kg);
-    return ok ? upsertWeight(list, { dateISO: e.dateISO as string, kg: e.kg as number }) : list;
-  }, []);
 }
 
 /**
@@ -27,8 +18,12 @@ export function sanitizeWeights(raw: unknown): readonly WeightEntry[] {
 @Injectable({ providedIn: 'root' })
 export class WeightStore {
   private readonly storage = inject(StorageService);
+  /** True, wenn Schreiben gesperrt ist (neueres Schema oder Änderung in anderem Fenster); Änderungen werden dann nicht gespeichert. */
+  readonly isReadOnly = this.storage.isLockedFor(KEY_WEIGHT);
 
-  private readonly _entries = signal<readonly WeightEntry[]>(sanitizeWeights(this.storage.get<unknown>(KEY_WEIGHT, [])));
+  private readonly _entries = signal<readonly WeightEntry[]>(
+    this.storage.getSanitized<WeightEntry>(KEY_WEIGHT, sanitizeWeightEntries),
+  );
 
   /** Alle Einträge, älteste zuerst. */
   readonly entries = this._entries.asReadonly();
@@ -44,18 +39,16 @@ export class WeightStore {
     return list.length > 0 ? list[list.length - 1] : null;
   });
 
-  /** Trägt das Gewicht eines Tages ein (ersetzt den Eintrag des Tages). Liefert false bei ungültigen Werten. */
+  /** Trägt das Gewicht eines Tages ein (ersetzt den Eintrag des Tages). Liefert false bei ungültigen Werten oder wenn das Speichern scheitert. */
   set(dateISO: string, kg: number): boolean {
     const next = upsertWeight(this._entries(), { dateISO, kg });
     if (next === this._entries()) return false;
-    this._entries.set(next);
-    this.persist();
-    return true;
+    return commitSignal(this._entries, next, () => this.persist());
   }
 
-  remove(dateISO: string): void {
-    this._entries.update((list) => removeWeight(list, dateISO));
-    this.persist();
+  /** Entfernt den Eintrag eines Tages; `false`, wenn das Speichern scheiterte (dann unverändert). */
+  remove(dateISO: string): boolean {
+    return commitSignal(this._entries, removeWeight(this._entries(), dateISO), () => this.persist());
   }
 
   /** Blendet den Hinweis „Ziel neu berechnen“ aus, bis sich das Gewicht erneut deutlich ändert. */
@@ -73,7 +66,7 @@ export class WeightStore {
     this.storage.remove(KEY_HINT);
   }
 
-  private persist(): void {
-    this.storage.set(KEY_WEIGHT, this._entries());
+  private persist(): boolean {
+    return this.storage.set(KEY_WEIGHT, this._entries());
   }
 }

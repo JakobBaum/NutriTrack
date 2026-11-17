@@ -42,7 +42,7 @@ const sampleData = {
     { id: 'c2', name: 'B', facts: { kcal: 1, proteinG: 0, carbsG: 0, fatG: 0, basis: 'perPortion' } },
   ],
   profile: { weightKg: 80, heightCm: 180, age: 30, sex: 'male', activityLevel: 'moderate', goal: 'maintain', updatedAt: '2026-11-01T10:00:00.000Z' },
-  shopping: { id: 's', items: [{ name: 'Milch', amount: 1, unit: 'l', checked: false }] },
+  shopping: { id: 's', items: [{ id: 'i1', name: 'Milch', amount: 1, unit: 'l', checked: false }] },
 };
 
 describe('Zustimmung im Backup', () => {
@@ -201,7 +201,7 @@ describe('validateBackup Inhaltsprüfung (QAE-01, Welle A)', () => {
     expect(r.cleanup.quarantined['diary']).toHaveLength(1);
   });
 
-  it('sortiert Rezepte ohne Titel oder mit kaputten Zutaten aus, behält aber das Backup', () => {
+  it('sortiert Rezepte ohne Titel aus und repariert kaputte Zutaten-Mengen, behält aber das Backup', () => {
     const r = cleanupOf({
       recipes: [
         { id: 'r', servings: 2, ingredients: [] },
@@ -209,8 +209,9 @@ describe('validateBackup Inhaltsprüfung (QAE-01, Welle A)', () => {
         { id: 'r3', title: 'Gut', servings: 2, ingredients: [] },
       ],
     });
-    expect(r.backup.data['recipes']).toHaveLength(1);
-    expect(r.cleanup.skipped).toBe(2);
+    expect(r.backup.data['recipes']).toHaveLength(2);
+    expect(r.cleanup.skipped).toBe(1);
+    expect(r.cleanup.repaired).toBe(1);
   });
 
   it('filtert Einkaufspositionen ohne Menge oder Namen', () => {
@@ -279,13 +280,22 @@ describe('Gewicht und Favoriten im Backup', () => {
     ['Gewicht zu groß', { weight: [{ dateISO: '2026-11-05', kg: 401 }] }],
     ['Datum kaputt', { weight: [{ dateISO: 'gestern', kg: 80 }] }],
     ['Gewicht kein Zahlenwert', { weight: [{ dateISO: '2026-11-05', kg: '80' }] }],
-    ['zwei Einträge am selben Tag', { weight: [{ dateISO: '2026-11-05', kg: 80 }, { dateISO: '2026-11-05', kg: 81 }] }],
     ['Favorit ohne Namen', { favorites: [{ ...fav, label: undefined }] }],
     ['Favorit ohne Nährwerte', { favorites: [{ id: 'f', label: 'X' }] }],
   ])('sortiert aus (Backup bleibt importierbar): %s', (_name, data) => {
     const r = parseBackup(JSON.stringify(validFile(data)));
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.cleanup.skipped).toBeGreaterThan(0);
+  });
+
+  it('führt zwei Gewichte am selben Tag still zusammen (kein Aussortieren)', () => {
+    const r = parseBackup(JSON.stringify(validFile({ weight: [{ dateISO: '2026-11-05', kg: 80 }, { dateISO: '2026-11-05', kg: 81 }] })));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.cleanup.skipped).toBe(0);
+      expect(r.cleanup.repaired).toBe(1);
+      expect(r.backup.data['weight']).toEqual([{ dateISO: '2026-11-05', kg: 81 }]);
+    }
   });
 
   it('zählt Gewichtseinträge und Favoriten in der Vorschau', () => {

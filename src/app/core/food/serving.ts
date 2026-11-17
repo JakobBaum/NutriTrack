@@ -1,4 +1,4 @@
-import { parseDecimal } from '../util/number-input';
+import { readMachineNumber } from './machine-number';
 
 /** Kleinste und größte Portionsgröße (g/ml), die als Vorbelegung der Menge taugt. */
 export const MIN_SERVING_G = 1;
@@ -9,7 +9,7 @@ export const MAX_SERVING_G = 1000;
  * Packungsgrößen, 0, Texte und Tippfehler ergeben undefined (Aufrufer nimmt dann 100 g).
  */
 export function plausibleServingG(raw: unknown): number | undefined {
-  const value = parseDecimal(raw);
+  const value = readMachineNumber(raw);
   if (value === null || value < MIN_SERVING_G || value > MAX_SERVING_G) return undefined;
   return value;
 }

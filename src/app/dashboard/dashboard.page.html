@@ -178,7 +178,7 @@
             Die Prozentwerte unten zeigen den Anteil an der Tagessumme.
           </p>
           <ion-list lines="none" class="nt-grouped">
-            @for (item of drill.items; track item.label) {
+            @for (item of drill.items; track $index) {
               <ion-item class="drill-item">
                 <ion-label>
                   <div class="drill-item__name">{{ item.label }}</div>

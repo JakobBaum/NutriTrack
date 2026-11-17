@@ -76,16 +76,19 @@ describe('OpenFoodFactsProvider — Mapping', () => {
     expect(item?.facts.proteinG).toBe(0);
   });
 
-  it('verwirft Produkte ohne/mit leerem Namen oder nicht-numerischen kcal', async () => {
+  it('verwirft Produkte ohne/mit leerem Namen', async () => {
     expect(await mapProduct({ ...base, product_name: '   ' })).toBeNull();
     expect(await mapProduct({ nutriments: base.nutriments })).toBeNull();
-    expect(await mapProduct({ ...base, nutriments: { 'energy-kcal_100g': '' } })).toBeNull();
-    expect(await mapProduct({ ...base, nutriments: { 'energy-kcal_100g': 'n/a' } })).toBeNull();
-    expect(await mapProduct({ ...base, nutriments: undefined })).toBeNull();
   });
 
-  it('verwirft Produkte ohne kcal und ohne kJ (nie still 0 kcal)', async () => {
-    expect(await mapProduct({ ...base, nutriments: { energy_100g: 1046 } })).toBeNull();
+  it('meldet nicht-numerische oder fehlende kcal als no-nutrition (K13)', async () => {
+    await expect(mapProduct({ ...base, nutriments: { 'energy-kcal_100g': '' } })).rejects.toMatchObject({ reason: 'no-nutrition' });
+    await expect(mapProduct({ ...base, nutriments: { 'energy-kcal_100g': 'n/a' } })).rejects.toMatchObject({ reason: 'no-nutrition' });
+    await expect(mapProduct({ ...base, nutriments: undefined })).rejects.toMatchObject({ reason: 'no-nutrition' });
+  });
+
+  it('meldet Produkte ohne kcal und ohne kJ als no-nutrition (nie still 0 kcal)', async () => {
+    await expect(mapProduct({ ...base, nutriments: { energy_100g: 1046 } })).rejects.toMatchObject({ reason: 'no-nutrition' });
   });
 
   // kJ-only-Produkte (in OFF häufig) werden umgerechnet statt verworfen (openfoodfacts.provider.ts, kcal-Ermittlung).
@@ -142,14 +145,6 @@ describe('OpenFoodFactsProvider — Eingaben', () => {
     const req = http.expectOne((r) => r.url === SEARCH_URL);
     expect(req.request.params.get('page_size')).toBe('50');
     req.flush({});
-    expect(await p).toEqual([]);
-  });
-
-  it('nutzt autocomplete mit Standardlimit 6', async () => {
-    const p = provider.autocomplete('kä');
-    const req = http.expectOne((r) => r.url === SEARCH_URL);
-    expect(req.request.params.get('page_size')).toBe('12');
-    req.flush({ hits: [] });
     expect(await p).toEqual([]);
   });
 

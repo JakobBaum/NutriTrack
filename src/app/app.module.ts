@@ -11,15 +11,14 @@ import { StatusBannerComponent } from './status-banner/status-banner.component';
 import { FOOD_PROVIDER } from './core/food/food-provider';
 import { OpenFoodFactsProvider } from './core/food/openfoodfacts.provider';
 import { nativeClientInterceptor } from './core/http/native-client.interceptor';
+import { reducedMotionQuery } from './core/motion/reduced-motion';
 
 /** Systemwunsch "Bewegung reduzieren": Ionic-Animationen (Modals, Seitenwechsel, Toasts) ausschalten. */
-function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
-}
+const PREFERS_REDUCED_MOTION = reducedMotionQuery()?.matches === true;
 
 @NgModule({
   declarations: [AppComponent, StatusBannerComponent],
-  imports: [BrowserModule, IonicModule.forRoot({ mode: 'ios', animated: !prefersReducedMotion() }), AppRoutingModule],
+  imports: [BrowserModule, IonicModule.forRoot({ mode: 'ios', animated: !PREFERS_REDUCED_MOTION }), AppRoutingModule],
   providers: [
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
     { provide: FOOD_PROVIDER, useExisting: OpenFoodFactsProvider },

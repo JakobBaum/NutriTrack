@@ -16,40 +16,6 @@ ion-searchbar.nt-searchbar {
   font-size: var(--nt-fs-headline);
 }
 
-// Mahlzeit-Wahl im Kopf des Add-Sheets: 4 gleich breite Spalten (passt bei 320 px)
-.meal-picker {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--nt-space-2);
-  margin: var(--nt-space-1) var(--nt-space-4) var(--nt-space-2);
-}
-
-.meal-chip {
-  min-height: var(--nt-touch);
-  padding: 0 var(--nt-space-1);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  background: var(--nt-card);
-  border: 0;
-  border-radius: var(--nt-radius-pill);
-  color: var(--nt-ink);
-  font: inherit;
-  font-size: var(--nt-fs-caption);
-  font-weight: 600;
-  cursor: pointer;
-
-  &--on {
-    background: var(--nt-accent);
-    color: var(--nt-on-accent);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--nt-focus);
-    outline-offset: 2px;
-  }
-}
-
 // "Zuletzt benutzt": Hauptfläche loggt sofort, Stift-Button öffnet das Formular
 .recent {
   --padding-start: 0;
@@ -104,8 +70,9 @@ ion-searchbar.nt-searchbar {
   &__name {
     font-size: var(--nt-fs-headline);
     font-weight: 600;
-    overflow-wrap: break-word;
-    hyphens: auto;
+    // Kein Silbentrenner mitten im Wort (150 % Schrift): nur bei Bedarf an beliebiger Stelle umbrechen.
+    overflow-wrap: anywhere;
+    hyphens: none;
   }
 
   &__edit {
@@ -123,42 +90,6 @@ ion-searchbar.nt-searchbar {
   }
 }
 
-.preview {
-  margin: var(--nt-space-4) var(--nt-space-5) var(--nt-space-3);
-  font-size: var(--nt-fs-body);
-  color: var(--nt-secondary);
-  font-variant-numeric: tabular-nums;
-
-  p {
-    margin: 0;
-  }
-
-  // Kalorien und Eiweiß gleichrangig, Kohlenhydrate und Fett klein darunter.
-  &__main {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--nt-space-1) var(--nt-space-5);
-  }
-
-  &__rest {
-    margin-top: var(--nt-space-1);
-    font-size: var(--nt-fs-caption);
-  }
-
-  strong {
-    font-size: var(--nt-fs-title);
-  }
-
-  &__kcal {
-    color: var(--nt-kcal);
-  }
-
-  &__protein {
-    color: var(--nt-protein);
-  }
-}
-
 .adjust {
   padding-bottom: var(--nt-space-2);
 }
@@ -173,18 +104,6 @@ ion-searchbar.nt-searchbar {
   background: var(--nt-card);
   border-radius: 0 0 var(--nt-radius-card) var(--nt-radius-card);
   overflow: hidden;
-}
-
-.scan-hint {
-  margin: var(--nt-space-2) var(--nt-space-5) 0;
-  font-size: var(--nt-fs-caption);
-  color: var(--nt-secondary);
-
-  &--empty {
-    margin-top: var(--nt-space-6);
-    text-align: center;
-    font-size: var(--nt-fs-body);
-  }
 }
 
 .ff-remaining {

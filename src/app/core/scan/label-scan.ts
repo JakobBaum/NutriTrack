@@ -1,5 +1,6 @@
 import { NutritionFacts } from '../models';
-import { LabelOcrService } from './label-ocr.service';
+import { ATWATER_SLACK_PER_100G, ATWATER_SLACK_PER_PORTION, isAtwaterDoubtful } from '../food/facts-plausibility';
+import { LabelOcrService, OcrTimeoutError } from './label-ocr.service';
 import { LabelField, ParsedNutritionLabel, parseNutritionLabel } from './nutrition-label-parser';
 
 /** Mindestens so viele der drei Makros (Fett, Kohlenhydrate, Eiweiß) müssen gelesen sein. */
@@ -20,8 +21,15 @@ const FIELD_NAMES: Record<LabelField, string> = {
 };
 
 export const LABEL_READ_HINT = 'Vom Etikett gelesen — bitte prüfen';
+export const LABEL_TIMEOUT_MESSAGE =
+  'Die Texterkennung hat zu lange gebraucht — versuche es erneut oder trage die Werte manuell ein.';
 export const LABEL_FAILED_MESSAGE =
   'Das Etikett konnte nicht zuverlässig gelesen werden — mach ein schärferes Foto oder trage die Werte manuell ein.';
+
+/** Nur eine Portionsspalte gelesen: die Portionsgröße ist unbekannt und muss ergänzt werden (K16). */
+export const PORTION_ONLY_HINT = 'Die Werte gelten je Portion — Portionsgröße bitte ergänzen.';
+/** Energie passt nicht zu den Makros: vermutlich falsch gelesen (K17). */
+export const LABEL_DOUBTFUL_HINT = 'Kalorien und Makros passen nicht zusammen — bitte mit dem Etikett vergleichen.';
 
 export type LabelScanOutcome =
   | { ok: true; facts: NutritionFacts; missing: LabelField[]; hint: string }
@@ -43,6 +51,17 @@ export function missingHint(missing: readonly LabelField[]): string {
   return `${LABEL_READ_HINT}. Nicht gefunden: ${missing.map((f) => FIELD_NAMES[f]).join(', ')}.`;
 }
 
+/** Zusätzliche Hinweise: nur Portionsspalte (Größe unbekannt) und Energie/Makro-Widerspruch. */
+function extraHints(facts: NutritionFacts, parsed: ParsedNutritionLabel): string[] {
+  const hints: string[] = [];
+  const perPortion = parsed.basis === 'perPortion';
+  if (perPortion) hints.push(PORTION_ONLY_HINT);
+  const complete = parsed.found.includes('fatG') && parsed.found.includes('carbsG') && parsed.found.includes('proteinG');
+  const slack = perPortion ? ATWATER_SLACK_PER_PORTION : ATWATER_SLACK_PER_100G;
+  if (complete && isAtwaterDoubtful(facts, slack)) hints.push(LABEL_DOUBTFUL_HINT);
+  return hints;
+}
+
 /** Bewertet ein Parse-Ergebnis: fertige Nährwerte oder eine klare Fehlermeldung. */
 export function evaluateLabelParse(parsed: ParsedNutritionLabel): LabelScanOutcome {
   if (!isUsableLabel(parsed)) return { ok: false, message: LABEL_FAILED_MESSAGE };
@@ -58,7 +77,7 @@ export function evaluateLabelParse(parsed: ParsedNutritionLabel): LabelScanOutco
     saltG: v.saltG,
     basis: parsed.basis === 'perPortion' ? 'perPortion' : 'per100g',
   };
-  return { ok: true, facts, missing, hint: missingHint(missing) };
+  return { ok: true, facts, missing, hint: [missingHint(missing), ...extraHints(facts, parsed)].join(' ') };
 }
 
 /** Formularfelder, die geleert werden sollen, weil der Wert nicht gelesen wurde. */
@@ -70,11 +89,16 @@ export function blankFieldsFor(missing: readonly LabelField[]): Partial<Record<'
   return out;
 }
 
-/** OCR + Parser; ein OCR-Fehler zählt wie "nicht lesbar". */
-export async function readLabelOffline(ocr: LabelOcrService, base64: string): Promise<LabelScanOutcome> {
+/** OCR + Parser; ein OCR-Fehler zählt wie "nicht lesbar", eine Zeitüberschreitung hat eine eigene Meldung. */
+export async function readLabelOffline(
+  ocr: LabelOcrService,
+  base64: string,
+  onError?: (e: unknown) => void,
+): Promise<LabelScanOutcome> {
   try {
     return evaluateLabelParse(parseNutritionLabel(await ocr.recognizeText(base64)));
-  } catch {
-    return { ok: false, message: LABEL_FAILED_MESSAGE };
+  } catch (e: unknown) {
+    onError?.(e);
+    return { ok: false, message: e instanceof OcrTimeoutError ? LABEL_TIMEOUT_MESSAGE : LABEL_FAILED_MESSAGE };
   }
 }

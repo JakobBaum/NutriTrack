@@ -54,9 +54,8 @@ describe('parseDiaryQuery', () => {
     expect(parseDiaryQuery(params({ date: '2026-11-09' })).date).toBe('2026-11-09');
   });
 
-  it('erkennt fastfood nur bei 1 und meal als Scroll-Ziel', () => {
-    expect(parseDiaryQuery(params({ fastfood: '1' })).wantsFastfood).toBe(true);
-    expect(parseDiaryQuery(params({ fastfood: 'ja' })).wantsFastfood).toBe(false);
+  it('liest meal als Scroll-Ziel und kennt den entfernten Parameter fastfood nicht mehr', () => {
     expect(parseDiaryQuery(params({ meal: 'dinner' })).scrollMeal).toBe('dinner');
+    expect(parseDiaryQuery(params({ fastfood: '1' })).hasAny).toBe(false);
   });
 });

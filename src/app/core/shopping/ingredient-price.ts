@@ -2,7 +2,7 @@ import { ShoppingItem } from '../models';
 import { nameKey } from './ingredient-name';
 import { DEFAULT_SPICE_PRICE, PRICE_TABLE, PriceEntry } from './ingredient-price-table';
 import { CATEGORY_PRICE_PER_KG } from './price-table';
-import { DEFAULT_SHOPPING_CATEGORY, ShoppingCategory, categorizeName } from './shopping-category';
+import { resolveCategory } from './shopping-category';
 import { normalizeUnit } from './shopping-units';
 import { spiceUnitFor } from './spice-rules';
 
@@ -89,15 +89,10 @@ function priceByEntry(entry: PriceEntry, item: ShoppingItem): number {
   return pricePerKgEntry(entry, n);
 }
 
-function categoryOf(item: ShoppingItem): ShoppingCategory {
-  const c = item.category;
-  return c && c in CATEGORY_PRICE_PER_KG ? (c as ShoppingCategory) : categorizeName(item.name) ?? DEFAULT_SHOPPING_CATEGORY;
-}
-
 function priceByCategory(item: ShoppingItem): number {
   const n = need(item, undefined);
   const grams = ceilTo(Math.max(n.grams, 1), UNKNOWN_STEP_G);
-  return (grams / 1000) * CATEGORY_PRICE_PER_KG[categoryOf(item)];
+  return (grams / 1000) * CATEGORY_PRICE_PER_KG[resolveCategory(item)];
 }
 
 /**

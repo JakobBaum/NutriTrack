@@ -12,7 +12,12 @@ const MESSAGES: Readonly<Record<StorageError['kind'], string>> = {
 export const SCHEMA_NEWER_MESSAGE =
   'Diese Daten stammen aus einer neueren NutriTrack-Version. Aktualisiere die App, bevor du etwas änderst.';
 
+export const EXTERNAL_CHANGE_MESSAGE = 'Daten wurden in einem anderen Fenster geändert. Bitte lade die App neu.';
+
 /** Meldung für das Fehler-Banner. */
 export function describeStorageError(error: StorageError): string {
   return MESSAGES[error.kind] ?? MESSAGES.unknown;
 }
+
+/** Änderung nicht gespeichert (Schreibsperre oder Speicherfehler); die Ursache steht im Hinweis oben. */
+export const WRITE_BLOCKED_MESSAGE = 'Nicht gespeichert. Lies den Hinweis oben und versuche es danach erneut.';
