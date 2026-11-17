@@ -5,6 +5,7 @@ import {
   canLogRows,
   checkDescription,
   entriesFromRows,
+  labelFromDescription,
   mealTotals,
   removeRow,
   rowTotals,
@@ -118,5 +119,26 @@ describe('entriesFromRows', () => {
   it('liefert für ungültige Zeilen keinen Eintrag', () => {
     const rows = [rowsFromItems([item()])[0], withAmountText(rowsFromItems([item({ name: 'B' })])[0], '')];
     expect(entriesFromRows(rows, '2026-11-14', 'lunch').map((e) => e.label)).toEqual(['Semmel']);
+  });
+});
+
+describe('Dezimalkomma in der Mengenzeile (T15)', () => {
+  it('zeigt die geschätzte Menge mit Komma', () => {
+    expect(rowsFromItems([item({ portionG: 12.5 })])[0].amountText).toBe('12,5');
+  });
+  it('zeigt die Menge nach einem Schritt mit Komma', () => {
+    const row = rowsFromItems([item({ portionG: 12.5 })])[0];
+    expect(withSteppedAmount(row, 1).amountText).toBe('22,5');
+  });
+});
+
+describe('labelFromDescription (T17)', () => {
+  it('nimmt den getrimmten Text', () => {
+    expect(labelFromDescription('  2 Semmeln mit Butter ')).toBe('2 Semmeln mit Butter');
+  });
+  it('kürzt lange Texte an einer Wortgrenze', () => {
+    const label = labelFromDescription('Haferflocken mit Milch und Banane und Honig und Nüssen und Zimt und noch viel mehr Zutaten');
+    expect(label.length).toBeLessThanOrEqual(60);
+    expect(label.endsWith(' ')).toBe(false);
   });
 });

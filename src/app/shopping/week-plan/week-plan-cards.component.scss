@@ -34,7 +34,6 @@
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   }
   &__meta { font-size: var(--nt-fs-caption); color: var(--nt-secondary); font-variant-numeric: tabular-nums; }
-  &__chev { flex: none; color: var(--nt-secondary); }
   &__spin { flex: none; width: 20px; height: 20px; color: var(--nt-secondary); }
 }
 

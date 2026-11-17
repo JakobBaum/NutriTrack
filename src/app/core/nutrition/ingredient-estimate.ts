@@ -1,5 +1,5 @@
 import { NutritionFacts } from '../models';
-import { canonicalUnitKey, unitGrams } from './units-weight';
+import { GRAM_UNITS, canonicalUnitKey, unitGrams } from './units-weight';
 
 /**
  * Deterministische Nährwert-Schätzung für gängige Zutaten (offline, ohne KI).
@@ -17,9 +17,6 @@ interface Density {
   fiberG: number;
   sugarG: number;
 }
-
-/** Einheiten, die 1:1 als Gramm/Milliliter gelten (→ Bezug per100g). */
-const GRAM_UNITS = new Set(['g', 'gramm', 'gr', 'kg', 'kilogramm', 'ml', 'milliliter', 'l', 'liter']);
 
 /** Keyword → Dichte. Längster Treffer am Wortanfang/-ende (case-insensitive) gewinnt. */
 const TABLE: { keywords: string[]; exclude?: string[]; d: Density }[] = [

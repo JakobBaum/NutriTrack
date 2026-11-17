@@ -88,3 +88,36 @@ describe('toRecipeDraft', () => {
     expect(draft.steps).toHaveLength(2);
   });
 });
+
+describe('factsFromNutrients — K14/K19', () => {
+  const nut = (n: string, amount: number) => ({ name: n, amount });
+
+  it('liefert keine Nährwerte, wenn ein Hauptmakro fehlt (nie still 0 g)', () => {
+    expect(factsFromNutrients([nut('Calories', 300), nut('Protein', 10), nut('Fat', 5)])).toBeUndefined();
+  });
+
+  it('liefert keine Nährwerte bei unmöglichen Werten', () => {
+    const all = (kcal: number) => [nut('Calories', kcal), nut('Protein', 10), nut('Carbohydrates', 20), nut('Fat', 5)];
+    expect(factsFromNutrients(all(99999))).toBeUndefined();
+    expect(factsFromNutrients(all(300))?.kcal).toBe(300);
+  });
+});
+
+describe('Zutaten-Gesamtmengen (Prüfrunde 2)', () => {
+  const nut = (n: string, amount: number) => ({ name: n, amount });
+  const flour = [nut('Calories', 5460), nut('Protein', 150), nut('Carbohydrates', 1140), nut('Fat', 15)];
+
+  it('behält die Werte von 1,5 kg Mehl (über der Portionsgrenze)', () => {
+    const f = factsFromNutrients(flour, false);
+    expect(f?.kcal).toBe(5460);
+    expect(f?.carbsG).toBe(1140);
+  });
+
+  it('wendet auf Rezept-Portionen weiterhin die Portionsgrenze an', () => {
+    expect(factsFromNutrients(flour)).toBeUndefined();
+  });
+
+  it('verwirft auch bei Zutaten Unmögliches', () => {
+    expect(factsFromNutrients([nut('Calories', 999999), nut('Protein', 1), nut('Carbohydrates', 1), nut('Fat', 1)], false)).toBeUndefined();
+  });
+});

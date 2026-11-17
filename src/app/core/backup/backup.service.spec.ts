@@ -208,3 +208,33 @@ describe('BackupService Reset bei neuerem Schema (Review-Befund 2)', () => {
     expect(stored('diary')).toBeNull();
   });
 });
+
+describe('BackupService Review 4 (D3, D4, D11)', () => {
+  beforeEach(() => setup({ diary: [entry('alt')] }));
+
+  it('D3: versucht nach rollbackFailed keinen zweiten Import und meldet rollbackFailed', () => {
+    const spy = vi.spyOn(storage, 'replaceAll').mockReturnValue('rollbackFailed');
+    const result = service.restore(backupWith([entry('neu')]));
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ ok: false, safetySaved: false, rollbackFailed: true });
+  });
+
+  it('D3: wiederholt nach failed einmal ohne Auto-Sicherung', () => {
+    const spy = vi.spyOn(storage, 'replaceAll').mockReturnValueOnce('failed').mockReturnValueOnce('ok');
+    const result = service.restore(backupWith([entry('neu')]));
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ ok: true, safetySaved: false });
+  });
+
+  it('D11: exportBackupDetailed meldet nicht lesbare Schlüssel', async () => {
+    localStorage.setItem('nutritrack:kaputt', '{x');
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    vi.stubGlobal('URL', { createObjectURL: () => 'blob:x', revokeObjectURL: () => undefined });
+    const out = await service.exportBackupDetailed();
+    expect(click).toHaveBeenCalled();
+    expect(out.skippedKeys).toEqual(['kaputt']);
+    expect(out.result).toBe('downloaded');
+    vi.unstubAllGlobals();
+  });
+});

@@ -39,7 +39,6 @@ export interface DiaryQuery {
   /** `?add=` war gesetzt (Sheet öffnen); meal = gültige Essenszeit oder null (dann Tageszeit). */
   wantsAdd: boolean;
   addMeal: MealType | null;
-  wantsFastfood: boolean;
   /** Gültige Essenszeit aus `?meal=` (Scroll-Ziel), sonst null. */
   scrollMeal: MealType | null;
   /** Mindestens ein Parameter war gesetzt (dann aus der URL entfernen). */
@@ -55,13 +54,11 @@ export function parseDiaryQuery(params: ParamReader): DiaryQuery {
   const add = params.get('add');
   const meal = params.get('meal');
   const date = params.get('date');
-  const wantsFastfood = params.get('fastfood') === '1';
   return {
     date: isIsoDate(date) ? date : null,
     wantsAdd: !!add,
     addMeal: isMealType(add) ? add : null,
-    wantsFastfood,
     scrollMeal: isMealType(meal) ? meal : null,
-    hasAny: !!add || wantsFastfood || !!meal || !!date,
+    hasAny: !!add || !!meal || !!date,
   };
 }

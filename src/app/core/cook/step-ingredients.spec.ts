@@ -94,6 +94,12 @@ describe('stepIngredientsFor (Grenzfälle)', () => {
     expect(input).toEqual([zwiebel]);
   });
 
+  it('ordnet nur ganze Wörter zu, keine Teilstrings (Salz/Salzwasser, Ei/Eiweiß)', () => {
+    expect(names(stepIngredientsFor('Das Salzwasser aufkochen.', [ing('Salz')]))).toEqual([]);
+    expect(names(stepIngredientsFor('Das Eiweiß steif schlagen.', [ing('Ei')]))).toEqual([]);
+    expect(names(stepIngredientsFor('Salz hinzufügen.', [ing('Salz')]))).toEqual(['Salz']);
+  });
+
   it('ignoriert Klammern und Zusätze nach dem Komma', () => {
     expect(names(stepIngredientsFor('Die Butter schmelzen.', [ing('Butter (zimmerwarm), weich')]))).toEqual(['Butter (zimmerwarm), weich']);
   });

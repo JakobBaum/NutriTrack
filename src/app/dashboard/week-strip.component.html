@@ -2,9 +2,9 @@
   <section class="nt-card strip" data-testid="week-strip" aria-label="Diese Woche">
     <ul class="strip__days">
       @for (d of strip(); track d.dateISO) {
-        <li class="strip__day" [class.strip__day--today]="d.isToday" [attr.aria-label]="d.ariaLabel" role="img">
-          <span class="strip__dot" [attr.data-state]="d.state"></span>
-          <span class="strip__weekday">{{ d.weekday }}</span>
+        <li class="strip__day" [class.strip__day--today]="d.isToday">
+          <span class="strip__dot" role="img" [attr.aria-label]="d.ariaLabel" [attr.data-state]="d.state"></span>
+          <span class="strip__weekday" aria-hidden="true">{{ d.weekday }}</span>
         </li>
       }
     </ul>

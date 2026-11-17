@@ -67,6 +67,13 @@
 }
 
 
+// Fehlende Makros stehen als 0 g: sichtbarer Hinweis in Warnfarbe (Text 6,2:1 auf Weiß).
+.incomplete {
+  font-size: var(--nt-fs-caption);
+  font-weight: 600;
+  color: var(--nt-warning);
+}
+
 .meta {
   flex: 0 1 auto;
   min-width: 0;

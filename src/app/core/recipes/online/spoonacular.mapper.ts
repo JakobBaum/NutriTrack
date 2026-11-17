@@ -1,3 +1,4 @@
+import { isWithinIngredientLimits, isWithinPortionLimits } from '../../food/facts-plausibility';
 import { NutritionFacts, RecipeIngredient } from '../../models';
 import { RecipeDraft } from '../../state/recipe.store';
 import { isUsUnit, toMetric } from '../../shopping/units/unit-convert';
@@ -47,23 +48,37 @@ function nutrientAmount(list: readonly SpoonNutrient[] | undefined, name: string
   return hit && typeof hit.amount === 'number' && Number.isFinite(hit.amount) ? hit.amount : undefined;
 }
 
-/** Nährwerte (Gesamtmenge der Liste) aus Spoonacular-Nutrients; ohne Kalorien → undefined. */
-export function factsFromNutrients(list: readonly SpoonNutrient[] | undefined): NutritionFacts | undefined {
+/**
+ * Nährwerte je Portion aus Spoonacular-Nutrients. Ohne Kalorien oder ohne eines der drei Hauptmakros
+ * (nie still 0 g, K14) sowie bei unmöglichen Werten (K19) → undefined, d. h. "keine Nährwerte".
+ */
+export function factsFromNutrients(
+  list: readonly SpoonNutrient[] | undefined,
+  requireMacros = true,
+): NutritionFacts | undefined {
   const kcal = nutrientAmount(list, 'Calories');
+  const protein = nutrientAmount(list, 'Protein');
+  const carbs = nutrientAmount(list, 'Carbohydrates');
+  const fat = nutrientAmount(list, 'Fat');
   if (kcal === undefined) return undefined;
+  // Zutaten-Listen lassen Nährwerte von 0 weg; nur beim Rezept gilt ein fehlendes Hauptmakro als unvollständig.
+  if (requireMacros && (protein === undefined || carbs === undefined || fat === undefined)) return undefined;
   const sodiumMg = nutrientAmount(list, 'Sodium');
   const sugar = nutrientAmount(list, 'Sugar');
   const fiber = nutrientAmount(list, 'Fiber');
-  return {
+  const facts: NutritionFacts = {
     kcal: Math.round(kcal),
-    proteinG: round(nutrientAmount(list, 'Protein') ?? 0, 1),
-    carbsG: round(nutrientAmount(list, 'Carbohydrates') ?? 0, 1),
-    fatG: round(nutrientAmount(list, 'Fat') ?? 0, 1),
+    proteinG: round(protein ?? 0, 1),
+    carbsG: round(carbs ?? 0, 1),
+    fatG: round(fat ?? 0, 1),
     ...(fiber !== undefined ? { fiberG: round(fiber, 1) } : {}),
     ...(sugar !== undefined ? { sugarG: round(sugar, 1) } : {}),
     ...(sodiumMg !== undefined ? { saltG: round((sodiumMg / MG_PER_G) * SALT_PER_SODIUM, 2) } : {}),
     basis: 'perPortion',
   };
+  // Zutaten-Gesamtmengen (requireMacros=false) dürfen größer sein als eine Portion.
+  const isWithin = requireMacros ? isWithinPortionLimits(facts) : isWithinIngredientLimits(facts);
+  return isWithin ? facts : undefined;
 }
 
 /** Menge + Einheit einer Zutat: bevorzugt metrisch (g/ml), sonst App-Einheit. */
@@ -133,7 +148,7 @@ export function mapIngredients(raw: SpoonRecipe): RecipeIngredient[] {
     const name = (e.nameClean ?? e.name ?? e.original ?? '').trim();
     if (!name) return;
     const { amount, unit, approx } = mapAmountUnit(e);
-    const facts = ingredientFacts(factsFromNutrients(matchNutrition(e, i, nutrition, ext.length, used)?.nutrients), amount, unit);
+    const facts = ingredientFacts(factsFromNutrients(matchNutrition(e, i, nutrition, ext.length, used)?.nutrients, false), amount, unit);
     out.push({ name, amount, unit, ...(approx ? { approx } : {}), ...(facts ? { facts } : {}) });
   });
   return out;

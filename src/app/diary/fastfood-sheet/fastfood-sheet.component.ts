@@ -19,12 +19,13 @@ import { AiService } from '../../core/ai/ai.service';
 import { DiaryStore } from '../../core/state/diary.store';
 import { formatNum } from '../../shared/num.pipe';
 import {
-  FASTFOOD_CHAINS, FastFoodForm, FastFoodInputs, MAX_FASTFOOD_ROUNDS, PREFERENCE_OPTIONS, defaultKcalBudget, excludeNames, fastfoodInputsOf,
+  FASTFOOD_CHAINS, KCAL_RANGE, FastFoodForm, FastFoodInputs, MAX_FASTFOOD_ROUNDS, PREFERENCE_OPTIONS, defaultKcalBudget, excludeNames, fastfoodInputsOf,
   isOverBudget, mergeSuggestions, preferenceSummary, sameFastfoodInputs,
 } from '../fastfood-options';
 import { mealForHour } from '../diary-helpers';
 import { lightHaptic } from '../haptics';
 import { showEntryToast } from '../entry-toast';
+import { ensureWritable } from '../write-guard';
 
 const NO_MORE_MESSAGE = 'Keine weiteren Vorschläge gefunden. Ändere die Auswahl für neue Ideen.';
 const LOAD_ERROR_MESSAGE = 'Die Vorschläge konnten nicht geladen werden — prüfe deine Verbindung und versuche es erneut.';
@@ -78,7 +79,7 @@ export class FastfoodSheetComponent implements OnChanges {
   /** Angaben der letzten erfolgreichen ersten Anfrage (unveränderlicher Schnappschuss); null vor der ersten Runde. */
   readonly lastInputs = signal<FastFoodInputs | null>(null);
   /** Aktuelle Angaben, so wie sie in eine Anfrage gingen. */
-  private readonly currentInputs = computed(() => fastfoodInputsOf(this.ff(), this.remainingKcal()));
+  private readonly currentInputs = computed(() => fastfoodInputsOf(this.ff(), this.budgetBase()));
   /** Haben sich die Angaben seit der letzten Anfrage geändert? Dann passt die Ausschlussliste nicht mehr. */
   readonly inputsChanged = computed(() => {
     const last = this.lastInputs();
@@ -91,6 +92,12 @@ export class FastfoodSheetComponent implements OnChanges {
   readonly showMore = computed(() => this.canLoadMore() && !this.inputsChanged());
   /** Zähler der Anfragen: Nur die neueste darf Ergebnisse oder Ladezustand setzen. */
   private requestSeq = 0;
+  /** Gegen Doppeltipp: pro Öffnen wird höchstens ein Vorschlag eingetragen. */
+  private isLogging = false;
+  /** Grundlage des Standard-Budgets: Resttag; ohne Tagesziel der Slider-Höchstwert (so zeigt es auch das Formular). */
+  private budgetBase(): number {
+    return this.targetKcal() > 0 ? this.remainingKcal() : KCAL_RANGE.max;
+  }
   readonly ff = signal<FastFoodForm>({
     restaurant: FASTFOOD_CHAINS[0], kcalBudget: null, moneyBudget: null, preferences: [PREFERENCE_OPTIONS[0].value],
     country: this.profile.fastfoodCountry(),
@@ -107,6 +114,7 @@ export class FastfoodSheetComponent implements OnChanges {
   /** Setzt Ergebnisse zurück und schlägt das Kalorienbudget aus dem Resttag vor. */
   private startSearch(): void {
     this.resetResults();
+    this.isLogging = false;
     // Auch bei verbrauchtem Budget setzen (0 = nichts mehr übrig).
     const kcalBudget = this.targetKcal() > 0 ? defaultKcalBudget(this.remainingKcal()) : this.ff().kcalBudget;
     this.ff.update((f) => ({ ...f, kcalBudget, country: this.profile.fastfoodCountry() }));
@@ -153,7 +161,7 @@ export class FastfoodSheetComponent implements OnChanges {
   }
 
   overBudget(s: FastFoodSuggestion): boolean {
-    return isOverBudget(s, this.ff().kcalBudget ?? defaultKcalBudget(this.remainingKcal()));
+    return isOverBudget(s, this.ff().kcalBudget ?? defaultKcalBudget(this.budgetBase()));
   }
 
   private buildRequest(inputs: FastFoodInputs, exclude: string[]): FastFoodRequest {
@@ -210,6 +218,8 @@ export class FastfoodSheetComponent implements OnChanges {
   }
 
   logFastfood(s: FastFoodSuggestion): void {
+    if (this.isLogging || !ensureWritable(this.diary, this.toastCtrl)) return;
+    this.isLogging = true;
     const entry = this.diary.add({
       dateISO: this.date(),
       meal: mealForHour(new Date().getHours()),

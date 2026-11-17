@@ -41,8 +41,8 @@ describe('recipe-nutrition — Randfälle', () => {
     expect(ingredientFacts(ing({ amount: 2, unit: 'Prise', facts: per100g(400) })).kcal).toBe(8);
   });
 
-  it('zählt eine unbekannte Einheit bei per100g als Faktor (aktuelles Verhalten)', () => {
-    expect(ingredientFacts(ing({ amount: 2, unit: 'Becher', facts: per100g(100) })).kcal).toBe(200);
+  it('rechnet eine unbekannte Einheit bei per100g nicht (K8: 0 kcal, zählt als fehlend)', () => {
+    expect(ingredientFacts(ing({ amount: 2, unit: 'Becher', facts: per100g(100) })).kcal).toBe(0);
   });
 
   it('zählt bei perPortion Löffel/Stück als Anzahl Portionen', () => {

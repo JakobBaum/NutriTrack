@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { normalizeRecipeImport, parseIngredientFacts } from './recipe-import-normalize';
 
 describe('normalizeRecipeImport', () => {
+  it('reicht usedFallbackText nur bei exakt true durch', () => {
+    expect(normalizeRecipeImport({ title: 'A', usedFallbackText: true }).usedFallbackText).toBe(true);
+    expect(normalizeRecipeImport({ title: 'A', usedFallbackText: 'true' }).usedFallbackText).toBeUndefined();
+    expect(normalizeRecipeImport({ title: 'A' }).usedFallbackText).toBeUndefined();
+  });
+
   it('leitet die Nährwert-Basis aus der Einheit ab (g → per100g, Stk → perPortion)', () => {
     // Arrange
     const raw = {
@@ -96,4 +102,11 @@ describe('parseIngredientFacts / normalizeRecipeImport — Randfälle', () => {
 it('parst Mengen mit Dezimalkomma', () => {
   const r = normalizeRecipeImport({ ingredients: [{ name: 'Mehl', amount: '2,5', unit: 'kg' }] });
   expect(r.ingredients[0].amount).toBe(2.5);
+});
+
+describe('parseIngredientFacts — maschinelle Zahlen (K15)', () => {
+  it('liest "1.250" als 1,25 statt 1250 (kein Tausenderpunkt in KI-Daten)', () => {
+    const facts = parseIngredientFacts({ kcal: 100, proteinG: '1.250', carbsG: 10, fatG: 1, basis: 'per100g' }, 'g');
+    expect(facts?.proteinG).toBe(1.25);
+  });
 });

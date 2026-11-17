@@ -132,3 +132,37 @@ describe('DiaryStore.update Name und Menge löschen (QAD-01, QAD-04)', () => {
     expect(store.entries()[0].unit).toBeUndefined();
   });
 });
+
+describe('DiaryStore.update Prüfung (D7)', () => {
+  it('bereinigt ungültige Nährwerte statt NaN zu speichern', () => {
+    const e = store.add(input());
+    store.update(e.id, { facts: { kcal: NaN, proteinG: -1, carbsG: 3, fatG: Infinity, basis: 'perPortion' } });
+    const f = store.entries()[0].facts;
+    expect([f.kcal, f.proteinG, f.carbsG, f.fatG]).toEqual([0, 0, 3, 0]);
+  });
+
+  it('übernimmt keine ungültige Essenszeit, Portion oder Einheit', () => {
+    const e = store.add(input({ servings: 2, unit: 'g' }));
+    store.update(e.id, { meal: 'brunch' as never, servings: -2, unit: 'pfund' as never });
+    const after = store.entries()[0];
+    expect(after.meal).toBe('lunch');
+    expect(after.servings).toBe(2);
+    expect(after.unit).toBe('g');
+  });
+
+  it('übernimmt gültige Portion, Essenszeit und Einheit', () => {
+    const e = store.add(input());
+    store.update(e.id, { meal: 'dinner', servings: 3, unit: 'ml' });
+    expect(store.entries()[0]).toMatchObject({ meal: 'dinner', servings: 3, unit: 'ml' });
+  });
+
+  it('übernimmt keine kaputten baseFacts', () => {
+    const e = store.add(input());
+    store.update(e.id, { baseFacts: { kcal: NaN, proteinG: 1, carbsG: 1, fatG: 1, basis: 'per100g' } });
+    expect(store.entries()[0].baseFacts).toBeUndefined();
+  });
+
+  it('bietet Schreibsperre', () => {
+    expect(store.isReadOnly()).toBe(false);
+  });
+});

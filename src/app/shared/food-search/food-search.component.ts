@@ -36,8 +36,10 @@ export class NtFoodSearchComponent {
   readonly manualEntry = output<string>();
 
   protected readonly error = signal<string | null>(null);
+  /** Online-Suche ausgefallen: es werden nur eigene Treffer gezeigt (F6). */
+  protected readonly remoteFailed = signal(false);
   readonly search = new DiarySearch(
-    withCustomFoods(inject(FOOD_PROVIDER), () => this.customFoods.foods()),
+    withCustomFoods(inject(FOOD_PROVIDER), () => this.customFoods.foods(), (failed) => this.remoteFailed.set(failed)),
     (message) => this.error.set(message),
   );
 
@@ -61,6 +63,7 @@ export class NtFoodSearchComponent {
   reset(): void {
     this.search.reset();
     this.error.set(null);
+    this.remoteFailed.set(false);
     this.cdr.markForCheck();
   }
 

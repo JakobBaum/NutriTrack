@@ -87,4 +87,19 @@ describe('IdleResource', () => {
     await expect(res.use(async () => 1)).rejects.toThrow('no worker');
     await expect(res.use(async () => 2)).resolves.toBe(2);
   });
+
+  it('beendet die Instanz bei einem Fehler erst, wenn ein paralleler Job fertig ist (K18)', async () => {
+    const { create, created } = makeFactory();
+    const res = new IdleResource(create, 60_000);
+    let finish: (v: number) => void = () => undefined;
+    const slow = res.use(() => new Promise<number>((r) => (finish = r)));
+    await expect(res.use(async () => { throw new Error('boom'); })).rejects.toThrow('boom');
+    expect(created[0].terminate).not.toHaveBeenCalled();
+    finish(1);
+    await expect(slow).resolves.toBe(1);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(created[0].terminate).toHaveBeenCalledTimes(1);
+    await res.use(async () => 2);
+    expect(create).toHaveBeenCalledTimes(2);
+  });
 });

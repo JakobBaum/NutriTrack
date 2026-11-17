@@ -32,3 +32,48 @@ describe('sanitizeRecipes', () => {
     expect(sanitizeRecipes([{ id: 1 }]).rejected).toEqual([{ id: 1 }]);
   });
 });
+
+describe('sanitizeRecipes — reparieren statt verwerfen (Prüfrunde 2)', () => {
+  it('entfernt ungültige Nährwerte einer Zutat (facts: null) und behält das Rezept', () => {
+    const r = sanitizeRecipes([{ ...own, ingredients: [{ name: 'Reis', amount: 1, unit: 'g', facts: null }] }]);
+    expect(r.rejected).toEqual([]);
+    expect(r.items).toEqual([own]);
+    expect(r.repaired).toBe(1);
+  });
+
+  it('setzt eine fehlende oder ungültige Menge auf 0', () => {
+    const bad = [{ name: 'A', amount: null, unit: 'g' }, { name: 'B', amount: Number.NaN, unit: 'g' }, { name: 'C', amount: -2, unit: 'g' }];
+    const r = sanitizeRecipes([{ ...own, ingredients: bad }]);
+    expect(r.rejected).toEqual([]);
+    expect(r.items[0].ingredients.map((i) => i.amount)).toEqual([0, 0, 0]);
+    expect(r.repaired).toBe(1);
+  });
+
+  it('repariert servings null (aus NaN nach JSON) zu 1, statt das Rezept zu verwerfen', () => {
+    const r = sanitizeRecipes([{ ...own, servings: null }]);
+    expect(r.rejected).toHaveLength(0);
+    expect(r.repaired).toBe(1);
+    expect(r.items[0].servings).toBe(1);
+  });
+
+  it('hebt servings 0 auf 1', () => {
+    const r = sanitizeRecipes([{ ...own, servings: 0 }]);
+    expect(r.items[0].servings).toBe(1);
+    expect(r.repaired).toBe(1);
+  });
+
+  it('verwirft weiterhin strukturell unbrauchbare Rezepte (Zutat ohne Namen, Schritte kein Text)', () => {
+    const noName = { ...own, ingredients: [{ amount: 1, unit: 'g' }] };
+    const badSteps = { ...own, steps: [1, 2] };
+    const r = sanitizeRecipes([noName, badSteps, own]);
+    expect(r.rejected).toEqual([noName, badSteps]);
+    expect(r.items).toEqual([own]);
+  });
+
+  it('verändert das Eingabeobjekt nicht', () => {
+    const input = { ...own, servings: 0, ingredients: [{ name: 'Reis', amount: null, unit: 'g' }] };
+    const copy = JSON.parse(JSON.stringify(input));
+    sanitizeRecipes([input]);
+    expect(input).toEqual(copy);
+  });
+});

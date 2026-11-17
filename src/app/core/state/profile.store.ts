@@ -16,6 +16,8 @@ const KEY_APP_SETTINGS = 'app-settings';
 @Injectable({ providedIn: 'root' })
 export class ProfileStore {
   private readonly storage = inject(StorageService);
+  /** True, wenn Schreiben gesperrt ist (neueres Schema oder Änderung in anderem Fenster); Änderungen werden dann nicht gespeichert. */
+  readonly isReadOnly = this.storage.isLockedFor(KEY_PROFILE);
   private readonly calc = inject(NutritionCalcService);
 
   /** Altes Fastfood-Land aus den App-Einstellungen (nur zur einmaligen Übernahme ins Profil). */
@@ -40,24 +42,18 @@ export class ProfileStore {
   readonly hasProfile = computed(() => this._profile() !== null);
 
   /** Speichert ein neues/aktualisiertes Profil und persistiert es. */
-  setProfile(profile: UserProfile): void {
+  setProfile(profile: UserProfile): boolean {
     const next: UserProfile = { ...profile, updatedAt: new Date().toISOString() };
     this._profile.set(next);
-    this.storage.set(KEY_PROFILE, next);
+    return this.storage.set(KEY_PROFILE, next);
   }
 
   /**
    * Liest das Profil und prüft es (Typen, Wertebereiche, Ernährungsangaben). Ein unbrauchbares Profil
-   * wird in Quarantäne gesichert und entfernt, damit die App nie mit kaputten Werten rechnet.
+   * wird in Quarantäne gesichert und (nur nach gelungener Sicherung) entfernt, damit die App nie mit kaputten Werten rechnet.
    */
   private load(): UserProfile | null {
-    const stored = this.storage.get<unknown>(KEY_PROFILE, null);
-    if (stored === null) return null;
-    const clean = sanitizeProfile(stored);
-    if (clean === null) {
-      this.storage.quarantine(KEY_PROFILE, [stored], 'invalid');
-      this.storage.remove(KEY_PROFILE);
-    }
+    const clean = this.storage.getObject(KEY_PROFILE, sanitizeProfile);
     return clean === null ? null : this.adoptLegacyCountry(clean);
   }
 

@@ -15,6 +15,8 @@ export interface SavedMealDraft {
 @Injectable({ providedIn: 'root' })
 export class MealsStore {
   private readonly storage = inject(StorageService);
+  /** True, wenn Schreiben gesperrt ist (neueres Schema oder Änderung in anderem Fenster); Änderungen werden dann nicht gespeichert. */
+  readonly isReadOnly = this.storage.isLockedFor(KEY);
   private readonly _meals = signal<SavedMeal[]>(
     this.storage.getSanitized<SavedMeal>(KEY, (raw) => sanitizeList<SavedMeal>(raw, ARRAY_CHECKS['savedMeals'])),
   );
@@ -57,7 +59,7 @@ export class MealsStore {
     this.persist();
   }
 
-  private persist(): void {
-    this.storage.set(KEY, this._meals());
+  private persist(): boolean {
+    return this.storage.set(KEY, this._meals());
   }
 }

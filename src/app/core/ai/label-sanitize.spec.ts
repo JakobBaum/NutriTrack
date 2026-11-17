@@ -38,6 +38,20 @@ describe('sanitizeLabelResult', () => {
     }
   });
 
+  it('markiert kcal, die nicht zu den Makros passen, als "bitte pruefen" statt sie zu verwerfen (K5)', () => {
+    const lowKcal = sanitizeLabelResult(label({}, { kcal: 50, proteinG: 8, carbsG: 60, fatG: 10 }), 'per100g');
+    expect(lowKcal?.isDoubtful).toBe(true);
+    expect(lowKcal?.facts.kcal).toBe(50);
+    const kjValue = sanitizeLabelResult(label({}, { kcal: 418, proteinG: 5, carbsG: 15, fatG: 2 }), 'per100g');
+    expect(kjValue?.isDoubtful).toBe(true);
+    const portion = sanitizeLabelResult(label({}, { kcal: 900, proteinG: 8, carbsG: 20, fatG: 10, basis: 'perPortion' }), 'perPortion');
+    expect(portion?.isDoubtful).toBe(true);
+  });
+
+  it('markiert stimmige Werte nicht', () => {
+    expect(sanitizeLabelResult(label(), 'per100g')?.isDoubtful).toBeUndefined();
+  });
+
   it('laesst unlesbare optionale Werte weg statt sie zu uebernehmen', () => {
     const result = sanitizeLabelResult(label({}, { fiberG: 'viel', sugarG: null, saltG: undefined }), 'per100g');
     expect(result?.facts.fiberG).toBeUndefined();

@@ -66,6 +66,12 @@ ion-content {
     --inner-border-width: 0;
   }
 
+  // Sichtbarer Fokusring auf der Zeile (Tastatur, Schalter-Steuerung).
+  ion-item::part(native):focus-visible {
+    outline: 2px solid var(--nt-focus);
+    outline-offset: -2px;
+  }
+
   &__more {
     flex: none;
     width: var(--nt-icon-btn);
@@ -107,7 +113,7 @@ ion-content {
   &__empty {
     display: flex;
     align-items: center;
-    min-height: 56px;
+    min-height: var(--nt-touch);
     margin: 0;
     padding: 0 var(--nt-space-4);
     font-size: var(--nt-fs-body);
@@ -209,9 +215,9 @@ ion-content {
   }
 }
 
-// Bearbeiten-Sheet: Speichern im .nt-sheet-footer, Zusatzaktionen als Text-Buttons (.nt-btn--text)
-.edit-delete {
-  color: var(--nt-danger);
+// Ein Makro-Paar ("F 10,8 g") bricht nie zwischen Buchstabe und Wert um.
+.macro {
+  white-space: nowrap;
 }
 
 .macro-legend {

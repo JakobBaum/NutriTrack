@@ -1,15 +1,41 @@
+/* Sheet-Griff und Hintergrund: die Diary-Sheet-Regeln gelten hier nicht (Emulated Encapsulation). */
+.sheet-grabber {
+  position: absolute;
+  top: var(--nt-space-2);
+  left: 50%;
+  z-index: 20;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--nt-grabber);
+}
+
+.sheet-content {
+  --background: var(--nt-ground);
+  --padding-bottom: var(--nt-space-4);
+}
+
 .consent {
   display: flex;
   flex-direction: column;
   gap: var(--nt-space-3);
+  padding-top: var(--nt-space-3);
+  padding-top: var(--nt-space-3);
   padding-bottom: var(--nt-space-4);
   color: var(--nt-ink);
   overflow-wrap: anywhere;
 
   &__lead,
   &__note,
-  &__minor {
+  &__minor,
+  &__error {
     margin: 0;
+  }
+
+  &__error {
+    color: var(--nt-over);
+    font-weight: 600;
   }
 
   &__note {
@@ -30,8 +56,23 @@
     gap: var(--nt-space-2);
   }
 
+  /* Alle Kinder behalten ihre Höhe: bei knappem Platz scrollt der Inhalt, nichts schiebt sich übereinander. */
+  > * {
+    flex: none;
+  }
+
   &__adult {
+    display: block;
+    width: 100%;
+    height: auto;
     min-height: var(--nt-btn-height);
+    white-space: normal;
+
+    &::part(label) {
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+    }
   }
 
   &__privacy {
@@ -50,4 +91,6 @@
   white-space: normal;
   overflow: visible;
   text-overflow: clip;
+  text-wrap: balance;
+  padding-top: var(--nt-space-2);
 }

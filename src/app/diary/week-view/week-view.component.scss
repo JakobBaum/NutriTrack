@@ -6,6 +6,11 @@
 $bar-height: 120px;
 
 .week {
+  // "Eiweiß" bliebe in Großbuchstaben "EIWEISS": Überschriften der Diagramme zeigen die Schreibweise unverändert.
+  &__title {
+    text-transform: none;
+  }
+
   &__stats {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -92,6 +97,30 @@ $bar-height: 120px;
       flex: 1;
       text-align: center;
     }
+  }
+
+  // Wert unter dem Wochentag: kompakt, bricht nie um.
+  &__values {
+    display: flex;
+    gap: var(--nt-space-2);
+    margin-top: 2px;
+    font-size: var(--nt-fs-caption);
+    font-variant-numeric: tabular-nums;
+    color: var(--nt-ink);
+
+    span {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-align: center;
+      white-space: nowrap;
+    }
+  }
+
+  &__target-text {
+    margin: var(--nt-space-2) 0 0;
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
   }
 
   &__label--today {

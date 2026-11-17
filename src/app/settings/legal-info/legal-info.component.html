@@ -1,9 +1,8 @@
 @switch (section()) {
   @case ('datenschutz') {
-    <h3>Datenschutzerklärung</h3>
     <p class="legal__stand">Stand: November 2026</p>
     <p><strong>Verantwortlich:</strong> Jakob Baumgartner, baumgartner.jakob12&#64;gmail.com</p>
-    <p>Hier steht pro Datenfluss, wozu er dient, welche Daten gesendet werden, an wen, in welches Land und wie lange sie gespeichert werden. Ohne deine Zustimmung zu den Online- und KI-Funktionen senden diese nichts an Dritte.</p>
+    <p>Hier steht pro Datenfluss, wozu er dient, welche Daten gesendet werden, an wen, in welches Land und wie lange sie gespeichert werden. Ohne deine Zustimmung senden KI und Rezeptsuche nichts. Lebensmittelsuche und Barcode-Scan fragen weiterhin Open Food Facts ab (siehe unten).</p>
 
     <h4>Auf deinem Gerät</h4>
     <p><strong>Zweck:</strong> Tagebuch, Ziele, Rezepte und Einstellungen. <strong>Daten:</strong> Profil (Alter, Geschlecht, Größe, Gewicht, Ziel, Ernährungsform, Unverträglichkeiten, ausgeschlossene Zutaten), Tagebuch, Rezepte, Einkaufsliste. <strong>Empfänger:</strong> keiner, die Daten liegen nur im Speicher deines Geräts. <strong>Speicherdauer:</strong> bis du sie löschst. „Alle lokalen Daten zurücksetzen“ löscht alles auf diesem Gerät, auch deine Zustimmung.</p>
@@ -49,7 +48,6 @@
     <p>Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch und Datenübertragbarkeit (Art. 15 bis 21 DSGVO). Kontakt per E-Mail. Beschwerden kannst du bei der österreichischen Datenschutzbehörde (dsb.gv.at) einreichen.</p>
   }
   @case ('agb') {
-    <h3>Nutzungsbedingungen</h3>
     <p>NutriTrack ist ein persönliches Ernährungstagebuch und dient ausschließlich zur Information. Es ist <strong>kein Medizinprodukt</strong> und ersetzt keine Ernährungs-, Gesundheits- oder ärztliche Beratung.</p>
     <p><strong>Mindestalter:</strong> Die App ist für Personen ab 18 Jahren gedacht. Die KI- und Online-Funktionen sind erst nach Bestätigung des Mindestalters nutzbar.</p>
     <p><strong>Nicht geeignet</strong> für Schwangere und Stillende, für Kinder und Jugendliche sowie für Menschen mit Erkrankungen oder Essstörungen ohne ärztliche Begleitung.</p>
@@ -61,7 +59,6 @@
     <p>Die App wird ohne Gewähr bereitgestellt. Die Haftung für leichte Fahrlässigkeit ist ausgeschlossen; das gilt nicht für Personenschäden und nicht, soweit das Gesetz anderes vorschreibt.</p>
   }
   @case ('quellen') {
-    <h3>Quellen und Lizenzen</h3>
     <h4>Daten und Dienste</h4>
     @for (source of dataSources; track source.name) {
       <p><strong><a [href]="source.url" target="_blank" rel="noopener">{{ source.name }}</a></strong><br />{{ source.note }}<br />Lizenz: {{ source.license }}</p>

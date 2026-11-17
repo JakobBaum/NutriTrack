@@ -126,6 +126,19 @@ describe('NutritionCalcService', () => {
     expect(svc.achievedRateKgPerWeek(male)).toBe(0);
   });
 
+  it('meldet 0 kg/Woche, wenn die Mindestzufuhr über dem Gesamtumsatz liegt (kein Defizit)', () => {
+    // Arrange: sehr kleiner Umsatz, Mindestzufuhr 1200 liegt über TDEE
+    const tiny: UserProfile = {
+      weightKg: 40, heightCm: 140, age: 80, sex: 'female',
+      activityLevel: 'sedentary', goal: 'lose', rateKgPerWeek: 0.3,
+      updatedAt: '2026-10-13T00:00:00.000Z',
+    };
+
+    // Act / Assert
+    expect(svc.totalDailyEnergy(tiny)).toBeLessThan(svc.dailyTarget(tiny).kcal);
+    expect(svc.achievedRateKgPerWeek(tiny)).toBe(0);
+  });
+
   it('meldet das gedeckelte Tempo als erreichtes Tempo', () => {
     const light: UserProfile = { ...male, weightKg: 60, goal: 'lose', rateKgPerWeek: 0.75 };
     expect(svc.achievedRateKgPerWeek(light)).toBeCloseTo(0.6, 1);

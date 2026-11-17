@@ -3,6 +3,7 @@ import { ActionSheetController, ToastController } from '@ionic/angular';
 import { ModalController } from '@ionic/angular/lazy';
 import { pickMealSheet } from '../../diary/diary-sheets';
 import { showEntryToast } from '../../diary/entry-toast';
+import { WRITE_BLOCKED_MESSAGE } from '../../core/storage/storage-messages';
 import { DiaryStore } from '../../core/state/diary.store';
 import { toDateISO } from '../../core/util/date';
 import { toRecipeDraft } from '../../core/recipes/online/spoonacular.mapper';
@@ -41,6 +42,10 @@ export class WeekRecipeSheetComponent {
 
   save(): void {
     if (this.isSaved()) return;
+    if (this.recipeStore.isReadOnly()) {
+      void showEntryToast(this.toasts, WRITE_BLOCKED_MESSAGE);
+      return;
+    }
     this.recipeStore.add(toRecipeDraft(this.recipe));
   }
 
@@ -51,6 +56,10 @@ export class WeekRecipeSheetComponent {
     if (!meal) return;
     const entry = weekRecipeToDiaryEntry(this.recipe, meal, toDateISO());
     if (!entry) return;
+    if (this.diary.isReadOnly()) {
+      void showEntryToast(this.toasts, WRITE_BLOCKED_MESSAGE);
+      return;
+    }
     const saved = this.diary.add(entry);
     void showEntryToast(this.toasts, 'Ins Tagebuch eingetragen.', () => this.diary.remove(saved.id));
   }

@@ -8,8 +8,8 @@ import { sanitizeProfileDiet } from '../diet/diet-prefs';
 import { DEFAULT_FASTFOOD_COUNTRY, parseFastfoodCountry } from '../ai/fastfood-countries';
 import { MANUAL_KCAL_RANGE, MANUAL_PROTEIN_RANGE } from '../nutrition/manual-target';
 import { MAX_WEIGHT_KG, MIN_WEIGHT_KG } from '../weight/weight-math';
+import { Rec, isRec } from '../util/guards';
 
-type Rec = Record<string, unknown>;
 interface Range { readonly min: number; readonly max: number }
 
 const SEXES: readonly Sex[] = ['male', 'female', 'diverse'];
@@ -31,7 +31,6 @@ export const PROFILE_LOAD_RANGES = {
 /** Ersatz für ein fehlendes oder ungültiges `updatedAt` (wird nur noch zur Anzeige der Aktualität genutzt). */
 const FALLBACK_UPDATED_AT = '1970-01-01T00:00:00.000Z';
 
-const isRec = (v: unknown): v is Rec => typeof v === 'object' && v !== null && !Array.isArray(v);
 const inRange = (v: unknown, r: Range): v is number => typeof v === 'number' && Number.isFinite(v) && v >= r.min && v <= r.max;
 const oneOf = <T extends string>(list: readonly T[], v: unknown): v is T => typeof v === 'string' && (list as readonly string[]).includes(v);
 const isValidIso = (v: unknown): v is string => typeof v === 'string' && !Number.isNaN(Date.parse(v));

@@ -1,10 +1,10 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { isPlausiblePer100g } from './facts-plausibility';
+import { EnergyHints, assessKcal, isPlausiblePer100g } from './facts-plausibility';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom, timeout } from 'rxjs';
 import { FoodItem, NutritionFacts } from '../models';
 import { makeId } from '../util/id';
-import { parseDecimal } from '../util/number-input';
+import { readMachineNumber } from './machine-number';
 import { FoodProvider } from './food-provider';
 import { FOOD_TIMEOUT_MS, FoodLookupError, toFoodLookupError } from './food-errors';
 import { plausibleServingG } from './serving';
@@ -100,8 +100,9 @@ export class OpenFoodFactsProvider implements FoodProvider {
         }).pipe(timeout(FOOD_TIMEOUT_MS)),
       );
       const entries = (res.hits ?? []).flatMap((p): RankEntry[] => {
-        const item = this.toFoodItem(p, (code) => this.log.info(`Unplausible Nährwerte verworfen (Barcode ${code})`));
-        return item ? [{ item, locale: localeScore(p), categories: p.categories_tags }] : [];
+        const parsed = this.parseProduct(p);
+        if (parsed === 'implausible') this.log.info(`Unplausible Nährwerte verworfen (Barcode ${p.code ?? 'ohne'})`);
+        return parsed !== null && typeof parsed === 'object' ? [{ item: parsed, locale: localeScore(p), categories: p.categories_tags }] : [];
       });
       const items = dedupe(rank(entries, q).map((e) => e.item)).slice(0, limit);
       this.log.success(`✓ ${items.length} Treffer für "${q}"`);
@@ -112,11 +113,6 @@ export class OpenFoodFactsProvider implements FoodProvider {
       this.log.error(`✗ Suche "${q}" (${err.reason}): ${err.message}`);
       throw err;
     }
-  }
-
-  /** Produkt-Namensvorschläge für die Freitextsuche (kleine, schnelle Trefferliste). */
-  async autocomplete(query: string, limit = 6): Promise<FoodItem[]> {
-    return this.searchByText(query, limit);
   }
 
   async lookupByBarcode(barcode: string): Promise<FoodItem | null> {
@@ -130,9 +126,7 @@ export class OpenFoodFactsProvider implements FoodProvider {
         ).pipe(timeout(FOOD_TIMEOUT_MS)),
       );
       if (!res.product || res.status === 'failure') return null;
-      return this.toFoodItem(res.product, () => {
-        throw new FoodLookupError('implausible', `Unplausible Nährwerte (Barcode ${code})`);
-      });
+      return this.toBarcodeItem(res.product, code);
     } catch (e: unknown) {
       if (isNotFound(e)) return null;
       const err = toFoodLookupError(e);
@@ -141,27 +135,35 @@ export class OpenFoodFactsProvider implements FoodProvider {
     }
   }
 
+  /** Barcode: Produkt ohne Nährwerte und fehlerhafte Daten bekommen je einen eigenen Fehlergrund. */
+  private toBarcodeItem(p: OffProduct, code: string): FoodItem | null {
+    const parsed = this.parseProduct(p);
+    if (parsed === 'implausible') throw new FoodLookupError('implausible', `Unplausible Nährwerte (Barcode ${code})`);
+    if (parsed === 'no-nutrition') throw new FoodLookupError('no-nutrition', `Produkt ohne Nährwerte (Barcode ${code})`);
+    return parsed;
+  }
+
   private num(v: number | string | undefined): number {
-    const n = parseDecimal(v);
+    const n = readMachineNumber(v);
     return n !== null ? Math.max(0, n) : 0;
   }
 
   /** Optionaler Nährwert: undefined statt 0, wenn OFF ihn nicht liefert (kein erfundenes "0 g Salz"). */
   private optionalNum(v: number | string | undefined): number | undefined {
-    const n = parseDecimal(v);
+    const n = readMachineNumber(v);
     return n !== null ? Math.max(0, n) : undefined;
   }
 
   /** kcal je 100 g; fehlt der Wert, wird aus kJ umgerechnet. null = keine Naehrwerte (nie still 0 kcal). */
   private kcalPer100g(n: OffNutriments): number | null {
-    const kcal = parseDecimal(n['energy-kcal_100g']);
+    const kcal = readMachineNumber(n['energy-kcal_100g']);
     if (kcal !== null) return Math.max(0, kcal);
-    const kj = parseDecimal(n['energy-kj_100g']);
+    const kj = readMachineNumber(n['energy-kj_100g']);
     return kj !== null ? Math.max(0, kj / KJ_PER_KCAL) : null;
   }
 
-  /** `onImplausible` entscheidet: still verwerfen (Suche) oder Fehler melden (Barcode). */
-  private toFoodItem(p: OffProduct, onImplausible: (code: string) => void): FoodItem | null {
+  /** Ohne Namen: null; ohne Nährwerte: 'no-nutrition'; offensichtlich falsche Werte: 'implausible'. */
+  private parseProduct(p: OffProduct): FoodItem | 'no-nutrition' | 'implausible' | null {
     const rawName = (p.product_name ?? '').trim();
     if (!rawName) return null;
     const stripped = stripSize(rawName);
@@ -172,7 +174,7 @@ export class OpenFoodFactsProvider implements FoodProvider {
     const nutriscore = /^[a-e]$/.test(grade) ? (grade as FoodItem['nutriscore']) : undefined;
     const n = p.nutriments ?? {};
     const kcal = this.kcalPer100g(n);
-    if (kcal === null) return null;
+    if (kcal === null) return 'no-nutrition';
     const facts: NutritionFacts = {
       kcal,
       proteinG: this.num(n['proteins_100g']),
@@ -183,10 +185,10 @@ export class OpenFoodFactsProvider implements FoodProvider {
       saltG: this.optionalNum(n['salt_100g']),
       basis: 'per100g',
     };
-    if (!isPlausiblePer100g(facts)) {
-      onImplausible(p.code ?? 'ohne');
-      return null;
-    }
+    const hints = this.energyHints(n);
+    if (!isPlausiblePer100g(facts, hints)) return 'implausible';
+    const isDoubtful = assessKcal(facts, hints) === 'check';
+    const isIncomplete = [n['proteins_100g'], n['carbohydrates_100g'], n['fat_100g']].some((v) => readMachineNumber(v) === null);
     return {
       id: makeId('off'),
       source: 'openfoodfacts',
@@ -197,6 +199,19 @@ export class OpenFoodFactsProvider implements FoodProvider {
       servingG: plausibleServingG(p.serving_quantity),
       quantity,
       nutriscore,
+      ...(isIncomplete ? { isIncomplete: true } : {}),
+      ...(isDoubtful ? { isKcalDoubtful: true } : {}),
+    };
+  }
+
+  /** kJ nur, wenn auch ein kcal-Feld vorliegt (sonst stammt kcal aus kJ), plus Polyole zur Erklärung einer kcal-Lücke. */
+  private energyHints(n: OffNutriments): EnergyHints {
+    const hasKcalField = readMachineNumber(n['energy-kcal_100g']) !== null;
+    const kj = hasKcalField ? readMachineNumber(n['energy-kj_100g']) : null;
+    const polyols = readMachineNumber(n['polyols_100g']);
+    return {
+      ...(kj !== null ? { kjPer100g: kj } : {}),
+      ...(polyols !== null ? { polyolsG: Math.max(0, polyols) } : {}),
     };
   }
 }

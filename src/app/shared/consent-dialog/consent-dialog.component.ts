@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { ModalController } from '@ionic/angular/lazy';
 import { ConsentStore } from '../../core/consent/consent.store';
+import { EXTERNAL_CHANGE_MESSAGE, SCHEMA_NEWER_MESSAGE, WRITE_BLOCKED_MESSAGE } from '../../core/storage/storage-messages';
+import { StorageService } from '../../core/storage/storage.service';
 import { PrivacyModalComponent } from './privacy-modal.component';
 
 /** Rollen, mit denen der Dialog schließt. */
@@ -18,19 +20,34 @@ export const CONSENT_ROLE_CANCEL = 'cancel';
 export class ConsentDialogComponent {
   private readonly modals = inject(ModalController);
   private readonly store = inject(ConsentStore);
+  private readonly storage = inject(StorageService);
 
   /** Das Profil hat ein Alter unter 18: Zustimmung nicht möglich. */
   isMinor = false;
 
   readonly isAdult = signal(false);
+  /** Fehlermeldung, wenn die Zustimmung nicht gespeichert werden konnte (Schreibsperre); der Dialog bleibt dann offen. */
+  readonly acceptError = signal<string | null>(null);
 
   setAdult(checked: boolean): void {
     this.isAdult.set(checked);
   }
 
   accept(): void {
-    if (this.isMinor || !this.store.grant(new Date(), this.isAdult())) return;
+    if (this.isMinor || !this.isAdult()) return;
+    if (!this.store.grant(new Date(), true)) {
+      this.acceptError.set(this.blockedMessage());
+      return;
+    }
+    this.acceptError.set(null);
     void this.modals.dismiss(null, CONSENT_ROLE_CONFIRM);
+  }
+
+  /** Ursache der Schreibsperre in Worten (der Hinweis oben im Banner liegt hinter dem Dialog). */
+  private blockedMessage(): string {
+    if (this.storage.schemaNewer()) return SCHEMA_NEWER_MESSAGE;
+    if (this.storage.externalChange()) return EXTERNAL_CHANGE_MESSAGE;
+    return WRITE_BLOCKED_MESSAGE;
   }
 
   decline(): void {

@@ -26,9 +26,3 @@ export function splitOutcomes(outcomes: readonly ResolveOutcome[]): PlanRecipes 
 export function skippedNote(skipped: readonly string[]): string | undefined {
   return skipped.length > 0 ? `Nicht geladen: ${skipped.join(', ')}` : undefined;
 }
-
-/** Fügt den Hinweis des Anbieters und den Hinweis zu ausgelassenen Rezepten zusammen. */
-export function joinNotes(...notes: readonly (string | undefined)[]): string | undefined {
-  const present = notes.filter((n): n is string => !!n);
-  return present.length > 0 ? present.join(' ') : undefined;
-}

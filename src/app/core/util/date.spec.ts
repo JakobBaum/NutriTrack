@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { addDaysISO, dayLabel, rollDate, toDateISO } from './date';
+import { addDaysISO, dayLabel, isIsoDay, rollDate, toDateISO } from './date';
 import { makeId } from './id';
 
 describe('date-Helfer', () => {
@@ -51,5 +51,20 @@ describe('rollDate (QAD-02)', () => {
 
   it('ändert nichts, solange derselbe Tag gilt', () => {
     expect(rollDate('2026-11-08', '2026-11-08', '2026-11-08')).toEqual({ selected: '2026-11-08', today: '2026-11-08' });
+  });
+});
+
+describe('isIsoDay', () => {
+  it('akzeptiert echte Kalendertage', () => {
+    expect(isIsoDay('2026-02-28')).toBe(true);
+    expect(isIsoDay('2028-02-29')).toBe(true);
+  });
+
+  it('lehnt unmögliche Tage und falsche Formate ab', () => {
+    expect(isIsoDay('2026-02-31')).toBe(false);
+    expect(isIsoDay('2026-13-01')).toBe(false);
+    expect(isIsoDay('2027-02-29')).toBe(false);
+    expect(isIsoDay('2026-1-01')).toBe(false);
+    expect(isIsoDay(20260101)).toBe(false);
   });
 });

@@ -1,14 +1,17 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { isTimeoutError } from '../ai/ai-errors';
+import { isDeviceOffline, isTimeoutError } from '../ai/ai-errors';
 import { STATE_MESSAGES } from '../messages/state-messages';
 
 /** Warum eine Lebensmittel-Abfrage fehlschlug (für passende Nutzer-Meldungen). */
-export type FoodLookupFailure = 'offline' | 'rate-limit' | 'server' | 'timeout' | 'implausible';
+export type FoodLookupFailure = 'offline' | 'rate-limit' | 'server' | 'timeout' | 'implausible' | 'no-nutrition';
 
 /** Zeitlimit für eine Lebensmittel-Abfrage (Suche und Barcode), danach Abbruch mit Meldung. */
 export const FOOD_TIMEOUT_MS = 10000;
 
 const HTTP_TOO_MANY_REQUESTS = 429;
+
+/** Meldung, wenn ein Produkt gefunden wurde, aber keine Nährwerte hat. */
+export const FOOD_NO_NUTRITION_MESSAGE = 'Produkt gefunden, aber ohne Nährwerte. Bitte manuell eintragen.';
 
 /** Fehler einer Food-Abfrage mit klassifiziertem Grund. */
 export class FoodLookupError extends Error {
@@ -19,11 +22,6 @@ export class FoodLookupError extends Error {
     super(message);
     this.name = 'FoodLookupError';
   }
-}
-
-/** True, wenn der Browser sicher weiß, dass das Gerät offline ist. */
-function isDeviceOffline(): boolean {
-  return typeof navigator !== 'undefined' && navigator.onLine === false;
 }
 
 /**
@@ -54,6 +52,8 @@ export function foodErrorMessage(e: unknown): string {
       return STATE_MESSAGES.offline;
     case 'implausible':
       return STATE_MESSAGES.foodImplausible;
+    case 'no-nutrition':
+      return FOOD_NO_NUTRITION_MESSAGE;
     default:
       return STATE_MESSAGES.foodServer;
   }

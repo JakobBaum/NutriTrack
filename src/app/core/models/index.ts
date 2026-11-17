@@ -95,6 +95,10 @@ export interface FoodItem {
   quantity?: string;
   /** Nutri-Score A-E (nur Anzeige). */
   nutriscore?: 'a' | 'b' | 'c' | 'd' | 'e';
+  /** Die Quelle liefert Eiweiß, Kohlenhydrate oder Fett nicht; fehlende Werte stehen als 0 g (nur Anzeige-Hinweis). */
+  isIncomplete?: boolean;
+  /** Die Energie passt nicht sicher zu den Makros (Quelle fehlerhaft?): in der Oberfläche "bitte prüfen". */
+  isKcalDoubtful?: boolean;
 }
 
 export interface RecipeIngredient {
@@ -168,6 +172,8 @@ export interface DiaryEntry {
 }
 
 export interface ShoppingItem {
+  /** Stabile Kennung der Position; fehlt bei Altbestand und wird beim Laden ergänzt. */
+  id?: string;
   name: string;
   amount: number;
   unit: string;
@@ -233,6 +239,10 @@ export interface SavedMealEntry {
   facts: NutritionFacts;
   amountG?: number;
   servings?: number;
+  /** Einheit der Menge amountG; fehlt = 'g'. */
+  unit?: AmountUnit;
+  /** Werte sind unvollständig (Rezept mit Zutaten ohne Nährwerte) – im Tagebuch als Untergrenze. */
+  isPartial?: boolean;
   ref: DiaryRef;
 }
 

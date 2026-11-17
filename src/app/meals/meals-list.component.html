@@ -2,7 +2,7 @@
   <div class="empty">
     <ion-icon name="nutrition-outline" class="empty__icon" aria-hidden="true"></ion-icon>
     <h2>Noch keine Mahlzeiten</h2>
-    <p>Speichere häufige Mahlzeiten (Rezept + Lebensmittel kombiniert) und füge sie mit einem Tippen ins Tagebuch ein.</p>
+    <p>Speichere häufige Mahlzeiten (Rezept + Lebensmittel kombiniert) und trage sie mit einem Tippen ins Tagebuch ein.</p>
     <button type="button" class="nt-btn nt-btn--tonal nt-btn--block" (click)="openCreate()">Erste Mahlzeit anlegen</button>
   </div>
 } @else {
@@ -14,7 +14,7 @@
           <ion-icon slot="start" name="nutrition-outline" color="primary" aria-hidden="true"></ion-icon>
           <ion-label>
             <h3>{{ meal.name }}</h3>
-            <p>{{ meal.entries.length }} Einträge · {{ totalKcal(meal) | ntNum: 0 }} kcal</p>
+            <p>{{ entryCountLabel(meal.entries.length) }} · {{ totalKcal(meal) | ntNum: 0 }} kcal</p>
           </ion-label>
           <ion-button slot="end" fill="clear" class="nt-icon-btn meal-use" [attr.aria-label]="'„' + meal.name + '“ ins Tagebuch eintragen'" (click)="$event.stopPropagation(); useMeal(meal)">
             <ion-icon slot="icon-only" name="add-circle-outline" aria-hidden="true"></ion-icon>
@@ -45,15 +45,17 @@
   (didDismiss)="onToastDismiss()"
 ></ion-toast>
 
-<ion-toast
-  [isOpen]="undoOpen()"
-  message="Mahlzeit gelöscht"
-  [duration]="undoDuration"
-  [buttons]="undoButtons"
-  position="bottom"
-  [swipeGesture]="toastSwipe"
-  (didDismiss)="onUndoDismiss($event)"
-></ion-toast>
+@for (seq of [undoSeq()]; track seq) {
+  <ion-toast
+    [isOpen]="undoOpen()"
+    [message]="undoMessage()"
+    [duration]="undoDuration"
+    [buttons]="undoButtons"
+    position="bottom"
+    [swipeGesture]="toastSwipe"
+    (didDismiss)="onUndoDismiss($any($event))"
+  ></ion-toast>
+}
 
 <!-- Neue Mahlzeit anlegen -->
 <ion-modal [isOpen]="createOpen()" [canDismiss]="canDismissCreate" (ionModalDidDismiss)="closeCreate()">
@@ -190,6 +192,9 @@
         @if (manualErrors().fatG; as err) { <p class="field-error" role="alert" data-testid="manual-error-fat">{{ err }}</p> }
         <p class="manual-hint">Werte für die ganze Portion in dieser Mahlzeit.</p>
         <div class="nt-sheet-footer">
+          @if (manualBlocked()) {
+            <p class="block-reason" role="note" data-testid="manual-block-reason">{{ manualBlocked() }}</p>
+          }
           <ion-button expand="block" class="nt-btn nt-btn--block" [disabled]="!manualValid()" (click)="addManual()">Hinzufügen</ion-button>
         </div>
       }

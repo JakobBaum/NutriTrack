@@ -13,8 +13,8 @@ const ref: StoredRecipe = {
 };
 const full = (f?: NutritionFacts): Recipe => ({ ...ref, servings: 2, ingredients: [{ name: 'Linsen', amount: 1, unit: 'g' }], factsPerServing: f });
 
-function loader(resolve: (r: StoredRecipe) => Promise<Recipe>): RecipeFactsLoader {
-  return new RecipeFactsLoader({ resolve } as unknown as OnlineRecipeDetailsService);
+function loader(resolve: (r: StoredRecipe) => Promise<Recipe>, log: { error(msg: string): void } = { error: () => undefined }): RecipeFactsLoader {
+  return new RecipeFactsLoader({ resolve } as unknown as OnlineRecipeDetailsService, log);
 }
 
 describe('RecipeFactsLoader', () => {
@@ -43,11 +43,22 @@ describe('RecipeFactsLoader', () => {
 
   it('meldet einen Ladefehler mit Meldung und dem Rezept zum erneuten Versuch', async () => {
     const l = loader(async () => { throw new OnlineSearchError('offline', 'Kein Netz.'); });
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     expect(await l.load(ref)).toBeNull();
 
     expect(l.state()).toEqual({ kind: 'error', message: 'Kein Netz.', recipe: ref });
+  });
+
+  it('schreibt einen Ladefehler ins Debug-Log statt in die Konsole', async () => {
+    const log = { error: vi.fn() };
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const l = loader(async () => { throw new OnlineSearchError('offline', 'Kein Netz.'); }, log);
+
+    await l.load(ref);
+
+    expect(log.error).toHaveBeenCalledWith(expect.stringContaining('Linsensuppe'));
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   it('meldet ein Rezept ohne Nährwerte', async () => {

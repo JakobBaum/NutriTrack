@@ -178,6 +178,20 @@
 .weight-sheet {
   padding-top: var(--nt-space-3);
 
+  // Unterzeile in der Gewichtszeile: Sekundärfarbe statt Ionic-Standardgrau (Kontrast)
+  .row-sub {
+    margin: 2px 0 0;
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-secondary);
+  }
+
+  &__error {
+    margin: var(--nt-space-3) 0 0;
+    padding-inline: var(--nt-space-4);
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-over);
+  }
+
   &__hint {
     margin: var(--nt-space-3) 0 0;
     padding-inline: var(--nt-space-4);

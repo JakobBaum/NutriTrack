@@ -2,6 +2,7 @@ import { sanitizeBackupData } from './backup-sanitize';
 import { SCHEMA_KEY } from '../storage/storage-schema';
 import { CONSENT_KEY } from '../consent/consent.model';
 import { isQuarantineKey } from '../storage/storage-quarantine';
+import { isRec as isPlainObject } from '../util/guards';
 
 /**
  * Reine Funktionen für Daten-Backups (Export/Import aller `nutritrack:`-Schlüssel).
@@ -90,9 +91,6 @@ export const BACKUP_ERRORS = {
   tooLarge: 'Die Datei ist zu groß für ein NutriTrack-Backup.',
   empty: 'Die Datei ist leer.',
 } as const;
-
-const isPlainObject = (v: unknown): v is Record<string, unknown> =>
-  typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /** Dateiname im Format `nutritrack-backup-YYYY-MM-DD.json` (lokales Datum). */
 export function backupFileName(date: Date): string {

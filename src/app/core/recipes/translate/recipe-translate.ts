@@ -1,6 +1,8 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { AiService } from '../../ai/ai.service';
+import { errorText } from '../../ai/ai-errors';
 import { ConsentService } from '../../consent/consent.service';
+import { DebugLogService } from '../../debug/debug-log.service';
 import { AppSettingsStore } from '../../state/app-settings.store';
 import { OnlineRecipe } from '../online/online-recipe.model';
 import { translateIngredientName, translateQueryWithDictionary } from './ingredient-dictionary';
@@ -49,6 +51,7 @@ export class RecipeTranslateService {
   private readonly consent = inject(ConsentService);
   private readonly cache = inject(TranslationCache);
   private readonly settings = inject(AppSettingsStore);
+  private readonly log = inject(DebugLogService);
   private readonly inFlight = new Map<string, Promise<TranslationResult>>();
   private readonly pending = signal(0);
 
@@ -113,8 +116,9 @@ export class RecipeTranslateService {
     if (this.isAiBlockedByConsent()) return { query: translateQueryWithDictionary(trimmed), viaAi: false };
     try {
       return { query: await this.ai.translateSearchQuery(trimmed, this.settings.appLanguage), viaAi };
-    } catch {
-      return { query: trimmed, viaAi: false };
+    } catch (e: unknown) {
+      this.log.error(`✗ Suchbegriff-Übersetzung fehlgeschlagen: ${errorText(e)}`);
+      return { query: translateQueryWithDictionary(trimmed), viaAi: false };
     }
   }
 
@@ -142,7 +146,8 @@ export class RecipeTranslateService {
       const texts = await this.ai.translateRecipe(source, this.settings.appLanguage);
       if (complete) this.cache.set(key, texts);
       return { texts, complete };
-    } catch {
+    } catch (e: unknown) {
+      this.log.error(`✗ Rezept-Übersetzung fehlgeschlagen: ${errorText(e)}`);
       return { texts: this.dictionaryTexts(source), complete: false };
     } finally {
       this.pending.update((n) => n - 1);

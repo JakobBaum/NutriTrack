@@ -19,7 +19,12 @@ export const AI_ERROR_MESSAGES = {
 export const AI_TIMEOUT_MS = 30000;
 
 /** True, wenn der Browser sicher weiß, dass das Gerät offline ist. */
-function isDeviceOffline(): boolean {
+/** Lesbarer Text eines beliebigen Fehlerwerts (für das Debug-Log). */
+export function errorText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+export function isDeviceOffline(): boolean {
   return typeof navigator !== 'undefined' && navigator.onLine === false;
 }
 

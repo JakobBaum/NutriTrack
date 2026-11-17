@@ -9,15 +9,16 @@ import {
 } from '../models';
 import { NutritionCalcService } from '../nutrition/nutrition-calc.service';
 import { StorageService } from '../storage/storage.service';
-import { addDaysISO, toDateISO } from '../util/date';
+import { addDaysISO, isIsoDay, toDateISO } from '../util/date';
 import { makeId } from '../util/id';
-import { sanitizeDiaryEntries } from './record-sanitize';
+import { commitSignal } from './commit-signal';
+import { cleanFacts, sanitizeDiaryEntries } from './record-sanitize';
 
 const KEY_ENTRIES = 'diary';
 /** Wie viele Tage "Wie gestern" / "Tag kopieren" höchstens zurückschaut. */
 export const COPY_LOOKBACK_DAYS = 7;
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const VALID_MEALS: ReadonlySet<string> = new Set(['breakfast', 'lunch', 'dinner', 'snack']);
+const VALID_UNITS: ReadonlySet<string> = new Set(['g', 'kg', 'ml', 'l']);
 const DEFAULT_LABEL = 'Eintrag';
 /** Zeitfenster (Tage), in dem "Zuletzt benutzt" nach Essenszeit zählt. */
 const RECENT_WINDOW_DAYS = 30;
@@ -107,6 +108,8 @@ export interface NewDiaryEntry {
 @Injectable({ providedIn: 'root' })
 export class DiaryStore {
   private readonly storage = inject(StorageService);
+  /** True, wenn Schreiben gesperrt ist (neueres Schema oder Änderung in anderem Fenster); Änderungen werden dann nicht gespeichert. */
+  readonly isReadOnly = this.storage.isLockedFor(KEY_ENTRIES);
   private readonly calc = inject(NutritionCalcService);
 
   private readonly _entries = signal<DiaryEntry[]>(
@@ -118,9 +121,25 @@ export class DiaryStore {
 
   /** Legt einen neuen Eintrag an und persistiert ihn. Ungültige Mengen und Nährwerte werden bereinigt. */
   add(input: NewDiaryEntry): DiaryEntry {
-    const entry: DiaryEntry = {
+    const entry = this.buildEntry(input);
+    this._entries.update((list) => [...list, entry]);
+    this.persist();
+    return entry;
+  }
+
+  /**
+   * Wie {@link add}, rollt aber zurück und liefert `null`, wenn das Speichern scheitert
+   * (Schreibsperre, ungesicherter Schlüssel). Die Oberfläche nutzt diese Variante.
+   */
+  tryAdd(input: NewDiaryEntry): DiaryEntry | null {
+    const entry = this.buildEntry(input);
+    return commitSignal(this._entries, [...this._entries(), entry], () => this.persist()) ? entry : null;
+  }
+
+  private buildEntry(input: NewDiaryEntry): DiaryEntry {
+    return {
       id: makeId('diary'),
-      dateISO: ISO_DATE_RE.test(input.dateISO) ? input.dateISO : toDateISO(),
+      dateISO: isIsoDay(input.dateISO) ? input.dateISO : toDateISO(),
       meal: VALID_MEALS.has(input.meal) ? input.meal : 'snack',
       label: typeof input.label === 'string' && input.label.trim() !== '' ? input.label : DEFAULT_LABEL,
       brand: input.brand,
@@ -134,9 +153,6 @@ export class DiaryStore {
       unit: input.unit,
       createdAt: new Date().toISOString(),
     };
-    this._entries.update((list) => [...list, entry]);
-    this.persist();
-    return entry;
   }
 
   /** Aktualisiert Name, Mahlzeit, Menge und skaliert Nährwerte neu (wenn baseFacts vorhanden). */
@@ -152,21 +168,25 @@ export class DiaryStore {
     baseFacts?: NutritionFacts;
     /** Entfernt die (rein informative) Menge samt Einheit; Nährwerte bleiben unverändert. */
     clearAmount?: boolean;
-  }): void {
+  }): boolean {
     // Leere/0/negative Menge nie übernehmen (würde alte oder negative Werte erzeugen).
-    const { amountG, baseFacts: patchBase, label, clearAmount, ...rest } = patch;
+    const { amountG, baseFacts: patchBase, label, clearAmount, facts, servings, meal, unit, ...rest } = patch;
     const cleanLabel = label?.trim();
     const hasValidAmount = typeof amountG === 'number' && Number.isFinite(amountG) && amountG > 0;
-    const validBase = patchBase?.basis === 'per100g' ? patchBase : undefined;
+    const cleanBase = patchBase?.basis === 'per100g' ? cleanFacts(patchBase) : null;
+    const validBase = cleanBase ?? undefined;
     const safePatch = {
       ...rest,
+      ...(facts ? { facts: sanitizeFacts(facts) } : {}),
+      ...(isPositiveNumber(servings) ? { servings } : {}),
+      ...(meal !== undefined && VALID_MEALS.has(meal) ? { meal } : {}),
+      ...(unit !== undefined && VALID_UNITS.has(unit) ? { unit } : {}),
       ...(cleanLabel ? { label: cleanLabel } : {}),
       ...(clearAmount && !hasValidAmount ? { amountG: undefined, unit: undefined } : {}),
       ...(hasValidAmount ? { amountG } : {}),
       ...(validBase ? { baseFacts: validBase } : {}),
     };
-    this._entries.update((list) =>
-      list.map((e) => {
+    const updated = this._entries().map((e) => {
         if (e.id !== id) return e;
         const next = { ...e, ...safePatch };
         const base = next.baseFacts;
@@ -186,9 +206,8 @@ export class DiaryStore {
           };
         }
         return next;
-      }),
-    );
-    this.persist();
+      });
+    return commitSignal(this._entries, updated, () => this.persist());
   }
 
   /** Listenposition eines Eintrags (-1, wenn unbekannt); für Rückgängig nach dem Löschen. */
@@ -197,9 +216,8 @@ export class DiaryStore {
   }
 
   /** Entfernt einen Eintrag. */
-  remove(id: string): void {
-    this._entries.update((list) => list.filter((e) => e.id !== id));
-    this.persist();
+  remove(id: string): boolean {
+    return commitSignal(this._entries, this._entries().filter((e) => e.id !== id), () => this.persist());
   }
 
   /**
@@ -210,12 +228,9 @@ export class DiaryStore {
     if (this._entries().some((e) => e.id === entry.id)) return false;
     const [clean] = sanitizeDiaryEntries([entry]).items;
     if (!clean) return false;
-    this._entries.update((list) => {
-      const at = index === undefined ? list.length : Math.min(Math.max(0, index), list.length);
-      return [...list.slice(0, at), clean, ...list.slice(at)];
-    });
-    this.persist();
-    return true;
+    const list = this._entries();
+    const at = index === undefined ? list.length : Math.min(Math.max(0, index), list.length);
+    return commitSignal(this._entries, [...list.slice(0, at), clean, ...list.slice(at)], () => this.persist());
   }
 
   /**
@@ -223,20 +238,17 @@ export class DiaryStore {
    * Gibt die angelegten Kopien zurück (z. B. für Rückgängig).
    */
   copyEntries(entries: readonly DiaryEntry[], dateISO: string): DiaryEntry[] {
-    if (!ISO_DATE_RE.test(dateISO) || entries.length === 0) return [];
+    if (!isIsoDay(dateISO) || entries.length === 0) return [];
     const copies = copyEntriesTo(withoutExisting(entries, this.entriesForDate(dateISO)), dateISO);
     if (copies.length === 0) return [];
-    this._entries.update((list) => [...list, ...copies]);
-    this.persist();
-    return copies;
+    return commitSignal(this._entries, [...this._entries(), ...copies], () => this.persist()) ? copies : [];
   }
 
-  /** Entfernt mehrere Einträge auf einmal (ein Persist). */
-  removeMany(ids: readonly string[]): void {
-    if (ids.length === 0) return;
+  /** Entfernt mehrere Einträge auf einmal (ein Persist); `false`, wenn das Speichern scheiterte (dann unverändert). */
+  removeMany(ids: readonly string[]): boolean {
+    if (ids.length === 0) return true;
     const drop = new Set(ids);
-    this._entries.update((list) => list.filter((e) => !drop.has(e.id)));
-    this.persist();
+    return commitSignal(this._entries, this._entries().filter((e) => !drop.has(e.id)), () => this.persist());
   }
 
   /**
@@ -244,7 +256,7 @@ export class DiaryStore {
    * optional nur für eine Mahlzeit.
    */
   copySources(dateISO: string, meal?: MealType, maxDaysBack = COPY_LOOKBACK_DAYS): CopySource[] {
-    if (!ISO_DATE_RE.test(dateISO)) return [];
+    if (!isIsoDay(dateISO)) return [];
     const sources: CopySource[] = [];
     for (let back = 1; back <= maxDaysBack; back++) {
       const day = addDaysISO(dateISO, -back);
@@ -340,7 +352,7 @@ export class DiaryStore {
     this.persist();
   }
 
-  private persist(): void {
-    this.storage.set(KEY_ENTRIES, this._entries());
+  private persist(): boolean {
+    return this.storage.set(KEY_ENTRIES, this._entries());
   }
 }

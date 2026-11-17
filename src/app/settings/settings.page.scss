@@ -95,6 +95,11 @@ ion-item {
   margin-top: var(--nt-space-2);
 }
 
+// Zerstörerische Aktion: eigene, abgesetzte Gruppe mit Abstand zu Backup und Import
+.data-reset {
+  margin-top: var(--nt-space-6, 24px);
+}
+
 // Zerstoererische Zeile: roter Text (danger)
 .danger-row {
   --color: var(--nt-danger);

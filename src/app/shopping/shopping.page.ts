@@ -1,4 +1,5 @@
 import { TOAST_SWIPE_GESTURE } from '../shared/toast-options';
+import { WRITE_BLOCKED_MESSAGE } from '../core/storage/storage-messages';
 import { selectAllOnFocus } from '../core/keyboard/select-all';
 import { ChangeDetectionStrategy, Component, ElementRef, OnDestroy, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -6,7 +7,9 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { ActionSheetController, AlertController } from '@ionic/angular';
 import { lightHaptic } from '../diary/haptics';
 import { clearQueryParams, pickParam } from '../core/navigation/query-params';
-import { formatDecimal, parseDecimal, parseNutrientInput } from '../core/util/number-input';
+import { formatDecimal, parseNutrientInput } from '../core/util/number-input';
+import { RequestGuard } from '../recipes/request-guard';
+import { GenerationCancelledError } from '../core/shopping/generation-cancelled';
 import { UNIT_OPTIONS } from '../core/util/units';
 import { AiService } from '../core/ai/ai.service';
 import { MealType, ShoppingItem } from '../core/models';
@@ -22,15 +25,12 @@ import {
   BUDGET_PRESETS,
   DAYS_MAX,
   DAYS_MIN,
-  DAY_PRESETS,
   PERSONS_MAX,
   PERSONS_MIN,
   ShoppingRow,
-  adjustIndex,
+  toRow,
   categoryLabel,
-  decodeIndexes,
   defaultPersonsInRange,
-  encodeIndexes,
   formatShareText,
   groupByCategory,
   splitRows,
@@ -56,6 +56,8 @@ const SHARE_TOAST_MS = 2500;
 /** Dauer des Hinweises nach „Wochenplan erstellt“: länger, damit die Aktion „Zur Liste“ erreichbar bleibt (kein Rückgängig-Hinweis). */
 const PLAN_TOAST_MS = 6000;
 const PLAN_TOAST_LIST_ROLE = 'list';
+/** Vorgabe-Einheit für neue Positionen (Stückzahl). */
+const DEFAULT_UNIT = 'Stk';
 
 /**
  * Einkaufsliste: generiert einen Wocheneinkauf (Personen × Tage × Mahlzeiten ×
@@ -90,21 +92,21 @@ export class ShoppingPage implements OnDestroy {
     });
   }
 
-  /** Eine ID = Komma-Liste von Indizes (Einzel- oder Sammel-Löschen). */
-  private readonly deletion = new UndoableDelete((id) => this.commitRemoval(decodeIndexes(id)));
+  /** Mehrere Löschungen bleiben vorgemerkt (stack): ein Rückgängig stellt alle wieder her. */
+  private readonly deletion = new UndoableDelete((id) => this.store.removeItem(id), { stack: true });
   readonly undoOpen = signal(false);
+  /** Zähler, der den Hinweis bei jeder neuen Löschung neu startet (Laufzeit und Text stimmen wieder). */
+  readonly undoSeq = signal(0);
   readonly undoMessage = signal('Position gelöscht');
   readonly undoDuration = UNDO_TOAST_MS;
   readonly undoButtons = UNDO_TOAST_BUTTONS;
 
   readonly list = this.store.list;
 
-  /** Positionen ohne die gerade zum Löschen vorgemerkten (Index = Position in der Liste). */
+  /** Positionen ohne die gerade zum Löschen vorgemerkten (Zeilen werden über die id angesprochen). */
   readonly rows = computed<ShoppingRow[]>(() => {
-    const pending = new Set(decodeIndexes(this.deletion.pendingId()));
-    return (this.list()?.items ?? [])
-      .map((item, index) => ({ item, index }))
-      .filter((r) => !pending.has(r.index));
+    const pending = new Set(this.deletion.pendingIds());
+    return (this.list()?.items ?? []).map(toRow).filter((r) => !pending.has(r.id));
   });
 
   private readonly split = computed(() => splitRows(this.rows()));
@@ -140,9 +142,12 @@ export class ShoppingPage implements OnDestroy {
   readonly personsMax = PERSONS_MAX;
   readonly daysMin = DAYS_MIN;
   readonly daysMax = DAYS_MAX;
-  readonly dayPresets = DAY_PRESETS;
   readonly budgetPresets = BUDGET_PRESETS;
   readonly loading = signal(false);
+  /** Verwirft Antworten abgebrochener Läufe („Abbrechen“ während des Ladens). */
+  private readonly guard = new RequestGuard();
+  /** Ein Lauf ist gestartet (auch während der Rückfrage): ein zweiter Tipp startet keinen zweiten. */
+  private busy = false;
   readonly error = signal<string | null>(null);
 
   /** Aktive Ansicht; bleibt über Tab-Wechsel im Seitenzustand erhalten (Standard: Liste). */
@@ -186,21 +191,20 @@ export class ShoppingPage implements OnDestroy {
   newItemAmountText = '';
   newItemPriceText = '';
   /** Feldfehler im Hinzufügen-Sheet (null = gültig). */
+  readonly addNameError = signal<string | null>(null);
   readonly addAmountError = signal<string | null>(null);
   readonly addPriceError = signal<string | null>(null);
   /** Volle Höhe (Abstand oben kommt aus sheets.scss): Felder bleiben über der iOS-Tastatur (216 + 44 + 44 pt). */
   readonly addBreakpoints = [0, 1];
   readonly addInitialBreakpoint = 1;
   readonly categoryLabel = categoryLabel;
-  readonly parseDecimal = parseDecimal;
-  readonly formatDecimal = formatDecimal;
   readonly unitOptions = UNIT_OPTIONS;
   // read: ElementRef, sonst liefert viewChild die IonInput-Instanz (ohne nativeElement).
   private readonly addNameInput = viewChild<string, ElementRef<HTMLElement & { setFocus?: () => Promise<void> }>>(
     'addName',
     { read: ElementRef },
   );
-  private readonly unitSignal = signal('g');
+  private readonly unitSignal = signal(DEFAULT_UNIT);
   /** Signal-gestützt, damit die OnPush-Ansicht die per Action Sheet gewählte Einheit zeigt. */
   get newItemUnit(): string {
     return this.unitSignal();
@@ -232,23 +236,31 @@ export class ShoppingPage implements OnDestroy {
 
   /** „Neu generieren“ in der Liste: zur Rezeptansicht wechseln, Generator offen. */
   openGenerator(): void {
+    this.error.set(null);
     this.generatorOpen.set(true);
     this.setView('recipes');
   }
 
   /** „Abbrechen“ im Generator: zurück zur Liste. */
   closeGenerator(): void {
+    this.error.set(null);
     this.generatorOpen.set(false);
     this.setView('list');
   }
 
   /** „Neuen Wochenplan erstellen“: klappt den Generator auf. */
   expandGenerator(): void {
+    this.error.set(null);
     this.generatorOpen.set(true);
   }
 
   /** „Abbrechen“ im Generator der Rezepte-Ansicht: mit Plan einklappen, sonst zur Liste. */
   cancelGenerator(): void {
+    // Läuft gerade eine Erstellung: Ergebnis verwerfen, nichts wird übernommen.
+    this.guard.cancel();
+    this.busy = false;
+    this.loading.set(false);
+    this.error.set(null);
     if (this.weekPlan() !== null) {
       this.generatorOpen.set(false);
       return;
@@ -272,11 +284,12 @@ export class ShoppingPage implements OnDestroy {
     return l && (l.days ?? null) !== null ? l.persons : undefined;
   }
 
-  private async confirmRegenerate(): Promise<boolean> {
+  private async confirmRegenerate(hasPlan: boolean): Promise<boolean> {
     const alert = await this.alertCtrl.create({
       header: 'Neu generieren?',
       message:
-        'Die Liste wird neu berechnet. Abgehakte und selbst hinzugefügte Positionen bleiben erhalten, alle anderen werden ersetzt.',
+        'Die Liste wird neu berechnet. Abgehakte und selbst hinzugefügte Positionen bleiben erhalten, alle anderen werden ersetzt.' +
+        (hasPlan ? ' Der aktuelle Wochenplan wird dabei entfernt.' : ''),
       buttons: [
         { text: 'Abbrechen', role: 'cancel' },
         { text: 'Neu generieren', role: 'confirm' },
@@ -330,86 +343,100 @@ export class ShoppingPage implements OnDestroy {
   }
 
   async generateWeekPlan(): Promise<void> {
-    if (!this.inputsValid()) return;
-    this.deletion.flush();
-    const hasListItems = (this.list()?.items.length ?? 0) > 0;
-    let keepExisting = true;
-    if (this.weekPlan() !== null || hasListItems) {
-      const choice = await this.confirmNewWeekPlan();
-      if (choice === null) return;
-      keepExisting = choice === 'keep';
-    }
-    this.error.set(null);
-    this.loading.set(true);
+    if (this.busy || this.loading() || !this.inputsValid()) return;
+    this.busy = true;
+    const token = this.guard.begin();
     try {
-      const { itemCount } = await this.weekPlanService.generate({
-        persons: this.persons,
-        days: this.days,
-        meals: this.selectedMeals(),
-        keepExisting,
+      this.deletion.flush();
+      const hasListItems = (this.list()?.items.length ?? 0) > 0;
+      let keepExisting = true;
+      if (this.weekPlan() !== null || hasListItems) {
+        const choice = await this.confirmNewWeekPlan();
+        if (choice === null) return;
+        keepExisting = choice === 'keep';
+      }
+      await this.runGeneration(token, 'Wochenplan konnte nicht erstellt werden.', async (isCurrent) => {
+        const { itemCount } = await this.weekPlanService.generate({
+          persons: this.persons,
+          days: this.days,
+          meals: this.selectedMeals(),
+          keepExisting,
+          isCurrent,
+        });
+        this.generatorOpen.set(false);
+        this.planToastMessage.set(`Wochenplan erstellt, ${itemCount} Zutaten in der Liste`);
+        this.planToastOpen.set(true);
       });
-      this.generatorOpen.set(false);
-      this.planToastMessage.set(`Wochenplan erstellt, ${itemCount} Zutaten in der Liste`);
-      this.planToastOpen.set(true);
-    } catch (e: unknown) {
-      this.error.set(e instanceof Error ? e.message : 'Wochenplan konnte nicht erstellt werden.');
     } finally {
-      this.loading.set(false);
+      if (this.guard.isCurrent(token)) this.busy = false;
     }
   }
 
   /** Fallback: Wocheneinkauf aus den eigenen Rezepten (ShoppingStore.generatePlan). */
   async generate(): Promise<void> {
-    if (!this.inputsValid() || this.noRecipesBlock()) return;
-    this.deletion.flush();
-    const existing = this.list();
-    if (existing && existing.items.length > 0 && !(await this.confirmRegenerate())) return;
-    this.error.set(null);
-    this.loading.set(true);
+    if (this.busy || this.loading() || !this.inputsValid() || this.noRecipesBlock()) return;
+    this.busy = true;
+    const token = this.guard.begin();
     try {
-      await this.store.generatePlan({
-        persons: this.persons,
-        days: this.days,
-        meals: this.selectedMeals(),
-        budget: this.budget ?? undefined,
-        store: this.storeName || undefined,
+      this.deletion.flush();
+      const existing = this.list();
+      const hasPlan = this.weekPlan() !== null;
+      const needsConfirm = (existing?.items.length ?? 0) > 0 || hasPlan;
+      if (needsConfirm && !(await this.confirmRegenerate(hasPlan))) return;
+      await this.runGeneration(token, 'Generierung fehlgeschlagen.', async (isCurrent) => {
+        await this.store.generatePlan({
+          persons: this.persons,
+          days: this.days,
+          meals: this.selectedMeals(),
+          budget: this.budget ?? undefined,
+          store: this.storeName || undefined,
+          isCurrent,
+        });
+        // Die Liste stammt jetzt aus den eigenen Rezepten: ein alter Wochenplan passt nicht mehr dazu.
+        this.weekPlanService.discardPlan();
+        this.generatorOpen.set(false);
+        this.setView('list');
       });
-      this.generatorOpen.set(false);
-      this.setView('list');
-    } catch (e: unknown) {
-      this.error.set(e instanceof Error ? e.message : 'Generierung fehlgeschlagen.');
     } finally {
-      this.loading.set(false);
+      if (this.guard.isCurrent(token)) this.busy = false;
     }
   }
 
-  toggle(index: number): void {
-    this.store.toggleItem(index);
+  /** Gemeinsamer Ablauf: Ladezustand, Abbruch ohne Meldung, Fehlertext. */
+  private async runGeneration(token: number, failText: string, job: (isCurrent: () => boolean) => Promise<void>): Promise<void> {
+    const isCurrent = (): boolean => this.guard.isCurrent(token);
+    if (this.store.isReadOnly()) {
+      this.error.set(WRITE_BLOCKED_MESSAGE);
+      return;
+    }
+    this.error.set(null);
+    this.loading.set(true);
+    try {
+      await job(isCurrent);
+    } catch (e: unknown) {
+      if (e instanceof GenerationCancelledError || !isCurrent()) return;
+      this.error.set(e instanceof Error ? e.message : failText);
+    } finally {
+      if (isCurrent()) this.loading.set(false);
+    }
   }
 
   /** Setzt den Haken auf den gewünschten Zustand; doppelte Events ändern nichts. */
-  setChecked(index: number, checked: boolean): void {
-    const item = this.list()?.items[index];
+  setChecked(id: string, checked: boolean): void {
+    const item = this.list()?.items.find((i) => i.id === id);
     if (!item || item.checked === checked) return;
     lightHaptic();
-    this.store.toggleItem(index);
+    this.store.toggleItem(id);
   }
 
   /** Blendet die Position aus und zeigt „Gelöscht – Rückgängig“. */
-  removeItem(index: number): void {
-    // Ein offenes früheres Löschen wird endgültig und verschiebt spätere Indizes.
-    const pending = decodeIndexes(this.deletion.pendingId());
-    this.deletion.flush();
-    this.startDeletion([adjustIndex(index, pending)], 'Position gelöscht');
+  removeItem(id: string): void {
+    this.startDeletion([id], 'Position gelöscht');
   }
 
   /** Blendet alle abgehakten Positionen aus („Erledigte entfernen“, mit Rückgängig). */
   removeChecked(): void {
-    this.deletion.flush();
-    const checked = (this.list()?.items ?? [])
-      .map((item, index) => ({ item, index }))
-      .filter((r) => r.item.checked)
-      .map((r) => r.index);
+    const checked = (this.list()?.items ?? []).filter((i) => i.checked && i.id).map((i) => i.id as string);
     if (checked.length === 0) return;
     const message =
       checked.length === 1 ? '1 erledigte Position entfernt' : `${checked.length} erledigte Positionen entfernt`;
@@ -425,21 +452,19 @@ export class ShoppingPage implements OnDestroy {
     this.undoOpen.set(false);
   }
 
-  private startDeletion(indexes: readonly number[], message: string): void {
-    this.deletion.start(encodeIndexes(indexes));
-    this.undoMessage.set(message);
+  private startDeletion(ids: readonly string[], message: string): void {
+    ids.forEach((id) => this.deletion.start(id));
+    const pending = this.deletion.pendingIds().length;
+    this.undoMessage.set(pending > ids.length ? `${pending} Positionen gelöscht` : message);
+    // Neuer Hinweis: Laufzeit und Text beginnen von vorn (der Hinweis wird neu aufgebaut).
+    this.undoSeq.update((n) => n + 1);
     this.undoOpen.set(true);
-  }
-
-  /** Entfernt endgültig, von hinten nach vorn, damit Indizes gültig bleiben. */
-  private commitRemoval(indexes: readonly number[]): void {
-    [...indexes].sort((a, b) => b - a).forEach((i) => this.store.removeItem(i));
   }
 
   /** Teilt die offenen Positionen per Web Share API; sonst Zwischenablage + Hinweis. */
   async shareList(): Promise<void> {
     if (this.openCount() === 0) {
-      this.showShareToast('Nichts zu teilen: alle Positionen sind erledigt.');
+      this.showShareToast(this.rows().length === 0 ? 'Die Liste ist leer.' : 'Nichts zu teilen: alle Positionen sind erledigt.');
       return;
     }
     const text = formatShareText(this.rows().map((r) => r.item), 'Einkaufsliste', this.appSettings.unitSystem());
@@ -502,8 +527,8 @@ export class ShoppingPage implements OnDestroy {
   }
 
   /** Eigenen Preis einer Position eintragen oder löschen (leer lassen). */
-  async editPrice(index: number, draft?: string, errorText?: string): Promise<void> {
-    const item = this.list()?.items[index];
+  async editPrice(id: string, draft?: string, errorText?: string): Promise<void> {
+    const item = this.list()?.items.find((i) => i.id === id);
     if (!item) return;
     const alert = await this.alertCtrl.create({
       header: 'Preis ändern',
@@ -514,7 +539,7 @@ export class ShoppingPage implements OnDestroy {
         {
           name: 'price',
           type: 'text',
-          placeholder: '0,00 €',
+          placeholder: 'z. B. 2,49',
           value: draft ?? (item.userPrice != null ? formatDecimal(item.userPrice) : ''),
           attributes: { inputmode: 'decimal' },
         },
@@ -528,18 +553,19 @@ export class ShoppingPage implements OnDestroy {
     await alert.present();
     const { role, data } = await alert.onDidDismiss<{ values?: { price?: string } }>();
     if (role === 'destructive') {
-      this.removeItem(index);
+      this.removeItem(id);
       return;
     }
     if (role !== 'confirm') return;
     const raw = String(data?.values?.price ?? '').trim();
-    const parsed = parseNutrientInput(raw);
+    // „2,49 €“ ist eine gültige Eingabe: Währungszeichen und Leerzeichen zählen nicht.
+    const parsed = parseNutrientInput(raw.replace(/€/g, '').trim());
     if (parsed.error) {
       // Ungültig: Eingabe behalten und erneut fragen, den Preis nicht löschen.
-      await this.editPrice(index, raw, parsed.error);
+      await this.editPrice(id, raw, parsed.error);
       return;
     }
-    this.store.setItemPrice(index, parsed.value);
+    this.store.setItemPrice(id, parsed.value);
   }
 
   openAdd(): void {
@@ -547,6 +573,7 @@ export class ShoppingPage implements OnDestroy {
   }
 
   closeAdd(): void {
+    this.clearAddErrors();
     this.addOpen.set(false);
   }
 
@@ -573,31 +600,39 @@ export class ShoppingPage implements OnDestroy {
     await sheet.present();
   }
 
+  /** Eingabe in einem Feld: die Fehlermeldungen verschwinden. */
+  clearAddErrors(): void {
+    this.addNameError.set(null);
+    this.addAmountError.set(null);
+    this.addPriceError.set(null);
+  }
+
   /** Legt den Artikel an, leert die Felder und lässt das Sheet für den nächsten offen. */
   addManual(): void {
     const name = this.newItemName.trim();
+    const amountRes = parseNutrientInput(this.newItemAmountText);
+    const priceRes = parseNutrientInput(this.newItemPriceText);
+    this.addNameError.set(name ? null : 'Name eingeben.');
+    this.addAmountError.set(amountRes.error);
+    this.addPriceError.set(priceRes.error);
     if (!name) {
       this.focusName();
       return;
     }
-    const amountRes = parseNutrientInput(this.newItemAmountText);
-    const priceRes = parseNutrientInput(this.newItemPriceText);
-    this.addAmountError.set(amountRes.error);
-    this.addPriceError.set(priceRes.error);
     if (amountRes.error || priceRes.error) return;
     const price = priceRes.value;
     this.store.addItem({
       name,
       // Leer = „ohne Menge“.
       amount: amountRes.value ?? 0,
-      unit: this.newItemUnit || 'g',
+      unit: this.newItemUnit || DEFAULT_UNIT,
       checked: false,
-      ...(price !== null && price > 0 ? { userPrice: price } : {}),
+      ...(price !== null ? { userPrice: price } : {}),
     });
     this.newItemName = '';
     this.newItemAmountText = '';
     this.newItemPriceText = '';
-    this.newItemUnit = 'g';
+    this.newItemUnit = DEFAULT_UNIT;
     this.focusName();
   }
 

@@ -9,6 +9,8 @@ import {
   isMealType,
   isValidAmount,
   rebaseTo100,
+  buildLastAmountIndex,
+  lastAmountFromIndex,
   unitForName,
   shouldRememberAsCustomFood,
   unitFactor,
@@ -171,7 +173,12 @@ describe('editBaseFor', () => {
   };
 
   it('leitet für manuelle Einträge mit Menge Werte pro 100 ab', () => {
-    expect(editBaseFor(base)).toMatchObject({ kcal: 45, proteinG: 0.7, carbsG: 10, fatG: 0.2, basis: 'per100g' });
+    const derived = editBaseFor(base);
+    expect(derived?.basis).toBe('per100g');
+    expect(derived?.kcal).toBeCloseTo(45, 3);
+    expect(derived?.proteinG).toBeCloseTo(0.7, 3);
+    expect(derived?.carbsG).toBeCloseTo(10, 3);
+    expect(derived?.fatG).toBeCloseTo(0.2, 3);
   });
 
   it('nutzt gespeicherte baseFacts und liefert ohne Menge null', () => {
@@ -346,5 +353,32 @@ describe('shouldRememberAsCustomFood (FDB-04)', () => {
   it('merkt weder Rezepte noch gramm-basierte Datenbank-Treffer', () => {
     expect(shouldRememberAsCustomFood({ recipeId: 'r1', baseUnit: undefined, isEstimate: false })).toBe(false);
     expect(shouldRememberAsCustomFood({ recipeId: undefined, baseUnit: 'g', isEstimate: false })).toBe(false);
+  });
+});
+
+describe('rebaseTo100 ohne Rundungsfehler (T23)', () => {
+  it('rechnet kleine Mengen genau zurück', () => {
+    const facts: NutritionFacts = { kcal: 13, proteinG: 0.4, carbsG: 2.6, fatG: 0.1, basis: 'perPortion' };
+    const base = rebaseTo100(facts, 5);
+    expect(base.kcal).toBeCloseTo(260, 5);
+    expect(scaleFacts(base, 5 / 100).kcal).toBe(13);
+  });
+});
+
+describe('Index der letzten Mengen (T14)', () => {
+  const entry = (id: string, label: string, amountG: number, createdAt: string): DiaryEntry => ({
+    id, dateISO: '2026-11-01', meal: 'lunch', label, amountG, createdAt, ref: { kind: 'manual' },
+    facts: { kcal: 1, proteinG: 0, carbsG: 0, fatG: 0, basis: 'perPortion' },
+  });
+  const entries = [entry('a', 'Reis', 100, '2026-11-01T10:00:00Z'), entry('b', 'reis ', 150, '2026-11-02T10:00:00Z')];
+
+  it('liefert die jüngste Menge je Name ohne Groß-/Kleinschreibung', () => {
+    expect(lastAmountFromIndex(buildLastAmountIndex(entries), 'REIS')).toBe(150);
+  });
+  it('überspringt den ausgeschlossenen Eintrag', () => {
+    expect(lastAmountFromIndex(buildLastAmountIndex(entries), 'reis', 'b')).toBe(100);
+  });
+  it('liefert null ohne Treffer', () => {
+    expect(lastAmountFromIndex(buildLastAmountIndex(entries), 'Brot')).toBeNull();
   });
 });

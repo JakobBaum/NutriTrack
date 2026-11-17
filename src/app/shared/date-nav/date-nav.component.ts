@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
-import { addDaysISO, dayLabel, toDateISO } from '../../core/util/date';
+import { addDaysISO, dayLabel } from '../../core/util/date';
+import { injectToday } from './use-today';
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}/;
 
@@ -28,8 +29,10 @@ export class NtDateNavComponent {
   readonly dateChange = output<string>();
 
   protected readonly pickerOpen = signal(false);
-  protected readonly maxDate = toDateISO();
-  protected readonly isToday = computed(() => this.date() >= toDateISO());
+  /** Heutiger Tag; rechnet nach Mitternacht neu (Obergrenze des Kalenders). */
+  private readonly today = injectToday();
+  protected readonly maxDate = computed(() => this.today());
+  protected readonly isToday = computed(() => this.date() >= this.today());
   protected readonly label = computed(() =>
     this.full()
       ? new Intl.DateTimeFormat('de-AT', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(`${this.date()}T12:00:00`))
@@ -41,7 +44,7 @@ export class NtDateNavComponent {
   }
 
   protected onPick(value: unknown): void {
-    const day = pickedDay(value, toDateISO());
+    const day = pickedDay(value, this.today());
     this.pickerOpen.set(false);
     if (day && day !== this.date()) this.dateChange.emit(day);
   }

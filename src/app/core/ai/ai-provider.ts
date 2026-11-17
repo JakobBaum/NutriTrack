@@ -38,6 +38,8 @@ export interface ShoppingPlanResult {
 export interface LabelResult {
   name: string;
   facts: NutritionFacts;
+  /** kcal passen nicht zu den Makros: Werte sind übernommen, der Nutzer soll sie prüfen. */
+  isDoubtful?: boolean;
 }
 
 /** Eingabe für den Rezept-Import: freier Text, URL oder Foto (Base64). */
@@ -67,6 +69,8 @@ export interface RecipeImportResult {
   ingredients: RecipeImportIngredient[];
   steps: string[];
   sourceUrl?: string;
+  /** Vom Worker gesetzt, wenn der Link nicht abrufbar war und stattdessen der Begleittext ausgewertet wurde. */
+  usedFallbackText?: boolean;
 }
 
 /**

@@ -1,4 +1,6 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { errorText } from '../ai/ai-errors';
+import { DebugLogService } from '../debug/debug-log.service';
 import type { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
 
 /** 720p statt Gerätestandard (iOS: 640x480): feine Striche der EAN-Codes bleiben lesbar. */
@@ -23,11 +25,20 @@ export const SCAN_ATTEMPT_DELAY_MS = 100;
  */
 @Injectable({ providedIn: 'root' })
 export class BarcodeScannerService {
+  private readonly log = inject(DebugLogService);
   private reader?: Promise<BrowserMultiFormatReader>;
 
-  /** zxing (~570 kB) wird erst bei Bedarf nachgeladen; {@link preload} holt es schon beim Antippen vor. */
+  /** Lädt zxing; eigene Methode, damit Tests den Import ersetzen können. */
+  protected importZxing(): Promise<typeof import('@zxing/browser')> {
+    return import('@zxing/browser');
+  }
+
+  /**
+   * zxing (~570 kB) wird erst bei Bedarf nachgeladen; {@link preload} holt es schon beim Antippen vor.
+   * Scheitert der Import (Netz weg, Chunk fehlt), wird er nicht gemerkt: der nächste Versuch lädt neu.
+   */
   protected loadReader(): Promise<BrowserMultiFormatReader> {
-    return (this.reader ??= import('@zxing/browser').then(async (m) => {
+    const loading = (this.reader ??= this.importZxing().then(async (m) => {
       const { DecodeHintType } = await import('@zxing/library');
       const formats = SCAN_FORMAT_NAMES.map((name) => m.BarcodeFormat[name]);
       const hints = new Map([[DecodeHintType.POSSIBLE_FORMATS, formats]]);
@@ -36,13 +47,17 @@ export class BarcodeScannerService {
         delayBetweenScanSuccess: SCAN_ATTEMPT_DELAY_MS,
       });
     }));
+    loading.catch(() => {
+      if (this.reader === loading) this.reader = undefined;
+    });
+    return loading;
   }
 
   /** Lädt die Bibliothek im Hintergrund, damit der Scanner nach dem Öffnen sofort startet. */
   preload(): void {
-    this.loadReader().catch(() => {
-      this.reader = undefined;
-    });
+    this.loadReader().catch((e: unknown) =>
+      this.log.error(`✗ Barcode-Bibliothek konnte nicht vorgeladen werden: ${errorText(e)}`),
+    );
   }
 
   /** True, wenn der Browser Kamerazugriff (getUserMedia) unterstützt. */

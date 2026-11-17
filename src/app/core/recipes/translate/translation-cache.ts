@@ -24,9 +24,13 @@ export function cacheKey(lang: string, source: RecipeTexts): string {
   return `${lang}:${hashTexts(source)}`;
 }
 
+function isStringList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((v) => typeof v === 'string');
+}
+
 function isTexts(value: unknown): value is RecipeTexts {
   const v = value as RecipeTexts | null;
-  return !!v && typeof v.title === 'string' && Array.isArray(v.ingredients) && Array.isArray(v.steps);
+  return !!v && typeof v.title === 'string' && isStringList(v.ingredients) && isStringList(v.steps);
 }
 
 /** Lokaler Übersetzungs-Cache je Rezept-Id und Textstand: dasselbe Rezept wird nie zweimal übersetzt. */

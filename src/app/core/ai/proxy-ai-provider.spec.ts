@@ -95,6 +95,12 @@ describe('ProxyAiProvider', () => {
     expect(res.sourceUrl).toBe('https://x.test');
   });
 
+  it('reicht usedFallbackText des Workers beim Rezept-Import durch', async () => {
+    const p = provider.importRecipe({ url: 'https://x.test', text: 'Zutaten' });
+    http.expectOne(PROXY).flush({ title: 'T', ingredients: [], steps: [], usedFallbackText: true });
+    expect((await p).usedFallbackText).toBe(true);
+  });
+
   it('meldet Status 0 bei vorhandenem Netz als Dienst nicht erreichbar', async () => {
     const p = provider.suggestFastfood(REQ);
     http.expectOne(PROXY).error(new ProgressEvent('error'), { status: 0 });

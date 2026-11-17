@@ -109,6 +109,11 @@ describe('kcal-Konsistenz', () => {
     expect(f.kcal).toBe(460);
   });
 
+  it('lässt zuckerfreie Produkte (Erythrit: 100 g KH, 0 kcal) unverändert, wie der OFF-Filter', () => {
+    const f: NutritionFacts = { kcal: 0, proteinG: 0, carbsG: 100, fatG: 0, basis: 'per100g' };
+    expect(reconcileKcal(f)).toBe(f);
+  });
+
   it('lässt plausible kcal unverändert', () => {
     const f: NutritionFacts = { kcal: 130, proteinG: 2.7, carbsG: 28, fatG: 0.3, basis: 'per100g' };
     expect(reconcileKcal(f)).toBe(f);
@@ -118,5 +123,16 @@ describe('kcal-Konsistenz', () => {
     const odd = ing({ amount: 1, unit: 'g', facts: per100g(4, 8, 8, 44) });
     const p = perServingFacts([odd], 2);
     expect(p.kcal * 1).toBeGreaterThanOrEqual(Math.floor((4 * p.proteinG + 4 * p.carbsG + 9 * p.fatG) * 0.7));
+  });
+});
+
+describe('ingredientFacts — unbekannte Einheit (K8)', () => {
+  it('setzt für Werte je 100 g und unbekannte Einheit keine Nährwerte an (statt 100 g je Einheit)', () => {
+    const zimt: RecipeIngredient = {
+      name: 'Zimt', amount: 2, unit: 'Msp',
+      facts: { kcal: 250, proteinG: 4, carbsG: 50, fatG: 3, basis: 'per100g' },
+    };
+
+    expect(ingredientFacts(zimt).kcal).toBe(0);
   });
 });

@@ -1,12 +1,8 @@
 import { Recipe, ShoppingItem } from '../models';
 import { withCategories } from './shopping-category';
 import { normalizeIngredient } from './normalize-ingredient';
+import { round2 } from './round2';
 import { itemKey } from './shopping-units';
-
-/** Rundet eine Menge auf max. 2 Nachkommastellen (hübsche Anzeige). */
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
 
 /** Ganze Zahl >= 1; nicht endliche Werte (NaN, Infinity) zählen als 1. */
 function safeCount(n: number): number {

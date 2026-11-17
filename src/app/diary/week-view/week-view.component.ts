@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { AppResumeService } from '../../core/app-resume/app-resume.service';
 import { DiaryStore } from '../../core/state/diary.store';
 import { ProfileStore } from '../../core/state/profile.store';
 import { toDateISO } from '../../core/util/date';
@@ -17,7 +18,8 @@ export interface BarView {
   readonly logged: boolean;
   /** Balkenhöhe in Prozent der Skala. */
   readonly heightPct: number;
-  readonly inGoal: boolean;
+  /** Kurztext unter dem Balken (Wert oder Strich). */
+  readonly valueText: string;
   /** Über dem Korridor: nur bei Kalorien als Warnung gefärbt. */
   readonly isOver: boolean;
 }
@@ -27,6 +29,8 @@ export interface BarChartView {
   /** Höhe der Ziel-Linie in Prozent der Skala; null ohne Ziel. */
   readonly targetPct: number | null;
   readonly description: string;
+  /** Beschriftung der Ziel-Linie, z. B. "Ziel 2.000 kcal"; null ohne Ziel. */
+  readonly targetText: string | null;
 }
 
 const weekdayOf = (dateISO: string): string => {
@@ -41,7 +45,6 @@ function buildChart(
   unit: string,
   today: string,
   isOverTarget: (value: number) => boolean,
-  inGoalOf: (d: DayTotals) => boolean,
 ): BarChartView {
   const scale = Math.max(target * SCALE_HEADROOM, ...days.map(pick), 1);
   const bars = days.map<BarView>((d) => ({
@@ -51,13 +54,15 @@ function buildChart(
     value: pick(d),
     logged: d.logged,
     heightPct: d.logged ? Math.max(2, Math.round((pick(d) / scale) * 100)) : 0,
-    inGoal: inGoalOf(d),
+    valueText: d.logged ? String(pick(d)) : '–',
     isOver: target > 0 && d.logged && isOverTarget(pick(d)),
   }));
   const description = bars
     .map((b) => `${b.label} ${b.logged ? `${formatNum(b.value, 0)} ${unit}` : 'nichts eingetragen'}`)
     .join(', ');
-  return { bars, targetPct: target > 0 ? Math.round((target / scale) * 100) : null, description };
+  const targetText = target > 0 ? `Ziel ${formatNum(target, 0)} ${unit}` : null;
+  const fullDescription = targetText ? `${description}. ${targetText}` : description;
+  return { bars, targetPct: target > 0 ? Math.round((target / scale) * 100) : null, description: fullDescription, targetText };
 }
 
 /**
@@ -79,7 +84,16 @@ export class WeekViewComponent {
   readonly kcalMinPct = Math.round(KCAL_CORRIDOR.min * 100);
   readonly kcalMaxPct = Math.round(KCAL_CORRIDOR.max * 100);
 
-  private readonly today = toDateISO();
+  private readonly today = signal(toDateISO());
+
+  constructor() {
+    // Nach Mitternacht (Rückkehr in die App) neu auf den heutigen Tag setzen.
+    const resume = inject(AppResumeService);
+    effect(() => {
+      if (resume.resumeCount() > 0) untracked(() => this.today.set(toDateISO()));
+    });
+  }
+
   private readonly target = computed(() => {
     const t = this.profile.target();
     return { kcal: t?.kcal ?? 0, proteinG: t?.proteinG ?? 0 };
@@ -94,23 +108,23 @@ export class WeekViewComponent {
 
   private readonly days = computed<DayTotals[]>(() => {
     this.diary.entries(); // Abhängigkeit: bei jeder Änderung neu rechnen
-    return lastDays(this.today).map((d) => this.dayTotals(d));
+    return lastDays(this.today()).map((d) => this.dayTotals(d));
   });
 
   readonly summary = computed(() => weekSummary(this.days(), this.target()));
   readonly streak = computed(() => {
     this.diary.entries();
     const target = this.target();
-    return currentStreak((d) => isDayInGoal(this.dayTotals(d), target), this.today);
+    return currentStreak((d) => isDayInGoal(this.dayTotals(d), target), this.today());
   });
 
   readonly kcalChart = computed(() => {
     const t = this.target();
-    return buildChart(this.days(), (d) => d.kcal, t.kcal, 'kcal', this.today, (v) => v > t.kcal * KCAL_CORRIDOR.max, (d) => isDayInGoal(d, t));
+    return buildChart(this.days(), (d) => d.kcal, t.kcal, 'kcal', this.today(), (v) => v > t.kcal * KCAL_CORRIDOR.max);
   });
   readonly proteinChart = computed(() => {
     const t = this.target();
-    return buildChart(this.days(), (d) => d.proteinG, t.proteinG, 'g Eiweiß', this.today, () => false, (d) => isDayInGoal(d, t));
+    return buildChart(this.days(), (d) => d.proteinG, t.proteinG, 'g Eiweiß', this.today(), () => false);
   });
 
   readonly daysWord = (n: number): string => (n === 1 ? 'Tag' : 'Tage');

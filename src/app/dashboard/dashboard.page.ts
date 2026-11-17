@@ -1,13 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { Router } from '@angular/router';
 import { AppResumeService } from '../core/app-resume/app-resume.service';
-import { MealType, NutritionFacts } from '../core/models';
+import { MealType } from '../core/models';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { formatNum } from '../shared/num.pipe';
 import { dayLabel, rollDate, toDateISO } from '../core/util/date';
 import { MEAL_DEFS, mealForHour } from '../diary/diary-helpers';
-import { isWarnMacro, macroEnergyShares, macroNote, proteinHint, proteinOfEntries, softHyphenLabel } from './dashboard-math';
+import { DrillData, buildDrillData, isWarnMacro, macroEnergyShares, proteinHint, proteinOfEntries, softHyphenLabel } from './dashboard-math';
 
 interface MacroView {
   key: 'kcal' | 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar';
@@ -23,27 +23,6 @@ interface MacroView {
   overBy: number;
   /** True, wenn eine Überschreitung rot gezeigt wird (nur kcal). */
   warn: boolean;
-}
-
-interface DrillItem {
-  label: string;
-  value: number;
-  percent: number;
-}
-
-interface DrillData {
-  label: string;
-  unit: string;
-  total: number;
-  /** Tagesziel dieses Werts und Anteil der Tagessumme daran (Prozent, 0 ohne Ziel). */
-  target: number;
-  targetPercent: number;
-  color: string;
-  /** True, wenn das Ziel dieses Werts deutlich überschritten ist (Warnfarbe). */
-  over: boolean;
-  /** Erklärung zum Wert (z. B. Zucker: Gesamtzucker gegen Richtwert für freien Zucker). */
-  note: string | null;
-  items: DrillItem[];
 }
 
 interface MealView {
@@ -164,49 +143,22 @@ export class DashboardPage {
   readonly addMeal = signal<MealType>('breakfast');
   readonly ffOpen = signal(false);
 
+  /** Offener Drill-Down (null = geschlossen); steuert nur das Sheet. */
   readonly drillMacro = signal<string | null>(null);
+  /** Zuletzt gewählter Wert: bleibt beim Schließen stehen, damit der Inhalt während der Schließ-Animation sichtbar bleibt. */
+  private readonly drillKey = signal<string | null>(null);
 
   readonly drillData = computed<DrillData | null>(() => {
-    const key = this.drillMacro();
+    const key = this.drillKey();
     if (!key) return null;
     const entries = this.diary.entriesForDate(this.selectedDate());
-    const color = key === 'kcal'
-      ? 'var(--nt-kcal)'
-      : (this.macros().find(m => m.key === key)?.color ?? 'var(--ion-color-primary)');
-    const label = key === 'kcal' ? 'Kalorien' : (this.macros().find(m => m.key === key)?.label ?? key);
-    const unit = key === 'kcal' ? 'kcal' : 'g';
-    const macro = this.macros().find(m => m.key === key);
-    const over = !!macro && macro.warn && macro.overBy > 0;
-    const items = entries
-      .map(e => ({ label: e.label, value: this.factValue(e.facts, key) }))
-      .filter(d => d.value > 0)
-      .sort((a, b) => b.value - a.value);
-    const total = items.reduce((s, i) => s + i.value, 0);
-    const target = macro?.target ?? 0;
-    return {
-      label, unit, color, over, target, note: macroNote(key),
-      targetPercent: target > 0 ? Math.round((total / target) * 100) : 0,
-      total: Math.round(total * 10) / 10,
-      items: items.map(i => ({
-        ...i,
-        value: Math.round(i.value * 10) / 10,
-        percent: total > 0 ? Math.round((i.value / total) * 100) : 0,
-      })),
-    };
+    return buildDrillData(key, entries, this.macros().find((m) => m.key === key));
   });
 
-  private factValue(facts: NutritionFacts, key: string): number {
-    const map: Record<string, keyof NutritionFacts> = {
-      kcal: 'kcal', protein: 'proteinG', carbs: 'carbsG',
-      fat: 'fatG', fiber: 'fiberG', sugar: 'sugarG',
-    };
-    const prop = map[key];
-    if (!prop) return 0;
-    const v = facts[prop];
-    return typeof v === 'number' ? v : 0;
+  openDrill(key: string): void {
+    this.drillKey.set(key);
+    this.drillMacro.set(key);
   }
-
-  openDrill(key: string): void { this.drillMacro.set(key); }
   closeDrill(): void { this.drillMacro.set(null); }
 
   /** Beim Betreten der Seite und beim Zurückkehren in die App: nach Mitternacht auf den neuen Tag springen. */

@@ -43,7 +43,7 @@ describe('ShoppingStore total', () => {
     store.addItem({ ...item('b'), userPrice: 3 });
     expect(store.list()?.estTotal).toBe(5);
 
-    store.removeItem(0);
+    store.removeItem(store.list()!.items[0].id!);
     expect(store.list()?.estTotal).toBe(3);
   });
 });
@@ -100,14 +100,15 @@ describe('ShoppingStore.setItemPrice', () => {
   it('sets, rounds and clears an entered price and keeps estTotal in sync', () => {
     const store = TestBed.inject(ShoppingStore);
     store.addItem({ name: 'Brot', amount: 1, unit: 'Stk', checked: false });
+    const id = store.list()!.items[0].id!;
     const estimate = store.list()?.items[0].estPrice;
     expect(estimate).toBeGreaterThan(0);
 
-    store.setItemPrice(0, 2.499);
+    store.setItemPrice(id, 2.499);
     expect(store.list()?.items[0].userPrice).toBe(2.5);
     expect(store.list()?.estTotal).toBe(2.5);
 
-    store.setItemPrice(0, null);
+    store.setItemPrice(id, null);
     expect(store.list()?.items[0].userPrice).toBeUndefined();
     expect(store.list()?.estTotal).toBe(estimate);
   });

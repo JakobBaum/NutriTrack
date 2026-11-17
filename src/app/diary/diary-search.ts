@@ -32,6 +32,7 @@ export class DiarySearch {
 
   /** Setzt Suchfeld, Treffer und Hinweise zurück. */
   reset(): void {
+    this.invalidatePending();
     this.query = '';
     this.results.set([]);
     this.resultsQuery = '';
@@ -41,8 +42,16 @@ export class DiarySearch {
 
   /** Leert Eingabe und Treffer nach der Auswahl. */
   clearAfterPick(): void {
+    this.invalidatePending();
     this.results.set([]);
+    this.resultsQuery = '';
     this.query = '';
+  }
+
+  /** Entwertet laufende Antworten: Eine späte Antwort darf weder Treffer setzen noch den Ladezustand ändern. */
+  private invalidatePending(): void {
+    this.seq += 1;
+    this.searching.set(false);
   }
 
   onInput(value: unknown): void {

@@ -58,3 +58,26 @@ describe('sanitizeBlocked', () => {
     expect(sanitizeBlocked(null)).toEqual([]);
   });
 });
+
+describe('sanitizeWeekPlan Review 4 (D6, D19)', () => {
+  it('verwirft Zutaten mit negativer Menge oder ungültigen Nährwerten', () => {
+    const out = sanitizeWeekPlan(plan({
+      recipes: [recipe({
+        ingredients: [
+          { name: 'a', amount: -1, unit: 'g' },
+          { name: 'b', amount: 1, unit: 'g', facts: { kcal: 'x' } },
+          { name: 'c', amount: 1, unit: 'g' },
+        ],
+      })],
+    }));
+    expect(out?.recipes[0].ingredients.map((i) => i.name)).toEqual(['c']);
+  });
+
+  it('übernimmt keine negativen Rezept-Nährwerte oder Zeiten', () => {
+    const out = sanitizeWeekPlan(plan({
+      recipes: [recipe({ facts: { kcal: -5, proteinG: 1, carbsG: 1, fatG: 1 }, readyInMinutes: -3 })],
+    }));
+    expect(out?.recipes[0].facts).toBeUndefined();
+    expect(out?.recipes[0].readyInMinutes).toBeUndefined();
+  });
+});

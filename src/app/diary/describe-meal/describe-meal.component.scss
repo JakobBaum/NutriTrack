@@ -1,5 +1,5 @@
 @use '../diary-sheets';
-@use '../diary-sheet-flows';
+@use '../diary-sheet-pick';
 
 // Beschreiben-Ansicht: eigener Inhalt und Fuss im Eintragen-Sheet. Wirt ohne Rahmen, damit ion-content/ion-footer Kinder des Sheets bleiben.
 :host {
@@ -8,6 +8,11 @@
 
 .dm {
   padding-bottom: var(--nt-space-4);
+
+  // Der Seitenrand kommt schon von .nt-page; die Chips fluchten so mit denen im Eintragen-Sheet.
+  .meal-picker {
+    margin-inline: 0;
+  }
 
   &__label {
     display: block;

@@ -4,17 +4,32 @@
     @if (exportError(); as failed) {
       <p class="banner__text banner__text--sub">{{ failed }}</p>
     }
-    @if (hasWriteError()) {
+    @if (hasWriteError() || hasExternalChange()) {
       <div class="banner__actions">
-        <button type="button" class="banner__btn" [disabled]="busy()" (click)="exportBackup()">Backup exportieren</button>
-        <button type="button" class="banner__btn banner__btn--ghost" (click)="retry()">Erneut versuchen</button>
+        @if (hasWriteError()) {
+          <button type="button" class="banner__btn" [disabled]="busy()" (click)="exportBackup()">Backup exportieren</button>
+          <button type="button" class="banner__btn banner__btn--ghost" (click)="retry()">Erneut versuchen</button>
+        }
+        @if (hasExternalChange()) {
+          <button type="button" class="banner__btn" [class.banner__btn--ghost]="hasWriteError()" data-testid="reload-btn" (click)="reloadApp()">Neu laden</button>
+        }
       </div>
     }
   </div>
 } @else if (noticeMessage(); as notice) {
   <div class="banner banner--info" role="status" data-testid="quarantine-banner">
-    <p class="banner__text">{{ notice }} Die Originale liegen gesichert im Gerätespeicher.</p>
+    @if (isNoticeSecured()) {
+      <p class="banner__text">{{ notice }} Die Originale liegen gesichert im Gerätespeicher.</p>
+    } @else {
+      <p class="banner__text">{{ notice }} Nicht gesichert. Exportiere ein Backup und gib Speicher frei.</p>
+      @if (exportError(); as failed) {
+        <p class="banner__text banner__text--sub">{{ failed }}</p>
+      }
+    }
     <div class="banner__actions">
+      @if (!isNoticeSecured()) {
+        <button type="button" class="banner__btn" [disabled]="busy()" (click)="exportBackup()">Backup exportieren</button>
+      }
       <button type="button" class="banner__btn banner__btn--ghost" (click)="dismissNotice()">Verstanden</button>
     </div>
   </div>

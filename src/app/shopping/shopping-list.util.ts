@@ -2,10 +2,10 @@ import { ShoppingItem } from '../core/models';
 import { SHOPPING_CATEGORIES } from '../core/shopping/shopping-category';
 import { DEFAULT_UNIT_SYSTEM, UnitSystem, formatQuantity } from '../core/shopping/units/unit-format';
 
-/** Eine Position samt Index in der gespeicherten Liste. */
+/** Eine Position samt ihrer stabilen id (Adresse für Abhaken, Preis und Löschen). */
 export interface ShoppingRow {
   item: ShoppingItem;
-  index: number;
+  id: string;
 }
 
 /** Eine Gruppe offener Positionen; `category` null = ungruppiert. */
@@ -20,12 +20,15 @@ export const FALLBACK_CATEGORY = 'Sonstiges';
 /** Standard-Personenzahl, wenn weder Profil noch Liste eine liefern. */
 export const DEFAULT_PERSONS = 2;
 
-/** Optionale Supermarkt-Kategorie (z. B. von der KI); das Basismodell kennt sie nicht. */
+/** Anzeige-Kategorie der Position (getrimmt, auch freie Texte aus Altdaten oder der KI); ohne Angabe null. */
 export function categoryOf(item: ShoppingItem): string | null {
-  const raw = (item as ShoppingItem & { category?: unknown }).category;
-  if (typeof raw !== 'string') return null;
-  const trimmed = raw.trim();
+  const trimmed = typeof item.category === 'string' ? item.category.trim() : '';
   return trimmed ? trimmed : null;
+}
+
+/** Zeile zu einer gespeicherten Position (die id vergibt der Store). */
+export function toRow(item: ShoppingItem): ShoppingRow {
+  return { item, id: item.id ?? '' };
 }
 
 /** Teilt Zeilen in offene und erledigte, Reihenfolge bleibt erhalten. */
@@ -83,38 +86,16 @@ export function formatShareText(
   title = 'Einkaufsliste',
   system: UnitSystem = DEFAULT_UNIT_SYSTEM,
 ): string {
-  const rows = items.map((item, index) => ({ item, index })).filter((r) => !r.item.checked);
+  const rows = items.map(toRow).filter((r) => !r.item.checked);
   const line = (r: ShoppingRow): string => {
     const amount = formatAmount(r.item, system);
     return amount ? `- ${r.item.name} (${amount})` : `- ${r.item.name}`;
   };
   const blocks = groupByCategory(rows).map((g) => {
     const lines = g.rows.map(line).join('\n');
-    return g.category ? `${g.category}:\n${lines}` : lines;
+    return g.category ? `${categoryLabel(g.category)}:\n${lines}` : lines;
   });
   return [title, ...blocks].join('\n\n');
-}
-
-/**
- * Indizes, die nach dem endgültigen Entfernen von `removed` an die Stelle von
- * `index` rücken (für Löschen, während ein anderes Löschen noch offen ist).
- */
-export function adjustIndex(index: number, removed: readonly number[]): number {
-  return index - removed.filter((r) => r < index).length;
-}
-
-/** Kodiert Indizes für {@link UndoableDelete} (eine ID = Komma-Liste). */
-export function encodeIndexes(indexes: readonly number[]): string {
-  return indexes.join(',');
-}
-
-/** Gegenstück zu {@link encodeIndexes}; ungültige Teile werden ignoriert. */
-export function decodeIndexes(id: string | null): number[] {
-  if (!id) return [];
-  return id
-    .split(',')
-    .map((part) => Number(part))
-    .filter((n) => Number.isInteger(n) && n >= 0);
 }
 
 /** Ganze Zahl ab 1 oder null. */
@@ -138,9 +119,6 @@ export function defaultPersons(profile: object | null, lastListPersons?: number)
 
 /** Gängige Wochen-Budgets (EUR) als Schnellwahl; null = „egal“ steht separat daneben. */
 export const BUDGET_PRESETS: readonly number[] = [50, 75, 100, 150];
-
-/** Schnellwahl für die Tage; andere Werte (1–14) über den Stepper. */
-export const DAY_PRESETS: readonly number[] = [1, 3, 5, 7];
 
 export const PERSONS_MIN = 1;
 export const PERSONS_MAX = 8;

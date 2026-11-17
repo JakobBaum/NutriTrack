@@ -4,28 +4,20 @@
  */
 import { MealType, RecipeIngredient } from '../models';
 import { WeekPlan, WeekPlanRecipe } from '../week-plan/week-plan.model';
-
-type Rec = Record<string, unknown>;
+import { Rec, isFactsRecord, isNonNegative, isNum, isPositive, isRec, isStr } from '../util/guards';
+import { isIngredient } from '../backup/backup-records';
 
 const MEALS: readonly MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 const URL_PATTERN = /^https?:\/\//i;
 const MIN_COUNT = 1;
 
-const isRec = (v: unknown): v is Rec => typeof v === 'object' && v !== null && !Array.isArray(v);
-const isStr = (v: unknown): v is string => typeof v === 'string';
-const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const isCount = (v: unknown): v is number => isNum(v) && Number.isInteger(v) && v >= MIN_COUNT;
 const isMeal = (v: unknown): v is MealType => isStr(v) && (MEALS as readonly string[]).includes(v);
 const isUrl = (v: unknown): v is string => isStr(v) && URL_PATTERN.test(v);
 const asArray = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
 function toIngredient(v: unknown): RecipeIngredient | null {
-  if (!isRec(v) || !isStr(v['name']) || !isNum(v['amount']) || !isStr(v['unit'])) return null;
-  return { ...(v as unknown as RecipeIngredient) };
-}
-
-function hasFacts(v: unknown): boolean {
-  return isRec(v) && [v['kcal'], v['proteinG'], v['carbsG'], v['fatG']].every(isNum);
+  return isIngredient(v) ? { ...(v as unknown as RecipeIngredient) } : null;
 }
 
 /** Optionale Rezeptfelder; nur mit passendem Typ übernommen (Adressen nur http/https). */
@@ -34,15 +26,15 @@ function optionalRecipeFields(v: Rec): Partial<WeekPlanRecipe> {
     ...(isUrl(v['imageUrl']) ? { imageUrl: v['imageUrl'] } : {}),
     ...(isUrl(v['sourceUrl']) ? { sourceUrl: v['sourceUrl'] } : {}),
     ...(isStr(v['sourceName']) ? { sourceName: v['sourceName'] } : {}),
-    ...(isNum(v['readyInMinutes']) ? { readyInMinutes: v['readyInMinutes'] } : {}),
-    ...(hasFacts(v['facts']) ? { facts: v['facts'] as WeekPlanRecipe['facts'] } : {}),
+    ...(isNonNegative(v['readyInMinutes']) ? { readyInMinutes: v['readyInMinutes'] } : {}),
+    ...(isFactsRecord(v['facts']) ? { facts: v['facts'] as WeekPlanRecipe['facts'] } : {}),
     ...(v['lang'] === 'de' || v['lang'] === 'en' ? { lang: v['lang'] } : {}),
   };
 }
 
 function toRecipe(v: unknown): WeekPlanRecipe | null {
   if (!isRec(v) || !isStr(v['id']) || !isStr(v['title']) || !isMeal(v['meal'])) return null;
-  if (!isNum(v['servings']) || v['servings'] < MIN_COUNT || !isNum(v['portions']) || v['portions'] <= 0) return null;
+  if (!isNum(v['servings']) || v['servings'] < MIN_COUNT || !isPositive(v['portions'])) return null;
   return {
     id: v['id'],
     title: v['title'],

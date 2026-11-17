@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
-import { toDateISO } from '../core/util/date';
+import { injectToday } from '../shared/date-nav/use-today';
 import { DayTotals, lastDays, proteinStripStates, ProteinStripState } from '../diary/week-view/week-stats';
 
 const STATE_TEXT: Record<ProteinStripState, string> = {
@@ -35,10 +35,12 @@ function weekdayShort(dateISO: string): string {
 export class WeekStripComponent {
   private readonly diary = inject(DiaryStore);
   private readonly profile = inject(ProfileStore);
+  /** Heutiger Tag; rechnet nach Mitternacht neu. */
+  private readonly today = injectToday();
 
   private readonly days = computed<DayTotals[]>(() => {
     this.diary.entries();
-    return lastDays(toDateISO()).map((dateISO) => {
+    return lastDays(this.today()).map((dateISO) => {
       const totals = this.diary.totalsForDate(dateISO);
       return { dateISO, kcal: Math.round(totals.kcal), proteinG: Math.round(totals.proteinG), logged: this.diary.entriesForDate(dateISO).length > 0 };
     });
@@ -47,7 +49,7 @@ export class WeekStripComponent {
   readonly strip = computed<StripDayView[]>(() => {
     const target = this.profile.target();
     if (!target) return [];
-    return proteinStripStates(this.days(), { kcal: target.kcal, proteinG: target.proteinG }, toDateISO()).map((d) => ({
+    return proteinStripStates(this.days(), { kcal: target.kcal, proteinG: target.proteinG }, this.today()).map((d) => ({
       dateISO: d.dateISO,
       weekday: weekdayShort(d.dateISO),
       state: d.state,

@@ -21,7 +21,8 @@ export function recipeMetaLine(r: WeekPlanRecipe): string {
   const parts: string[] = [];
   if (r.facts) parts.push(`${de(r.facts.kcal)} kcal`, `${de(Math.round(r.facts.proteinG))} g Eiweiß`);
   if (r.readyInMinutes) parts.push(`${r.readyInMinutes} Min`);
-  parts.push(r.portions === 1 ? '1 Portion' : `${r.portions} Portionen`);
+  // Geschütztes Leerzeichen: „2“ und „Portionen“ brechen nie auseinander.
+  parts.push(r.portions === 1 ? '1 Portion' : `${r.portions} Portionen`);
   return parts.join(' · ');
 }
 

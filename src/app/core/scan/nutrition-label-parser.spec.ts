@@ -199,3 +199,20 @@ describe('parseNutritionLabel', () => {
     expect(r.found.slice(0, 3)).toEqual(['kcal', 'fatG', 'saturatedFatG']);
   });
 });
+
+describe('parseNutritionLabel — K17', () => {
+  it('liest "1 046 kJ" mit Leerzeichen-Tausendertrenner als 1046 kJ (250 kcal)', () => {
+    const r = parseNutritionLabel('pro 100 g\nEnergie 1 046 kJ / 250 kcal\nFett 10 g');
+    expect(r.values.kcal).toBe(250);
+    const kjOnly = parseNutritionLabel('pro 100 g\nBrennwert 1 046 kJ\nFett 10 g');
+    expect(Math.round(kjOnly.values.kcal ?? 0)).toBe(250);
+  });
+
+  it('akzeptiert je Portion höhere Werte als je 100 g', () => {
+    const portion = parseNutritionLabel('pro Portion\nEnergie 1200 kcal\nFett 60 g\nKohlenhydrate 130 g\nEiweiß 40 g');
+    expect(portion.values.kcal).toBe(1200);
+    expect(portion.values.carbsG).toBe(130);
+    const per100 = parseNutritionLabel('pro 100 g\nEnergie 1200 kcal\nFett 60 g');
+    expect(per100.values.kcal).toBeUndefined();
+  });
+});

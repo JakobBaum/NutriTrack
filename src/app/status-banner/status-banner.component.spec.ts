@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 
 import { BackupService } from '../core/backup/backup.service';
+import { EXTERNAL_CHANGE_MESSAGE } from '../core/storage/storage-messages';
 import { StorageService } from '../core/storage/storage.service';
 import { StatusBannerComponent } from './status-banner.component';
 
@@ -18,13 +19,14 @@ function failingStorage(): void {
 }
 
 describe('StatusBannerComponent', () => {
-  const exportBackup = vi.fn();
+  const exportDetailed = vi.fn();
+
 
   beforeEach(async () => {
-    exportBackup.mockReset().mockResolvedValue(undefined);
+    exportDetailed.mockReset().mockResolvedValue({ result: 'shared', skippedKeys: [] });
     await TestBed.configureTestingModule({
       declarations: [StatusBannerComponent],
-      providers: [{ provide: BackupService, useValue: { exportBackup } }],
+      providers: [{ provide: BackupService, useValue: { exportBackupDetailed: exportDetailed } }],
     }).compileComponents();
   });
 
@@ -58,16 +60,66 @@ describe('StatusBannerComponent', () => {
     fixture.detectChanges();
 
     await fixture.componentInstance.exportBackup();
-    expect(exportBackup).toHaveBeenCalledTimes(1);
+    expect(exportDetailed).toHaveBeenCalledTimes(1);
   });
 
   it('zeigt eine Fehlermeldung, wenn der Export scheitert', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    exportBackup.mockRejectedValue(new Error('x'));
+    exportDetailed.mockRejectedValue(new Error('x'));
     const fixture = TestBed.createComponent(StatusBannerComponent);
     await fixture.componentInstance.exportBackup();
     expect(fixture.componentInstance.exportError()).toContain('nicht erstellt');
     expect(errSpy).toHaveBeenCalled();
+  });
+
+  it('meldet im Banner, wenn der Export nicht bestätigt werden konnte', async () => {
+    exportDetailed.mockResolvedValue({ result: 'unverified', skippedKeys: [] });
+    const fixture = TestBed.createComponent(StatusBannerComponent);
+    await fixture.componentInstance.exportBackup();
+    expect(fixture.componentInstance.exportError()).toContain('Teilen-Menü');
+  });
+
+  it('zeigt nach erfolgreichem Export keine Fehlermeldung', async () => {
+    exportDetailed.mockResolvedValue({ result: 'shared', skippedKeys: [] });
+    const fixture = TestBed.createComponent(StatusBannerComponent);
+    await fixture.componentInstance.exportBackup();
+    expect(fixture.componentInstance.exportError()).toBeNull();
+  });
+
+  it('nennt fehlende Bereiche, wenn das Backup unvollständig ist', async () => {
+    exportDetailed.mockResolvedValue({ result: 'shared', skippedKeys: ['diary'] });
+    const fixture = TestBed.createComponent(StatusBannerComponent);
+    await fixture.componentInstance.exportBackup();
+    expect(fixture.componentInstance.exportError()).toContain('unvollständig');
+    expect(fixture.componentInstance.exportError()).toContain('Tagebuch');
+  });
+
+  it('zeigt bei Änderung in einem anderen Fenster eine Meldung mit Neu-laden-Aktion', () => {
+    const storage = TestBed.inject(StorageService);
+    const fixture = TestBed.createComponent(StatusBannerComponent);
+    const reload = vi.spyOn(fixture.componentInstance, 'reloadApp').mockImplementation(() => undefined);
+    window.dispatchEvent(new StorageEvent('storage', { key: 'nutritrack:diary', newValue: '[]', storageArea: localStorage }));
+    expect(storage.externalChange()).toBe(true);
+    fixture.detectChanges();
+
+    const banner: HTMLElement = fixture.nativeElement.querySelector('[role="alert"]');
+    expect(banner.textContent).toContain(EXTERNAL_CHANGE_MESSAGE);
+    fixture.nativeElement.querySelector('[data-testid="reload-btn"]').click();
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('zeigt "Neu laden" auch dann, wenn zugleich ein Speicherfehler besteht', () => {
+    failingStorage();
+    const storage = TestBed.inject(StorageService);
+    const fixture = TestBed.createComponent(StatusBannerComponent);
+    window.dispatchEvent(new StorageEvent('storage', { key: 'nutritrack:diary', newValue: '[]' }));
+    expect(storage.lastError()).not.toBeNull();
+    expect(storage.externalChange()).toBe(true);
+    fixture.detectChanges();
+
+    const root: HTMLElement = fixture.nativeElement;
+    expect(root.querySelector('[data-testid="reload-btn"]')).not.toBeNull();
+    expect(root.textContent).toContain('Erneut versuchen');
   });
 
   it('erneuter Versuch ruft retryNow auf', () => {
@@ -90,13 +142,36 @@ describe('StatusBannerComponent', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[data-testid="quarantine-banner"]')).toBeNull();
   });
+
+  it('behauptet die Sicherung nur, wenn alle Hinweise gesichert sind', () => {
+    const storage = TestBed.inject(StorageService);
+    storage.quarantine('diary', [{ bad: true }], 'invalid');
+    const fixture = TestBed.createComponent(StatusBannerComponent);
+    fixture.detectChanges();
+    const text = (): string => fixture.nativeElement.querySelector('[data-testid="quarantine-banner"]').textContent;
+    expect(text()).toContain('Die Originale liegen gesichert im Gerätespeicher.');
+    expect(text()).not.toContain('Nicht gesichert');
+  });
+
+  it('warnt bei gescheiterter Quarantäne statt Sicherung zu behaupten, mit Backup-Export', () => {
+    const storage = TestBed.inject(StorageService);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    failingStorage();
+    storage.quarantine('diary', [{ bad: true }], 'invalid');
+    const fixture = TestBed.createComponent(StatusBannerComponent);
+    fixture.detectChanges();
+    const banner: HTMLElement = fixture.nativeElement.querySelector('[data-testid="quarantine-banner"]');
+    expect(banner.textContent).not.toContain('gesichert im Gerätespeicher');
+    expect(banner.textContent).toContain('Nicht gesichert. Exportiere ein Backup und gib Speicher frei.');
+    expect(banner.textContent).toContain('Backup exportieren');
+  });
 });
 
 describe('StatusBannerComponent Offline-Hinweis', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       declarations: [StatusBannerComponent],
-      providers: [{ provide: BackupService, useValue: { exportBackup: vi.fn() } }],
+      providers: [{ provide: BackupService, useValue: { exportBackupDetailed: vi.fn() } }],
     }).compileComponents();
   });
 

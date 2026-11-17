@@ -5,6 +5,7 @@ import { AiService } from '../../core/ai/ai.service';
 import { ConsentService } from '../../core/consent/consent.service';
 import { BarcodeScannerService } from '../../core/scan/barcode-scanner.service';
 import { CameraService } from '../../core/scan/camera.service';
+import { CAMERA_DENIED_MESSAGE, CameraCancelledError, CameraDeniedError } from '../../core/scan/camera-errors';
 import { LabelOcrService } from '../../core/scan/label-ocr.service';
 import {
   NtFoodSourcesComponent, SLOW_AI_HINT_MS, STATUS_PREPARING, STATUS_READING, STATUS_SLOW,
@@ -104,5 +105,26 @@ describe('NtFoodSourcesComponent — ohne Zustimmung', () => {
 
     expect(recognizeLabel).toHaveBeenCalledTimes(1);
     expect(recognizeText).not.toHaveBeenCalled();
+  });
+});
+
+describe('NtFoodSourcesComponent — Kamera-Abbruch und Berechtigung (K2)', () => {
+  type WithError = Internals & { error(): string | null };
+
+  it('beendet den Abbruch der nativen Kamera still ohne Fehlermeldung', async () => {
+    const cmp = create() as WithError;
+
+    await cmp.run(async () => { throw new CameraCancelledError(); }, 'x');
+
+    expect(cmp.error()).toBeNull();
+    expect(cmp.scanStatus()).toBeNull();
+  });
+
+  it('zeigt bei verweigerter Berechtigung die deutsche Meldung', async () => {
+    const cmp = create() as WithError;
+
+    await cmp.run(async () => { throw new CameraDeniedError(); }, 'x');
+
+    expect(cmp.error()).toBe(CAMERA_DENIED_MESSAGE);
   });
 });

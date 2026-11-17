@@ -1,0 +1,6 @@
+// Bearbeiten-Sheet: Speichern im .nt-sheet-footer, Zusatzaktionen als Text-Buttons (.nt-btn--text)
+@use '../diary-sheets';
+
+.edit-delete {
+  color: var(--nt-danger);
+}

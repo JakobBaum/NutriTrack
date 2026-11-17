@@ -107,15 +107,17 @@
     (didDismiss)="onToastDismiss()"
   ></ion-toast>
 
-  <ion-toast
-    [isOpen]="undoOpen()"
-    message="Rezept gelöscht"
-    [duration]="undoDuration"
-    [buttons]="undoButtons"
-    position="bottom"
-    [swipeGesture]="toastSwipe"
-    (didDismiss)="onUndoDismiss($any($event))"
-  ></ion-toast>
+  @for (seq of [undoSeq()]; track seq) {
+    <ion-toast
+      [isOpen]="undoOpen()"
+      [message]="undoMessage()"
+      [duration]="undoDuration"
+      [buttons]="undoButtons"
+      position="bottom"
+      [swipeGesture]="toastSwipe"
+      (didDismiss)="onUndoDismiss($any($event))"
+    ></ion-toast>
+  }
 </ion-content>
 
 <!-- Add/Edit recipe modal -->
@@ -131,10 +133,6 @@
       </div>
     </ion-header>
     <ion-content>
-      @if (error()) {
-        <p class="form-error" role="alert">{{ error() }}</p>
-      }
-
       <label class="field-label nt-section-header" for="recipe-name">Name</label>
       <ion-input id="recipe-name" class="nt-field" autocapitalize="words" autocorrect="off" [(ngModel)]="form.title" aria-label="Name" placeholder="zum Beispiel Linsen-Dal"></ion-input>
 
@@ -165,7 +163,7 @@
                       } @else {
                         <span class="ing-facts-toggle--missing">Nährwerte fehlen – kcal eintragen</span>
                       }
-                      <ion-icon [name]="isExpanded($index) ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
+                      <ion-icon [name]="isExpanded($index) ? 'chevron-up-outline' : 'chevron-down-outline'" aria-hidden="true"></ion-icon>
                     </button>
                   </div>
                   @if (isUnknownUnit(ing.unit)) {
@@ -178,7 +176,7 @@
               </ion-item>
               <ion-item-options side="end">
                 <ion-item-option color="danger" aria-label="Zutat löschen" (click)="removeIngredient($index)">
-                  <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+                  <ion-icon slot="icon-only" name="trash-outline" aria-hidden="true"></ion-icon>
                 </ion-item-option>
               </ion-item-options>
             </ion-item-sliding>
@@ -194,19 +192,19 @@
                     <div><strong>{{ factsOf(ing).sugarG | ntNum }} g</strong><span>Zucker</span></div>
                   </div>
                   <p class="ing-detail__note">
-                    Werte für {{ ing.amount || 0 | ntNum: 2 }} {{ ing.unit }}. Zum Korrigieren die Felder je 100 g unten anpassen.
+                    Werte für {{ ing.amount || 0 | ntNum: 2 }} {{ ing.unit }}. Zum Korrigieren die Felder unten anpassen (Angaben {{ basisLabel(ing) }}).
                   </p>
                   <div class="ing-detail__inputs">
-                    <label class="ing-field">kcal/100g <ion-input class="nt-field" type="text" inputmode="decimal" [ngModel]="formatDecimal(ing.facts.kcal)" (ngModelChange)="setFact(ing, 'kcal', $event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="kcal je 100g"></ion-input></label>
-                    <label class="ing-field">Eiweiß <ion-input class="nt-field" type="text" inputmode="decimal" [ngModel]="formatDecimal(ing.facts.proteinG)" (ngModelChange)="setFact(ing, 'proteinG', $event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Eiweiß je 100g"></ion-input></label>
-                    <label class="ing-field">Kohlenh. <ion-input class="nt-field" type="text" inputmode="decimal" [ngModel]="formatDecimal(ing.facts.carbsG)" (ngModelChange)="setFact(ing, 'carbsG', $event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Kohlenhydrate je 100g"></ion-input></label>
-                    <label class="ing-field">Fett <ion-input class="nt-field" type="text" inputmode="decimal" [ngModel]="formatDecimal(ing.facts.fatG)" (ngModelChange)="setFact(ing, 'fatG', $event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Fett je 100g"></ion-input></label>
-                    <label class="ing-field">Ballast. <ion-input class="nt-field" type="text" inputmode="decimal" [ngModel]="formatDecimal(ing.facts.fiberG)" (ngModelChange)="setFact(ing, 'fiberG', $event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Ballaststoffe je 100g"></ion-input></label>
-                    <label class="ing-field">Zucker <ion-input class="nt-field" type="text" inputmode="decimal" [ngModel]="formatDecimal(ing.facts.sugarG)" (ngModelChange)="setFact(ing, 'sugarG', $event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Zucker je 100g"></ion-input></label>
+                    <label class="ing-field">{{ kcalFieldLabel(ing) }} <ion-input class="nt-field" type="text" inputmode="decimal" [ngModel]="formatDecimal(ing.facts.kcal)" (ngModelChange)="setFact(ing, 'kcal', $event)" [ngModelOptions]="{ updateOn: 'blur' }" [attr.aria-label]="factAria(ing, 'kcal')"></ion-input></label>
+                    <label class="ing-field">Eiweiß <ion-input class="nt-field" type="text" inputmode="decimal" [ngModel]="formatDecimal(ing.facts.proteinG)" (ngModelChange)="setFact(ing, 'proteinG', $event)" [ngModelOptions]="{ updateOn: 'blur' }" [attr.aria-label]="factAria(ing, 'Eiweiß')"></ion-input></label>
+                    <label class="ing-field">Kohlenh. <ion-input class="nt-field" type="text" inputmode="decimal" [ngModel]="formatDecimal(ing.facts.carbsG)" (ngModelChange)="setFact(ing, 'carbsG', $event)" [ngModelOptions]="{ updateOn: 'blur' }" [attr.aria-label]="factAria(ing, 'Kohlenhydrate')"></ion-input></label>
+                    <label class="ing-field">Fett <ion-input class="nt-field" type="text" inputmode="decimal" [ngModel]="formatDecimal(ing.facts.fatG)" (ngModelChange)="setFact(ing, 'fatG', $event)" [ngModelOptions]="{ updateOn: 'blur' }" [attr.aria-label]="factAria(ing, 'Fett')"></ion-input></label>
+                    <label class="ing-field">Ballast. <ion-input class="nt-field" type="text" inputmode="decimal" [ngModel]="formatDecimal(ing.facts.fiberG)" (ngModelChange)="setFact(ing, 'fiberG', $event)" [ngModelOptions]="{ updateOn: 'blur' }" [attr.aria-label]="factAria(ing, 'Ballaststoffe')"></ion-input></label>
+                    <label class="ing-field">Zucker <ion-input class="nt-field" type="text" inputmode="decimal" [ngModel]="formatDecimal(ing.facts.sugarG)" (ngModelChange)="setFact(ing, 'sugarG', $event)" [ngModelOptions]="{ updateOn: 'blur' }" [attr.aria-label]="factAria(ing, 'Zucker')"></ion-input></label>
                   </div>
                 } @else {
                   <p class="ing-detail__hint">
-                    <ion-icon name="information-circle-outline"></ion-icon>
+                    <ion-icon name="information-circle-outline" aria-hidden="true"></ion-icon>
                     Keine Nährwerte hinterlegt. Trage die kcal je 100 g ein, damit die Zutat in die Summe einfließt.
                   </p>
                   <div class="ing-detail__inputs">
@@ -222,7 +220,7 @@
         <ion-icon name="add-outline" aria-hidden="true"></ion-icon> Zutat hinzufügen
       </button>
       <button type="button" class="nt-btn nt-btn--tonal nt-btn--block" (click)="addManualIngredient()">
-        <ion-icon name="create-outline" aria-hidden="true"></ion-icon> manuelle Zutat
+        <ion-icon name="create-outline" aria-hidden="true"></ion-icon> Manuelle Zutat
       </button>
 
       <!-- Live-Nährwerte -->
@@ -258,11 +256,14 @@
       <!-- Fertig gekocht + Portionen -->
       <div class="two-col">
         <div>
-          <label class="field-label nt-section-header" for="recipe-cooked">Fertig gekocht</label>
+          <label class="field-label nt-section-header" for="recipe-cooked">Fertig gekocht (Gewicht in g)</label>
           <div class="unit-field">
             <ion-input id="recipe-cooked" class="nt-field" type="text" inputmode="decimal" [ngModel]="formatDecimal(cookedWeightValue())" (ngModelChange)="setCookedWeight($event)" [ngModelOptions]="{ updateOn: 'blur' }" aria-label="Fertig gekocht in Gramm" placeholder="0"></ion-input>
             <span class="unit-field__suffix" aria-hidden="true">g</span>
           </div>
+          @if (!cookedWeightIsEstimate()) {
+            <p class="auto-weight-hint">Gesamtgewicht des fertigen Gerichts in Gramm.</p>
+          }
           @if (cookedWeightIsEstimate()) {
             <p class="auto-weight-hint"><span class="ai-badge">geschätzt</span> aus den Zutaten{{ autoWeightIsApprox() ? ' (EL, TL und Stück nur ungefähr)' : '' }}. Zum Überschreiben eintippen.</p>
             @if (autoWeightIsApprox()) {
@@ -279,7 +280,7 @@
         </div>
         <div>
           <span class="field-label nt-section-header">Ergibt Portionen</span>
-          <nt-stepper class="servings-stepper" label="Ergibt Portionen" [unit]="form.servings === 1 ? 'Portion' : 'Portionen'" [value]="form.servings" [min]="1" [max]="99" [step]="0.5" [decimals]="1" [start]="2" (valueChange)="form.servings = $event"></nt-stepper>
+          <nt-stepper class="servings-stepper" label="Ergibt Portionen" [unit]="form.servings === 1 ? 'Portion' : 'Portionen'" [value]="form.servings" [min]="1" [max]="99" [step]="0.5" [decimals]="1" [trimZeros]="true" [start]="2" (valueChange)="form.servings = $event"></nt-stepper>
           <p class="auto-weight-hint">Mindestens 1, ganz oder halb (z. B. 2 oder 2,5).</p>
         </div>
       </div>
@@ -309,7 +310,7 @@
         @if (error()) {
           <ion-text color="danger"><p class="form-error save-error" role="alert">{{ error() }}</p></ion-text>
         }
-        <ion-button expand="block" class="nt-btn nt-btn--block save-btn" (click)="save()">Speichern</ion-button>
+        <ion-button expand="block" class="nt-btn nt-btn--block save-btn" [disabled]="saving()" (click)="save()">Speichern</ion-button>
       </div>
     </ion-content>
   </ng-template>
@@ -450,13 +451,13 @@
       ></ion-input>
       @if (isTikTokUrl(importUrl) && !isLive()) {
         <p class="tiktok-hint">
-          <ion-icon name="logo-tiktok"></ion-icon>
+          <ion-icon name="logo-tiktok" aria-hidden="true"></ion-icon>
           TikTok-Import braucht die KI-Verbindung. Alternativ: Rezepttext aus der Video-Beschreibung oben einfügen.
         </p>
       }
       @if (isTikTokUrl(importUrl) && isLive()) {
         <p class="tiktok-hint tiktok-hint--ok">
-          <ion-icon name="logo-tiktok"></ion-icon>
+          <ion-icon name="logo-tiktok" aria-hidden="true"></ion-icon>
           TikTok erkannt — die KI liest Titel und Beschreibung automatisch.
         </p>
       }
@@ -466,16 +467,16 @@
         @if (nativeCamera) {
           <ion-button class="nt-btn nt-btn--tonal" (click)="importFromCamera()" [disabled]="!isLive() || importBusy() || importPhotoScanning()">
             @if (importPhotoScanning()) { <ion-spinner name="dots"></ion-spinner> } @else {
-              <ion-icon slot="start" name="camera-outline"></ion-icon> Kamera
+              <ion-icon slot="start" name="camera-outline" aria-hidden="true"></ion-icon> Kamera
             }
           </ion-button>
         }
         <ion-button class="nt-btn nt-btn--tonal" (click)="importPhotoInput.click()" [disabled]="!isLive() || importBusy() || importPhotoScanning()">
           @if (importPhotoScanning()) { <ion-spinner name="dots"></ion-spinner> } @else {
-            <ion-icon slot="start" name="image-outline"></ion-icon> Foto auswählen
+            <ion-icon slot="start" name="image-outline" aria-hidden="true"></ion-icon> Foto auswählen
           }
         </ion-button>
-        <input #importPhotoInput type="file" accept="image/*" capture="environment" hidden (change)="onImportPhotoFile($event)" />
+        <input #importPhotoInput type="file" accept="image/*" hidden (change)="onImportPhotoFile($event)" />
       </div>
 
       <div class="nt-sheet-footer">
@@ -486,7 +487,7 @@
           @if (importBusy()) {
             <ion-spinner name="dots" slot="start"></ion-spinner> Importiere…
           } @else {
-            <ion-icon slot="start" name="sparkles-outline"></ion-icon> Importieren
+            <ion-icon slot="start" name="sparkles-outline" aria-hidden="true"></ion-icon> Importieren
           }
         </ion-button>
       </div>

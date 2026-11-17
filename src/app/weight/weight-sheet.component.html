@@ -19,6 +19,9 @@
           </ion-item>
         </ion-list>
         <p class="weight-sheet__hint">Ein Eintrag je Tag. Morgens nüchtern gewogen sind die Werte am besten vergleichbar.</p>
+        @if (saveError(); as err) {
+          <p class="weight-sheet__error" role="alert" data-testid="weight-save-error">{{ err }}</p>
+        }
         <div class="nt-sheet-footer">
           <ion-button class="nt-btn nt-btn--block" expand="block" data-testid="weight-save" (click)="save()">Speichern</ion-button>
         </div>

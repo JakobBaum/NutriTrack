@@ -11,22 +11,21 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, ParamMap, Router } from '@angular/router';
 import { AppResumeService } from '../core/app-resume/app-resume.service';
 import { ActionSheetController, AlertController, ToastController } from '@ionic/angular';
-import { AmountUnit, DiaryEntry, MealType, NutritionFacts } from '../core/models';
-import { AiService } from '../core/ai/ai.service';
+import { DiaryEntry, MealType } from '../core/models';
 import { CopySource, DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
-import { FavoriteStore } from '../core/state/favorite.store';
 import { dayLabel, rollDate, toDateISO } from '../core/util/date';
 import { formatNum } from '../shared/num.pipe';
-import { MEAL_DEFS, mealForHour, mealLabel, isIsoDate, isMealType, isValidAmount, toBaseAmount, toNumberOrNull, inputTextFor, AMOUNT_UNITS, fromBaseAmount, convertAmount, lastAmountForLabel, editBaseFor } from './diary-helpers';
+import { MEAL_DEFS, mealForHour } from './diary-helpers';
 import { parseDiaryQuery, summarizeDay } from './diary-day';
-import { confirmDiscardSheet, pickMealSheet } from './diary-sheets';
 import { pickEntryAction } from './entry-menu';
 import { lightHaptic } from './haptics';
-import { dismissKeyboard } from '../core/keyboard/dismiss-keyboard';
+import { WRITE_BLOCKED_MESSAGE } from '../core/storage/storage-messages';
 import { showEntryToast } from './entry-toast';
-import { clearRawTexts } from './raw-texts';
-import { EditMode, StepDirection, amountChips, editModeFor, entryToInput, stepAmount, stepServings, withServings } from './diary-edit';
+import { entryToInput } from './diary-edit';
+import { EntryPatch } from './edit-entry-sheet/edit-entry-logic';
+import { EditedEntry } from './edit-entry-sheet/edit-entry-sheet.component';
+import { ensureWritable } from './write-guard';
 import { copyFromButtonText, copyFromText, copySourceOptionText, entriesKcal, entryCountText } from './diary-copy';
 
 interface MealGroup {
@@ -40,14 +39,6 @@ interface MealGroup {
 }
 
 
-interface EditForm {
-  label: string;
-  meal: MealType;
-  amountG: number | null;
-}
-
-/** rawTexts-Schlüssel des Bearbeiten-Dialogs. */
-const EDIT_FORM_TEXT_KEYS: readonly string[] = ['editAmount', 'editServings'];
 const SCROLL_TO_MEAL_DELAY_MS = 150;
 
 /**
@@ -65,20 +56,12 @@ const SCROLL_TO_MEAL_DELAY_MS = 150;
 export class DiaryPage {
   private readonly diary = inject(DiaryStore);
   private readonly profileStore = inject(ProfileStore);
-  private readonly favorites = inject(FavoriteStore);
-  private readonly ai = inject(AiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly resume = inject(AppResumeService);
   private readonly toastCtrl = inject(ToastController);
   private readonly alertCtrl = inject(AlertController);
   private readonly sheetCtrl = inject(ActionSheetController);
-
-  /** KI-Schätzungen kennzeichnen (nur mit aktiver KI sichtbar). */
-  ffLive = (): boolean => this.ai.isLive();
-
-  /** Roher Tipptext je Zahlenfeld des Bearbeiten-Dialogs. */
-  private readonly rawTexts: Record<string, string> = {};
 
   /** Tagebuch zeigt entweder einen Tag oder die letzten 7 Tage. */
   readonly view = signal<'day' | 'week'>('day');
@@ -91,7 +74,6 @@ export class DiaryPage {
   /** Der Tag, den die Seite zuletzt als "heute" kannte (für den Tageswechsel). */
   private readonly today = signal(toDateISO());
   readonly dateLabel = computed(() => dayLabel(this.selectedDate()));
-  readonly isToday = computed(() => this.selectedDate() === this.today());
 
   private readonly summary = computed(() =>
     summarizeDay(this.diary.totalsForDate(this.selectedDate()), this.profileStore.target()),
@@ -102,7 +84,6 @@ export class DiaryPage {
   readonly targetProtein = computed(() => this.summary().targetProtein);
   /** Eiweiß, das zum Tagesziel noch fehlt (0, wenn erreicht oder ohne Ziel). */
   readonly remainingProtein = computed(() => this.summary().remainingProtein);
-  readonly dismissKeyboard = dismissKeyboard;
   /** Verbleibende kcal des gewählten Tages (0, wenn das Ziel erreicht oder überschritten ist). */
   readonly remainingKcal = computed(() => this.summary().remainingKcal);
   readonly overKcal = computed(() => this.summary().overKcal);
@@ -125,23 +106,8 @@ export class DiaryPage {
   readonly addMeal = signal<MealType>('breakfast');
   readonly ffOpen = signal(false);
 
-  /** Formatierung der Mengen in der Tagesliste. */
-
-  // --- Edit-Modal ---
-  readonly editOpen = signal(false);
-  private editEntry: DiaryEntry | null = null;
-  editForm: EditForm = { label: '', meal: 'breakfast', amountG: null };
-  /** Einheit im Bearbeiten-Dialog; editForm.amountG zeigt den Wert in dieser Einheit. */
-  editUnit: AmountUnit = 'g';
-  editBaseFacts: NutritionFacts | null = null;
-  editError: string | null = null;
-  /** Welche Mengenzeile der Bearbeiten-Dialog zeigt (Menge, Portionen, optionale Menge). */
-  editMode: EditMode = 'amount';
-  editServings: number | null = null;
-  /** Stand der Felder beim Öffnen; Abweichung = „Verwerfen?“ beim Schließen. */
-  private editInitial = '';
-
-  readonly mealLabelOf = mealLabel;
+  /** Eintrag im Bearbeiten-Sheet (null = zu); das Sheet ist eine eigene Komponente. */
+  readonly editEntry = signal<DiaryEntry | null>(null);
 
   constructor() {
     effect(() => {
@@ -158,8 +124,8 @@ export class DiaryPage {
   }
 
   /**
-   * Liest `?add=<meal>` (öffnet das Eintragen-Sheet), `?fastfood=1` (öffnet den
-   * Fastfood-Helfer) und `?date=` einmalig und entfernt sie danach aus der URL.
+   * Liest `?add=<meal>` (öffnet das Eintragen-Sheet), `?meal=` (Scroll-Ziel) und `?date=`
+   * einmalig und entfernt sie danach aus der URL.
    */
   private handleQuery(params: ParamMap): void {
     const query = parseDiaryQuery(params);
@@ -170,13 +136,12 @@ export class DiaryPage {
       if (!query.date) this.selectedDate.set(toDateISO());
       this.openAdd(query.addMeal ?? this.currentMeal());
     }
-    if (query.wantsFastfood) this.openFastfood();
     const scrollMeal = query.scrollMeal;
     if (scrollMeal) setTimeout(() => this.scrollToMeal(scrollMeal), SCROLL_TO_MEAL_DELAY_MS);
 
     void this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { add: null, fastfood: null, date: null, meal: null },
+      queryParams: { add: null, date: null, meal: null },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
@@ -213,203 +178,28 @@ export class DiaryPage {
   }
 
   // --- Eintrag bearbeiten / löschen ---
-  get editEntryUnit(): AmountUnit {
-    return this.editUnit;
-  }
-
-  /** Bearbeiten-Dialog: Einheit wechseln, gezeigten Wert umrechnen. */
-  setEditUnit(unit: unknown): void {
-    if (!AMOUNT_UNITS.includes(unit as AmountUnit) || unit === this.editUnit) return;
-    const next = unit as AmountUnit;
-    const v = this.editForm.amountG;
-    this.editForm = { ...this.editForm, amountG: v == null ? null : convertAmount(v, this.editUnit, next) };
-    this.editUnit = next;
-  }
-
-  /** Anzeigetext eines Zahlenfelds im Bearbeiten-Dialog (Dezimalkomma, Tipptext bleibt erhalten). */
-  numText(key: string, value: number | null): string {
-    return inputTextFor(this.rawTexts[key], value);
-  }
-
-  setEditAmount(value: unknown): void {
-    this.rawTexts['editAmount'] = String(value ?? '');
-    this.editForm = { ...this.editForm, amountG: toNumberOrNull(value) };
-  }
-
-  stepEditAmount(direction: StepDirection): void {
-    delete this.rawTexts['editAmount'];
-    this.setEditAmount(stepAmount(this.editForm.amountG, this.editUnit, direction));
-  }
-
-  stepEditServings(direction: StepDirection): void {
-    delete this.rawTexts['editServings'];
-    this.setEditServings(stepServings(this.editServings, direction));
-  }
-
-  setEditServings(value: unknown): void {
-    if (typeof value === 'string') this.rawTexts['editServings'] = value;
-    this.editServings = toNumberOrNull(value);
-  }
-
-  /**
-   * Letzte geloggte Menge (in aktueller Einheit) für das gewählte Lebensmittel, sonst null.
-   * `excludeId`: der gerade bearbeitete Eintrag zählt nicht als „zuletzt“.
-   */
-  lastAmountFor(label: string, unit: AmountUnit, excludeId?: string | null): number | null {
-    const amount = lastAmountForLabel(this.diary.entries(), label, excludeId);
-    return amount == null ? null : fromBaseAmount(amount, unit);
-  }
-
-  /** ID des Eintrags im Bearbeiten-Dialog (für „wie zuletzt“). */
-  get editEntryId(): string | null {
-    return this.editEntry?.id ?? null;
-  }
-
-  get editChips() {
-    return amountChips(this.editUnit, this.lastAmountFor(this.editForm.label, this.editUnit, this.editEntryId));
-  }
-
-  pickEditAmount(value: number): void {
-    delete this.rawTexts['editAmount'];
-    this.setEditAmount(value);
-  }
-
   openEdit(entry: DiaryEntry): void {
-    this.editEntry = entry;
-    clearRawTexts(this.rawTexts, EDIT_FORM_TEXT_KEYS);
-    this.editUnit = entry.unit ?? 'g';
-    // Manuelle Einträge mit Menge bekommen eine abgeleitete Basis, damit die Menge änderbar ist.
-    this.editBaseFacts = editBaseFor(entry);
-    this.editMode = editModeFor(entry, this.editBaseFacts);
-    this.editServings = this.editMode === 'portion' ? (entry.servings ?? 1) : null;
-    this.editForm = {
-      label: entry.label,
-      meal: entry.meal,
-      amountG: entry.amountG == null ? null : fromBaseAmount(entry.amountG, this.editUnit),
-    };
-    this.editError = null;
-    this.editInitial = this.editSnapshot();
-    this.editOpen.set(true);
+    this.editEntry.set(entry);
   }
 
   closeEdit(): void {
-    this.editEntry = null;
-    this.editOpen.set(false);
+    this.editEntry.set(null);
   }
 
-  private editSnapshot(): string {
-    const f = this.editForm;
-    return JSON.stringify([f.label, f.meal, f.amountG, this.editUnit, this.editServings]);
-  }
-
-  /** canDismiss des Bearbeiten-Sheets: Rückfrage nur bei geänderten Feldern. */
-  readonly canDismissEdit = (): Promise<boolean> => this.confirmEditClose();
-
-  async requestCloseEdit(): Promise<void> {
-    if (await this.confirmEditClose()) this.closeEdit();
-  }
-
-  private async confirmEditClose(): Promise<boolean> {
-    const isDirty = !!this.editEntry && this.editSnapshot() !== this.editInitial;
-    return !isDirty || confirmDiscardSheet(this.sheetCtrl);
-  }
-
-  /** Mahlzeit im Bearbeiten-Sheet per Action-Sheet wählen. */
-  async pickEditMeal(): Promise<void> {
-    const meal = await pickMealSheet(this.sheetCtrl, this.editForm.meal);
-    if (meal) this.editForm = { ...this.editForm, meal };
-  }
-
-  saveEdit(): void {
-    if (!this.editEntry) return;
-    if (this.editMode === 'portion') {
-      this.savePortionEdit(this.editEntry);
-      return;
-    }
-    const editBase = this.editForm.amountG == null ? null : toBaseAmount(this.editForm.amountG, this.editUnit);
-    if (this.editBaseFacts && !isValidAmount(editBase)) {
-      this.editError = 'Die Menge fehlt — gib eine Menge größer als 0 ein.';
-      return;
-    }
-    if (this.editMode === 'optional' && editBase != null && !isValidAmount(editBase)) {
-      this.editError = 'Die Menge muss größer als 0 sein — oder lass das Feld leer.';
-      return;
-    }
-    const patch: Parameters<typeof this.diary.update>[1] = {
-      label: this.editForm.label,
-      meal: this.editForm.meal,
-    };
-    if (this.editBaseFacts && isValidAmount(editBase)) {
-      patch.amountG = editBase;
-      patch.unit = this.editUnit;
-      // Abgeleitete Basis nur bei geänderter Menge übernehmen (sonst keine Rundungsdrift).
-      const isDerivedBase = !this.editEntry.baseFacts;
-      if (isDerivedBase && editBase !== this.editEntry.amountG) patch.baseFacts = this.editBaseFacts;
-    }
-    if (this.editMode === 'optional') {
-      // Nur Anzeige-Menge: ohne Bezugswerte bleiben die Nährwerte unverändert; leeres Feld entfernt die Menge.
-      if (isValidAmount(editBase)) {
-        patch.amountG = editBase;
-        patch.unit = this.editUnit;
-      } else {
-        patch.clearAmount = true;
-      }
-    }
-    this.diary.update(this.editEntry.id, patch);
-    lightHaptic();
-    this.closeEdit();
-  }
-
-  /** Portionen ändern: Nährwerte neu skaliert, Eintrag bleibt (id, createdAt, Reihenfolge). */
-  private savePortionEdit(entry: DiaryEntry): void {
-    if (!isValidAmount(this.editServings)) {
-      this.editError = 'Die Portionen fehlen — gib eine Zahl größer als 0 ein.';
-      return;
-    }
-    const next = withServings(entry, this.editServings);
-    this.diary.update(entry.id, {
-      label: this.editForm.label,
-      meal: this.editForm.meal,
-      servings: next.servings,
-      facts: next.facts,
-    });
-    lightHaptic();
-    this.closeEdit();
-  }
-
-  /** Der Eintrag im Bearbeiten-Dialog ist als Favorit gemerkt (gleicher Name und gleiche Marke). */
-  isEditFavorite(): boolean {
-    return !!this.editEntry && this.favorites.isFavorite(this.editEntry);
-  }
-
-  toggleEditFavorite(): void {
-    const entry = this.editEntry;
-    if (!entry) return;
-    const added = this.favorites.toggle(entry);
-    lightHaptic();
-    this.showToast(added ? `„${entry.label}“ als Favorit gemerkt` : `„${entry.label}“ aus den Favoriten entfernt`);
-  }
-
-  duplicateFromEdit(): void {
-    const entry = this.editEntry;
-    this.closeEdit();
-    if (entry) this.duplicate(entry);
-  }
-
-  deleteFromEdit(): void {
-    const entry = this.editEntry;
-    this.closeEdit();
-    if (entry) this.remove(entry);
+  /** „Doppelt eintragen“ aus dem Bearbeiten-Sheet: die Kopie bekommt die dort eingegebenen Änderungen. */
+  duplicateEdited({ entry, patch }: EditedEntry): void {
+    this.duplicate(entry, patch);
   }
 
   /** Löscht einen Eintrag; „Rückgängig“ legt ihn (am Ende der Mahlzeit) neu an. */
   remove(entry: DiaryEntry): void {
+    if (!ensureWritable(this.diary, this.toastCtrl)) return;
     lightHaptic();
     const index = this.diary.indexOf(entry.id);
     this.diary.remove(entry.id);
     // Rückgängig stellt den Eintrag mit alter Id und an alter Position wieder her.
     this.showToast(`„${entry.label}“ gelöscht`, () => {
-      this.diary.restore(entry, index);
+      if (ensureWritable(this.diary, this.toastCtrl)) this.diary.restore(entry, index);
     });
   }
 
@@ -421,11 +211,19 @@ export class DiaryPage {
     else if (action === 'delete') this.remove(entry);
   }
 
-  /** Doppelt eintragen (Wisch-Aktion): Kopie am Ende der Mahlzeit, mit „Rückgängig“. */
-  duplicate(entry: DiaryEntry): void {
-    const copy = this.diary.add(entryToInput(entry));
+  /** Doppelt eintragen: Kopie am Ende der Mahlzeit (optional mit geänderten Werten), mit „Rückgängig“. */
+  duplicate(entry: DiaryEntry, patch?: EntryPatch): void {
+    if (!ensureWritable(this.diary, this.toastCtrl)) return;
+    const copy = this.diary.tryAdd(entryToInput(entry));
+    if (!copy) {
+      void showEntryToast(this.toastCtrl, WRITE_BLOCKED_MESSAGE);
+      return;
+    }
+    if (patch) this.diary.update(copy.id, patch);
     lightHaptic();
-    this.showToast(`„${entry.label}“ doppelt eingetragen`, () => this.diary.remove(copy.id));
+    this.showToast(`„${patch?.label?.trim() || entry.label}“ doppelt eingetragen`, () => {
+      if (ensureWritable(this.diary, this.toastCtrl)) this.diary.remove(copy.id);
+    });
   }
 
   // --- Wie gestern / Tag kopieren ---
@@ -435,7 +233,7 @@ export class DiaryPage {
 
   /** Übernimmt eine leere Mahlzeit vom letzten Tag, an dem sie Einträge hatte. */
   copyMeal(group: MealGroup): void {
-    if (!group.copySource || this.copyBusy) return;
+    if (!group.copySource || this.copyBusy || !ensureWritable(this.diary, this.toastCtrl)) return;
     const copies = this.diary.copyEntries(group.copySource.entries, this.selectedDate());
     this.confirmCopy(copies, `${group.label} ${copyFromText(group.copySource.dateISO)}`);
   }
@@ -444,6 +242,7 @@ export class DiaryPage {
   async copyDay(): Promise<void> {
     const sources = this.daySources();
     if (sources.length === 0 || this.copyBusy) return;
+    if (!ensureWritable(this.diary, this.toastCtrl)) return;
     this.copyBusy = true;
     try {
       const sourceDate = await this.askCopyDay(sources);
@@ -485,9 +284,9 @@ export class DiaryPage {
   private confirmCopy(copies: DiaryEntry[], what: string): void {
     if (copies.length === 0) return;
     const kcal = formatNum(entriesKcal(copies), 0);
-    this.showToast(`${what} übernommen · ${entryCountText(copies.length)} · ${kcal} kcal`, () =>
-      this.diary.removeMany(copies.map((c) => c.id)),
-    );
+    this.showToast(`${what} übernommen · ${entryCountText(copies.length)} · ${kcal} kcal`, () => {
+      if (ensureWritable(this.diary, this.toastCtrl)) this.diary.removeMany(copies.map((c) => c.id));
+    });
   }
 
   // --- Feedback ---

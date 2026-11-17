@@ -1,7 +1,7 @@
 // Welle 4: "Essen beschreiben" (Text -> KI-Erkennung gemockt -> Bestätigungsliste -> Tagebuch).
 import fs from 'node:fs';
 import path from 'node:path';
-import { assert, go, readStore, settle } from '../lib/harness.mjs';
+import { assert, eventually, go, readStore, settle } from '../lib/harness.mjs';
 import { clickToastButton, stableClick, topModal } from '../lib/ionic.mjs';
 import { seed } from '../lib/fixtures.mjs';
 
@@ -111,6 +111,36 @@ export function register({ test }) {
     assert.equal(diary[0].isEstimate, true);
     await clickToastButton(page, 'Rückgängig');
     assert.equal((await readStore(page, 'diary')).length, 0, 'Rückgängig nimmt den Eintrag zurück');
+  });
+
+  test('w4 describe: Eintragen schließt das Sheet ohne Verwerfen-Dialog', seed(), async (page) => {
+    await mockWorker(page);
+    const modal = await openDescribe(page);
+    await typeAndRun(page, modal);
+    await waitForRows(modal, 2);
+    await modal.locator('[data-testid="describe-log"]').click();
+    await settle(page, 900);
+    assert.equal(await page.locator('ion-alert, ion-action-sheet', { hasText: 'Verwerfen?' }).count(), 0, 'kein Verwerfen-Dialog nach Eintragen');
+    assert.equal(await page.locator('ion-modal.show-modal').count(), 0, 'Sheet muss geschlossen sein');
+    assert.equal((await readStore(page, 'diary')).length, 2);
+  });
+
+  test('w4 describe: Titel nennt die Essenszeit, X mit Text fragt genau einmal nach', seed(), async (page) => {
+    await mockWorker(page);
+    await go(page, 'diary');
+    assert.equal(await page.locator('.meal__add').count(), 0, '"+" je Mahlzeit nur bei nicht leeren Mahlzeiten');
+    await stableClick(page.locator('[data-testid="diary-add"]'));
+    const modal = topModal(page);
+    assert.match(await modal.locator('.nt-sheet-header__title').innerText(), /^In (Frühstück|Mittagessen|Abendessen|Snacks) eintragen$/);
+    await modal.locator('[data-testid="describe-open"]').click();
+    await textInput(modal).fill(DESCRIPTION);
+    await modal.locator('[data-testid="add-close"]').last().click();
+    const dialog = page.locator('ion-action-sheet', { hasText: 'Verwerfen?' });
+    await dialog.waitFor({ timeout: 3000 });
+    await dialog.getByRole('button', { name: 'Verwerfen' }).click();
+    // Action-Sheet und Modal blenden noch aus: erst auf das geschlossene Sheet warten, dann auf die zweite Rückfrage prüfen.
+    await eventually(async () => assert.equal(await page.locator('ion-modal.show-modal').count(), 0, 'Sheet geschlossen'));
+    assert.equal(await page.locator('ion-action-sheet', { hasText: 'Verwerfen?' }).count(), 0, 'keine zweite Rückfrage');
   });
 
   test('w4 describe: mehrere Zeilen ergeben je einen Eintrag', seed(), async (page) => {

@@ -1,7 +1,7 @@
 import { STATE_MESSAGES } from '../core/messages/state-messages';
 import { NutritionFacts, Recipe, RecipeIngredient, RecipeOrigin } from '../core/models';
 import { hasNutrition, perServingFacts, reconcileKcal } from '../core/nutrition/recipe-nutrition';
-import { UNIT_WEIGHT_G, countMissingFacts } from '../core/nutrition/units-weight';
+import { UNIT_WEIGHT_G, canonicalUnitKey, countMissingFacts, unitGrams } from '../core/nutrition/units-weight';
 import { formatNum } from '../shared/num.pipe';
 
 // Re-Export: Bestandsimporte (z. B. Diary) bleiben unverändert gültig.
@@ -16,15 +16,15 @@ export const APPROX_UNITS: readonly { unit: string; g: number }[] = Object.entri
   .map(([unit, g]) => ({ unit, g }));
 
 /** Gesamtgewicht der Zutaten in Gramm (Näherung bei EL, TL, Stk …). */
-export function totalWeightG(ingredients: readonly Pick<RecipeIngredient, 'amount' | 'unit'>[]): number {
+export function totalWeightG(ingredients: readonly (Pick<RecipeIngredient, 'amount' | 'unit'> & { name?: string })[]): number {
   return Math.round(
-    ingredients.reduce((sum, i) => sum + i.amount * (UNIT_WEIGHT_G[i.unit] ?? 0), 0),
+    ingredients.reduce((sum, i) => sum + i.amount * (unitGrams(i.unit, i.name) ?? 0), 0),
   );
 }
 
 /** True, wenn mindestens eine Zutat eine Näherungseinheit nutzt. */
 export function hasApproxUnits(ingredients: readonly Pick<RecipeIngredient, 'unit'>[]): boolean {
-  return ingredients.some((i) => !EXACT_UNITS.has(i.unit));
+  return ingredients.some((i) => !EXACT_UNITS.has(canonicalUnitKey(i.unit) ?? i.unit));
 }
 
 /** „1 Zutat ohne Werte“ / „2 Zutaten ohne Werte“. */
@@ -57,11 +57,6 @@ export function recipeMetaLine(recipe: Pick<Recipe, 'servings' | 'ingredients'>,
   const parts = [servingsLabel(recipe.servings), ingredientsLabel(recipe.ingredients.length)];
   if (perServingKcal !== undefined) parts.push(`${formatNum(perServingKcal * recipe.servings, 0)} kcal gesamt`);
   return parts.join(' · ');
-}
-
-/** Präfix „≥ “, wenn die Summe wegen fehlender Zutatenwerte nur eine Untergrenze ist. */
-export function lowerBoundPrefix(missingCount: number): string {
-  return missingCount > 0 ? '≥ ' : '';
 }
 
 /** True, wenn die Werte des Rezepts aus einem KI-Import stammen. */
@@ -102,28 +97,21 @@ export function optionalGramsLabel(value: number | undefined, missingCount: numb
   return `${String(Math.round(value * 10) / 10).replace('.', ',')} g`;
 }
 
-/** Einmalige Erklärung statt „≥“ an jeder Zahl; leer, wenn nichts fehlt. */
+/** Bezugsgröße hinterlegter Zutaten-Nährwerte: „je 100 g“ oder „je Portion (30 g)“. */
+export function factsBasisLabel(facts: Pick<NutritionFacts, 'basis' | 'portionG'>): string {
+  if (facts.basis === 'per100g') return 'je 100 g';
+  const g = facts.portionG;
+  return g !== undefined && Number.isFinite(g) && g > 0 ? `je Portion (${String(Math.round(g * 10) / 10).replace('.', ',')} g)` : 'je Portion';
+}
+
+/** Einmalige Erklärung statt „≥“ an jeder Zahl, z. B. „Werte unvollständig (4 Zutaten ohne Nährwerte)“; leer, wenn nichts fehlt. */
 export function lowerBoundNote(missingCount: number): string {
-  return missingCount > 0 ? `≥ Mindestwerte: ${missingFactsLabel(missingCount)}` : '';
+  return missingCount > 0 ? `Werte unvollständig (${missingCount} ${missingCount === 1 ? 'Zutat' : 'Zutaten'} ohne Nährwerte)` : '';
 }
 
 /** True, wenn die Einheit nicht in der Auswahlliste steht (Import-Prüfung). */
 export function isUnknownUnit(unit: string, options: readonly string[]): boolean {
   return !!unit.trim() && !options.includes(unit);
-}
-
-/** Häufige Einheiten als 1-Tipp-Chips neben der Auswahl. */
-export const QUICK_UNITS: readonly string[] = ['g', 'ml', 'EL', 'TL', 'Stk'];
-
-/** Einheiten für „weitere“ im Action-Sheet: alles aus der Auswahl, was nicht schon als Chip sichtbar ist. */
-export function moreUnits(options: readonly string[], quick: readonly string[]): string[] {
-  return options.filter((u) => !quick.includes(u));
-}
-
-/** Chips je Zutat: die Schnell-Einheiten plus die aktuelle Einheit, falls sie nicht dazugehört (z. B. „Dose“). */
-export function unitChips(current: string, quick: readonly string[]): string[] {
-  const unit = (current ?? '').trim();
-  return unit && !quick.includes(unit) ? [...quick, unit] : [...quick];
 }
 
 /** Warum „Importieren“ noch nicht geht (leer = es geht). */

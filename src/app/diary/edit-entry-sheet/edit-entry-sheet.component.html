@@ -1,0 +1,53 @@
+<!-- Eintrag bearbeiten (öffnet, sobald ein Eintrag übergeben wird) -->
+<ion-modal [isOpen]="isOpen()" [canDismiss]="canDismiss" (didDismiss)="closed.emit()">
+  <ng-template>
+    <div class="sheet-grabber" aria-hidden="true"></div>
+    <ion-header class="ion-no-border sheet-header">
+      <div class="nt-sheet-header">
+        <div class="nt-sheet-header__start"></div>
+        <h2 class="nt-sheet-header__title" role="heading" aria-level="2">Eintrag bearbeiten</h2>
+        <div class="nt-sheet-header__end">
+          <ion-button fill="clear" class="nt-sheet-close" (click)="requestClose()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
+        </div>
+      </div>
+    </ion-header>
+    <ion-content class="sheet-content">
+      <div class="nt-page edit-sheet">
+      @let s = state();
+      <div class="nt-stack">
+      @if (error()) {
+        <p class="form-error" role="alert">{{ error() }}</p>
+      }
+      <ion-list class="diary-list diary-list--page" lines="none">
+        <ion-item lines="none">
+          <ion-input label="Name" labelPlacement="stacked" [ngModel]="s.label" (ngModelChange)="setLabel($event)" autocapitalize="words" autocorrect="off" enterkeyhint="done" (keyup.enter)="dismissKeyboard()"></ion-input>
+        </ion-item>
+        @if (s.mode === 'portion') {
+          <app-amount-row label="Portionen" suffix="Portionen" [text]="servingsText()" (textChange)="setServings($event)" (stepped)="stepServings($event)"></app-amount-row>
+        } @else {
+          <app-amount-row [label]="s.mode === 'optional' ? 'Menge (optional)' : 'Menge'" [unit]="s.unit" [text]="amountText()" (textChange)="setAmount($event)" (unitChange)="setUnit($event)" (stepped)="stepAmount($event)">
+            <app-amount-chips [chips]="chips()" [unit]="s.unit" (pick)="setAmount($event)"></app-amount-chips>
+          </app-amount-row>
+        }
+        <ion-item button detail="true" lines="none" (click)="pickMeal()" [attr.aria-label]="'Essenszeit wählen, aktuell ' + mealName()">
+          <ion-label>Essenszeit</ion-label>
+          <ion-note slot="end">{{ mealName() }}</ion-note>
+        </ion-item>
+      </ion-list>
+      <button type="button" class="nt-btn nt-btn--text nt-btn--block edit-fav" data-testid="edit-favorite" (click)="toggleFavorite()" [attr.aria-pressed]="isFavorite()">
+        <ion-icon [name]="isFavorite() ? 'star' : 'star-outline'" aria-hidden="true"></ion-icon> {{ isFavorite() ? 'Favorit entfernen' : 'Als Favorit merken' }}
+      </button>
+      <button type="button" class="nt-btn nt-btn--text nt-btn--block edit-fav" data-testid="edit-duplicate" (click)="duplicateEntry()">
+        <ion-icon name="copy-outline" aria-hidden="true"></ion-icon> Doppelt eintragen
+      </button>
+      <button type="button" class="nt-btn nt-btn--text nt-btn--block edit-delete" (click)="removeEntry()">
+        <ion-icon name="trash-outline" aria-hidden="true"></ion-icon> Eintrag löschen
+      </button>
+      </div>
+      <div class="nt-sheet-footer">
+        <ion-button class="nt-btn nt-btn--block" expand="block" data-testid="edit-save" (click)="save()">Speichern</ion-button>
+      </div>
+      </div>
+    </ion-content>
+  </ng-template>
+</ion-modal>

@@ -44,6 +44,11 @@
     font-size: var(--nt-fs-headline);
     font-weight: 600;
     color: var(--nt-ink);
+    // Bei großer Schrift darf das Datum umbrechen (Höhe wächst, nichts wird abgeschnitten).
+    padding-block: var(--nt-space-1);
+    line-height: 1.25;
+    text-align: center;
+    flex-wrap: wrap;
 
     ion-icon {
       font-size: 18px;

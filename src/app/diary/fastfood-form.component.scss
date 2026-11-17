@@ -19,7 +19,7 @@
 
   &__label {
     font-size: var(--nt-fs-body);
-    color: var(--nt-secondary);
+    color: var(--nt-ink);
   }
 
   &__value {
@@ -36,8 +36,8 @@
   }
 
   &__bound {
-    font-size: 0.8125rem;
-    color: var(--nt-secondary);
+    font-size: var(--nt-fs-caption);
+    color: var(--nt-ink);
   }
 
   &__toggle {

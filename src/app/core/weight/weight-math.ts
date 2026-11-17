@@ -1,4 +1,5 @@
 /** Reine Rechenlogik für den Gewichtsverlauf (keine Angular-Abhängigkeit). */
+import { isIsoDay } from '../util/date';
 
 export interface WeightEntry {
   /** Kalendertag "YYYY-MM-DD"; höchstens ein Eintrag je Tag. */
@@ -17,7 +18,6 @@ export const MIN_TREND_SPAN_DAYS = 7;
 /** Ab dieser Abweichung zum Profilgewicht wird das Neuberechnen vorgeschlagen. */
 export const RECALC_DRIFT_KG = 2;
 
-const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 const MS_PER_DAY = 86_400_000;
 
 /** Tage seit dem Ursprung (über UTC), für Abstände zwischen Kalendertagen. */
@@ -31,11 +31,13 @@ export function isValidWeight(kg: unknown): kg is number {
 }
 
 const round1 = (n: number): number => Math.round(n * 10) / 10;
+/** Gewicht auf 0,1 kg gerundet (so wird es gespeichert). */
+export const roundKg = round1;
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 /** Legt den Eintrag an oder ersetzt den des gleichen Tags; Ergebnis nach Datum sortiert. Ungültiges lässt die Liste unverändert. */
 export function upsertWeight(list: readonly WeightEntry[], entry: WeightEntry): readonly WeightEntry[] {
-  if (!ISO_DAY.test(entry.dateISO) || !isValidWeight(entry.kg)) return list;
+  if (!isIsoDay(entry.dateISO) || !isValidWeight(entry.kg)) return list;
   const next: WeightEntry = { dateISO: entry.dateISO, kg: round1(entry.kg) };
   return [...list.filter((x) => x.dateISO !== next.dateISO), next].sort((a, b) => a.dateISO.localeCompare(b.dateISO));
 }

@@ -11,7 +11,6 @@ import { DiaryStore } from '../core/state/diary.store';
 import { ProfileStore } from '../core/state/profile.store';
 import { RecipeStore } from '../core/state/recipe.store';
 import { MealsStore } from '../core/state/meals.store';
-import { formatDecimal } from '../core/util/number-input';
 import { NutritionCalcService } from '../core/nutrition/nutrition-calc.service';
 import { defaultAiProxyUrl } from '../core/ai/ai-endpoint';
 import { CustomFoodStore } from '../core/state/custom-food.store';
@@ -25,6 +24,7 @@ import { FavoriteStore } from '../core/state/favorite.store';
 import { DebugLogService } from '../core/debug/debug-log.service';
 import { resolveDebugMode, safeLocalStorage } from './debug-flag';
 import { backupStatusLabel, goalLabel, hasManualTarget } from './settings-view';
+import { WRITE_BLOCKED_MESSAGE } from '../core/storage/storage-messages';
 import { BackupService } from '../core/backup/backup.service';
 import { isSetupLink } from './setup-link';
 import { InfoSectionId, infoLinkSection } from './info-link';
@@ -32,15 +32,19 @@ import { consentStatusLabel } from './settings-view';
 import { ConsentService } from '../core/consent/consent.service';
 import { ConsentStore } from '../core/consent/consent.store';
 import { consentDateLabel } from '../core/consent/consent.model';
-import { BackupCleanup, BackupFile, countBackup, describeCounts, formatBackupDate } from '../core/backup/backup';
+import { BackupCleanup, BackupFile, formatBackupDate } from '../core/backup/backup';
 import { describeSafetySnapshot } from '../core/backup/backup-safety';
 import { ExportFeedback, exportMessage, resetFailure, restoreFailure } from './backup-messages';
+import { exportFailedDialog, importDialog, presentAlert, resetDialog, safetyDialog, showMessage } from './backup-dialogs';
 
 
 /**
  * Einstellungen: Profil (eigenes Sheet), KI-Status, Backup und Rechtliches.
  * Der Einrichtungslink (?setup=1) öffnet das Profil und wird danach entfernt.
  */
+/** Ausgang eines Exports: erledigt, vom Nutzer abgebrochen oder fehlgeschlagen (mit Meldungstext). */
+type ExportRun = { readonly kind: 'ok' | 'cancelled' } | { readonly kind: 'failed'; readonly header: string; readonly message: string };
+
 @Component({
   selector: 'app-settings',
   templateUrl: './settings.page.html',
@@ -66,7 +70,6 @@ export class SettingsPage implements OnInit {
   private readonly savedMeals = inject(MealsStore);
   private readonly weightStore = inject(WeightStore);
   private readonly favoriteStore = inject(FavoriteStore);
-  readonly formatDecimal = formatDecimal;
   private readonly calc = inject(NutritionCalcService);
   private readonly alertCtrl = inject(AlertController);
   private readonly win = inject(DOCUMENT).defaultView;
@@ -134,9 +137,13 @@ export class SettingsPage implements OnInit {
     await this.consentService.ensure();
   }
 
-  revokeConsent(): void {
+  async revokeConsent(): Promise<void> {
+    if (this.profileStore.isReadOnly()) {
+      await this.showBackupError('Nicht gespeichert', WRITE_BLOCKED_MESSAGE);
+      return;
+    }
     this.consentStore.revoke();
-    this.savedToast.set('Zustimmung widerrufen. Es wird nichts mehr an Dritte gesendet.');
+    this.savedToast.set('Zustimmung widerrufen. KI und Rezeptsuche senden nichts mehr. Lebensmittelsuche und Barcode-Scan fragen weiterhin Open Food Facts ab.');
   }
 
   openProfile(prefillKg: number | null): void {
@@ -170,23 +177,20 @@ export class SettingsPage implements OnInit {
 
   /** Fragt vor dem Löschen aller lokalen Daten nach und bietet vorher ein Backup an. */
   async confirmReset(): Promise<void> {
-    const alert = await this.alertCtrl.create({
-      header: 'Alle Daten löschen?',
-      message:
-        `Profil, Tagebuch, Gewichtsverlauf, Favoriten, Rezepte, gespeicherte Mahlzeiten, eigene Lebensmittel, Einkaufsliste und Einstellungen werden von diesem Gerät gelöscht. ${this.lastBackupLabel()}. Zur Sicherheit bleibt eine automatische Sicherung auf diesem Gerät, bis du sie unter Daten löschst.`,
-      buttons: [
-        { text: 'Abbrechen', role: 'cancel' },
-        { text: 'Backup zuerst', handler: () => void this.exportThen(() => this.confirmReset()) },
-        { text: 'Löschen', role: 'destructive', handler: () => void this.resetData() },
-      ],
-    });
-    await alert.present();
+    await presentAlert(this.alertCtrl, resetDialog(this.lastBackupLabel(), {
+      exportFirst: () => void this.exportThen(() => this.confirmReset()),
+      confirm: () => void this.resetData(),
+    }));
   }
 
   /** Exportiert ein Backup und öffnet danach den Dialog erneut, damit nichts ohne Sicherung gelöscht wird. */
   private async exportThen(next: () => Promise<void>): Promise<void> {
-    await this.exportBackup();
-    await next();
+    const outcome = await this.runExport();
+    if (outcome.kind !== 'failed') {
+      await next();
+      return;
+    }
+    await presentAlert(this.alertCtrl, exportFailedDialog(outcome.message, () => void next()));
   }
 
   async resetData(): Promise<void> {
@@ -217,11 +221,21 @@ export class SettingsPage implements OnInit {
 
   /** Exportiert alle Daten als JSON (Teilen-Menü auf iOS, sonst Download). */
   async exportBackup(): Promise<void> {
+    const outcome = await this.runExport();
+    if (outcome.kind === 'failed') await this.showBackupError(outcome.header, outcome.message);
+  }
+
+  /** Führt den Export aus und meldet Erfolg und Teilerfolg selbst; ein Fehlschlag wird nur zurückgegeben (der Aufrufer entscheidet). */
+  private async runExport(): Promise<ExportRun> {
     this.backupBusy.set(true);
     try {
-      await this.showExportFeedback(exportMessage(await this.backup.exportBackup()));
+      const { result, skippedKeys } = await this.backup.exportBackupDetailed();
+      const feedback = exportMessage(result, skippedKeys);
+      if (result === 'unverified' && feedback?.kind === 'alert') return { kind: 'failed', header: feedback.header, message: feedback.message };
+      await this.showExportFeedback(feedback);
+      return { kind: feedback ? 'ok' : 'cancelled' };
     } catch {
-      await this.showBackupError('Backup nicht erstellt', 'Das Backup konnte nicht erstellt werden. Bitte erneut versuchen.');
+      return { kind: 'failed', header: 'Backup nicht erstellt', message: 'Das Backup konnte nicht erstellt werden. Bitte erneut versuchen.' };
     } finally {
       this.backupBusy.set(false);
     }
@@ -247,24 +261,19 @@ export class SettingsPage implements OnInit {
         return;
       }
       await this.confirmImport(result.backup, result.cleanup);
+    } catch (e) {
+      console.error('NutriTrack: Backup-Datei konnte nicht verarbeitet werden', e);
+      await this.showBackupError('Backup kann nicht gelesen werden', 'Die Datei konnte nicht verarbeitet werden. Deine Daten sind unverändert.');
     } finally {
       this.backupBusy.set(false);
     }
   }
 
   private async confirmImport(backup: BackupFile, cleanup: BackupCleanup): Promise<void> {
-    const date = formatBackupDate(backup.exportedAt) ?? 'unbekannt';
-    const skipped = cleanup.skipped > 0 ? ` ${cleanup.skipped} beschädigte Einträge werden übersprungen und gesichert.` : '';
-    const alert = await this.alertCtrl.create({
-      header: 'Backup importieren?',
-      message: `Backup vom ${date}: ${describeCounts(countBackup(backup.data))}. Alle aktuellen Daten auf diesem Gerät werden dadurch ersetzt. Der aktuelle Stand wird vorher automatisch gesichert.${skipped}`,
-      buttons: [
-        { text: 'Abbrechen', role: 'cancel' },
-        { text: 'Erst Backup exportieren', handler: () => void this.exportThen(() => this.confirmImport(backup, cleanup)) },
-        { text: 'Ersetzen', role: 'destructive', handler: () => void this.applyImport(backup, cleanup) },
-      ],
-    });
-    await alert.present();
+    await presentAlert(this.alertCtrl, importDialog(backup, cleanup, {
+      exportFirst: () => void this.exportThen(() => this.confirmImport(backup, cleanup)),
+      confirm: () => void this.applyImport(backup, cleanup),
+    }));
   }
 
   /** Schreibt das Backup und lädt die App neu, damit alle Stores den neuen Stand lesen. */
@@ -279,31 +288,28 @@ export class SettingsPage implements OnInit {
       this.win?.location.reload();
       return;
     }
-    const alert = await this.alertCtrl.create({
+    await presentAlert(this.alertCtrl, {
       header: 'Import abgeschlossen',
       message: 'Das Backup wurde eingespielt. Für die automatische Sicherung des alten Stands war nicht genug Speicher frei.',
       buttons: [{ text: 'OK', handler: () => this.win?.location.reload() }],
     });
-    await alert.present();
   }
 
   /** Fragt nach, ob die automatische Sicherung wiederhergestellt oder gelöscht werden soll. */
   async confirmRestoreSafety(): Promise<void> {
     const info = this.safetyInfo();
     if (!info) return;
-    const alert = await this.alertCtrl.create({
-      header: 'Automatische Sicherung',
-      message: `${info}. Beim Wiederherstellen wird der aktuelle Stand selbst zur automatischen Sicherung.`,
-      buttons: [
-        { text: 'Abbrechen', role: 'cancel' },
-        { text: 'Sicherung löschen', role: 'destructive', handler: () => this.discardSafety() },
-        { text: 'Wiederherstellen', handler: () => void this.restoreSafety() },
-      ],
-    });
-    await alert.present();
+    await presentAlert(this.alertCtrl, safetyDialog(info, {
+      discard: () => void this.discardSafety(),
+      restore: () => void this.restoreSafety(),
+    }));
   }
 
-  private discardSafety(): void {
+  async discardSafety(): Promise<void> {
+    if (this.profileStore.isReadOnly()) {
+      await this.showBackupError('Nicht gespeichert', WRITE_BLOCKED_MESSAGE);
+      return;
+    }
     this.backup.discardSafetySnapshot();
     this.refreshSafetyInfo();
     this.savedToast.set('Automatische Sicherung gelöscht.');
@@ -320,8 +326,7 @@ export class SettingsPage implements OnInit {
   }
 
   private async showBackupError(header: string, message: string): Promise<void> {
-    const alert = await this.alertCtrl.create({ header, message, buttons: ['OK'] });
-    await alert.present();
+    await showMessage(this.alertCtrl, header, message);
   }
 
   onToastDismiss(): void {

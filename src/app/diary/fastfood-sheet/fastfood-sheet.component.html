@@ -42,7 +42,7 @@
           </ion-card-header>
           <ion-card-content>
             <p>{{ s.rationale }}</p>
-            <ion-button size="small" fill="clear" class="touch-btn touch-btn--text" (click)="logFastfood(s)">
+            <ion-button size="small" fill="clear" class="touch-btn touch-btn--text" (click)="logFastfood(s)" [attr.aria-label]="s.itemName + ' eintragen'">
               <ion-icon slot="start" name="add-circle-outline"></ion-icon> Eintragen
             </ion-button>
           </ion-card-content>

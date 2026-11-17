@@ -3,9 +3,12 @@ import {
 } from '@angular/core';
 import type { IScannerControls } from '@zxing/browser';
 import { FoodItem } from '../../core/models';
+import { errorText } from '../../core/ai/ai-errors';
+import { DebugLogService } from '../../core/debug/debug-log.service';
 import { FOOD_PROVIDER } from '../../core/food/food-provider';
 import { foodErrorMessage } from '../../core/food/food-errors';
 import { BarcodeScannerService } from '../../core/scan/barcode-scanner.service';
+import { CAMERA_DENIED_MESSAGE, isCameraDenied } from '../../core/scan/camera-errors';
 
 /** Pause vor dem erneuten Scan nach Fehlschlag, damit derselbe Code nicht sofort wieder abgefragt wird. */
 export const RESCAN_DELAY_MS = 1500;
@@ -35,6 +38,7 @@ export interface BarcodeHit {
 export class NtBarcodeScannerComponent implements OnDestroy {
   private readonly food = inject(FOOD_PROVIDER);
   private readonly scanner = inject(BarcodeScannerService);
+  private readonly log = inject(DebugLogService);
 
   readonly open = input(false);
   readonly found = output<BarcodeHit>();
@@ -50,6 +54,8 @@ export class NtBarcodeScannerComponent implements OnDestroy {
   private controls?: IScannerControls;
   private presented = false;
   private starting = false;
+  /** Zählt Starts und Stopps: ein Start, der nach einem Stopp fertig wird, gibt seinen Stream sofort frei. */
+  private startToken = 0;
   private pendingHit: BarcodeHit | null = null;
   private rescanTimer?: ReturnType<typeof setTimeout>;
 
@@ -92,17 +98,29 @@ export class NtBarcodeScannerComponent implements OnDestroy {
       return;
     }
     this.starting = true;
+    const token = ++this.startToken;
     try {
-      this.controls = await this.scanner.start(
+      const controls = await this.scanner.start(
         video,
         (code) => void this.lookup(code),
-        () => this.showWithoutCamera('Kamerazugriff fehlgeschlagen — gib den Code manuell ein.'),
+        (err) => this.onCameraError(err, 'Kamerazugriff fehlgeschlagen — gib den Code manuell ein.'),
       );
-    } catch {
-      this.showWithoutCamera('Kamera nicht verfügbar — gib den Code manuell ein.');
+      if (!this.presented || token !== this.startToken) {
+        controls.stop();
+        return;
+      }
+      this.controls = controls;
+    } catch (e: unknown) {
+      if (token === this.startToken) this.onCameraError(e, 'Kamera nicht verfügbar — gib den Code manuell ein.');
     } finally {
-      this.starting = false;
+      if (token === this.startToken) this.starting = false;
     }
+  }
+
+  /** Loggt den Kamerafehler und zeigt bei verweigerter Berechtigung eine eigene Meldung. */
+  private onCameraError(err: unknown, fallback: string): void {
+    this.log.error(`✗ Barcode-Scanner: Kamera-Fehler: ${errorText(err)}`);
+    this.showWithoutCamera(isCameraDenied(err) ? CAMERA_DENIED_MESSAGE : fallback);
   }
 
   /** ion-modal didDismiss → Kamera freigeben, Schließen melden, danach den wartenden Treffer. */
@@ -143,6 +161,8 @@ export class NtBarcodeScannerComponent implements OnDestroy {
   }
 
   private stop(): void {
+    this.startToken++;
+    this.starting = false;
     clearTimeout(this.rescanTimer);
     this.controls?.stop();
     this.controls = undefined;
@@ -171,6 +191,7 @@ export class NtBarcodeScannerComponent implements OnDestroy {
     this.looking.set(true);
     try {
       const item = await this.food.lookupByBarcode(code);
+      if (!this.presented) return; // Modal inzwischen geschlossen: Treffer verwerfen
       if (!item) {
         this.error.set(`Kein Produkt zu Barcode ${code} gefunden — prüfe die Ziffern oder suche per Name.`);
         this.scheduleRescan();
@@ -178,6 +199,7 @@ export class NtBarcodeScannerComponent implements OnDestroy {
       }
       await this.finishWith({ item, code });
     } catch (e: unknown) {
+      if (!this.presented) return;
       this.error.set(foodErrorMessage(e));
       this.scheduleRescan();
     } finally {

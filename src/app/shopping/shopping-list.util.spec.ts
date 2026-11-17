@@ -2,13 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { ShoppingItem } from '../core/models';
 import {
   DEFAULT_PERSONS,
-  adjustIndex,
   categoryOf,
-  decodeIndexes,
   defaultPersons,
   defaultPersonsInRange,
   scaleRecipeIngredients,
-  encodeIndexes,
   formatAmount,
   formatShareText,
   categoryLabel,
@@ -19,7 +16,7 @@ import {
 
 const item = (name: string, extra: Partial<ShoppingItem> & { category?: string } = {}): ShoppingItem =>
   ({ name, amount: 1, unit: 'Stk', checked: false, ...extra }) as ShoppingItem;
-const rowsOf = (items: ShoppingItem[]) => items.map((it, index) => ({ item: it, index }));
+const rowsOf = (items: ShoppingItem[]) => items.map((it, index) => ({ item: it, id: String(index) }));
 
 describe('categoryOf', () => {
   it('returns a trimmed category or null', () => {
@@ -30,10 +27,10 @@ describe('categoryOf', () => {
 });
 
 describe('splitRows', () => {
-  it('separates open and done rows keeping order and indexes', () => {
+  it('separates open and done rows keeping order and ids', () => {
     const result = splitRows(rowsOf([item('A'), item('B', { checked: true }), item('C')]));
-    expect(result.open.map((r) => r.index)).toEqual([0, 2]);
-    expect(result.done.map((r) => r.index)).toEqual([1]);
+    expect(result.open.map((r) => r.id)).toEqual(['0', '2']);
+    expect(result.done.map((r) => r.id)).toEqual(['1']);
   });
 });
 
@@ -56,7 +53,7 @@ describe('groupByCategory', () => {
     );
     expect(groups.map((g) => g.category)).toEqual(['Obst', 'Kühlregal', 'Sonstiges']);
     expect(groups[0].rows.map((r) => r.item.name)).toEqual(['Apfel', 'Birne']);
-    expect(groups[2].rows.map((r) => r.index)).toEqual([0]);
+    expect(groups[2].rows.map((r) => r.id)).toEqual(['0']);
   });
 
   it('returns no groups for no rows', () => {
@@ -89,21 +86,6 @@ describe('formatShareText', () => {
       item('Salz', { amount: 0 }),
     ]);
     expect(text).toBe('Einkaufsliste\n\nObst:\n- Apfel (3 Stk)\n\nSonstiges:\n- Salz');
-  });
-});
-
-describe('adjustIndex', () => {
-  it('shifts by the number of removed indexes before it', () => {
-    expect(adjustIndex(5, [1, 3, 7])).toBe(3);
-    expect(adjustIndex(0, [2])).toBe(0);
-  });
-});
-
-describe('encode/decodeIndexes', () => {
-  it('round-trips and ignores invalid parts', () => {
-    expect(decodeIndexes(encodeIndexes([2, 0, 5]))).toEqual([2, 0, 5]);
-    expect(decodeIndexes('1,x,-2,3')).toEqual([1, 3]);
-    expect(decodeIndexes(null)).toEqual([]);
   });
 });
 

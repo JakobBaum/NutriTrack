@@ -2,11 +2,12 @@ import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { ProviderToken } from '@angular/core';
-import { AiService, NO_AI_MESSAGE } from './ai.service';
+import { AiService, NO_AI_MESSAGE, NO_CONSENT_TEST_MESSAGE } from './ai.service';
 import { AiProvider } from './ai-provider';
 import { MockAiProvider } from './mock-ai-provider';
 import { ProxyAiProvider } from './proxy-ai-provider';
 import { AI_ERROR_MESSAGES } from './ai-errors';
+import { ConsentService } from '../consent/consent.service';
 import { environment } from '../../../environments/environment';
 
 const FACTS = { kcal: 1, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0 };
@@ -76,8 +77,17 @@ describe('AiService — testConnection', () => {
     expect(result).toEqual({ ok: false, message: NO_AI_MESSAGE });
   });
 
+  it('sendet ohne Zustimmung keinen Ping (K9)', async () => {
+    environment.aiProxyUrl = PROXY_URL;
+    vi.spyOn(TestBed.inject(ConsentService), 'isGranted').mockReturnValue(false);
+    const ping = vi.spyOn(TestBed.inject(ProxyAiProvider), 'ping').mockResolvedValue();
+    expect(await svc.testConnection()).toEqual({ ok: false, message: NO_CONSENT_TEST_MESSAGE });
+    expect(ping).not.toHaveBeenCalled();
+  });
+
   it('meldet Erfolg, wenn der Worker antwortet', async () => {
     environment.aiProxyUrl = PROXY_URL;
+    vi.spyOn(TestBed.inject(ConsentService), 'isGranted').mockReturnValue(true);
     vi.spyOn(TestBed.inject(ProxyAiProvider), 'ping').mockResolvedValue();
     const result = await svc.testConnection();
     expect(result.ok).toBe(true);
@@ -85,6 +95,7 @@ describe('AiService — testConnection', () => {
 
   it('gibt die Fehlermeldung zurück, wenn der Worker nicht erreichbar ist', async () => {
     environment.aiProxyUrl = PROXY_URL;
+    vi.spyOn(TestBed.inject(ConsentService), 'isGranted').mockReturnValue(true);
     vi.spyOn(TestBed.inject(ProxyAiProvider), 'ping').mockRejectedValue(new Error(AI_ERROR_MESSAGES.offline));
     const result = await svc.testConnection();
     expect(result.ok).toBe(false);

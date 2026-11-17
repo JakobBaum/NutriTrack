@@ -2,24 +2,29 @@ import { DiaryEntry, MealType, NutritionFacts, Recipe, SavedMeal } from '../../c
 import { NewDiaryEntry } from '../../core/state/diary.store';
 import { StoredRecipe, isOnlineRef } from '../../core/recipes/online/online-recipe-ref';
 import { countMissingFacts } from '../../recipes/recipe-view';
-import { factsDiffer, isValidAmount, rebaseTo100, scaleFacts } from '../diary-helpers';
+import { entryToInput } from '../diary-edit';
+import { factsDiffer, isValidAmount, rebaseTo100, scalePrecise, scaleFacts } from '../diary-helpers';
+
+/** Meldung, wenn ein Rezept beim Schnell-Eintragen keine Nährwerte liefert. */
+export const NO_RECIPE_FACTS_MESSAGE = 'Für dieses Rezept fehlen die Nährwerte. Tippe auf „Anpassen“ und trage sie von Hand ein.';
+
+/**
+ * Neue Bezugswerte aus von Hand angepassten Feldern: auf 100 g (Menge in g) bzw. eine Portion zurückgerechnet,
+ * damit eine spätere Mengenänderung die eigenen Werte proportional mitnimmt statt sie zu überschreiben.
+ */
+export function rebaseScaleBase(
+  facts: NutritionFacts,
+  unit: 'g' | 'portion',
+  baseAmount: number | null,
+  servings: number | null,
+): NutritionFacts | null {
+  if (unit === 'g') return isValidAmount(baseAmount) ? rebaseTo100(facts, baseAmount) : null;
+  return isValidAmount(servings) ? scalePrecise(facts, 1 / servings, 'perPortion') : null;
+}
 
 /** Zuletzt benutzten Eintrag unverändert erneut buchen. */
 export function entryFromRecent(entry: DiaryEntry, dateISO: string, meal: MealType): NewDiaryEntry {
-  return {
-    dateISO,
-    meal,
-    label: entry.label,
-    brand: entry.brand,
-    ref: entry.ref,
-    amountG: entry.amountG,
-    servings: entry.servings,
-    facts: entry.facts,
-    baseFacts: entry.baseFacts,
-    isEstimate: entry.isEstimate,
-    isPartial: entry.isPartial,
-    unit: entry.unit,
-  };
+  return { ...entryToInput(entry), dateISO, meal };
 }
 
 /** Rezept, das sich ins Tagebuch eintragen lässt: mit eigenen Werten je Portion oder als Online-Verweis (Werte kommen beim Auswählen). */
@@ -63,6 +68,8 @@ export function entriesFromSavedMeal(saved: SavedMeal, dateISO: string, meal: Me
     amountG: e.amountG,
     servings: e.servings,
     facts: e.facts,
+    unit: e.unit,
+    isPartial: e.isPartial,
   }));
 }
 

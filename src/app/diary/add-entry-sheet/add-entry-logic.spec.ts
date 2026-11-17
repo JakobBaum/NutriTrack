@@ -1,3 +1,4 @@
+import { scaleFacts } from '../diary-helpers';
 import { DiaryEntry, NutritionFacts, Recipe, SavedMeal } from '../../core/models';
 import {
   baseFactsForSave,
@@ -7,6 +8,8 @@ import {
   entryFromRecipe,
   filterLoggableRecipes,
   resolveAdjustOpen,
+  rebaseScaleBase,
+  NO_RECIPE_FACTS_MESSAGE,
   savedMealProtein,
   sumEntryTotals,
 } from './add-entry-logic';
@@ -154,5 +157,41 @@ describe('add-entry-logic', () => {
       const toggle = {};
       expect(resolveAdjustOpen({ target: toggle, currentTarget: group, detail: { value: 'on' } }, 'adjust')).toBe('adjust');
     });
+  });
+});
+
+describe('rebaseScaleBase (T1)', () => {
+  const edited: NutritionFacts = { kcal: 245, proteinG: 12.3, carbsG: 30, fatG: 4, basis: 'perPortion' };
+
+  it('rechnet von Hand angepasste Werte auf 100 g zurück, damit eine Mengenänderung sie nicht überschreibt', () => {
+    const base = rebaseScaleBase(edited, 'g', 150, null);
+    expect(base?.basis).toBe('per100g');
+    expect(scaleFacts(base as NutritionFacts, 1.5).kcal).toBe(245);
+    expect(scaleFacts(base as NutritionFacts, 3).kcal).toBe(490);
+  });
+
+  it('rechnet bei Portionen auf eine Portion zurück', () => {
+    const base = rebaseScaleBase(edited, 'portion', null, 2);
+    expect(base?.kcal).toBeCloseTo(122.5, 3);
+  });
+
+  it('liefert null ohne gültige Menge', () => {
+    expect(rebaseScaleBase(edited, 'g', null, null)).toBeNull();
+    expect(rebaseScaleBase(edited, 'portion', null, 0)).toBeNull();
+  });
+});
+
+describe('Hinweis bei Rezept ohne Werte (F7)', () => {
+  it('hat einen Text, der zum Anpassen rät', () => {
+    expect(NO_RECIPE_FACTS_MESSAGE).toContain('Anpassen');
+  });
+});
+
+describe('Gespeicherte Mahlzeit (T18)', () => {
+  it('übernimmt Einheit und Teilwerte-Kennzeichen, wenn das Modell sie kennt', () => {
+    const saved = { id: 's', name: 'x', createdAt: 'a', entries: [{ label: 'Milch', facts: PER100, amountG: 200, ref: { kind: 'manual' as const }, unit: 'ml' as const, isPartial: true }] } as unknown as SavedMeal;
+    const [entry] = entriesFromSavedMeal(saved, DATE, 'lunch');
+    expect(entry.unit).toBe('ml');
+    expect(entry.isPartial).toBe(true);
   });
 });

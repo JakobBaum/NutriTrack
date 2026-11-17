@@ -1,10 +1,13 @@
 import { NutritionBasis, NutritionFacts } from '../models';
 import { parseDecimal } from '../util/number-input';
+import {
+  MAX_GRAMS_PER_100G, MAX_KCAL_PER_100G, PORTION_MAX_GRAMS, PORTION_MAX_KCAL,
+} from '../food/facts-plausibility';
+import { readMachineNumber } from '../food/machine-number';
+import { GRAM_UNITS } from '../nutrition/units-weight';
 import { RecipeImportIngredient, RecipeImportResult } from './ai-provider';
 import { boundedList, cleanText, isInRange } from './sanitize-common';
 
-// Einheiten, die 1:1 als Gramm/Milliliter gelten (→ Bezug per100g).
-const GRAM_UNITS = new Set(['g', 'gramm', 'gr', 'kg', 'kilogramm', 'ml', 'milliliter', 'l', 'liter']);
 const DEFAULT_PORTION_G = 50;
 const DEFAULT_SERVINGS = 2;
 const FALLBACK_TITLE = 'Importiertes Rezept';
@@ -19,11 +22,6 @@ export const MAX_IMPORT_STEP_CHARS = 1000;
 export const MAX_IMPORT_SERVINGS = 100;
 export const MAX_IMPORT_AMOUNT = 100000;
 export const MAX_IMPORT_PORTION_G = 5000;
-/** Nährwerte je 100 g (physikalisch höchstens rund 900 kcal) bzw. je Portion/Stück. */
-const MAX_KCAL_PER_100G = 900;
-const MAX_GRAMS_PER_100G = 100;
-const MAX_KCAL_PER_PORTION = 5000;
-const MAX_GRAMS_PER_PORTION = 1000;
 
 /** Zahl aus einem Modellwert: nie negativ, endlich, höchstens `max`. */
 function num(v: unknown, max = MAX_IMPORT_AMOUNT): number {
@@ -31,9 +29,15 @@ function num(v: unknown, max = MAX_IMPORT_AMOUNT): number {
   return n === null ? 0 : Math.min(max, Math.max(0, n));
 }
 
-/** Rohwert als Zahl, aber ohne Begrenzung nach oben; Unsinn wird 0 (zur Prüfung der Plausibilität). */
+/** Nährwert aus einem Modellwert (strikt, ohne Tausenderpunkt): nie negativ, höchstens `max`. */
+function factNum(v: unknown, max = MAX_IMPORT_AMOUNT): number {
+  const n = readMachineNumber(v);
+  return n === null ? 0 : Math.min(max, Math.max(0, n));
+}
+
+/** Rohwert als Nährwert, aber ohne Begrenzung nach oben; Unsinn wird 0 (zur Prüfung der Plausibilität). */
 function rawNum(v: unknown): number {
-  const n = parseDecimal(v);
+  const n = readMachineNumber(v);
   return n === null ? 0 : Math.max(0, n);
 }
 
@@ -43,8 +47,8 @@ function deriveBasis(rawBasis: unknown, unit: string): NutritionBasis {
 }
 
 function isWithinLimits(f: Record<string, unknown>, basis: NutritionBasis): boolean {
-  const maxKcal = basis === 'per100g' ? MAX_KCAL_PER_100G : MAX_KCAL_PER_PORTION;
-  const maxG = basis === 'per100g' ? MAX_GRAMS_PER_100G : MAX_GRAMS_PER_PORTION;
+  const maxKcal = basis === 'per100g' ? MAX_KCAL_PER_100G : PORTION_MAX_KCAL;
+  const maxG = basis === 'per100g' ? MAX_GRAMS_PER_100G : PORTION_MAX_GRAMS;
   const kcalOk = isInRange(rawNum(f['kcal']), 0, maxKcal);
   const gramsOk = ['proteinG', 'carbsG', 'fatG', 'fiberG', 'sugarG'].every((k) => isInRange(rawNum(f[k]), 0, maxG));
   return kcalOk && gramsOk;
@@ -56,10 +60,10 @@ function isWithinLimits(f: Record<string, unknown>, basis: NutritionBasis): bool
 export function parseIngredientFacts(raw: unknown, unit: string): NutritionFacts | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const f = raw as Record<string, unknown>;
-  const kcal = num(f['kcal']);
-  const proteinG = num(f['proteinG']);
-  const carbsG = num(f['carbsG']);
-  const fatG = num(f['fatG']);
+  const kcal = factNum(f['kcal']);
+  const proteinG = factNum(f['proteinG']);
+  const carbsG = factNum(f['carbsG']);
+  const fatG = factNum(f['fatG']);
   // Reine Null-Werte (z.B. Wasser/Salz liefern 0) nur verwerfen, wenn ALLES 0 ist.
   if (kcal === 0 && proteinG === 0 && carbsG === 0 && fatG === 0) return undefined;
 
@@ -71,8 +75,8 @@ export function parseIngredientFacts(raw: unknown, unit: string): NutritionFacts
     proteinG,
     carbsG,
     fatG,
-    fiberG: num(f['fiberG']),
-    sugarG: num(f['sugarG']),
+    fiberG: factNum(f['fiberG']),
+    sugarG: factNum(f['sugarG']),
     basis,
     portionG,
   };
@@ -109,5 +113,6 @@ export function normalizeRecipeImport(raw: unknown, sourceUrl?: string): RecipeI
     ingredients,
     steps: parseSteps(obj['steps']),
     sourceUrl,
+    ...(obj['usedFallbackText'] === true ? { usedFallbackText: true } : {}),
   };
 }

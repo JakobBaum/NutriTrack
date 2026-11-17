@@ -13,7 +13,7 @@ async function createRecipe(page) {
   const modal = topModal(page);
   await modal.locator('.nt-sheet-header__title', { hasText: 'Neues Rezept' }).waitFor();
   await fillAndBlur(byAria(modal, 'Name'), TITLE);
-  await modal.locator('.nt-btn--tonal.nt-btn--block', { hasText: 'manuelle Zutat' }).click();
+  await modal.locator('.nt-btn--tonal.nt-btn--block', { hasText: 'Manuelle Zutat' }).click();
   await fillAndBlur(byAria(modal, 'Zutatname'), 'Rote Linsen');
   await amountInput(modal, 'Menge').first().fill('300');
   await modal.locator('.ing-facts-toggle').first().click();

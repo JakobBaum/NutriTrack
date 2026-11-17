@@ -14,7 +14,7 @@
     @if (chart(); as c) {
       <figure class="weight__chart" data-testid="weight-chart">
         <svg [attr.viewBox]="'0 0 ' + chartSize.width + ' ' + chartSize.height" role="img"
-             [attr.aria-label]="'Gewichtsverlauf, ' + recent().length + ' letzte Einträge, aktuell ' + (l.kg | ntNum:1) + ' kg'">
+             [attr.aria-label]="'Gewichtsverlauf, ' + entryCount() + (entryCount() === 1 ? ' Eintrag' : ' Einträge') + ', aktuell ' + (l.kg | ntNum:1) + ' kg'">
           <line class="weight__grid" [attr.x1]="chartSize.padX" [attr.x2]="chartSize.width - chartSize.padX" [attr.y1]="chartSize.padY" [attr.y2]="chartSize.padY"></line>
           <line class="weight__grid" [attr.x1]="chartSize.padX" [attr.x2]="chartSize.width - chartSize.padX" [attr.y1]="chartSize.height - chartSize.padY" [attr.y2]="chartSize.height - chartSize.padY"></line>
           @for (d of c.dots; track d.dateISO) {
@@ -34,7 +34,7 @@
     <p class="weight__empty" data-testid="weight-empty">Noch kein Gewicht eingetragen. Trage dein Gewicht ein, um den Verlauf zu sehen.</p>
   }
 
-  <button type="button" class="nt-btn nt-btn--tonal nt-btn--inner weight__add" data-testid="weight-add" (click)="openSheet()">
+  <button type="button" class="nt-btn nt-btn--tonal nt-btn--block nt-btn--inner weight__add" data-testid="weight-add" (click)="openSheet()">
     <ion-icon name="add" aria-hidden="true"></ion-icon> Gewicht eintragen
   </button>
 

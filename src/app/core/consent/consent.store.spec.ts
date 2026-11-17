@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { ConsentStore } from './consent.store';
+import { StorageService } from '../storage/storage.service';
 import { CONSENT_KEY, CONSENT_VERSION } from './consent.model';
 
 const KEY = `nutritrack:${CONSENT_KEY}`;
@@ -44,6 +45,16 @@ describe('ConsentStore', () => {
   it('gilt bei kaputtem JSON im Speicher als keine Zustimmung', () => {
     localStorage.setItem(KEY, '{kaputt');
     expect(freshStore().granted()).toBe(false);
+  });
+
+  it('liest eine Änderung aus einem anderen Fenster neu ein, ohne zu sperren', () => {
+    const store = freshStore();
+    expect(store.granted()).toBe(false);
+    localStorage.setItem(KEY, JSON.stringify({ version: CONSENT_VERSION, acceptedAt: '2026-11-14T10:00:00.000Z', isAdultConfirmed: true }));
+    window.dispatchEvent(new StorageEvent('storage', { key: KEY }));
+    TestBed.tick();
+    expect(store.granted()).toBe(true);
+    expect(TestBed.inject(StorageService).externalChange()).toBe(false);
   });
 
   it('widerruft die Zustimmung und entfernt den Eintrag', () => {

@@ -1,6 +1,7 @@
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DebugLogService } from '../../core/debug/debug-log.service';
 import { FOOD_PROVIDER } from '../../core/food/food-provider';
 import { FoodLookupError } from '../../core/food/food-errors';
 import { BarcodeScannerService } from '../../core/scan/barcode-scanner.service';
@@ -145,5 +146,87 @@ describe("NtBarcodeScannerComponent — Treffer erst nach dem Schließen (Abstur
     await vi.advanceTimersByTimeAsync(0);
 
     expect(found).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('NtBarcodeScannerComponent — Robustheit (K1, K20, K21)', () => {
+  const ITEM = { id: 'x', name: 'Haferdrink' };
+
+  it('stoppt einen Stream sofort, wenn das Modal schon geschlossen ist, bevor der Start fertig wird', async () => {
+    // Arrange
+    const stop = vi.fn();
+    let finishStart: (c: { stop: () => void }) => void = () => undefined;
+    start.mockImplementationOnce(() => new Promise((resolve) => { finishStart = resolve; }));
+    const cmp = create();
+    const pending = cmp.onPresent();
+
+    // Act
+    cmp.onDismiss();
+    finishStart({ stop });
+    await pending;
+
+    // Assert
+    expect(stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('verwirft einen Treffer, der nach dem Schließen ankommt (kein hängender Treffer)', async () => {
+    // Arrange
+    let resolveLookup: (v: unknown) => void = () => undefined;
+    lookupByBarcode.mockImplementation(() => new Promise((resolve) => { resolveLookup = resolve; }));
+    const cmp = create();
+    const dismiss = vi.fn(async () => true);
+    cmp.modal = { dismiss };
+    const found = vi.fn();
+    cmp.found.subscribe(found);
+    await cmp.onPresent();
+    onCode('4000');
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Act: Modal wird geschlossen, danach kommt der Treffer
+    cmp.onDismiss();
+    resolveLookup(ITEM);
+    await vi.advanceTimersByTimeAsync(0);
+    cmp.onDismiss();
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Assert
+    expect(dismiss).not.toHaveBeenCalled();
+    expect(found).not.toHaveBeenCalled();
+  });
+
+  it('startet nicht doppelt, wenn onPresent zweimal kurz hintereinander läuft', async () => {
+    const cmp = create();
+    await Promise.all([cmp.onPresent(), cmp.onPresent()]);
+    expect(start).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('NtBarcodeScannerComponent — Kamerafehler (K21, F8)', () => {
+  it('nennt verweigerte Kameraberechtigung mit eigener Meldung und loggt den Fehler', async () => {
+    // Arrange
+    const log = vi.spyOn(TestBed.inject(DebugLogService), 'error');
+    start.mockRejectedValueOnce(new DOMException('denied', 'NotAllowedError'));
+    const cmp = create();
+
+    // Act
+    await cmp.onPresent();
+
+    // Assert
+    expect(cmp.error()).toBe(
+      'Kamerazugriff nicht erlaubt. In den Einstellungen freigeben oder den Code eintippen.',
+    );
+    expect(log).toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it('nennt andere Startfehler weiterhin "Kamera nicht verfügbar"', async () => {
+    const log = vi.spyOn(TestBed.inject(DebugLogService), 'error');
+    start.mockRejectedValueOnce(new Error('kaputt'));
+    const cmp = create();
+
+    await cmp.onPresent();
+
+    expect(cmp.error()).toContain('Kamera nicht verfügbar');
+    log.mockRestore();
   });
 });

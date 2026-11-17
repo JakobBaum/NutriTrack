@@ -1,4 +1,5 @@
-import { signal } from '@angular/core';
+import { inject, signal } from '@angular/core';
+import { DebugLogService } from '../core/debug/debug-log.service';
 import { NutritionFacts, Recipe } from '../core/models';
 import { OnlineRecipeDetailsService } from '../core/recipes/online/online-recipe-details.service';
 import { StoredRecipe, isOnlineRef } from '../core/recipes/online/online-recipe-ref';
@@ -42,7 +43,11 @@ export class RecipeFactsLoader {
   readonly state = signal<FactsLoadState>({ kind: 'idle' });
   private readonly guard = new RequestGuard();
 
-  constructor(private readonly details: OnlineRecipeDetailsService) {}
+  constructor(
+    private readonly details: OnlineRecipeDetailsService,
+    /** Standard: DebugLogService (nur im Injektionskontext, z. B. als Feld-Initialisierer). */
+    private readonly log: { error(msg: string): void } = inject(DebugLogService),
+  ) {}
 
   /** Werte des Rezepts; `null` bei Fehler (siehe `state`), fehlenden Werten oder veralteter Antwort. */
   async load(stored: StoredRecipe): Promise<LoadedRecipeFacts | null> {
@@ -52,7 +57,7 @@ export class RecipeFactsLoader {
     try {
       return this.checkLoaded(token, stored, await this.details.resolve(stored));
     } catch (e: unknown) {
-      console.error('NutriTrack: Rezeptdetails nicht geladen', stored.title, e);
+      this.log.error(`Rezeptdetails „${stored.title}“ nicht geladen: ${e instanceof Error ? e.message : String(e)}`);
       this.fail(token, describeLoadError(e).message, stored);
       return null;
     }

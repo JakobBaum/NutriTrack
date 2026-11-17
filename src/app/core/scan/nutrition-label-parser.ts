@@ -21,6 +21,9 @@ const KJ_PER_KCAL = 4.184;
 const SODIUM_TO_SALT = 2.5;
 const MAX_KCAL_PER_100 = 950;
 const MAX_GRAMS_PER_100 = 100;
+/** Je Portion (z. B. Riegel, Fertiggericht) sind höhere Werte möglich. */
+const MAX_KCAL_PER_PORTION = 3000;
+const MAX_GRAMS_PER_PORTION = 500;
 const MAX_UNITLESS_LINE = 40;
 const MACRO_TOLERANCE = 0.35;
 const INCONSISTENT_FACTOR = 0.7;
@@ -76,7 +79,9 @@ function normalize(text: string): string {
     .replace(/[–—]/g, '-')
     .replace(/[ \t]/g, ' ')
     .replace(/ {2,}/g, ' ')
-    .toLowerCase();
+    .toLowerCase()
+    // Tausendertrenner per Leerzeichen bei Energieangaben: "1 046 kJ" -> "1046 kJ".
+    .replace(/(\d) (\d{3})(?=\s*(?:kj|kcal|kc[a4][l1i]))/g, '$1$2');
 }
 
 /** Alle Zahlen einer Zeile (ohne Prozentangaben), `<`-Werte als halber Grenzwert. */
@@ -153,9 +158,11 @@ function readGrams(line: string, column: number): number | undefined {
   return pickColumn(nums, column)?.value;
 }
 
-function isPlausible(field: LabelField, value: number): boolean {
+function isPlausible(field: LabelField, value: number, perPortion: boolean): boolean {
   if (!Number.isFinite(value) || value < 0) return false;
-  return field === 'kcal' ? value <= MAX_KCAL_PER_100 : value <= MAX_GRAMS_PER_100;
+  const maxKcal = perPortion ? MAX_KCAL_PER_PORTION : MAX_KCAL_PER_100;
+  const maxGrams = perPortion ? MAX_GRAMS_PER_PORTION : MAX_GRAMS_PER_100;
+  return field === 'kcal' ? value <= maxKcal : value <= maxGrams;
 }
 
 function startsWithNumber(line: string): boolean {
@@ -167,10 +174,10 @@ function hasValues(line: string): boolean {
   return extractNumbers(line).length > 0 || new RegExp(ENERGY_VALUES_RE.source).test(line);
 }
 
-function parseLines(lines: string[], column: number): Values {
+function parseLines(lines: string[], column: number, perPortion: boolean): Values {
   const values: Values = {};
   const set = (field: LabelField, v: number | undefined): void => {
-    if (v !== undefined && values[field] === undefined && isPlausible(field, v)) values[field] = v;
+    if (v !== undefined && values[field] === undefined && isPlausible(field, v, perPortion)) values[field] = v;
   };
   lines.forEach((line, i) => {
     if (IGNORED_LINE.test(line)) return;
@@ -220,7 +227,7 @@ export function parseNutritionLabel(text: string): ParsedNutritionLabel {
   const normalized = normalize(text ?? '');
   const lines = normalized.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
   const { basis, assumed } = detectBasis(normalized);
-  const values = dropInconsistent(parseLines(lines, basis === 'perPortion' ? 0 : per100Column(normalized)));
+  const values = dropInconsistent(parseLines(lines, basis === 'perPortion' ? 0 : per100Column(normalized), basis === 'perPortion'));
   const found = FIELD_ORDER.filter((f) => values[f] !== undefined);
   return { values, found, basis, confidence: computeConfidence(values, assumed) };
 }

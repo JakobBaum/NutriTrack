@@ -1,10 +1,10 @@
-<ion-modal [isOpen]="isOpen()" [handle]="true" (ionModalDidDismiss)="closed.emit()">
+<ion-modal [isOpen]="isOpen()" [handle]="true" [canDismiss]="canDismiss" (ionModalDidDismiss)="closed.emit()">
   <ng-template>
     <div class="nt-sheet-header">
       <span class="nt-sheet-header__start"></span>
       <h2 class="nt-sheet-header__title" role="heading" aria-level="2">Mein Profil</h2>
       <span class="nt-sheet-header__end">
-        <ion-button fill="clear" class="nt-sheet-close" (click)="closed.emit()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
+        <ion-button fill="clear" class="nt-sheet-close" (click)="requestClose()" aria-label="Schließen"><ion-icon slot="icon-only" name="close-outline" aria-hidden="true"></ion-icon></ion-button>
       </span>
     </div>
     <ion-content>
@@ -86,7 +86,7 @@
             }
           </div>
           <p class="hint" role="status" data-testid="rate-hint">
-            {{ rateDeltaText() }}@if (maxRateText()) { · höchstens {{ maxRateText() }} kg pro Woche ({{ form().goal === 'gain' ? '0,5' : '1' }} % deines Gewichts).}
+            {{ rateDeltaText() }}@if (maxRateText()) { {{ rateDeltaText() ? '· ' : '' }}höchstens {{ maxRateText() }} kg pro Woche ({{ form().goal === 'gain' ? '0,5' : '1' }} % deines Gewichts).}
             @if (form().goal === 'gain') { Beim Aufbau reicht ein moderater Überschuss, mehr wird überwiegend Fett. }
             @if (rateIsCapped()) { Dein gewähltes Tempo wird darauf begrenzt. }
           </p>
@@ -104,7 +104,7 @@
           </ion-item>
         </ion-list>
         @if (form().targetWeightKg !== null) {
-          <ion-button fill="clear" size="small" (click)="clearTargetWeight()">Zielgewicht entfernen</ion-button>
+          <ion-button fill="clear" class="touch-btn touch-btn--text" (click)="clearTargetWeight()">Zielgewicht entfernen</ion-button>
         }
 
         <h2 class="nt-section-header">Ziele</h2>
@@ -145,7 +145,7 @@
             @else if (manualProteinNote(); as note) { <p class="hint hint--info row-error--block" role="status">{{ note }}</p> }
             @if (manualProteinGrams(); as g) { <p class="row-sub row-sub--block">≈ {{ g | ntNum:0 }} g Eiweiß pro Tag (erlaubt: 1,2 bis 2,4 g/kg)</p> }
             @else { <p class="row-sub row-sub--block">Erlaubt: 1,2 bis 2,4 g pro kg Körpergewicht</p> }
-          <ion-button fill="clear" size="small" data-testid="target-reset" (click)="resetToFormula()">Auf Formel zurücksetzen</ion-button>
+          <ion-button fill="clear" class="touch-btn touch-btn--text" data-testid="target-reset" (click)="resetToFormula()">Auf Formel zurücksetzen</ion-button>
         }
 
         <h2 class="nt-section-header">Ernährung</h2>
@@ -195,7 +195,7 @@
             Mindestzufuhr aktiv: Die Formel läge darunter, das Ziel wird auf den Mindestwert angehoben – tatsächlich ca. {{ achievedRateText() }} kg/Woche.
           </p>
           @if (lowerRateOffer(); as offer) {
-            <ion-button fill="clear" size="small" (click)="setRate(offer)">
+            <ion-button fill="clear" class="touch-btn touch-btn--text" (click)="setRate(offer)">
               Tempo auf {{ offer | ntNum:2 }} kg/Woche senken
             </ion-button>
           }
@@ -204,6 +204,9 @@
           <p class="row-error row-error--block" role="alert" data-testid="form-error">Bitte die markierten Felder korrigieren.</p>
         } @else if (form().weightKg === null || form().heightCm === null || form().age === null) {
           <p class="hint" role="status">Bitte Gewicht, Größe und Alter angeben.</p>
+        }
+        @if (saveError(); as err) {
+          <p class="row-error row-error--block" role="alert" data-testid="save-error">{{ err }}</p>
         }
         <div class="nt-sheet-footer">
           <ion-button class="nt-btn nt-btn--block" expand="block" data-testid="profile-save" [disabled]="saving()" (click)="save()">

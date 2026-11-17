@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { WeightStore } from '../core/state/weight.store';
-import { toDateISO } from '../core/util/date';
+import { injectToday } from '../shared/date-nav/use-today';
 
 /** Kompakte Gewichtskachel auf Heute (erscheint erst nach dem ersten Eintrag des Tages); öffnet das Gewichts-Sheet. */
 @Component({
@@ -29,9 +29,11 @@ import { toDateISO } from '../core/util/date';
 })
 export class WeightTileComponent {
   private readonly weights = inject(WeightStore);
+  /** Heutiger Tag; rechnet nach Mitternacht neu. */
+  private readonly today = injectToday();
 
   readonly sheetOpen = signal(false);
   readonly latest = this.weights.latest;
-  readonly hasToday = computed(() => this.weights.entries().some((e) => e.dateISO === toDateISO()));
+  readonly hasToday = computed(() => this.weights.entries().some((e) => e.dateISO === this.today()));
   readonly ariaLabel = computed(() => (this.hasToday() ? 'Gewicht von heute ändern' : 'Gewicht heute eintragen'));
 }

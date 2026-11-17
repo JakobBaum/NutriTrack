@@ -1,5 +1,6 @@
 import { NutritionFacts, RecipeIngredient } from '../models';
-import { unitGrams } from './units-weight';
+import { hasUnknownUnitForPer100g, unitGrams } from './units-weight';
+import { isKcalBelowProtFat } from './kcal-consistency';
 
 /** Einheiten mit exaktem Gewicht (Gramm je Einheit) für die Skalierung. */
 const EXACT_UNIT_G: Readonly<Record<string, number>> = {
@@ -15,28 +16,26 @@ function round1(v: number): number {
   return Math.round(v * 10) / 10;
 }
 
-/** Mindestanteil der Makro-Energie (4/4/9 kcal je g), den die kcal-Angabe erreichen muss. */
-const MIN_KCAL_SHARE = 0.75;
-
 /** Energie aus Eiweiß, Kohlenhydraten und Fett (Atwater: 4/4/9 kcal je g). */
 export function macroKcal(f: Pick<NutritionFacts, 'proteinG' | 'carbsG' | 'fatG'>): number {
   return 4 * (f.proteinG || 0) + 4 * (f.carbsG || 0) + 9 * (f.fatG || 0);
 }
 
 /**
- * Macht kcal und Makros konsistent: Liegt die kcal-Angabe deutlich unter der Energie
- * der Makros (z. B. 2 kcal bei 2,2 g Fett), ist sie falsch erfasst und wird aus den Makros berechnet.
+ * Macht kcal und Makros konsistent: Liegt die kcal-Angabe klar unter der Energie von Eiweiß und Fett
+ * (z. B. 2 kcal bei 2,2 g Fett), ist sie falsch erfasst und wird aus den Makros berechnet. Dieselbe Regel wie
+ * der Open-Food-Facts-Filter; zuckerfreie Produkte (Erythrit, Kaugummi) mit nur Kohlenhydraten bleiben unverändert.
  */
 export function reconcileKcal(f: NutritionFacts): NutritionFacts {
-  const fromMacros = macroKcal(f);
-  if (fromMacros <= 0 || (f.kcal || 0) >= fromMacros * MIN_KCAL_SHARE) return f;
-  return { ...f, kcal: Math.round(fromMacros) };
+  if (!isKcalBelowProtFat(f)) return f;
+  return { ...f, kcal: Math.round(macroKcal(f)) };
 }
 
 /**
  * Nährwerte einer einzelnen Zutat, skaliert auf ihre Menge.
  *
- * - Hat die Zutat keine hinterlegten Nährwerte, trägt sie 0 bei (manuelle Zutat).
+ * - Hat die Zutat keine hinterlegten Nährwerte oder eine unbekannte Einheit bei Werten je 100 g, trägt sie 0 bei
+ *   (zählt als "fehlt", siehe countMissingFacts).
  * - Bei g/ml/kg/l wird über die Bezugsmenge skaliert
  *   (per100g → amount/100, perPortion → amount/portionG).
  * - Bei Stück-/Löffel-Einheiten: per100g über das Näherungsgewicht (EL = 15 g …),
@@ -45,7 +44,7 @@ export function reconcileKcal(f: NutritionFacts): NutritionFacts {
 export function ingredientFacts(ing: RecipeIngredient): NutritionFacts {
   const facts = ing.facts;
   const amount = Number.isFinite(ing.amount) ? ing.amount : 0;
-  if (!facts || amount <= 0) return emptyFacts();
+  if (!facts || amount <= 0 || hasUnknownUnitForPer100g(ing)) return emptyFacts();
 
   const unit = (ing.unit || 'g').trim().toLowerCase();
   let factor: number;
@@ -56,9 +55,8 @@ export function ingredientFacts(ing: RecipeIngredient): NutritionFacts {
   if (exactG !== undefined) {
     factor = (amount * exactG) / refGrams;
   } else if (facts.basis === 'per100g') {
-    // EL, TL, Stk …: Menge über das Näherungsgewicht in Gramm umrechnen.
-    const approxG = unitGrams(unit, ing.name);
-    factor = approxG !== undefined ? (amount * approxG) / refGrams : amount;
+    // EL, TL, Stk …: Menge über das Näherungsgewicht in Gramm umrechnen (unbekannte Einheit: oben ausgeschlossen).
+    factor = (amount * (unitGrams(unit, ing.name) ?? 0)) / refGrams;
   } else {
     // perPortion: amount ist die Anzahl der Bezugsmengen.
     factor = amount;

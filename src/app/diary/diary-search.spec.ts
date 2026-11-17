@@ -34,3 +34,33 @@ describe('DiarySearch.pickFirst', () => {
     expect(await search.pickFirst()).toBeNull();
   });
 });
+
+describe('DiarySearch: späte Antworten', () => {
+  function pending() {
+    let resolve!: (r: FoodItem[]) => void;
+    const search = new DiarySearch({ searchByText: () => new Promise<FoodItem[]>((res) => { resolve = res; }) }, () => undefined);
+    return { search, resolve: (r: FoodItem[]) => resolve(r) };
+  }
+
+  it('verwirft eine späte Antwort nach reset()', async () => {
+    const { search, resolve } = pending();
+    search.query = 'hafer';
+    const running = search.run();
+    search.reset();
+    resolve([item('Haferflocken')]);
+    await running;
+    expect(search.results()).toEqual([]);
+    expect(search.searching()).toBe(false);
+  });
+
+  it('verwirft eine späte Antwort nach clearAfterPick()', async () => {
+    const { search, resolve } = pending();
+    search.query = 'hafer';
+    const running = search.run();
+    search.clearAfterPick();
+    resolve([item('Haferflocken')]);
+    await running;
+    expect(search.results()).toEqual([]);
+    expect(search.searching()).toBe(false);
+  });
+});

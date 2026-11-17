@@ -44,8 +44,7 @@ describe('ShoppingStore.applyWeekPlan', () => {
     const store = TestBed.inject(ShoppingStore);
     store.applyWeekPlan(plan([wp('1', 2, [{ name: 'Reis', amount: 100, unit: 'g' }, { name: 'Brokkoli', amount: 1, unit: 'Stk' }])]));
     store.addItem({ name: 'Kaffee', amount: 1, unit: 'Pck', checked: false, manual: true });
-    const reisIndex = store.list()!.items.findIndex((i) => i.name === 'Reis');
-    store.toggleItem(reisIndex);
+    store.toggleItem(store.list()!.items.find((i) => i.name === 'Reis')!.id!);
 
     const list = store.applyWeekPlan(plan([wp('2', 2, [{ name: 'Hirse', amount: 100, unit: 'g' }])]));
 
@@ -60,7 +59,7 @@ describe('ShoppingStore.applyWeekPlan', () => {
     const store = TestBed.inject(ShoppingStore);
     store.applyWeekPlan(plan([wp('1', 2, [{ name: 'Reis', amount: 100, unit: 'g' }])]));
     store.addItem({ name: 'Kaffee', amount: 1, unit: 'Pck', checked: false, manual: true });
-    store.toggleItem(store.list()!.items.findIndex((i) => i.name === 'Reis'));
+    store.toggleItem(store.list()!.items.find((i) => i.name === 'Reis')!.id!);
 
     const list = store.applyWeekPlan(plan([wp('2', 2, [{ name: 'Hirse', amount: 100, unit: 'g' }])]), false);
 

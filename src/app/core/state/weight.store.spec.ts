@@ -1,7 +1,8 @@
 import { TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { StorageService } from '../storage/storage.service';
-import { WeightStore, sanitizeWeights } from './weight.store';
+import { WeightStore } from './weight.store';
+import { sanitizeWeightEntries } from './weight-sanitize';
 
 describe('WeightStore', () => {
   let store: WeightStore;
@@ -19,6 +20,20 @@ describe('WeightStore', () => {
     expect(store.set('2026-11-05', 79.4)).toBe(true);
     expect(store.entries()).toEqual([{ dateISO: '2026-11-05', kg: 79.4 }]);
     expect(storage.get('weight', [])).toEqual([{ dateISO: '2026-11-05', kg: 79.4 }]);
+  });
+
+  it('meldet false, wenn das Speichern scheitert', () => {
+    vi.spyOn(storage, 'set').mockReturnValue(false);
+    expect(store.set('2026-11-05', 80)).toBe(false);
+  });
+
+  it('rollt den Wert zurück, wenn das Speichern scheitert', () => {
+    store.set('2026-11-05', 80);
+    vi.spyOn(storage, 'set').mockReturnValue(false);
+    expect(store.set('2026-11-05', 70)).toBe(false);
+    expect(store.entries()).toEqual([{ dateISO: '2026-11-05', kg: 80 }]);
+    expect(store.remove('2026-11-05')).toBe(false);
+    expect(store.entries()).toHaveLength(1);
   });
 
   it('rejects weights outside 20 to 400 kg', () => {
@@ -62,19 +77,64 @@ describe('WeightStore', () => {
   });
 });
 
-describe('sanitizeWeights', () => {
+describe('sanitizeWeightEntries', () => {
   it('drops broken records and duplicates', () => {
-    const out = sanitizeWeights([
+    const out = sanitizeWeightEntries([
       { dateISO: '2026-11-05', kg: 80 },
       { dateISO: '2026-11-05', kg: 79 },
       { dateISO: 'x', kg: 80 },
       { dateISO: '2026-11-06', kg: 1 },
       null,
     ]);
-    expect(out).toEqual([{ dateISO: '2026-11-05', kg: 79 }]);
+    expect(out.items).toEqual([{ dateISO: '2026-11-05', kg: 79 }]);
+  });
+
+  it('rundet auf 0,1 kg und führt doppelte Tage still zusammen (jüngster gewinnt, nicht in rejected)', () => {
+    const out = sanitizeWeightEntries([
+      { dateISO: '2026-11-05', kg: 80.04 },
+      { dateISO: '2026-11-05', kg: 79.26 },
+      { dateISO: '2026-11-06', kg: 78.449 },
+      { dateISO: '2026-11-07', kg: 77.5 },
+    ]);
+    expect(out.items).toEqual([
+      { dateISO: '2026-11-05', kg: 79.3 },
+      { dateISO: '2026-11-06', kg: 78.4 },
+      { dateISO: '2026-11-07', kg: 77.5 },
+    ]);
+    expect(out.rejected).toEqual([]);
+    expect(out.repaired).toBe(3);
   });
 
   it('returns an empty list for non-arrays', () => {
-    expect(sanitizeWeights({})).toEqual([]);
+    expect(sanitizeWeightEntries({}).items).toEqual([]);
+  });
+});
+
+describe('WeightStore Laden (D9)', () => {
+  function load(raw: unknown): { store: WeightStore; storage: StorageService } {
+    localStorage.clear();
+    localStorage.setItem('nutritrack:weight', JSON.stringify(raw));
+    TestBed.resetTestingModule();
+    return { store: TestBed.inject(WeightStore), storage: TestBed.inject(StorageService) };
+  }
+
+  it('sichert ungültige Einträge in Quarantäne statt sie still zu verwerfen', () => {
+    const { store, storage } = load([{ dateISO: '2026-11-05', kg: 80 }, { dateISO: '2026-02-31', kg: 80 }, { dateISO: '2026-11-06', kg: 5 }]);
+    expect(store.entries()).toEqual([{ dateISO: '2026-11-05', kg: 80 }]);
+    expect(storage.quarantineNotices()).toHaveLength(1);
+    expect(storage.quarantineNotices()[0].count).toBe(2);
+  });
+
+  it('sortiert nach Datum', () => {
+    const { store } = load([{ dateISO: '2026-11-06', kg: 79 }, { dateISO: '2026-11-05', kg: 80 }]);
+    expect(store.entries().map((e) => e.dateISO)).toEqual(['2026-11-05', '2026-11-06']);
+  });
+
+  it('bietet Schreibsperre und Erfolg von persist', () => {
+    const { store, storage } = load([]);
+    expect(store.isReadOnly()).toBe(false);
+    window.dispatchEvent(new StorageEvent('storage', { key: 'nutritrack:weight' }));
+    expect(store.isReadOnly()).toBe(true);
+    expect(storage.writeLocked()).toBe(true);
   });
 });

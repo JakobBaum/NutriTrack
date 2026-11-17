@@ -157,7 +157,8 @@
 // <ion-fab slot="fixed" vertical="bottom" horizontal="end" class="nt-fab"><ion-fab-button aria-label="Eintragen" (click)="..."><ion-icon name="add"></ion-icon></ion-fab-button></ion-fab>
 // Muss direktes Kind von ion-content sein: dann bekommt der Inhalt unten automatisch Platz (--nt-fab-clearance).
 :root {
-  --nt-fab-clearance: calc(var(--nt-fab-bottom) + var(--nt-fab-size) + var(--nt-space-4));
+  // Unterkante des FAB plus Luft: die letzte Zeile (Summe, Zucker) endet sichtbar über dem Knopf.
+  --nt-fab-clearance: calc(var(--nt-fab-bottom) + var(--nt-fab-size) + var(--nt-space-6));
 }
 
 :root ion-fab.nt-fab {

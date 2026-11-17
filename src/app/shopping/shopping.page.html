@@ -1,5 +1,5 @@
 <ion-header class="ion-no-border">
-  <nt-page-header title="Einkaufsliste">
+  <nt-page-header title="Einkauf">
     @if (isListView() && list() !== null) {
       <ion-button fill="clear" class="nt-icon-btn" (click)="shareList()" aria-label="Liste teilen">
         <ion-icon slot="icon-only" name="share-outline"></ion-icon>
@@ -43,15 +43,7 @@
 
           <div class="generator__field">
             <span class="generator__sub" id="days-label">Tage</span>
-            <ion-segment [value]="dayPresets.includes(days) ? days : null" (ionChange)="setDays(+($any($event).detail.value))" aria-labelledby="days-label">
-              @for (d of dayPresets; track d) {
-                <ion-segment-button [value]="d"><ion-label>{{ d }}</ion-label></ion-segment-button>
-              }
-            </ion-segment>
-            <div class="generator__custom">
-              <span class="generator__hint">Anderer Wert (1–14)</span>
-              <nt-stepper label="Tage" [value]="days" [min]="daysMin" [max]="daysMax" [step]="1" (valueChange)="setDays($event)"></nt-stepper>
-            </div>
+            <nt-stepper label="Tage" [value]="days" [min]="daysMin" [max]="daysMax" [step]="1" (valueChange)="setDays($event)"></nt-stepper>
           </div>
 
           <div class="generator__meals" role="group" aria-labelledby="meals-label">
@@ -62,7 +54,6 @@
                   type="button"
                   class="meal-chip"
                   role="checkbox"
-                  tabindex="0"
                   [attr.aria-checked]="m.checked"
                   [class.on]="m.checked"
                   (click)="toggleMeal(m.value)"
@@ -92,7 +83,7 @@
             <div class="generator__alt">
             @if (live()) {
               <p class="generator__mode" role="note">Mit KI-Verbindung: Preise werden geschätzt.</p>
-              <div class="generator__field" role="group" aria-labelledby="budget-label">
+              <div class="generator__field" role="radiogroup" aria-labelledby="budget-label">
                 <span class="generator__sub" id="budget-label">Budget pro Woche</span>
                 <div class="chips">
                   <button type="button" class="meal-chip" role="radio" [attr.aria-checked]="budget === null" [class.on]="budget === null" (click)="setBudget(null)">egal</button>
@@ -131,7 +122,7 @@
               }
             </ion-button>
           }
-          @if (weekPlan() !== null || list() !== null) {
+          @if (weekPlan() !== null || list() !== null || loading()) {
             <ion-button expand="block" fill="clear" class="nt-btn nt-btn--text nt-btn--block nt-btn--inner" (click)="cancelGenerator()">Abbrechen</ion-button>
           }
           @if (error()) {
@@ -146,14 +137,17 @@
   @if (isListView()) {
     @if (list(); as l) {
       <div class="summary">
-        <p class="summary__text">
-          Einkauf für {{ l.persons }} {{ l.persons === 1 ? 'Person' : 'Personen' }}
-          @if ((l.days ?? null) !== null) { · {{ l.days }} {{ l.days === 1 ? 'Tag' : 'Tage' }} }
-        </p>
-        <ion-button class="nt-btn nt-btn--tonal summary__btn" (click)="openGenerator()">
-          <ion-icon slot="start" name="refresh-outline"></ion-icon>
-          Neu generieren
-        </ion-button>
+        @if ((l.days ?? null) !== null) {
+          <p class="summary__text">
+            Einkauf für {{ l.persons }} {{ l.persons === 1 ? 'Person' : 'Personen' }} · {{ l.days }} {{ l.days === 1 ? 'Tag' : 'Tage' }}
+          </p>
+          <ion-button class="nt-btn nt-btn--tonal summary__btn" (click)="openGenerator()">
+            <ion-icon slot="start" name="refresh-outline"></ion-icon>
+            Neu generieren
+          </ion-button>
+        } @else {
+          <p class="summary__text">Eigene Einkaufsliste</p>
+        }
       </div>
 
       @if (showTotals()) {
@@ -175,7 +169,6 @@
             </span>
           </div>
           <div class="totals__meta">
-            <span class="ai-badge">geschätzt</span>
             @if (live() && (l.budget ?? null) !== null) {
               <span class="totals__budget">Budget {{ l.budget! | ntNum:2:2 }} €</span>
             }
@@ -194,6 +187,9 @@
       <!-- Eine Zeile (offen oder erledigt); Index = Position in der gespeicherten Liste. -->
       <ng-template #rowTpl let-row>
         @let item = row.item;
+        @let hasAmount = item.amount > 0;
+        @let price = shownPrice(item);
+        @let ownPrice = typeof item.userPrice === 'number';
         <ion-item-sliding>
           <ion-item class="check-row" detail="false" lines="full">
             <ion-checkbox
@@ -202,30 +198,23 @@
               justify="start"
               alignment="center"
               [checked]="item.checked"
-              (ionChange)="setChecked(row.index, $event.detail.checked)"
+              (ionChange)="setChecked(row.id, $event.detail.checked)"
             >
               <span class="check-row__text" [class.checked]="item.checked">
                 <span class="check-row__name">{{ item.name }}</span>
                 <span class="qty">
-                  @let hasAmount = item.amount > 0;
-                  @let hasPrice = shownPrice(item) !== undefined;
-                  @if (hasAmount) { {{ qty(item) }} }
-                  @if (hasAmount && hasPrice) { · }
-                  @if (hasPrice) { <span class="qty__sum">ca. {{ shownPrice(item)! | ntNum:2:2 }} €</span> <span class="est-badge">{{ typeof item.userPrice === 'number' ? 'eigener Preis' : 'geschätzt' }}</span> }
-                  @if (!hasAmount && !hasPrice) { ohne Menge }
-                  @else if (!hasAmount) { ohne Menge }
+                  @if (hasAmount) { {{ qty(item) }} } @else { ohne Menge }
+                  @if (ownPrice) { · eigener Preis }
                 </span>
               </span>
             </ion-checkbox>
-            <ion-button slot="end" fill="clear" class="nt-btn nt-btn--text price-btn" (click)="editPrice(row.index)" [attr.aria-label]="item.name + ': Preis ändern'">
-              Preis ändern
-            </ion-button>
-            <ion-button slot="end" fill="clear" color="medium" class="nt-hover-delete" (click)="removeItem(row.index)" [attr.aria-label]="item.name + ' löschen'">
-              <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+            <!-- Der Preis selbst ist die Fläche zum Ändern (und Löschen): auf Touch ohne Hover erreichbar. -->
+            <ion-button slot="end" fill="clear" class="nt-btn nt-btn--text price-btn" (click)="editPrice(row.id)" [attr.aria-label]="item.name + ': Preis ändern'">
+              @if (price !== undefined) { {{ ownPrice ? '' : 'ca. ' }}{{ price | ntNum:2:2 }} € } @else { Preis }
             </ion-button>
           </ion-item>
           <ion-item-options side="end">
-            <ion-item-option color="danger" (click)="removeItem(row.index)" [attr.aria-label]="item.name + ' löschen'">
+            <ion-item-option color="danger" (click)="removeItem(row.id)" [attr.aria-label]="item.name + ' löschen'">
               <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
             </ion-item-option>
           </ion-item-options>
@@ -237,7 +226,7 @@
           <h2 class="nt-section-header">{{ categoryLabel(group.category) }}</h2>
         }
         <ion-list class="nt-grouped" lines="full">
-          @for (row of group.rows; track row.index) {
+          @for (row of group.rows; track row.id) {
             <ng-container *ngTemplateOutlet="rowTpl; context: { $implicit: row }"></ng-container>
           }
         </ion-list>
@@ -266,7 +255,7 @@
         </div>
         @if (doneOpen()) {
           <ion-list id="done-list" class="nt-grouped done-list" lines="full">
-            @for (row of doneRows(); track row.index) {
+            @for (row of doneRows(); track row.id) {
               <ng-container *ngTemplateOutlet="rowTpl; context: { $implicit: row }"></ng-container>
             }
           </ion-list>
@@ -277,21 +266,24 @@
     } @else {
       <div class="empty">
         <ion-icon name="cart-outline" class="empty__icon" aria-hidden="true"></ion-icon>
-        <p>Noch keine Liste. Tippe auf „+“, um Artikel einzutragen, oder erstelle einen Wochenplan.</p>
+        <p>Noch keine Liste. Tippe auf „+“, um Artikel hinzuzufügen, oder erstelle einen Wochenplan.</p>
         <ion-button class="nt-btn nt-btn--tonal empty__btn" (click)="setView('recipes')">Wochenplan erstellen</ion-button>
       </div>
     }
   }
 
-  <ion-toast
-    [isOpen]="undoOpen()"
-    [message]="undoMessage()"
-    [duration]="undoDuration"
-    [buttons]="undoButtons"
-    position="bottom"
-    [swipeGesture]="toastSwipe"
-    (didDismiss)="onUndoDismiss($any($event))"
-  ></ion-toast>
+  <!-- Jede neue Löschung baut den Hinweis neu auf: Laufzeit und Text beginnen von vorn. -->
+  @for (seq of [undoSeq()]; track seq) {
+    <ion-toast
+      [isOpen]="undoOpen()"
+      [message]="undoMessage()"
+      [duration]="undoDuration"
+      [buttons]="undoButtons"
+      position="bottom"
+      [swipeGesture]="toastSwipe"
+      (didDismiss)="onUndoDismiss($any($event))"
+    ></ion-toast>
+  }
   <ion-toast
     [isOpen]="planToastOpen()"
     [message]="planToastMessage()"
@@ -354,6 +346,7 @@
           enterkeyhint="done"
           [autofocus]="true"
           [(ngModel)]="newItemName"
+          (ngModelChange)="clearAddErrors()"
           (keyup.enter)="addManual()"
           placeholder="Artikel"
           aria-label="Artikel"
@@ -366,6 +359,7 @@
               inputmode="decimal"
               enterkeyhint="done"
               [(ngModel)]="newItemAmountText"
+              (ngModelChange)="clearAddErrors()"
               (keyup.enter)="addManual()"
               (ionFocus)="selectAll($event)"
               placeholder="1"
@@ -383,12 +377,14 @@
             inputmode="decimal"
             enterkeyhint="done"
             [(ngModel)]="newItemPriceText"
+            (ngModelChange)="clearAddErrors()"
             (keyup.enter)="addManual()"
             (ionFocus)="selectAll($event)"
             placeholder="Preis (optional)"
             aria-label="Preis in Euro, optional"
           ></ion-input>
         </div>
+        @if (addNameError(); as err) { <p class="add-error" role="alert" data-testid="add-name-error">{{ err }}</p> }
         @if (addAmountError(); as err) { <p class="add-error" role="alert" data-testid="add-amount-error">Menge: {{ err }}</p> }
         @if (addPriceError(); as err) { <p class="add-error" role="alert" data-testid="add-price-error">Preis: {{ err }}</p> }
         <button type="button" class="nt-btn nt-btn--block add-submit" (click)="addManual()">Hinzufügen</button>

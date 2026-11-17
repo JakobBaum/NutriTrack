@@ -30,11 +30,11 @@
     </div>
   </div>
   <p class="week__note">
-    Mittel über {{ summary().loggedDays }} {{ summary().loggedDays === 1 ? 'Tag' : 'Tage' }} mit Einträgen.
+    @if (summary().loggedDays === 0) { Noch keine Einträge in dieser Woche. } @else { Mittel über {{ summary().loggedDays }} {{ summary().loggedDays === 1 ? 'Tag' : 'Tage' }} mit Einträgen. }
     @if (!hasTarget()) { Lege im Profil dein Ziel fest, um Tage im Ziel zu sehen. }
   </p>
 
-  <h2 class="nt-section-header">Kalorien pro Tag</h2>
+  <h2 class="nt-section-header week__title">Kalorien pro Tag</h2>
   <div class="week__chart nt-card" data-testid="week-kcal-chart">
     <div class="bars" role="img" [attr.aria-label]="'Kalorien: ' + kcalChart().description">
       @if (kcalChart().targetPct !== null) {
@@ -51,9 +51,17 @@
         <span [class.bars__label--today]="b.isToday">{{ b.label }}</span>
       }
     </div>
+    <div class="bars__values" aria-hidden="true">
+      @for (b of kcalChart().bars; track b.dateISO) {
+        <span>{{ b.valueText }}</span>
+      }
+    </div>
+    @if (kcalChart().targetText; as targetText) {
+      <p class="bars__target-text">{{ targetText }} (gestrichelte Linie)</p>
+    }
   </div>
 
-  <h2 class="nt-section-header">Eiweiß pro Tag</h2>
+  <h2 class="nt-section-header week__title">Eiweiß pro Tag</h2>
   <div class="week__chart nt-card" data-testid="week-protein-chart">
     <div class="bars" role="img" [attr.aria-label]="'Eiweiß: ' + proteinChart().description">
       @if (proteinChart().targetPct !== null) {
@@ -70,6 +78,14 @@
         <span [class.bars__label--today]="b.isToday">{{ b.label }}</span>
       }
     </div>
+    <div class="bars__values" aria-hidden="true">
+      @for (b of proteinChart().bars; track b.dateISO) {
+        <span>{{ b.valueText }}</span>
+      }
+    </div>
+    @if (proteinChart().targetText; as targetText) {
+      <p class="bars__target-text">{{ targetText }} (gestrichelte Linie)</p>
+    }
   </div>
   <p class="week__note">Gestrichelte Linie: dein Tagesziel. Im Ziel heißt: Eiweiß mindestens {{ proteinSharePct }} % des Ziels und Kalorien zwischen {{ kcalMinPct }} und {{ kcalMaxPct }} % des Ziels.</p>
 </section>

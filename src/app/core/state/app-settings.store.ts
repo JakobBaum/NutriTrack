@@ -24,6 +24,8 @@ function parseUnitSystem(raw: unknown): UnitSystem {
 @Injectable({ providedIn: 'root' })
 export class AppSettingsStore {
   private readonly storage = inject(StorageService);
+  /** True, wenn Schreiben gesperrt ist (neueres Schema oder Änderung in anderem Fenster); Änderungen werden dann nicht gespeichert. */
+  readonly isReadOnly = this.storage.isLockedFor(KEY_APP_SETTINGS);
 
   private readonly stored = this.storage.get<StoredAppSettings>(KEY_APP_SETTINGS, {});
   private readonly _unitSystem = signal<UnitSystem>(parseUnitSystem(this.stored.unitSystem));
@@ -47,9 +49,9 @@ export class AppSettingsStore {
   }
 
   /** Schreibt die Einstellungen und lässt ein noch nicht übernommenes altes Fastfood-Land stehen. */
-  private persist(): void {
+  private persist(): boolean {
     const legacy = this.storage.get<StoredAppSettings>(KEY_APP_SETTINGS, {}).fastfoodCountry;
-    this.storage.set(KEY_APP_SETTINGS, {
+    return this.storage.set(KEY_APP_SETTINGS, {
       unitSystem: this._unitSystem(),
       ...(legacy === undefined ? {} : { fastfoodCountry: legacy }),
     });
