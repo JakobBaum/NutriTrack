@@ -136,9 +136,14 @@ ion-select::after {
     font-weight: 600;
     color: var(--nt-ink);
     text-align: center;
-    white-space: nowrap;
+    // Auf 320 px und bei breiteren Schriften umbrechen statt abschneiden; sehr lange Titel (Rezepte) nach 2 Zeilen kürzen.
+    text-wrap: balance;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   &__start,

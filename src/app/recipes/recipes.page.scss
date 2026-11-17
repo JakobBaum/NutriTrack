@@ -155,7 +155,8 @@ ion-modal ion-content > .nt-section-header:first-child { margin-top: 0; }
 
 .ai-needed { @extend %hint; margin: 8px 0 12px; font-size: 0.8125rem; }
 .block-reason { text-align: center; }
-.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+// Zwei Spalten nur, wenn beide mind. 9.5rem haben (Portionen-Stepper); auf 320 px untereinander.
+.two-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 10px; }
 .auto-weight-hint { @extend %hint; margin: var(--nt-space-1) var(--nt-space-4) 0; }
 .scan-hint { @extend %hint; margin: 8px 0 0; }
 .weight-detail { @extend %hint; margin: 0 var(--nt-space-4); summary { @extend %row; min-height: var(--nt-touch); cursor: pointer; } p { margin: 0 0 8px; } }

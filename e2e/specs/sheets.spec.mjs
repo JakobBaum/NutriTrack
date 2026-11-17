@@ -50,7 +50,8 @@ const headerGeometry = (page) => page.evaluate(() => {
     title: rect(title),
     buttons,
     overflowing: title.scrollWidth > title.clientWidth,
-    ellipsis: style.textOverflow === 'ellipsis' && style.whiteSpace === 'nowrap',
+    // Titel brechen auf höchstens zwei Zeilen um und werden danach gekürzt (line-clamp).
+    clampedTwoLines: style.webkitLineClamp === '2' && title.scrollHeight > title.clientHeight + 1,
     headWidth: head.getBoundingClientRect().width,
     // ion-button reicht aria-label an den inneren Knopf weiter (Host verliert das Attribut).
     closeLabel: [...head.querySelectorAll('ion-button')].some((b) => (b.getAttribute('aria-label') ?? b.shadowRoot?.querySelector('button')?.getAttribute('aria-label')) === 'Schließen'),
@@ -116,14 +117,14 @@ export function register({ test }) {
     });
   }
 
-  test('sheets: langer Titel wird mit Ellipsis gekürzt, X bleibt sichtbar (320 px)', seed({ recipes: [LONG_RECIPE] }), async (page) => {
+  test('sheets: langer Titel bricht auf zwei Zeilen um und wird dann gekürzt, X bleibt sichtbar (320 px)', seed({ recipes: [LONG_RECIPE] }), async (page) => {
     await page.setViewportSize(VIEWPORTS[1]);
     await go(page, 'recipes');
     await page.locator('.recipe__title-btn').first().click();
     const modal = topModal(page);
     await modal.locator('.nt-sheet-header__title').waitFor();
     const g = await headerGeometry(page);
-    assert.equal(g.ellipsis, true, 'Titel ohne Ellipsis');
+    assert.equal(g.clampedTwoLines, true, 'Langer Titel nicht auf zwei Zeilen gekürzt');
     assert.equal(g.closeLabel, true, 'X "Schließen" fehlt');
     for (const b of g.buttons) assert.ok(b.right <= g.title.left + 0.5 || b.left >= g.title.right - 0.5, 'Titel ueberlappt Schaltflaeche');
   });
