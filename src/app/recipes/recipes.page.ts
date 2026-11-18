@@ -36,7 +36,7 @@ import {
   recipeDiaryEntry,
   toRecipeIngredients,
 } from './recipe-form';
-import { askPortionsSheet, cardMenuSheet, mealLabel, pickMealSheet } from './recipe-sheets';
+import { askPortionsSheet, mealLabel, pickMealSheet } from './recipe-sheets';
 import { TOAST_SWIPE_GESTURE } from '../shared/toast-options';
 import { WRITE_BLOCKED_MESSAGE } from '../core/storage/storage-messages';
 import { confirmDiscard } from '../meals/confirm-discard';
@@ -61,7 +61,7 @@ import { OnlineRecipeDetailsService } from '../core/recipes/online/online-recipe
 import { StoredRecipe, isOnlineRef } from '../core/recipes/online/online-recipe-ref';
 import { fileToBase64 } from './file-base64';
 import { OnlineDetailLoader } from './online-detail-loader';
-import { onlineMetaLine } from './online-ref-view';
+import { ONLINE_RECIPE_LABEL, onlineMetaLine } from './online-ref-view';
 import { RecipeDetailFlow } from './recipe-detail-flow';
 import { RequestGuard } from './request-guard';
 import {
@@ -91,7 +91,7 @@ const RECIPES_VIEWS: readonly RecipesView[] = ['recipes', 'meals'];
 @Component({
   selector: 'app-recipes',
   templateUrl: './recipes.page.html',
-  styleUrls: ['./recipes.page.scss'],
+  styleUrls: ['./recipes.page.scss', './recipe-list.scss'],
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -177,6 +177,12 @@ export class RecipesPage implements OnDestroy {
   metaLine(recipe: StoredRecipe): string {
     if (isOnlineRef(recipe)) return onlineMetaLine(this.onlineDetails.peek(recipe.onlineRef.externalId));
     return recipeMetaLine(recipe, recipeDisplayFacts(recipe)?.kcal);
+  }
+
+  /** Kurzzeile für die Listenkarte: nur Portionen (kcal je Portion steht groß darunter). */
+  cardMetaLine(recipe: StoredRecipe): string {
+    if (isOnlineRef(recipe)) return ONLINE_RECIPE_LABEL;
+    return servingsLabel(recipe.servings);
   }
 
   readonly unitOptions = UNIT_OPTIONS;
@@ -656,10 +662,12 @@ export class RecipesPage implements OnDestroy {
     this.toastMessage.set(null);
   }
 
-  // --- Karten-Menü (Bearbeiten/Löschen) ---
-  async openCardMenu(recipe: StoredRecipe): Promise<void> {
-    const choice = await cardMenuSheet(this.actionSheets, recipe.title);
-    if (choice === 'edit') await this.detail.edit(recipe);
-    if (choice === 'delete') this.remove(recipe.id);
+  /** „Rezept löschen“ im Bearbeiten-Sheet: schließt ohne Verwerfen-Frage, Löschen ist rückgängig machbar. */
+  deleteEditedRecipe(): void {
+    const id = this.editId();
+    if (!id) return;
+    this.allowClose = true;
+    this.isModalOpen.set(false);
+    this.remove(id);
   }
 }

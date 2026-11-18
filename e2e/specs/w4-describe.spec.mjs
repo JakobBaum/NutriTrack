@@ -263,7 +263,7 @@ export function register({ test }) {
         (els) => els.map((e) => Math.round(e.getBoundingClientRect().height)),
       );
       const minTouch = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nt-touch')));
-      assert.ok(minTouch >= 40, `--nt-touch unerwartet: ${minTouch}`);
+      assert.ok(minTouch >= 36, `--nt-touch unerwartet: ${minTouch}`);
       assert.ok(sizes.every((h) => h >= minTouch), `Tippziele unter var(--nt-touch) (${minTouch}): ${sizes}`);
       const footer = await modal.locator('[data-testid="describe-log"]').boundingBox();
       assert.ok(footer && footer.y + footer.height <= vp.height, 'Eintragen liegt nicht im sichtbaren Bereich');

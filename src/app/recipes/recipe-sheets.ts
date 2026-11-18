@@ -37,21 +37,3 @@ export async function askPortionsSheet(sheets: ActionSheetController): Promise<n
   const { data, role } = await sheet.onDidDismiss<number>();
   return role === 'cancel' || typeof data !== 'number' ? null : data;
 }
-
-/** Karten-Menü eines Rezepts; liefert die gewählte Aktion oder undefined. */
-export async function cardMenuSheet(
-  sheets: ActionSheetController,
-  title: string,
-): Promise<'edit' | 'delete' | undefined> {
-  const sheet = await sheets.create({
-    header: title,
-    buttons: [
-      { text: 'Bearbeiten', icon: 'create-outline', data: 'edit' },
-      { text: 'Löschen', icon: 'trash-outline', role: 'destructive', data: 'delete' },
-      CANCEL_BUTTON,
-    ],
-  });
-  await sheet.present();
-  const { data } = await sheet.onDidDismiss<string>();
-  return data === 'edit' || data === 'delete' ? data : undefined;
-}

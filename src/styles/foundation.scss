@@ -4,7 +4,7 @@
  * ========================================================================= */
 
 :root {
-  --nt-field-height: 52px;
+  --nt-field-height: 44px;
   --nt-field-radius: 14px;
   --nt-field-bg: var(--nt-card);
   --nt-field-border: var(--nt-separator);
@@ -14,8 +14,8 @@
   --nt-fs-input: max(16px, var(--nt-fs-body));
   --nt-page-max: 720px;
   --nt-page-gutter: var(--nt-space-4);
-  // Freiraum unten, damit Inhalt nicht unter der Kapsel-Tab-Bar verschwindet (Bar 64 + 8 + 24 Luft).
-  --nt-tabbar-clearance: calc(var(--ion-safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 96px);
+  // Freiraum unten, damit Inhalt nicht unter der Kapsel-Tab-Bar verschwindet (Bar 58 + 8 + 22 Luft).
+  --nt-tabbar-clearance: calc(var(--ion-safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 88px);
   // FAB: 16 px ueber der Tab-Bar (Bar-Oberkante = Safe-Area + 8 + 64).
   --nt-fab-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px + var(--nt-tabbar-height) + var(--nt-fab-lift));
   --nt-fab-lift: 16px; // Abstand FAB -> Tab-Bar, auch auf Kompaktphones 16

@@ -1,6 +1,7 @@
 // Welle 3: Kochmodus mit Utensilien auf der ersten Seite und Zutaten (mit Menge) je Schritt.
 import { assert, go, settle } from '../lib/harness.mjs';
 import { seed } from '../lib/fixtures.mjs';
+import { topModal } from '../lib/ionic.mjs';
 
 const VIEWPORTS = [{ width: 375, height: 667 }, { width: 320, height: 568 }];
 const STAMP = new Date().toISOString();
@@ -23,7 +24,8 @@ const RECIPE = {
 async function startCook(page, viewport, title = RECIPE.title) {
   await page.setViewportSize(viewport);
   await go(page, 'recipes');
-  await page.locator('article.recipe', { hasText: title }).locator('ion-button', { hasText: 'Kochen' }).click();
+  await page.locator('article.recipe', { hasText: title }).click();
+  await topModal(page).locator('ion-button', { hasText: 'Kochen' }).click();
   await page.locator('.cook__close').waitFor();
   await settle(page, 700);
 }

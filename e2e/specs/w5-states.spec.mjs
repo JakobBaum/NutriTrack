@@ -8,7 +8,7 @@ import { amountInput, ionInput, topModal } from '../lib/ionic.mjs';
 import { DIARY_NORMAL, PROFILE, SHOPPING, seed } from '../lib/fixtures.mjs';
 
 const VIEWPORTS = [{ width: 375, height: 667 }, { width: 320, height: 568 }];
-const MIN_TAP_PX = 40;
+const MIN_TAP_PX = 36; // kompakte Phones: --nt-touch 36 px
 const SPINNER_GONE_MS = 5000;
 const SHOT_DIR = process.env.W5_SHOT_DIR ?? path.join(ARTIFACTS, 'w5');
 const BAD_TOKENS = /\b(NaN|undefined|null|Infinity)\b|\[object/;
@@ -111,7 +111,8 @@ function layoutProblems(page) {
     }
     for (const b of root.querySelectorAll('button, ion-button, ion-segment-button, ion-item[button], ion-fab-button')) {
       if (!visible(b) || b.closest('ion-item-sliding ion-item-options')) continue;
-      const r = b.getBoundingClientRect();
+      // Ganze Karte tippbar (data-tap-card): Tippflaeche ist die Karte, nicht der innere Titel-Button.
+      const r = (b.closest('[data-tap-card]') ?? b).getBoundingClientRect();
       // Bausteine wie der Stepper vergrößern die Tippfläche unsichtbar über ::before (negatives inset).
       const before = getComputedStyle(b, '::before');
       const grow = before.content !== 'none' && before.position === 'absolute' ? Math.max(0, -parseFloat(before.top) || 0) + Math.max(0, -parseFloat(before.bottom) || 0) : 0;

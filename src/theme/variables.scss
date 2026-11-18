@@ -75,28 +75,28 @@
   --nt-space-2: 8px;
   --nt-space-3: 12px;
   --nt-space-4: 16px;
-  --nt-space-5: 20px;
-  --nt-space-6: 24px;
+  --nt-space-5: 18px;
+  --nt-space-6: 20px;
 
   // Typografie
-  --nt-fs-caption: 0.8125rem;
-  --nt-fs-body: 0.9375rem;
-  --nt-fs-headline: 1.0625rem;
-  --nt-fs-title: 1.375rem;
-  --nt-fs-large-title: 2.125rem;
-  --nt-fs-hero: 2.5rem;
+  --nt-fs-caption: 0.75rem; // 12 px (dichter, Runde 7)
+  --nt-fs-body: 0.875rem; // 14 px
+  --nt-fs-headline: 0.9375rem; // 15 px
+  --nt-fs-title: 1.125rem; // 18 px
+  --nt-fs-large-title: 1.625rem; // 26 px
+  --nt-fs-hero: 1.875rem; // 30 px
 
   // Schatten / Linien
   --nt-shadow: 0 1px 2px rgba(28, 28, 30, 0.04), 0 4px 16px rgba(28, 28, 30, 0.05);
   --nt-shadow-sm: 0 1px 2px rgba(28, 28, 30, 0.05);
   --nt-shadow-float: 0 8px 24px rgba(28, 28, 30, 0.14);
   --nt-hairline: 0.5px;
-  --nt-touch: 44px;
+  --nt-touch: 40px;
 
   // ---------------------------------------------------------------------------
   // 3) KOMPONENTEN
   // ---------------------------------------------------------------------------
-  --nt-tabbar-height: 64px;
+  --nt-tabbar-height: 56px;
   --nt-tabbar-inset: 16px;
   --nt-tabbar-bg: rgba(255, 255, 255, 0.85);
   --nt-tabbar-ring: rgba(28, 28, 30, 0.1);
@@ -110,9 +110,9 @@
   --nt-section-gap: var(--nt-space-6);
   --nt-header-row: 44px;
   --nt-header-gap: var(--nt-space-3);
-  --nt-btn-height: 44px;
+  --nt-btn-height: 38px; // sichtbare Hoehe; Icon-Buttons behalten 44 Tippflaeche
   --nt-icon-btn: 44px;
-  --nt-fab-size: 56px;
+  --nt-fab-size: 50px;
   --nt-fab-end: 16px;
   --nt-radius-inner: max(8px, calc(var(--nt-radius-card) - var(--nt-card-pad)));
 

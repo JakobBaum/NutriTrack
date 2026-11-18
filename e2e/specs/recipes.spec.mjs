@@ -1,6 +1,6 @@
 // Rezepte: anlegen mit 1,5 Portionen Ergiebigkeit, ins Tagebuch loggen (Rezeptseite und halbe Portion im Tagebuch).
 import { assert, eventually, go, readStore, settle } from '../lib/harness.mjs';
-import { amountInput, fillAndBlur, pickActionSheet, stepTo, topModal } from '../lib/ionic.mjs';
+import { amountInput, clickToastButton, fillAndBlur, pickActionSheet, stepTo, topModal } from '../lib/ionic.mjs';
 import { seed } from '../lib/fixtures.mjs';
 
 const TITLE = 'E2E Linsentopf';
@@ -35,7 +35,8 @@ export function register({ test }) {
 
     const card = page.locator('article.recipe', { hasText: TITLE });
     await assert.match(await card.innerText(), /1,5 Portionen/);
-    await card.locator('ion-button', { hasText: 'Eintragen' }).click();
+    await card.click();
+    await topModal(page).locator('ion-button', { hasText: 'Eintragen' }).click();
     await pickActionSheet(page, 'Mittagessen');
     await pickActionSheet(page, '0,5 Portionen');
     const logged = await eventually(async () => {
@@ -66,13 +67,22 @@ export function register({ test }) {
     assert.equal(e?.facts.kcal, 100);
   });
 
-  test('recipes: gespeichertes Rezept über das Karten-Menü bearbeiten (gleiche id)', seed(), async (page) => {
+  /** Tippt irgendwo auf die Karte (nicht auf den Titel) und öffnet aus dem Detail den Editor. */
+  async function openEditor(page) {
+    const card = page.locator('article.recipe', { hasText: TITLE });
+    const box = await card.boundingBox();
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height - 12);
+    await topModal(page).locator('ion-button', { hasText: 'Bearbeiten' }).first().click();
+    await settle(page);
+    const modal = topModal(page);
+    await modal.locator('.nt-sheet-header__title', { hasText: 'Rezept bearbeiten' }).waitFor();
+    return modal;
+  }
+
+  test('recipes: Tipp auf die Karte öffnet das Detail, Bearbeiten behält die id', seed(), async (page) => {
     await createRecipe(page);
     const before = (await readStore(page, 'recipes')).find((r) => r.title === TITLE);
-    const card = page.locator('article.recipe', { hasText: TITLE });
-    await card.locator('.recipe__icon-btn').click();
-    await pickActionSheet(page, 'Bearbeiten');
-    const modal = topModal(page);
+    const modal = await openEditor(page);
     await modal.locator('.nt-sheet-header__title', { hasText: 'Rezept bearbeiten' }).waitFor();
     assert.equal(await byAria(modal, 'Name').inputValue(), TITLE, 'Editor nicht vorbefüllt');
     await fillAndBlur(byAria(modal, 'Name'), TITLE + ' neu');
@@ -82,6 +92,25 @@ export function register({ test }) {
     assert.equal(all.length, 1);
     assert.equal(all[0].id, before.id);
     assert.equal(all[0].title, TITLE + ' neu');
+  });
+
+  test('recipes: Löschen im Bearbeitungsmodus, Rückgängig stellt es wieder her', seed(), async (page) => {
+    await createRecipe(page);
+    const modal = await openEditor(page);
+    await modal.locator('[data-testid="recipe-delete"]').click();
+    await eventually(async () => assert.equal(await page.locator('article.recipe', { hasText: TITLE }).count(), 0));
+    await eventually(async () => assert.equal(await page.locator('ion-modal.show-modal, ion-alert').count(), 0, 'kein Verwerfen-Dialog, Sheet geschlossen'));
+    await clickToastButton(page, 'Rückgängig');
+    await eventually(async () => assert.equal(await page.locator('article.recipe', { hasText: TITLE }).count(), 1));
+    assert.ok((await readStore(page, 'recipes')).some((r) => r.title === TITLE), 'Rezept wiederhergestellt');
+  });
+
+  test('recipes: Neues Rezept hat kein Löschen', seed(), async (page) => {
+    await go(page, 'recipes');
+    await page.getByRole('button', { name: 'Neues Rezept' }).click();
+    const modal = topModal(page);
+    await modal.locator('.nt-sheet-header__title', { hasText: 'Neues Rezept' }).waitFor();
+    assert.equal(await modal.locator('[data-testid="recipe-delete"]').count(), 0);
   });
 
   test('recipes: Detail-Sheet hat Bearbeiten', seed(), async (page) => {
@@ -193,9 +222,10 @@ export function register({ test }) {
 
   test('recipes: Kochen ist getoent, Eintragen gefuellt (verschiedene Flaechen)', seed({ recipes: [COOKABLE] }), async (page) => {
     await go(page, 'recipes');
-    const card = page.locator('article.recipe', { hasText: COOKABLE.title });
-    const log = await nativeBg(card.locator('ion-button', { hasText: 'Eintragen' }));
-    const cook = await nativeBg(card.locator('ion-button', { hasText: 'Kochen' }));
+    await page.locator('article.recipe', { hasText: COOKABLE.title }).click();
+    const sheet = topModal(page);
+    const log = await nativeBg(sheet.locator('ion-button', { hasText: 'Eintragen' }));
+    const cook = await nativeBg(sheet.locator('ion-button', { hasText: 'Kochen' }));
     assert.notEqual(cook, log, `Kochen ${cook} gleich Eintragen ${log}`);
   });
 

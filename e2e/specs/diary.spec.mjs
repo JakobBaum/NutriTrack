@@ -2,6 +2,7 @@
 import { assert, eventually, go, readStore, settle } from '../lib/harness.mjs';
 import { amountInput, clickToastButton, ionInput, pickUnit, topModal } from '../lib/ionic.mjs';
 import { DIARY_NORMAL, SCALABLE_ENTRY, seed } from '../lib/fixtures.mjs';
+import { MIN_BUTTON_PX, tokenPx } from '../lib/tokens.mjs';
 
 const MENGE_MANUAL = 'Menge (optional)';
 
@@ -155,7 +156,7 @@ export function register({ test }) {
     ['Eintragen', async (page) => { await page.locator('[data-testid="diary-add"]').click(); const m = topModal(page); await m.locator('.nt-source-btn', { hasText: 'Manuell' }).click(); await ionInput(m, 'Name').waitFor(); }, '.add-footer__save'],
     ['Fastfood', async (page) => { await page.locator('.ff-btn').click(); }, '[data-testid="ff-run"]'],
   ]) {
-    test(`diary: Sheet ${name}: X rechts, Bestaetigen unten in voller Breite, 44 hoch`, seed({ diary: DIARY_NORMAL }), async (page) => {
+    test(`diary: Sheet ${name}: X rechts, Bestaetigen unten in voller Breite, Hoehe = --nt-btn-height`, seed({ diary: DIARY_NORMAL }), async (page) => {
       await go(page, 'diary');
       await open(page);
       const modal = topModal(page);
@@ -168,7 +169,9 @@ export function register({ test }) {
       assert.ok(m.close && m.save, 'X oder Bestaetigen fehlt');
       assert.ok(m.close.left >= m.vw / 2, `X nicht rechts (x ${m.close.left})`);
       assert.ok(Math.abs(m.save.width - (m.vw - 2 * m.gutter)) <= 2, `Button ${m.save.width}px statt ${m.vw - 2 * m.gutter}`);
-      assert.ok(Math.abs(m.save.height - 44) <= 0.6, `Button ${m.save.height}px hoch`);
+      const btnHeight = await tokenPx(page, '--nt-btn-height');
+      assert.ok(btnHeight >= MIN_BUTTON_PX, `--nt-btn-height unerwartet: ${btnHeight}`);
+      assert.ok(Math.abs(m.save.height - btnHeight) <= 0.6, `Button ${m.save.height}px hoch, erwartet ${btnHeight}`);
       assert.ok(m.save.top > m.header.bottom && m.save.bottom <= m.vh + 0.5, 'Button nicht unten sichtbar');
     });
   }

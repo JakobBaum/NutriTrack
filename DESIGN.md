@@ -56,7 +56,7 @@ Typo: Systemschrift, tabular-nums; 13 / 15 / 17 / 22 / 34, Hero-Zahlen 48 (kcal 
 - Komponenten: `nt-stepper` (Zeile 56, Buttons 36 mit 44 px Tippflaeche), `nt-food-row` (nur Text, keine Produktbilder: Name fett, darunter Marke · Packungsgroesse, kcal und Eiweiss je 100 g bzw. je Portion, Nutri-Score als kleine Textmarke A-E nur wenn vorhanden; eigene Lebensmittel tragen das Kennzeichen "Eigen" in `--nt-accent-on-tint` auf `--nt-accent-tint`, 5,4:1), `nt-food-sources` (vier gleiche Spalten, "Manuell" immer sichtbar), `nt-amount-row` (Feld wie `.nt-field`).
 
 ## Regeln
-- Touch-Ziele >= 44 px; Fokusringe sichtbar (2px Akzent); `prefers-reduced-motion` wird respektiert.
+- Touch-Ziele >= `--nt-touch` (40 px, kompakt 36 px), Symbol-Buttons 44 px; Fokusringe sichtbar (2px Akzent); `prefers-reduced-motion` wird respektiert.
 - Keine Verlaeufe, kein Glow, keine Emojis. Farbe traegt Bedeutung (Naehrwert/Status), nie Dekoration.
 - Text auf Flaechen >= 4.5:1, Ringe/Balken gegen Spur >= 3:1.
 - Heute: Grosstitel + "+ Eintragen"-Pille (ersetzt den FAB, gleiche Aktion). Hero ohne Karte in zwei Spalten: links "kcal uebrig" (Tinte), rechts "g Eiweiss noch" (Violett), jeweils 48-px-Zahl, darunter "gegessen von Ziel"; jeder Wert oeffnet seinen Drill. Weisse Karte mit zwei grossen Ringen (Kalorien, Eiweiss; 88 px, Strich 8) und vier kleinen (Kohlenhydrate, Fett, Ballaststoffe, Zucker; 56 px, Strich 5), darunter Energieanteile in %. Essenszeiten und Helfer als gruppierte Listen mit Chevron. Der Ring faerbt sich nur bei kcal und Zucker rot (Ueberschreitung), nie bei Eiweiss. Kein Tag/Woche-Umschalter auf Heute.
@@ -66,7 +66,7 @@ Typo: Systemschrift, tabular-nums; 13 / 15 / 17 / 22 / 34, Hero-Zahlen 48 (kcal 
 - Navigation: 5 Tabs (Heute, Tagebuch, Rezepte, Einkauf, Profil; Profil mit Person-Icon). Begriffe siehe Glossar in PRODUCT.md.
 
 ## Kompakte Phones
-Unter 390 px Breite (oder Hoehe <= 700 px) verkleinert `src/styles/compact-phone.scss` die Tokens um ca. 6-10 %: Titel 31 px, Body 14 px, Touch 40 px, Tab-Leiste 56 px. Untergrenzen: Tippflaeche 40 px, Tab-Leiste >= 44, Schrift >= 13 px (Tab-Beschriftung >= 11 px). Datei wird zuletzt geladen; Komponenten-SCSS mit Emulated Encapsulation schlaegt :root, daher Tab-Leiste in `tabs.page.scss`.
+Unter 390 px Breite (oder Hoehe <= 700 px) verkleinert `src/styles/compact-phone.scss` die Tokens (Dichte-Runde 2026-11-18): Titel 24 px, Body 13 px, Headline 14 px, Buttons und Touch 36 px, Felder 42 px (Feldschrift bleibt 16 px), FAB 46 px, Tab-Leiste 52 px. Untergrenzen: Tippflaeche 36 px (Symbol-Buttons bleiben 44), Tab-Leiste >= 44, Schrift >= 13 px (Tab-Beschriftung >= 11 px). Ganz tippbare Karten tragen `data-tap-card`; die Tippflaechen-Pruefung misst dann die Karte. Datei wird zuletzt geladen; Komponenten-SCSS mit Emulated Encapsulation schlaegt :root, daher Tab-Leiste in `tabs.page.scss`.
 
 ## Layout-Bausteine (Welle 2)
 
@@ -78,7 +78,7 @@ Tokens: `--nt-page-gutter` (Seitenrand, einzige Quelle), `--nt-card-pad` 16, `--
 - `.nt-stack` am `.nt-page`: Abstand Karte-Karte 12, vor Abschnittsueberschrift 24, Ueberschrift-Gruppe 8. Komponenten-Hosts ohne eigenen margin-top; Hosts, die mit einer Ueberschrift beginnen, tragen `.nt-stack__section`.
 - Kopf: `<ion-header class="ion-no-border"><nt-page-header title="..."> [Symbol-Buttons] </nt-page-header></ion-header>`. Rechts nur `<ion-button fill="clear" class="nt-icon-btn" aria-label="..."><ion-icon slot="icon-only" name="..."></ion-icon></ion-button>` (44x44). Aktionen wie "Eintragen" sind der FAB, kein Text-Button im Kopf. Der Abstand zum Inhalt steckt im Kopf, der erste Block hat margin-top 0. Heute: Titel im Kopf, Datumsleiste (`nt-date-nav`) als erster Block darunter.
 - FAB: `<ion-fab slot="fixed" vertical="bottom" horizontal="end" class="nt-fab"><ion-fab-button aria-label="Eintragen"><ion-icon name="add"></ion-icon></ion-fab-button></ion-fab>` als direktes Kind von `ion-content`; der Inhalt bekommt unten automatisch Platz (`:has(> ion-fab.nt-fab)`).
-- Buttons: `.nt-btn` (primaer), `.nt-btn--tonal`, `.nt-btn--text`, Zusaetze `.nt-btn--block`, `.nt-btn--inner` (in Karten: abgerundetes Rechteck). Immer 44 px. Die Alt-Namen `.nt-pill`, `.nt-pill--secondary` und `.nt-add-btn` sind entfallen (Umstellung: `.nt-btn`, `.nt-btn--tonal`, `.nt-btn--tonal.nt-btn--block`). Pillen nur frei auf dem Seitengrund, in Karten `.nt-btn--inner`.
+- Buttons: `.nt-btn` (primaer), `.nt-btn--tonal`, `.nt-btn--text`, Zusaetze `.nt-btn--block`, `.nt-btn--inner` (in Karten: abgerundetes Rechteck). Hoehe `--nt-btn-height` (38 px, kompakt 36 px). Die Alt-Namen `.nt-pill`, `.nt-pill--secondary` und `.nt-add-btn` sind entfallen (Umstellung: `.nt-btn`, `.nt-btn--tonal`, `.nt-btn--tonal.nt-btn--block`). Pillen nur frei auf dem Seitengrund, in Karten `.nt-btn--inner`.
 - `.nt-section-header`: 13 px, Grossbuchstaben, secondary, Einzug 16. `.nt-card`: Padding 16, Kompakt-Phones 14.
 - `.nt-stat`: `__value` (Zeile mit `__num` und `__unit`, nie umbrechend), `__extra` darunter ("noch", "gegessen").
 - `.nt-inner`/`--nt-radius-inner` fuer Kacheln in Karten. Sheets: X immer rechts, Speichern in `.nt-sheet-footer` unten, volle Breite.

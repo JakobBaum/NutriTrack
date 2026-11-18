@@ -63,11 +63,11 @@
     --inner-border-width: 0;
   }
 
-  // Formularfelder: Label klein, Wert 17 px
+  // Formularfelder: Label klein, Wert nie unter 16 px (iOS-Zoom, auch kompakt)
   ion-input,
   ion-select {
     --padding-start: 0;
-    font-size: var(--nt-fs-headline);
+    font-size: max(var(--nt-fs-input), var(--nt-fs-headline));
     color: var(--nt-ink);
   }
 

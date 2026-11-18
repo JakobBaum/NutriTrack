@@ -113,9 +113,8 @@ ion-content {
   &__empty {
     display: flex;
     align-items: center;
-    min-height: var(--nt-touch);
     margin: 0;
-    padding: 0 var(--nt-space-4);
+    padding: var(--nt-space-3) var(--nt-space-4) 0; // nur Text, keine Tippflaeche: Karte = eine Zeile + Button
     font-size: var(--nt-fs-body);
     color: var(--nt-secondary);
   }

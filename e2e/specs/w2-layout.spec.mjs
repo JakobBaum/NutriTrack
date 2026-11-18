@@ -3,6 +3,7 @@
 import { assert, go, settle } from '../lib/harness.mjs';
 import { ionInput, topModal } from '../lib/ionic.mjs';
 import { DIARY_NORMAL, WEIGHT_HISTORY, seed } from '../lib/fixtures.mjs';
+import { ICON_BUTTON_PX, MIN_BUTTON_PX, MIN_FAB_PX, MIN_FONT_PX, tokenPx } from '../lib/tokens.mjs';
 
 const VIEWPORTS = [{ width: 375, height: 667 }, { width: 320, height: 568 }];
 const ROUTES = [
@@ -18,12 +19,8 @@ const REFERENCE_ROUTE = ROUTES[0];
 const TOL_PX = 1;
 const RADIUS_TOL_PX = 2;
 const MIN_INNER_RADIUS_PX = 8;
-const BUTTON_HEIGHT_PX = 44;
-const ICON_BUTTON_PX = 44;
-const FAB_PX = 56;
 const FAB_END_PX = 16;
 const FAB_TO_TABBAR_PX = 16;
-const SECTION_FONT_PX = 13;
 const SETTLE_MS = 500;
 /** Speichern steht hoechstens so weit ueber der Sheet-Unterkante (Abstand 12 + Safe Area). */
 const SHEET_FOOTER_BOTTOM_MAX_PX = 24;
@@ -82,7 +79,9 @@ function measureInPage({ tol, minR, rtol, activeSel }) {
   };
   const cardEls = all.filter(isCard);
   const topCards = cardEls.filter((el) => !cardEls.some((o) => o !== el && o.contains(el)));
-  const cards = topCards.map((el) => ({ cls: `${el.tagName.toLowerCase()}.${String(el.className).trim().split(/\s+/).join('.')}`, ...rect(el), rightGap: vw - el.getBoundingClientRect().right, radius: radiusOf(el) }));
+  // Karten in einem Raster (Rezeptliste zweispaltig): der Rand gilt fuer das Raster, nicht fuer die einzelne Spalte.
+  const outerBox = (el) => (el.parentElement && getComputedStyle(el.parentElement).display === 'grid' ? el.parentElement : el);
+  const cards = topCards.map((el) => ({ cls: `${el.tagName.toLowerCase()}.${String(el.className).trim().split(/\s+/).join('.')}`, ...rect(outerBox(el)), rightGap: vw - outerBox(el).getBoundingClientRect().right, radius: radiusOf(el) }));
 
   // Seitentitel und Kopf
   const header = page.querySelector('.nt-page-header');
@@ -223,7 +222,8 @@ async function measureRoute(page, vp, route) {
     await settle(page, SETTLE_MS);
     const data = await page.evaluate(measureInPage, { tol: TOL_PX, minR: MIN_INNER_RADIUS_PX, rtol: RADIUS_TOL_PX, activeSel: ACTIVE_PAGE });
     const clearance = route.fab ? await measureFabClearance(page) : null;
-    cache.set(key, { ...data, clearance });
+    const tokens = { btnHeight: await tokenPx(page, '--nt-btn-height'), caption: await tokenPx(page, '--nt-fs-caption'), fab: await tokenPx(page, '--nt-fab-size') };
+    cache.set(key, { ...data, clearance, tokens });
   }
   return cache.get(key);
 }
@@ -253,12 +253,13 @@ const RULES = {
     assert.deepEqual(m.strayHeadings, [], `Ueberschrift ohne .nt-section-header: ${describe(m.strayHeadings)}`);
     if (m.sectionHeaders.length === 0) return;
     assert.equal(new Set(m.sectionHeaders.map((h) => h.style)).size, 1, `Stile: ${describe([...new Set(m.sectionHeaders.map((h) => h.style))])}`);
-    for (const h of m.sectionHeaders) assert.ok(Math.abs(h.fontSize - SECTION_FONT_PX) <= 0.1 && h.uppercase, `Schrift ${h.fontSize}px, Grossbuchstaben ${h.uppercase}`);
+    for (const h of m.sectionHeaders) assert.ok(Math.abs(h.fontSize - m.tokens.caption) <= 0.1 && h.fontSize >= MIN_FONT_PX && h.uppercase, `Schrift ${h.fontSize}px, Grossbuchstaben ${h.uppercase}`);
     const indents = m.sectionHeaders.map((h) => h.indent).filter((v) => v !== null);
     assert.ok(spread(indents) <= TOL_PX, `Einzug uneinheitlich: ${indents.join(', ')}`);
   },
-  'Buttons primaer/getoent: Hoehe 44': (m) => {
-    const bad = m.solidButtons.filter((b) => Math.abs(b.height - BUTTON_HEIGHT_PX) > 0.6);
+  'Buttons primaer/getoent: Hoehe = --nt-btn-height': (m) => {
+    assert.ok(m.tokens.btnHeight >= MIN_BUTTON_PX, `--nt-btn-height unerwartet: ${m.tokens.btnHeight}`);
+    const bad = m.solidButtons.filter((b) => Math.abs(b.height - m.tokens.btnHeight) > 0.6);
     assert.equal(bad.length, 0, describe(bad.map((b) => `${b.tag} "${b.text}" ${b.height.toFixed(1)}px`)));
   },
   'Kopf: nur Symbol-Buttons 44x44 mit aria-label': (m) => {
@@ -298,13 +299,13 @@ export function register({ test }) {
       });
 
       if (route.fab) {
-        test(`w2 ${route.id}: FAB mit aria-label, 56 px, ueber der Tab-Bar, Inhalt frei (${at})`, SEED(), async (page) => {
+        test(`w2 ${route.id}: FAB mit aria-label, --nt-fab-size, ueber der Tab-Bar, Inhalt frei (${at})`, SEED(), async (page) => {
           const m = await measureRoute(page, vp, route);
           assert.ok(m.fabData, 'kein ion-fab.nt-fab');
           const f = m.fabData;
           assert.equal(f.count, 1, `${f.count} FABs`);
           assert.ok(f.label.trim() !== '', 'FAB ohne aria-label');
-          assert.ok(Math.abs(f.width - FAB_PX) <= TOL_PX && Math.abs(f.height - FAB_PX) <= TOL_PX, `FAB ${f.width}x${f.height}`);
+          assert.ok(m.tokens.fab >= MIN_FAB_PX && Math.abs(f.width - m.tokens.fab) <= TOL_PX && Math.abs(f.height - m.tokens.fab) <= TOL_PX, `FAB ${f.width}x${f.height}`);
           assert.ok(Math.abs(f.rightGap - FAB_END_PX) <= TOL_PX, `FAB rechts ${f.rightGap}`);
           assert.ok(f.tabTop !== null && Math.abs(f.tabTop - f.bottom - FAB_TO_TABBAR_PX) <= TOL_PX, `FAB-Unterkante ${f.bottom}, Tab-Bar-Oberkante ${f.tabTop}`);
           assert.ok(m.clearance.fabTop !== null && m.clearance.maxBottom <= m.clearance.fabTop + TOL_PX, `letzte Zeile ${m.clearance.maxBottom} unter FAB-Oberkante ${m.clearance.fabTop}`);
@@ -335,7 +336,7 @@ export function register({ test }) {
       }
     }
 
-    test(`w2 bausteine: .nt-btn Rollen sind 44 px hoch, Text-Button 16/600 (${at})`, SEED(), async (page) => {
+    test(`w2 bausteine: .nt-btn Rollen haben Hoehe --nt-btn-height, Text-Button 16/600 (${at})`, SEED(), async (page) => {
       await page.setViewportSize(vp);
       await go(page, 'settings');
       const m = await page.evaluate((activeSel) => {
@@ -350,7 +351,9 @@ export function register({ test }) {
         host.remove();
         return out;
       }, ACTIVE_PAGE);
-      for (const b of m) assert.ok(Math.abs(b.height - BUTTON_HEIGHT_PX) <= 0.6, `${b.tag}.${b.cls} ${b.height}px`);
+      const btnHeight = await tokenPx(page, '--nt-btn-height');
+      assert.ok(btnHeight >= MIN_BUTTON_PX, `--nt-btn-height unerwartet: ${btnHeight}`);
+      for (const b of m) assert.ok(Math.abs(b.height - btnHeight) <= 0.6, `${b.tag}.${b.cls} ${b.height}px`);
       const sizes = new Set(m.map((b) => `${b.size}|${b.weight}`));
       assert.equal(sizes.size, 1, `Schrift je Rolle uneinheitlich: ${[...sizes].join(', ')}`);
     });
@@ -381,6 +384,8 @@ export function register({ test }) {
         const modal = topModal(page);
         await modal.locator(saveSel).waitFor();
         await settle(page, 900);
+        const btnHeight = await tokenPx(page, '--nt-btn-height');
+        assert.ok(btnHeight >= MIN_BUTTON_PX, `--nt-btn-height unerwartet: ${btnHeight}`);
         const m = await modal.evaluate((el, sel) => {
           const q = (s) => el.querySelector(s)?.getBoundingClientRect() ?? null;
           const header = q('.nt-sheet-header');
@@ -390,7 +395,7 @@ export function register({ test }) {
         assert.ok(m.close.left > m.title.left + m.title.width / 2 || m.close.left >= m.vw / 2, `X nicht rechts (x ${m.close.left})`);
         assert.ok(Math.abs(m.close.width - ICON_BUTTON_PX) <= 0.6 && Math.abs(m.close.height - ICON_BUTTON_PX) <= 0.6, `X ${m.close.width}x${m.close.height}`);
         assert.ok(Math.abs(m.save.width - (m.vw - 2 * m.gutter)) <= 2, `Speichern ${m.save.width}px statt volle Breite ${m.vw - 2 * m.gutter}`);
-        assert.ok(Math.abs(m.save.height - BUTTON_HEIGHT_PX) <= 0.6, `Speichern ${m.save.height}px hoch`);
+        assert.ok(Math.abs(m.save.height - btnHeight) <= 0.6, `Speichern ${m.save.height}px hoch, erwartet ${btnHeight}`);
         assert.ok(m.save.top > m.header.bottom && m.save.bottom <= m.vh + 0.5, `Speichern nicht unten sichtbar (${m.save.top}..${m.save.bottom} von ${m.vh})`);
         const radii = await page.evaluate(measureInPage, { tol: TOL_PX, minR: MIN_INNER_RADIUS_PX, rtol: RADIUS_TOL_PX, activeSel: 'ion-modal.show-modal' });
         assert.equal(radii.radiusIssues.length, 0, describe(radii.radiusIssues));

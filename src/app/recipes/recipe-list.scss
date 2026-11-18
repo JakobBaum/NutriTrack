@@ -1,0 +1,36 @@
+// Rezeptliste: zwei Karten nebeneinander, kompakte Schrift; Naehrwerte bleiben vollstaendig sichtbar.
+// Eigene Datei, damit recipes.page.scss im Komponenten-Budget (8 kB) bleibt.
+.recipe-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nt-space-2);
+  align-items: stretch;
+}
+
+.recipe--compact {
+  display: flex;
+  flex-direction: column;
+  padding: var(--nt-space-2) var(--nt-space-3);
+  .recipe__title { font-size: 0.8125rem; line-height: 1.25; }
+  .recipe__title-btn {
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+    min-height: 0; margin-top: var(--nt-space-1);
+    overflow-wrap: break-word; hyphens: auto; // Silbentrennung statt Bruch mitten im Wort
+  }
+  .recipe__meta { font-size: var(--nt-fs-body); }
+  .recipe__kcal { margin-top: var(--nt-space-1); .nt-stat__num { font-size: 1.125rem; } .nt-stat__unit { font-size: 0.625rem; } }
+  // Naehrwerte als dichte Zeilen: Bezeichnung links, Wert rechts; bei 320 px rutscht der Wert notfalls darunter
+  .recipe__macros {
+    grid-template-columns: 1fr; gap: 0; margin-top: var(--nt-space-1);
+    > div { display: flex; flex-wrap: wrap; column-gap: var(--nt-space-1); padding: 0; background: none; }
+    dt { font-size: 0.6875rem; }
+    dd { margin: 0 0 0 auto; font-size: 0.6875rem; white-space: nowrap; }
+  }
+  .recipe__missing { font-size: var(--nt-fs-body); margin-top: var(--nt-space-1); }
+  // Ganze Karte tippbar (Klick sitzt auf der Karte); Fokusring des Titel-Buttons umrahmt die Karte
+  cursor: pointer;
+  &:has(.recipe__title-btn:focus-visible) { outline: 2px solid var(--ion-color-primary); outline-offset: 2px; }
+  .recipe__title-btn:focus-visible { outline: none; }
+  &:active { background: var(--nt-ground); }
+  @media (max-width: 359px) { padding-inline: var(--nt-space-2); }
+}

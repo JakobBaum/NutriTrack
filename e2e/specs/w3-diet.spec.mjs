@@ -5,7 +5,7 @@ import { pickActionSheet, topModal } from '../lib/ionic.mjs';
 
 const VIEWPORTS = [{ width: 375, height: 667 }, { width: 320, height: 568 }];
 const MAX_OVERFLOW_PX = 1;
-const MIN_TAP_PX = 44;
+const MIN_TAP_PX = 36; // Feldhoehe (kompakt --nt-field-height 42)
 const MIN_FONT_PX = 16;
 const LONG_DISLIKES = Array.from({ length: 15 }, (_, i) => `Sehr lange Zutat Nummer ${String(i).padStart(2, '0')} xx`.slice(0, 30));
 const ALL_INTOLERANCES = ['dairy', 'egg', 'gluten', 'peanut', 'seafood', 'shellfish', 'soy', 'tree nut', 'wheat', 'sesame'];

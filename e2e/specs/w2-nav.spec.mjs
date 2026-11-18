@@ -3,7 +3,7 @@ import { assert, go, settle } from '../lib/harness.mjs';
 import { seed } from '../lib/fixtures.mjs';
 
 const VIEWPORTS = [{ width: 375, height: 667 }, { width: 320, height: 568 }];
-const MIN_TAP_PX = 44;
+const MIN_TAP_PX = 36; // Sicherheitsnetz; Tab-Buttons messen kompakt 40 (Symbol-Buttons im Kopf bleiben 44)
 const EXPECTED = [
   { tab: 'dashboard', label: 'Heute', icon: 'home-outline' },
   { tab: 'recipes', label: 'Rezepte und Mahlzeiten', icon: 'book-outline' },

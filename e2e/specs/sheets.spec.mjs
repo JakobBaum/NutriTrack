@@ -6,7 +6,7 @@ import { seed } from '../lib/fixtures.mjs';
 const VIEWPORTS = [{ width: 375, height: 667 }, { width: 320, height: 568 }];
 /** Mindestabstand zwischen Bildschirmrand und Sheet (ohne Safe Area, die in Chromium 0 ist). */
 const MIN_TOP_GAP_PX = 12;
-const MIN_TAP_PX = 40;
+const MIN_TAP_PX = 36; // kompakte Phones: --nt-touch 36 px
 const STAMP = new Date().toISOString();
 const LONG_RECIPE = {
   id: 'r-long', title: 'Spaghetti Aglio e Olio mit geröstetem Knoblauch, Chili und frischer Petersilie', servings: 2,

@@ -55,17 +55,17 @@ ion-modal ion-content > .nt-section-header:first-child { margin-top: 0; }
   // Im Detail-Sheet liegen die Kacheln auf dem Seitengrund: weisse Flaeche statt Grund
   ion-modal &__macros > div { background: var(--nt-card); }
 
-  // Karte und Detail-Fuss: gleiche Buttons nebeneinander, schmale Innenabstaende damit "Eintragen" bei 320 px passt
+  // Detail-Fuss: gleiche Buttons nebeneinander, schmale Innenabstaende damit "Eintragen" bei 320 px passt
   &__actions {
     display: flex;
     gap: var(--nt-space-2);
     margin-top: var(--nt-card-gap);
     ion-button { flex: 1 1 0; min-width: 0; --padding-start: var(--nt-space-2); --padding-end: var(--nt-space-2); }
   }
-
-  // Menue-Symbol: Glyph bleibt an der Textkante der Karte
-  &__head &__icon-btn { flex: none; margin: calc(-1 * var(--nt-space-2)) calc(-1 * var(--nt-space-2)) 0 0; --color: var(--nt-secondary); }
 }
+
+// Bearbeiten-Sheet: Loeschen als ruhiger roter Text-Button unter „Speichern“
+.delete-btn { margin: var(--nt-space-2) 0 0; min-height: var(--nt-touch); font-weight: 600; text-transform: none; letter-spacing: 0; }
 
 .form-error { margin: 0 0 var(--nt-space-2); font-weight: 600; }
 .field-label { display: block; }

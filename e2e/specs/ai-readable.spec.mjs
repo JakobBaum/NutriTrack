@@ -1,8 +1,8 @@
-// KI-Antworten auf schmalen Phones (320 px = iPhone SE 1, 375 px): kein Überlauf, Schrift >= 13 px, Fortschritt sichtbar.
+// KI-Antworten auf schmalen Phones (320 px = iPhone SE 1, 375 px): kein Überlauf, Schrift >= 12 px, Fortschritt sichtbar.
 import { assert, eventually, go, settle } from '../lib/harness.mjs';
 import { seed } from '../lib/fixtures.mjs';
 
-const MIN_FONT_PX = 13;
+const MIN_FONT_PX = 12; // = --nt-fs-caption
 const NARROW_VIEWPORTS = [{ width: 320, height: 568 }, { width: 375, height: 667 }];
 const AI_DELAY_MS = 700;
 const LONG = 'Ein sehr langer Vorschlag mit ein_wirklich_extrem_langes_Wort_ohne_Leerzeichen_Cheeseburger_mit_Extra_Sosse und einer ausführlichen Begründung, die mehrfach umbrechen muss.';
@@ -80,7 +80,7 @@ async function scanLabel(page) {
 
 export function register({ test }) {
   for (const viewport of NARROW_VIEWPORTS) {
-    test(`ki-lesbar ${viewport.width}px: Fastfood-Vorschlag bricht um, ist >= 13 px und liegt im Blick`, seed(), async (page) => {
+    test(`ki-lesbar ${viewport.width}px: Fastfood-Vorschlag bricht um, ist >= 12 px und liegt im Blick`, seed(), async (page) => {
       await page.setViewportSize(viewport);
       await mockAi(page);
       await openFastfood(page);

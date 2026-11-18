@@ -81,7 +81,7 @@
     min-height: var(--nt-touch);
     --padding-start: 0;
     --padding-end: 0;
-    font-size: var(--nt-fs-headline);
+    font-size: max(var(--nt-fs-input), var(--nt-fs-headline)); // nie unter 16 px (iOS-Zoom), auch kompakt
     font-weight: 600;
     color: var(--nt-ink);
     font-variant-numeric: tabular-nums;

@@ -4,7 +4,7 @@ import { topModal } from '../lib/ionic.mjs';
 import { seed } from '../lib/fixtures.mjs';
 
 const VIEWPORTS = [{ width: 375, height: 667 }, { width: 320, height: 568 }];
-const MIN_TOUCH_PX = 44;
+const MIN_TOUCH_PX = 36; // Sicherheitsnetz; kompakt = --nt-btn-height 36
 const RECIPE_ID = 4242;
 const TITLE = 'Mock Lentil Soup';
 const ISO = new Date().toISOString();

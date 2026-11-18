@@ -1,13 +1,13 @@
 // Fehlerklasse "Layout klein": jedes Sheet bei 320x568 und 375x667 (Abstand oben, Kopf ohne Ueberlappung,
-// kein Ueberlauf, Schrift >= 13 px, Tippflaechen >= 40 px). Siehe docs/review-2/FEHLERKLASSEN.md.
+// kein Ueberlauf, Schrift >= 12 px, Tippflaechen >= 36 px). Siehe docs/review-2/FEHLERKLASSEN.md.
 import { assert, go, settle } from '../lib/harness.mjs';
 import { DIARY_NORMAL, WEIGHT_HISTORY, seed } from '../lib/fixtures.mjs';
 
 const VIEWPORTS = [{ width: 375, height: 667 }, { width: 320, height: 568 }];
-const MIN_FONT_PX = 13;
+const MIN_FONT_PX = 12; // = --nt-fs-caption
 /** iOS zoomt beim Fokus in Felder unter 16 px hinein (Capacitor sperrt Pinch-Zoom): jedes Textfeld mindestens 16 px. */
 const MIN_FIELD_FONT_PX = 16;
-const MIN_TAP_PX = 40;
+const MIN_TAP_PX = 36; // kompakte Phones: --nt-touch 36 px
 const MIN_TOP_GAP_PX = 12;
 /** Kompakte Phones: Tab-Leiste mindestens 44 pt, hoechstens 64 px (vorher 76 gemessen); Tab-Beschriftung lesbar; Titel kleiner als vorher (34 px). */
 const MIN_TABBAR_PX = 44;
@@ -108,7 +108,7 @@ function fieldFontProblems(page, minField) {
 
 const PAGES = ['dashboard', 'diary', 'recipes', 'shopping', 'settings'];
 
-/** Seite (ohne Tab-Leiste): Ueberlauf, Schrift >= 13 px, Tippflaechen >= 40 px, Tab-Leiste >= 44 px hoch. */
+/** Seite (ohne Tab-Leiste): Ueberlauf, Schrift >= 12 px, Tippflaechen >= 36 px, Tab-Leiste >= 44 px hoch. */
 function auditPage(page, limits) {
   return page.evaluate(({ minFont, minTap, minBar, maxBar, minTabLabel, maxTitle }) => {
     const problems = [];
@@ -135,7 +135,9 @@ function auditPage(page, limits) {
       if (r.right > window.innerWidth + 1) problems.push(`ragt heraus "${text.slice(0, 24)}"`);
     }
     for (const b of root.querySelectorAll('button, ion-button, ion-segment-button, ion-item[button], a[href]')) {
-      const r = b.getBoundingClientRect();
+      if (b.getBoundingClientRect().width === 0) continue;
+      // Ganze Karte tippbar (data-tap-card): Tippflaeche ist die Karte, nicht der innere Titel-Button.
+      const r = (b.closest('[data-tap-card]') ?? b).getBoundingClientRect();
       if (r.width === 0 || r.height === 0) continue;
       if (r.height < minTap) problems.push(`Tippflaeche ${Math.round(r.width)}x${Math.round(r.height)} ${b.className.toString().slice(0, 30) || b.tagName}`);
     }

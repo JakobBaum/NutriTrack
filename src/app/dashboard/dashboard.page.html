@@ -56,7 +56,7 @@
     <section class="nt-card macros" [class.macros--empty]="isEmptyDay()" aria-label="Nährwerte">
       <div class="macros__primary">
         @for (m of primaryMacros(); track m.key) {
-          <ng-container *ngTemplateOutlet="macroTpl; context: { $implicit: m, size: 88, stroke: 8 }"></ng-container>
+          <ng-container *ngTemplateOutlet="macroTpl; context: { $implicit: m, size: 68, stroke: 6 }"></ng-container>
         }
       </div>
       <div class="macros__secondary">

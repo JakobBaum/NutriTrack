@@ -35,21 +35,20 @@
         </button>
       </div>
     } @else {
+      <div class="recipe-grid" data-testid="recipe-grid">
       @for (recipe of recipes(); track recipe.id) {
         @let missing = countMissingFacts(recipe.ingredients);
         @let f = recipeFacts(recipe);
-        <article class="nt-card recipe">
+        <!-- Tipp irgendwo auf die Karte öffnet das Detail; der Titel-Button ist das Tastatur-/Screenreader-Ziel, sein Klick bubbelt hierher -->
+        <article class="nt-card recipe recipe--compact" data-tap-card (click)="detail.open(recipe)">
           <div class="recipe__head">
             <div class="recipe__head-text">
-              <h2 class="recipe__title"><button type="button" class="recipe__title-btn" (click)="detail.open(recipe)" [attr.aria-label]="'„' + recipe.title + '“ ansehen'">{{ recipe.title }}</button></h2>
+              <h2 class="recipe__title"><button type="button" class="recipe__title-btn" [attr.aria-label]="'„' + recipe.title + '“ ansehen'">{{ recipe.title }}</button></h2>
               <p class="recipe__meta">
-                {{ metaLine(recipe) }}
+                {{ cardMetaLine(recipe) }}
                 @if (isAiOrigin(recipe.origin)) { <span class="ai-badge">KI-Schätzung</span> }
               </p>
             </div>
-            <ion-button fill="clear" class="nt-icon-btn recipe__icon-btn" [attr.aria-label]="'Weitere Aktionen für „' + recipe.title + '“'" (click)="openCardMenu(recipe)">
-              <ion-icon slot="icon-only" name="ellipsis-horizontal" aria-hidden="true"></ion-icon>
-            </ion-button>
           </div>
           @if (f) {
             <p class="nt-stat recipe__kcal"><span class="nt-stat__value"><strong class="nt-stat__num">{{ f.kcal | ntNum: 0 }}</strong><span class="nt-stat__unit">kcal je Portion</span></span></p>
@@ -66,20 +65,9 @@
               {{ lowerBoundNote(missing) }}
             </p>
           }
-          <div class="recipe__actions">
-            <ion-button class="nt-btn nt-btn--inner" fill="solid" (click)="detail.run('diary', recipe)">
-              <ion-icon slot="start" name="add-circle-outline" aria-hidden="true"></ion-icon>
-              Eintragen
-            </ion-button>
-            @if (recipe.steps.length > 0 || isRef(recipe)) {
-              <ion-button class="nt-btn nt-btn--tonal nt-btn--inner" fill="solid" (click)="detail.startCook(recipe)">
-                <ion-icon slot="start" name="flame-outline" aria-hidden="true"></ion-icon>
-                Kochen
-              </ion-button>
-            }
-          </div>
         </article>
       }
+      </div>
     }
     }
   </div>
@@ -311,6 +299,12 @@
           <ion-text color="danger"><p class="form-error save-error" role="alert">{{ error() }}</p></ion-text>
         }
         <ion-button expand="block" class="nt-btn nt-btn--block save-btn" [disabled]="saving()" (click)="save()">Speichern</ion-button>
+        @if (editId()) {
+          <ion-button expand="block" fill="clear" color="danger" class="delete-btn" data-testid="recipe-delete" (click)="deleteEditedRecipe()">
+            <ion-icon slot="start" name="trash-outline" aria-hidden="true"></ion-icon>
+            Rezept löschen
+          </ion-button>
+        }
       </div>
     </ion-content>
   </ng-template>

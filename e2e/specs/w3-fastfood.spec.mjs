@@ -2,6 +2,7 @@
 import { assert, go, settle } from '../lib/harness.mjs';
 import { topModal } from '../lib/ionic.mjs';
 import { seed } from '../lib/fixtures.mjs';
+import { MIN_BUTTON_PX, tokenPx } from '../lib/tokens.mjs';
 
 const VIEWPORTS = [{ width: 375, height: 667 }, { width: 320, height: 568 }];
 const OLD_WORKER_PREFERENCE_MAX = 60;
@@ -57,7 +58,7 @@ const overflow = (page) => page.evaluate(() => {
 });
 
 export function register({ test }) {
-  test('w3 fastfood: Mehrfachauswahl 1 bis 4, aria-pressed, 44 px, Land mit Vorgabe Österreich', seed(), async (page) => {
+  test('w3 fastfood: Mehrfachauswahl 1 bis 4, aria-pressed, Chips >= --nt-touch, Land mit Vorgabe Österreich', seed(), async (page) => {
     await openFastfood(page);
     assert.deepEqual(await pressed(page), ['Viel Eiweiß']);
     await tapChip(page, 'Günstig');
@@ -72,7 +73,9 @@ export function register({ test }) {
     await tapChip(page, 'Sättigend');
     assert.equal((await pressed(page)).length, 1, 'mindestens 1 Kriterium bleibt');
     const heights = await topModal(page).locator('.ff-chip').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
-    assert.ok(heights.every((h) => h >= 44), `Chips zu niedrig: ${heights}`);
+    const touch = await tokenPx(page, '--nt-touch');
+    assert.ok(touch >= MIN_BUTTON_PX, `--nt-touch unerwartet: ${touch}`);
+    assert.ok(heights.every((h) => h >= touch - 0.5), `Chips zu niedrig (< ${touch}): ${heights}`);
     const hint = (await topModal(page).locator('[data-testid="ff-country"]').innerText()).replace(/\s+/g, ' ').trim();
     assert.equal(hint, 'Land: Österreich, im Profil ändern');
   });

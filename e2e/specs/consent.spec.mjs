@@ -4,7 +4,7 @@ import { topModal } from '../lib/ionic.mjs';
 import { PROFILE, seed } from '../lib/fixtures.mjs';
 
 const VIEWPORTS = [{ width: 375, height: 667 }, { width: 320, height: 568 }];
-const MIN_TOUCH_PX = 44;
+const MIN_TOUCH_PX = 36; // Sicherheitsnetz; kompakt = --nt-btn-height 36
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' };
 const DECLINE_MESSAGE = /Zustimmung zu den Online-Funktionen/;
 
@@ -207,7 +207,7 @@ export function register({ test }) {
   });
 
   for (const vp of VIEWPORTS) {
-    test(`consent ${vp.width}px: Dialog ohne Überlauf, Buttons mindestens 44 px hoch`, seed({ consent: null }), async (page) => {
+    test(`consent ${vp.width}px: Dialog ohne Überlauf, Buttons mindestens 36 px hoch`, seed({ consent: null }), async (page) => {
       await page.setViewportSize(vp);
       await mockWorker(page);
       await startOnlineSearch(page);
